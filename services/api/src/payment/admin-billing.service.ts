@@ -201,15 +201,20 @@ export class AdminBillingService {
     confirm: boolean | undefined,
     operatorId: string,
   ): Promise<PersonalChargeOverview & { previous: boolean }> {
-    const { previous, next } = await writePersonalChargeEnabled(this.prisma, enabled, confirm, operatorId)
-    await this.audit.write({
-      actorId: null,
-      actorRole: 'system',
-      action: next ? PERSONAL_CHARGE_ENABLE_AUDIT_ACTION : PERSONAL_CHARGE_DISABLE_AUDIT_ACTION,
-      targetType: 'platform_setting',
-      targetId: PERSONAL_CHARGE_SETTING_KEY,
-      payload: { operatorId, previous, next },
-    })
+    const { previous } = await writePersonalChargeEnabled(
+      this.prisma,
+      enabled,
+      confirm,
+      operatorId,
+      (tx, saved) => this.audit.writeRequired(tx, {
+        actorId: null,
+        actorRole: 'system',
+        action: saved.next ? PERSONAL_CHARGE_ENABLE_AUDIT_ACTION : PERSONAL_CHARGE_DISABLE_AUDIT_ACTION,
+        targetType: 'platform_setting',
+        targetId: PERSONAL_CHARGE_SETTING_KEY,
+        payload: { operatorId, previous: saved.previous, next: saved.next },
+      }),
+    )
     const overview = await listPersonalChargeOverview(this.prisma)
     return { ...overview, previous }
   }

@@ -11,7 +11,6 @@ import {
   type TerminalPricingView,
   type TerminalUserChargeMode,
 } from './terminal-charge.contract'
-import { PRINT_UNIT_PRICE_CENTS } from '../print-jobs/print-pricing'
 import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 
 /**
@@ -153,39 +152,4 @@ export function assertUserPaysUnit(row: EffectiveServicePrice): void {
   if (!Number.isInteger(row.configuredCents) || row.configuredCents < 0 || row.configuredCents > TERMINAL_CHARGE_MAX_UNIT_CENTS) {
     throw new Error('PRICE_CONFIG_INVALID')
   }
-}
-
-/**
- * 测试夹具用：把一台已存在的终端配成向用户收费，并打开总开关。
- * 不经过公共点位 409。公共点位即使这样写，生效价仍是 0。
- */
-export async function setTerminalUserPrintPrices(
-  db: PrismaService,
-  terminalId: string,
-  prices: Partial<Record<TerminalChargeServiceKey, number>>,
-): Promise<void> {
-  await db.platformSetting.upsert({
-    where: { key: PERSONAL_CHARGE_SETTING_KEY },
-    create: { key: PERSONAL_CHARGE_SETTING_KEY, value: 'true' },
-    update: { value: 'true' },
-  })
-  await db.terminal.update({ where: { id: terminalId }, data: { userChargeMode: 'user_pays' } })
-  for (const [serviceKey, unitCents] of Object.entries(prices) as Array<[TerminalChargeServiceKey, number]>) {
-    await db.terminalServicePrice.upsert({
-      where: { terminalId_serviceKey: { terminalId, serviceKey } },
-      create: { terminalId, serviceKey, unitCents },
-      update: { unitCents },
-    })
-  }
-}
-
-/**
- * 门禁夹具：把开发种子价写到这台机器上，并打开总开关。
- * 页数 × 种子单价的旧断言因此还能成立。用户实付只认本机生效价，不认全站 PriceConfig。
- */
-export async function adoptDevPrintSeedPrices(db: PrismaService, terminalId: string): Promise<void> {
-  await setTerminalUserPrintPrices(db, terminalId, {
-    print_bw_page: PRINT_UNIT_PRICE_CENTS.black_white,
-    print_color_page: PRINT_UNIT_PRICE_CENTS.color,
-  })
 }

@@ -38,7 +38,7 @@ import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
 import { ONLINE_PAID_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
 import { RefundService } from '../src/payment/refund.service'
-import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { AlipayProvider, alipayTimestamp, buildAlipaySignBase } from '../src/payment/providers/alipay.provider'
 import {
@@ -823,6 +823,7 @@ async function main(): Promise<void> {
 
     console.log(`\n  ✅ verify:refund-real-channels 全部通过（${passCount} checks）\n`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }

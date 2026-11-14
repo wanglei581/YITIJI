@@ -38,7 +38,7 @@ import {
 } from '../src/payment/providers/wechat-pay.provider'
 import { PricingService } from '../src/payment/pricing.service'
 import { RefundService } from '../src/payment/refund.service'
-import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices } from './support/terminal-charge-fixture'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'

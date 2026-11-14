@@ -32,9 +32,11 @@ import { RolesGuard } from '../src/common/guards/roles.guard'
 import { RedisService } from '../src/common/redis/redis.service'
 import { quoteCopy } from '../src/payment/copy-pricing'
 import { PricingService } from '../src/payment/pricing.service'
+import { readPersonalChargeEnabled } from '../src/payment/effective-user-prices'
 import {
   PERSONAL_CHARGE_DISABLE_AUDIT_ACTION,
   PERSONAL_CHARGE_ENABLE_AUDIT_ACTION,
+  TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION,
   TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION,
 } from '../src/payment/terminal-charge-settings'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -139,6 +141,7 @@ async function main(): Promise<void> {
   assert.equal(isPublicEmploymentOrgType('public_service'), false)
   assert.equal(isPublicEmploymentOrgType(null), false)
   assert.equal(TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION, 'terminal.charge_settings.update')
+  assert.equal(TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION, 'terminal.charge_settings.reset_on_rebind')
   assert.equal(PERSONAL_CHARGE_ENABLE_AUDIT_ACTION, 'billing.personal_charge.enable')
   assert.equal(PERSONAL_CHARGE_DISABLE_AUDIT_ACTION, 'billing.personal_charge.disable')
 
@@ -330,6 +333,33 @@ async function main(): Promise<void> {
     assert.equal(chargePayload.next?.prices?.print_bw_page, 100)
     console.log('PASS 修改终端收费设置记了改前改后')
 
+    async function selfChargeRows(): Promise<{ mode: string | undefined; prices: Array<{ serviceKey: string; unitCents: number }> }> {
+      const mode = await prisma.terminal.findUnique({ where: { id: SELF_TERMINAL }, select: { userChargeMode: true } })
+      const prices = await prisma.terminalServicePrice.findMany({
+        where: { terminalId: SELF_TERMINAL },
+        orderBy: { serviceKey: 'asc' },
+        select: { serviceKey: true, unitCents: true },
+      })
+      return { mode: mode?.userChargeMode, prices }
+    }
+    const beforeInvalid = await selfChargeRows()
+    const invalidBodies: unknown[] = [
+      { userChargeMode: 'user_pays', prices: { ...SAMPLE_PRICES, print_bw_page: -1 } },
+      { userChargeMode: 'user_pays', prices: { ...SAMPLE_PRICES, print_bw_page: 1.5 } },
+      { userChargeMode: 'user_pays', prices: { ...SAMPLE_PRICES, print_bw_page: 100001 } },
+      {
+        userChargeMode: 'user_pays',
+        prices: { resume_optimize: 0, mock_interview: 0, print_color_page: 0, scan: 0 },
+      },
+      { userChargeMode: 'user_pays', prices: { ...SAMPLE_PRICES, unknown_service: 1 } },
+    ]
+    for (const body of invalidBodies) {
+      const rejected = await call('PUT', `/api/v1/admin/terminals/${SELF_TERMINAL}/charge-settings`, body, adminHeaders)
+      assert.equal(rejected.status, 400, `非法价格必须 400：${JSON.stringify(body)} → ${rejected.status} ${JSON.stringify(rejected.json)}`)
+      assert.deepEqual(await selfChargeRows(), beforeInvalid, `非法价格不能写库：${JSON.stringify(body)}`)
+    }
+    console.log('PASS 负数、小数、超上限、缺键、未知键返回 400 且不写库')
+
     const publicSave = await call('PUT', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/charge-settings`, {
       userChargeMode: 'user_pays',
       prices: SAMPLE_PRICES,
@@ -355,9 +385,66 @@ async function main(): Promise<void> {
       assert.equal(publicData.prices?.[key]?.reason, 'public_site')
     }
     console.log('PASS 公共点位开关开 + user_pays + 价大于 0 仍为 0')
+
+    await prisma.terminal.update({ where: { id: SCHOOL_TERMINAL }, data: { userChargeMode: 'org_pays' } })
+    await prisma.terminalServicePrice.create({
+      data: { terminalId: SCHOOL_TERMINAL, serviceKey: 'print_bw_page', unitCents: 80 },
+    })
+    const orgPays = await call('GET', `/api/v1/admin/terminals/${SCHOOL_TERMINAL}/charge-settings`, undefined, adminHeaders)
+    expectStatus(orgPays, 200, '机构承担读设置')
+    const orgPaysData = orgPays.json.data as EffectiveBody
+    assert.equal(orgPaysData.personalChargeEnabled, true)
+    assert.equal(orgPaysData.userChargeMode, 'org_pays')
+    assert.equal(orgPaysData.isPublicSite, false)
+    for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
+      assert.equal(orgPaysData.prices?.[key]?.effectiveCents, 0, `org_pays 生效价必须是 0：${key}`)
+      assert.equal(orgPaysData.prices?.[key]?.reason, 'org_pays')
+    }
+    assert.equal(orgPaysData.prices?.print_bw_page?.configuredCents, 80)
+    const orgPaysQuote = await new PricingService(prisma).quotePrint({
+      billablePages: 2,
+      billingPageSource: 'pdf_lightweight_scan',
+      copies: 1,
+      colorMode: 'black_white',
+      terminalId: SCHOOL_TERMINAL,
+    })
+    assert.equal(orgPaysQuote.amountCents, 0, 'org_pays 报价必须是 0')
+    console.log('PASS 总开关开、非公共、org_pays、价大于 0 时生效价和报价都是 0')
+
+    const chargingList = await call('GET', '/api/v1/admin/billing/personal-charge', undefined, adminHeaders)
+    expectStatus(chargingList, 200, '会开始收费的机器')
+    const chargingCodes = ((chargingList.json.terminals as Array<{ terminalCode?: string }> | undefined) ?? []).map((row) => row.terminalCode)
+    assert.equal(chargingCodes.includes('CHG-SELF'), true, '自营向用户收费的机器要在清单里')
+    assert.equal(chargingCodes.includes('CHG-PUBLIC'), false, '公共点位不能进会开始收费的清单')
+    assert.equal(chargingCodes.includes('CHG-SCHOOL'), false, 'org_pays 不能进会开始收费的清单')
+    console.log('PASS 会开始收费的清单排除公共点位和 org_pays')
+
+    const publicOps = await partnerStats.getTerminalOperations(ORG_PUBLIC as never, 'week')
+    const publicOpsRow = publicOps.terminals[0]
+    assert.ok(publicOpsRow)
+    assert.equal(publicOpsRow.terminalCode, 'CHG-PUBLIC')
+    assert.equal(publicOpsRow.charge.isPublicSite, true)
+    assert.equal(publicOpsRow.charge.userChargeMode, 'user_pays')
+    for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
+      assert.equal(publicOpsRow.charge.effective[key], 0, `机构视图公共点位锁 0：${key}`)
+    }
+    console.log('PASS 机构视图公共点位锁 0')
+
+    for (const value of ['TRUE', '1', '']) {
+      await prisma.platformSetting.update({ where: { key: 'charge.personalCharge.enabled' }, data: { value } })
+      const off = await call('GET', `/api/v1/admin/terminals/${SELF_TERMINAL}/charge-settings`, undefined, adminHeaders)
+      const offData = off.json.data as EffectiveBody
+      assert.equal(offData.personalChargeEnabled, false, `开关值 ${JSON.stringify(value)} 必须算关`)
+      assert.equal(offData.prices?.print_bw_page?.effectiveCents, 0)
+      assert.equal(offData.prices?.print_bw_page?.reason, 'personal_charge_off')
+    }
+    assert.equal(
+      await readPersonalChargeEnabled({ platformSetting: { findUnique: async () => ({ value: true }) } } as never),
+      false,
+      '布尔 true 不是字符串 "true"，必须算关',
+    )
+    console.log('PASS 开关值不是字符串 true 一律算关')
     await prisma.platformSetting.delete({ where: { key: 'charge.personalCharge.enabled' } })
-    await prisma.terminal.update({ where: { id: PUBLIC_TERMINAL }, data: { userChargeMode: 'org_pays' } })
-    await prisma.terminalServicePrice.deleteMany({ where: { terminalId: PUBLIC_TERMINAL } })
 
     const openBare = await call('PUT', '/api/v1/admin/billing/personal-charge', { enabled: true }, adminHeaders)
     expectStatus(openBare, 400, '打开不带确认')
@@ -373,7 +460,8 @@ async function main(): Promise<void> {
     assert.equal(overviewBefore.json.enabled, false)
     const warning = (overviewBefore.json.terminals as Array<{ terminalCode?: string; prices?: Record<string, number> }> | undefined) ?? []
     assert.equal(warning.some((row) => row.terminalCode === 'CHG-SELF'), true, '预先配好的自营机应出现在打开后会收费的清单')
-    assert.equal(warning.some((row) => row.terminalCode === 'CHG-PUBLIC'), false)
+    assert.equal(warning.some((row) => row.terminalCode === 'CHG-PUBLIC'), false, '公共点位即使存着价也不进清单')
+    assert.equal(warning.some((row) => row.terminalCode === 'CHG-SCHOOL'), false, 'org_pays 不进清单')
     const selfWarning = warning.find((row) => row.terminalCode === 'CHG-SELF')
     assert.equal(selfWarning?.prices?.print_bw_page, 100)
 
@@ -488,6 +576,86 @@ async function main(): Promise<void> {
     assert.equal(kioskPricing?.effective?.print_color_page, 300)
     assert.equal(String(kiosk.json.configVersion).includes('pricing:'), true)
     console.log('PASS 一体机配置带上本机 pricing')
+
+    const resetBefore = await prisma.auditLog.count({
+      where: { action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
+    })
+    const rebound = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: ORG_OTHER }, adminHeaders)
+    expectStatus(rebound, 200, '公共点位改绑到非公共机构')
+    const reboundView = await call('GET', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/charge-settings`, undefined, adminHeaders)
+    const reboundData = reboundView.json.data as EffectiveBody
+    assert.equal(reboundData.userChargeMode, 'org_pays')
+    assert.equal(reboundData.isPublicSite, false)
+    for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
+      assert.equal(reboundData.prices?.[key]?.configuredCents, 0, `改绑后配置价清零：${key}`)
+      assert.equal(reboundData.prices?.[key]?.effectiveCents, 0, `改绑后生效价是 0：${key}`)
+      assert.equal(reboundData.prices?.[key]?.reason, 'org_pays')
+    }
+    assert.equal(await prisma.terminalServicePrice.count({ where: { terminalId: PUBLIC_TERMINAL } }), 0)
+    const resetAfter = await prisma.auditLog.count({
+      where: { action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
+    })
+    assert.equal(resetAfter, resetBefore + 1, '改绑机构要记收费设置复位审计')
+    console.log('PASS 改绑机构后收费设置复位为 org_pays 且五个价清 0')
+
+    await prisma.terminal.update({ where: { id: PUBLIC_TERMINAL }, data: { userChargeMode: 'user_pays' } })
+    await prisma.terminalServicePrice.create({
+      data: { terminalId: PUBLIC_TERMINAL, serviceKey: 'scan', unitCents: 40 },
+    })
+    const sameOrg = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: ORG_OTHER }, adminHeaders)
+    expectStatus(sameOrg, 200, '同一机构再绑一次')
+    const kept = await prisma.terminal.findUnique({ where: { id: PUBLIC_TERMINAL }, select: { userChargeMode: true } })
+    const keptScan = await prisma.terminalServicePrice.findUnique({
+      where: { terminalId_serviceKey: { terminalId: PUBLIC_TERMINAL, serviceKey: 'scan' } },
+    })
+    assert.equal(kept?.userChargeMode, 'user_pays', '机构没变不能复位谁付钱')
+    assert.equal(keptScan?.unitCents, 40, '机构没变不能清价')
+    assert.equal(
+      await prisma.auditLog.count({
+        where: { action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
+      }),
+      resetAfter,
+      '机构没变不能再记复位审计',
+    )
+    console.log('PASS 绑回同一机构不复位收费设置')
+
+    const unbound = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: null }, adminHeaders)
+    expectStatus(unbound, 200, '解绑机构')
+    const unboundRow = await prisma.terminal.findUnique({
+      where: { id: PUBLIC_TERMINAL },
+      select: { userChargeMode: true, orgId: true, servicePrices: { select: { serviceKey: true } } },
+    })
+    assert.equal(unboundRow?.orgId, null)
+    assert.equal(unboundRow?.userChargeMode, 'org_pays', '解绑必须把谁付钱复位成 org_pays')
+    assert.equal(unboundRow?.servicePrices.length, 0, '解绑必须清掉五个价')
+    assert.equal(
+      await prisma.auditLog.count({
+        where: { action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
+      }),
+      resetAfter + 1,
+      '解绑要记收费设置复位审计',
+    )
+    await prisma.terminal.update({ where: { id: PUBLIC_TERMINAL }, data: { userChargeMode: 'user_pays' } })
+    await prisma.terminalServicePrice.create({
+      data: { terminalId: PUBLIC_TERMINAL, serviceKey: 'print_bw_page', unitCents: 70 },
+    })
+    const bound = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: ORG_SCHOOL }, adminHeaders)
+    expectStatus(bound, 200, '绑定机构')
+    const boundRow = await prisma.terminal.findUnique({
+      where: { id: PUBLIC_TERMINAL },
+      select: { userChargeMode: true, orgId: true, servicePrices: true },
+    })
+    assert.equal(boundRow?.orgId, ORG_SCHOOL)
+    assert.equal(boundRow?.userChargeMode, 'org_pays', '绑定必须把谁付钱复位成 org_pays')
+    assert.equal(boundRow?.servicePrices.length, 0, '绑定必须清掉五个价')
+    assert.equal(
+      await prisma.auditLog.count({
+        where: { action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
+      }),
+      resetAfter + 2,
+      '绑定要记收费设置复位审计',
+    )
+    console.log('PASS 绑定与解绑同样复位收费设置')
 
     const partnerWrite = await call('PUT', `/api/v1/admin/terminals/${SCHOOL_TERMINAL}/charge-settings`, {
       userChargeMode: 'org_pays',

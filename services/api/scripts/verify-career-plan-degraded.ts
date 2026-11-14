@@ -44,7 +44,7 @@ import { PrintPageCountService } from '../src/print-jobs/print-page-count.servic
 import { PricingService } from '../src/payment/pricing.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
-import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -370,6 +370,7 @@ async function main() {
     console.error(err instanceof Error ? err.message : err)
     if (resp) console.error(`  详情: ${JSON.stringify(resp)}`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup().catch(() => undefined)
     await prisma.onModuleDestroy?.()
   }

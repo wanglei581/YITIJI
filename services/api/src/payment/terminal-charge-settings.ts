@@ -8,12 +8,15 @@ import {
   type TerminalUserChargeMode,
 } from './terminal-charge.contract'
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
-import type { PrismaService } from '../prisma/prisma.service'
+import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 import { getEffectiveUserPrices, normalizeUserChargeMode } from './effective-user-prices'
 
 export const TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION = 'terminal.charge_settings.update'
+export const TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION = 'terminal.charge_settings.reset_on_rebind'
 export const PERSONAL_CHARGE_ENABLE_AUDIT_ACTION = 'billing.personal_charge.enable'
 export const PERSONAL_CHARGE_DISABLE_AUDIT_ACTION = 'billing.personal_charge.disable'
+
+type ChargeReadDb = Pick<PrismaTransactionClient, 'terminal' | 'platformSetting'>
 
 export interface TerminalChargeSettingsView extends EffectiveUserPrices {
   terminalCode: string
@@ -41,7 +44,7 @@ function configuredFrom(prices: EffectiveUserPrices): Record<TerminalChargeServi
 }
 
 export async function getTerminalChargeSettings(
-  db: PrismaService,
+  db: ChargeReadDb,
   terminalId: string,
 ): Promise<TerminalChargeSettingsView> {
   const terminal = await db.terminal.findUnique({
@@ -87,28 +90,34 @@ export function parseChargeSettingsBody(raw: { userChargeMode?: unknown; prices?
   return { userChargeMode: raw.userChargeMode, prices: parsePrices(raw.prices) }
 }
 
+export type ChargeSettingsAuditWriter = (
+  tx: PrismaTransactionClient,
+  saved: { previous: TerminalChargeSettingsView; next: TerminalChargeSettingsView },
+) => Promise<unknown>
+
 export async function saveTerminalChargeSettings(
   db: PrismaService,
   terminalId: string,
   raw: { userChargeMode?: unknown; prices?: unknown },
   adminId: string,
+  writeAudit?: ChargeSettingsAuditWriter,
 ): Promise<{ previous: TerminalChargeSettingsView; next: TerminalChargeSettingsView }> {
   const input = parseChargeSettingsBody(raw)
-  const existing = await db.terminal.findUnique({
-    where: { id: terminalId },
-    select: { id: true, terminalCode: true, orgId: true, org: { select: { type: true } }, userChargeMode: true },
-  })
-  if (!existing) {
-    throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
-  }
-  const charging = input.userChargeMode === 'user_pays' || TERMINAL_CHARGE_SERVICE_KEYS.some((key) => input.prices[key] > 0)
-  if (isPublicEmploymentOrgType(existing.org?.type) && charging) {
-    throw new ConflictException({
-      error: { code: 'PUBLIC_SITE_ALWAYS_FREE', message: '公共就业点位永远不向求职者收费' },
+  return db.$transaction(async (tx) => {
+    const existing = await tx.terminal.findUnique({
+      where: { id: terminalId },
+      select: { id: true, org: { select: { type: true } } },
     })
-  }
-  const previous = await getTerminalChargeSettings(db, terminalId)
-  await db.$transaction(async (tx) => {
+    if (!existing) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+    const charging = input.userChargeMode === 'user_pays' || TERMINAL_CHARGE_SERVICE_KEYS.some((key) => input.prices[key] > 0)
+    if (isPublicEmploymentOrgType(existing.org?.type) && charging) {
+      throw new ConflictException({
+        error: { code: 'PUBLIC_SITE_ALWAYS_FREE', message: '公共就业点位永远不向求职者收费' },
+      })
+    }
+    const previous = await getTerminalChargeSettings(tx, terminalId)
     await tx.terminal.update({ where: { id: terminalId }, data: { userChargeMode: input.userChargeMode } })
     for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
       await tx.terminalServicePrice.upsert({
@@ -117,9 +126,10 @@ export async function saveTerminalChargeSettings(
         update: { unitCents: input.prices[key], updatedByAdminId: adminId },
       })
     }
+    const next = await getTerminalChargeSettings(tx, terminalId)
+    if (writeAudit) await writeAudit(tx, { previous, next })
+    return { previous, next }
   })
-  const next = await getTerminalChargeSettings(db, terminalId)
-  return { previous, next }
 }
 
 export function chargeAuditSnapshot(view: TerminalChargeSettingsView): {
@@ -167,23 +177,33 @@ export async function listPersonalChargeOverview(db: PrismaService): Promise<Per
   return { enabled, terminals }
 }
 
+export type PersonalChargeAuditWriter = (
+  tx: PrismaTransactionClient,
+  saved: { previous: boolean; next: boolean },
+) => Promise<unknown>
+
 export async function writePersonalChargeEnabled(
   db: PrismaService,
   enabled: boolean,
   confirm: boolean | undefined,
   operatorId: string,
+  writeAudit?: PersonalChargeAuditWriter,
 ): Promise<{ previous: boolean; next: boolean }> {
   if (enabled && confirm !== true) {
     throw new BadRequestException({
       error: { code: 'PERSONAL_CHARGE_CONFIRM_REQUIRED', message: '打开向个人收费必须确认' },
     })
   }
-  const previousRow = await db.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
-  const previous = previousRow?.value === 'true'
-  await db.platformSetting.upsert({
-    where: { key: PERSONAL_CHARGE_SETTING_KEY },
-    create: { key: PERSONAL_CHARGE_SETTING_KEY, value: enabled ? 'true' : 'false', updatedBy: operatorId },
-    update: { value: enabled ? 'true' : 'false', updatedBy: operatorId },
+  return db.$transaction(async (tx) => {
+    const previousRow = await tx.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
+    const previous = previousRow?.value === 'true'
+    const saved = { previous, next: enabled }
+    await tx.platformSetting.upsert({
+      where: { key: PERSONAL_CHARGE_SETTING_KEY },
+      create: { key: PERSONAL_CHARGE_SETTING_KEY, value: enabled ? 'true' : 'false', updatedBy: operatorId },
+      update: { value: enabled ? 'true' : 'false', updatedBy: operatorId },
+    })
+    if (writeAudit) await writeAudit(tx, saved)
+    return saved
   })
-  return { previous, next: enabled }
 }

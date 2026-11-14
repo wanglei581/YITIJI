@@ -24,7 +24,9 @@
 
 import type { Locator, Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
+import { KIOSK_CONFIG_PATH, withMachinePricing } from '../fixtures/machine-pricing'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
 import { W2_FILE, W2_ORDER, W2_PRINT_PARAMS, writePrintHandoff } from './fixtures/fusion-w2-state'
 
@@ -244,7 +246,11 @@ async function routeQuote(
 type JobReply = { status: 409 | 201; unitCents: number; pages?: number; delayMs?: number }
 
 /** POST /print/jobs 桩：按顺序给出 409 PRICE_CHANGED（服务端同款 details 串）或建单成功；记录每次请求体。 */
-async function routeJobs(page: Page, replies: JobReply[]): Promise<Array<Record<string, unknown>>> {
+async function routeJobs(
+  page: Page,
+  replies: JobReply[],
+  onConflict?: () => void,
+): Promise<Array<Record<string, unknown>>> {
   const bodies: Array<Record<string, unknown>> = []
   await page.route('**/api/v1/print/jobs', async (route: Route) => {
     if (route.request().method() !== 'POST') {
@@ -256,6 +262,7 @@ async function routeJobs(page: Page, replies: JobReply[]): Promise<Array<Record<
     if (reply.delayMs) await new Promise((resolve) => setTimeout(resolve, reply.delayMs))
     const pages = reply.pages ?? W2_FILE.pages
     const amountCents = reply.unitCents * pages
+    if (reply.status === 409) onConflict?.()
     await route.fulfill(reply.status === 409
       ? {
           status: 409,
@@ -283,8 +290,22 @@ async function routeJobs(page: Page, replies: JobReply[]): Promise<Array<Record<
   return bodies
 }
 
-/** 公示价按调用次序给：开页读到旧价，409 之后重读到新价（后台真实改价时就是这样）。 */
-function registerPriceConfig(api: ApiRouter, units: number[]): void {
+/**
+ * 公示价在本机配置上：开页读到旧价，409 发出之后的下一次配置读取才是新价。
+ * 旧价目接口仍登记，避免没人接的请求；页面不再用它决定屏上价格。
+ * failNext 时，409 之后的配置读取失败，用来守「重读失败只说没取到」。
+ */
+function registerPriceConfig(api: ApiRouter, units: number[], failNext = false): { markChanged: () => void } {
+  let changed = false
+  const color = units.every((unit) => unit === 0) ? 0 : UNIT_CENTS.color
+  api.respondWith('GET', KIOSK_CONFIG_PATH, () => {
+    if (changed && failNext) return { status: 503, json: {} }
+    const bw = changed ? units[units.length - 1]! : units[0]!
+    return {
+      status: 200,
+      json: withMachinePricing(terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'price-truth'), bw, color),
+    }
+  })
   api.respondWith('GET', '/api/v1/print/price-config', (n) => ({
     status: 200,
     json: {
@@ -292,6 +313,7 @@ function registerPriceConfig(api: ApiRouter, units: number[]): void {
       items: [{ serviceKey: BW_LINE, unitCents: units[Math.min(n, units.length) - 1]!, unit: 'page', description: '黑白打印' }],
     },
   }))
+  return { markChanged: () => { changed = true } }
 }
 
 /** 付费单建成后会进收银页；只挂收银页挂载时读的两条接口。 */
@@ -334,14 +356,21 @@ for (const scenario of [
     const from = scenario.fromUnit * W2_FILE.pages
     const to = scenario.toUnit * W2_FILE.pages
     registerShell(api, [])
-    registerPriceConfig(api, [scenario.fromUnit, scenario.toUnit])
+    const prices = registerPriceConfig(api, [scenario.fromUnit, scenario.toUnit])
     registerCashier(api, to)
     const quotes = await routeQuote(page, () => ({ unitCents: scenario.fromUnit, pages: W2_FILE.pages }))
-    const jobs = await routeJobs(page, [{ status: 409, unitCents: scenario.toUnit }, { status: 201, unitCents: scenario.toUnit }])
+    const jobs = await routeJobs(
+      page,
+      [{ status: 409, unitCents: scenario.toUnit }, { status: 201, unitCents: scenario.toUnit }],
+      prices.markChanged,
+    )
 
     await openConfirm(page)
     if (from === 0) await expect(amountCard(page)).toHaveText('免费试运营')
     else await expectConfirmAmount(page, from)
+    await expect(originalConfirm(page)).toBeEnabled()
+    await expect.poll(() => api.requestCount('GET', KIOSK_CONFIG_PATH)).toBeGreaterThan(0)
+    const configReadsBeforeConfirm = api.requestCount('GET', KIOSK_CONFIG_PATH)
     await originalConfirm(page).click()
 
     // 409 之后：屏上换成服务端现价，明确说没建单，按钮写明新金额；停在确认页。
@@ -351,9 +380,11 @@ for (const scenario of [
     await expect(page.locator('[data-cost-calc]')).toHaveText(`${yuan(scenario.toUnit)}/页 × ${W2_FILE.pages} 页`)
     await expect(page.getByTestId('print-confirm-state-quoted')).toBeVisible()
     await expect(reconfirm(page, to)).toBeEnabled()
-    // 公示价随之重读：权益卡不得拿开页时的旧价对比新报价，误报「本屏报价已不是现价」。
-    await expect.poll(() => api.requestCount('GET', '/api/v1/print/price-config')).toBeGreaterThanOrEqual(2)
+    // 公示价绕过 30 秒缓存重读：权益卡不得拿开页时的旧价对比新报价。
+    await expect.poll(() => api.requestCount('GET', KIOSK_CONFIG_PATH)).toBeGreaterThan(configReadsBeforeConfirm)
     await expect(page.getByText('本屏报价已不是现价')).toHaveCount(0)
+    await expect(page.getByText('不要按本屏金额付款')).toHaveCount(0)
+    await expect(page.getByText('本机没能取到现行价目')).toHaveCount(0)
     // 不自动重试：等一会儿仍只有一次建单请求，也没有为 409 再去报价（现价取自 409 本身）。
     await page.waitForTimeout(800)
     expect(jobs).toHaveLength(1)
@@ -369,6 +400,26 @@ for (const scenario of [
     expect(pageErrors).toEqual([])
   })
 }
+
+test('price change re-read failure shows only the unavailable sentence @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  const prices = registerPriceConfig(api, [20, 30], true)
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  await routeJobs(page, [{ status: 409, unitCents: 30 }], prices.markChanged)
+
+  await openConfirm(page)
+  await expect(originalConfirm(page)).toBeEnabled()
+  await expect.poll(() => api.requestCount('GET', KIOSK_CONFIG_PATH)).toBeGreaterThan(0)
+  const configReadsBeforeConfirm = api.requestCount('GET', KIOSK_CONFIG_PATH)
+  await originalConfirm(page).click()
+
+  await expect.poll(() => api.requestCount('GET', KIOSK_CONFIG_PATH)).toBeGreaterThan(configReadsBeforeConfirm)
+  await expect(page.getByText('本机没能取到现行价目', { exact: true })).toBeVisible()
+  await expect(page.getByText('本屏报价已不是现价')).toHaveCount(0)
+  await expect(page.getByText('不要按本屏金额付款')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /按新金额/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '去付款' })).toHaveCount(0)
+})
 
 test('rapid repeated confirm sends exactly one create request @kiosk', async ({ page, api }) => {
   registerShell(api, [])
@@ -487,9 +538,9 @@ for (const viewport of [
   test(`price-changed notice and reconfirm control fit the ${viewport.name} viewport @kiosk`, async ({ page, api }, testInfo) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     registerShell(api, [])
-    registerPriceConfig(api, [20, 30])
+    const prices = registerPriceConfig(api, [20, 30])
     await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
-    await routeJobs(page, [{ status: 409, unitCents: 30 }])
+    await routeJobs(page, [{ status: 409, unitCents: 30 }], prices.markChanged)
 
     await openConfirm(page)
     await expect(originalConfirm(page)).toBeEnabled()

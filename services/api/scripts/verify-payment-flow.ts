@@ -48,7 +48,7 @@ import { createPaymentSessionToken, paymentSessionTtlMs } from '../src/payment/p
 import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
-import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import {
   SANDBOX_NONCE_HEADER,
@@ -2271,6 +2271,7 @@ async function main(): Promise<void> {
 
     console.log('\nAll payment-flow assertions passed.\n')
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }

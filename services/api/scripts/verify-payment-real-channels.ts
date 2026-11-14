@@ -35,7 +35,7 @@ import { OrderStatusService } from '../src/payment/order-status.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
-import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import {
   AlipayProvider,
@@ -1157,6 +1157,7 @@ async function main(): Promise<void> {
 
     console.log(`\n  ✅ verify:payment-real-channels 全部通过（${passCount} checks）\n`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }

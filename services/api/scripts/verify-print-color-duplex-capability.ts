@@ -40,7 +40,7 @@ import {
   setPrintScanCapabilityModeForTest,
 } from '../src/terminals/terminal-capabilities.service'
 import { PricingService } from '../src/payment/pricing.service'
-import { adoptDevPrintSeedPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PRINT_UNIT_PRICE_CENTS } from '../src/print-jobs/print-pricing'
 import * as apiContract from '../src/terminals/terminal-capabilities.types'
@@ -331,6 +331,7 @@ async function main(): Promise<void> {
     }
     pass('计费页与收银页均无双面附加计价标签')
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     setPrintScanCapabilityModeForTest(null)
     await prisma.terminalCapability.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })

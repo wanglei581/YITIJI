@@ -1,6 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import { KIOSK_AI_CAPABILITIES_PATH, kioskAiCapabilitiesResponse } from './ai-capabilities'
 import { kioskProfileBody, UNVERIFIED_KIOSK_PROFILE } from './kiosk-profile'
+import { withMachinePricing } from './machine-pricing'
 import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
 import { SELF_ASSESSMENT_QUESTIONS_PATH, selfAssessmentQuestionsResponse } from './self-assessment-questions'
 
@@ -67,9 +68,10 @@ export class ApiRouter {
     // 默认按「托管打开」（客户私有化部署 b，也就是今天的岗位 / 招聘会行为）应答，既有用例不因这条新请求中断；
     // 托管关闭（我们云上的默认）的用例自行 respond RECRUITMENT_HOSTING_OFF 覆盖。
     // 需要百宝箱 / 智慧校园开着、或者要数配置请求次数的用例，本来就各自登记了配置，会覆盖这一条。
+    // 没单独登记本机价的用例，沿用下面这条旧价目桩的 20/50。价在配置上，不在价目接口。
     this.respond('GET', '/api/v1/terminals/KSK-001/config', {
       status: 200,
-      json: terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'api-router-default'),
+      json: withMachinePricing(terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'api-router-default'), 20, 50),
     })
     // 练面试服务台、设置页、作答页挂载时各读一次各 AI 能力的配置状态（GET /kiosk/ai/capabilities，不调计费 AI）。
     // 默认按「全部可用」应答，既有用例不因这条新请求中断，入口也不会被误停；
@@ -219,6 +221,24 @@ export class ApiRouter {
 
   respondWith(method: string, path: string, responder: DynamicResponder): void {
     this.#handlers.set(requestKey(method, path), { kind: 'dynamic', responder })
+  }
+
+  /** 包住当前应答，只改 JSON。后登记的整段 respond 会换掉这一层。 */
+  mapJson(method: string, path: string, map: (json: unknown) => unknown): void {
+    const key = requestKey(method, path)
+    const existing = this.#handlers.get(key)
+    if (!existing) {
+      throw new Error(`ApiRouter.mapJson: no handler for ${key}`)
+    }
+    this.#handlers.set(key, {
+      kind: 'dynamic',
+      responder: async (requestNumber) => {
+        if (existing.kind === 'abort') return { abort: existing.errorCode }
+        const result = existing.kind === 'dynamic' ? await existing.responder(requestNumber) : existing.response
+        if ('abort' in result) return result
+        return { status: result.status, json: map(result.json) }
+      },
+    })
   }
 
   requestCount(method: string, path: string): number {

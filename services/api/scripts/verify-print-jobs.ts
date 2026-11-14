@@ -47,7 +47,7 @@ import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { isPaidUnfulfilledRefundRequired } from '../src/payment/pending-refund-signal'
-import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices } from '../src/payment/effective-user-prices'
+import { adoptDevPrintSeedPrices, setTerminalUserPrintPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
@@ -2003,6 +2003,7 @@ async function main() {
       pass('检查后软删除：旧任务仍被领取但 content 拒绝，下一条 active 可领取且读回字节（本地存储，非 COS / 非出纸）')
     }
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }
