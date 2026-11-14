@@ -102,6 +102,10 @@ const LIST: ListCase[] = [
   { id: 'agy3z', source: 'r17-1114/r1j/agy/agy-verify-3ver.log agy3（75b603a1f 对、e3f630a43 剥成「0架构…」并丢模型项）', lines: ['1.0架构重构与微服务拆分', '2.高并发接口性能调优'], model: ['1.0架构重构与微服务拆分', '高并发接口性能调优'], expected: ['1.0架构重构与微服务拆分', '高并发接口性能调优'] },
   { id: 'agy3zb', source: 'r17-1114/r1j/agy/agy-verify-3ver.log agy3b（模型漏交第一项）', lines: ['1.0架构重构与微服务拆分', '2.高并发接口性能调优'], model: ['高并发接口性能调优'], expected: ['1.0架构重构与微服务拆分', '高并发接口性能调优'] },
   { id: 'set3d', source: '本包第2条；r1i 的 1.3D 成套才剥', lines: ['1.3D角色建模', '2.贴图绘制', '3.场景搭建'], model: ['3D角色建模', '贴图绘制', '场景搭建'], expected: ['3D角色建模', '贴图绘制', '场景搭建'] },
+  { id: 'r1l15', source: '第十二段口径：1.5倍模型原样交回（其余行已去编号，这一行留着「1.5」）', lines: ['1.5倍并发性能提升', '2.系统可用性达99.9%'], model: ['1.5倍并发性能提升', '系统可用性达99.9%'], expected: ['1.5倍并发性能提升', '系统可用性达99.9%'] },
+  { id: 'r1l15b', source: '第十二段口径：1.5倍同一栏模型漏交首行，原样补回', lines: ['1.5倍并发性能提升', '2.系统可用性达99.9%'], model: ['系统可用性达99.9%'], expected: ['1.5倍并发性能提升', '系统可用性达99.9%'] },
+  { id: 'r1l13', source: '第十二段口径：1.3年以上模型交回去编号，用模型的', lines: ['1.3年以上Java开发经验', '2.熟悉Spring Boot'], model: ['3年以上Java开发经验', '熟悉Spring Boot'], expected: ['3年以上Java开发经验', '熟悉Spring Boot'] },
+  { id: 'r1l13b', source: '第十二段口径：1.3年以上模型漏交首行，原样补回', lines: ['1.3年以上Java开发经验', '2.熟悉Spring Boot'], model: ['熟悉Spring Boot'], expected: ['1.3年以上Java开发经验', '熟悉Spring Boot'] },
 ]
 
 const PROJECT: ProjectCase[] = [
@@ -134,6 +138,7 @@ const PROJECT: ProjectCase[] = [
   { id: 'E3', source: 'r17-1114/r1j/own-probe-r1j-3ver.log E3（跨行改写说明 before 带编号、第三行漏交）', lines: ['2023.05 - 2023.11 智慧电商平台 后端开发', '1.负责订单模块核心开发', '2.负责支付模块核心开发', '3.负责系统日常监控与维护'], project: { name: '智慧电商平台', role: '后端开发', description: '主导订单与支付核心模块研发' }, modules: [{ before: '1.负责订单模块核心开发\n2.负责支付模块核心开发', after: '主导订单与支付核心模块研发' }], name: '智慧电商平台', role: '后端开发', description: '主导订单与支付核心模块研发\n负责系统日常监控与维护' },
   { id: 'E4', source: 'r17-1114/r1j/own-probe-r1j-3ver.log E4（单行改写说明 before 带编号、第三行漏交）', lines: ['2023.05 - 2023.11 智慧电商平台 后端开发', '1.负责订单模块核心开发', '2.负责支付模块核心开发', '3.负责系统日常监控与维护'], project: { name: '智慧电商平台', role: '后端开发', description: '主导订单模块研发\n负责支付模块核心开发' }, modules: [{ before: '1.负责订单模块核心开发', after: '主导订单模块研发' }], name: '智慧电商平台', role: '后端开发', description: '主导订单模块研发\n负责支付模块核心开发\n负责系统日常监控与维护' },
   { id: 'descNum', source: '本包第2条 描述栏成套编号', lines: ['智慧园区管理系统 | 2023.03 - 2023.09 | 前端开发', '1.负责前端架构与页面开发', '2.负责首屏性能优化，加载时间缩短40%'], project: { name: '智慧园区管理系统', role: '前端开发', description: '负责前端架构与页面开发' }, name: '智慧园区管理系统', role: '前端开发', description: '负责前端架构与页面开发\n负责首屏性能优化，加载时间缩短40%' },
+  { id: 'r1l15p', source: '第十二段口径：项目描述「1.5倍」模型漏交首句，原样补回', lines: ['智慧园区管理系统 | 2023.03 - 2023.09 | 前端开发', '1.5倍核心接口并发吞吐量提升', '2. 线上系统零故障稳定运行'], project: { name: '智慧园区管理系统', role: '前端开发', description: '线上系统零故障稳定运行' }, name: '智慧园区管理系统', role: '前端开发', description: '1.5倍核心接口并发吞吐量提升\n线上系统零故障稳定运行' },
 ]
 
 function projectAt(item: ProjectCase) {

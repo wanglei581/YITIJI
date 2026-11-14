@@ -48,6 +48,56 @@ export function withoutLeadingIndex(line: string): string {
   return classifyLeadingIndex(line)?.rest ?? line
 }
 
+/** 点号后紧跟 1–3 位数字（「1.5倍」「1.3年」「1.0」「1.3D」）。四位年份不算。 */
+function ambiguousDigitTail(line: string): { num: number; rest: string } | null {
+  const text = line.trim().replace(BULLET_RE, '').trim()
+  const match = COLUMN_INDEX_RE.exec(text)
+  const digits = match?.[1]
+  const mark = match?.[2]
+  if (!match || digits === undefined || mark === undefined || (mark !== '.' && mark !== '．')) return null
+  const num = Number(digits)
+  if (!Number.isInteger(num) || num < 1) return null
+  const rawRest = text.slice(match[0].length)
+  if (!/^\d/u.test(rawRest) || /^\d{4}(?!\d)/u.test(rawRest)) return null
+  if (!/^(\d{1,3})(?!\d)/u.test(rawRest)) return null
+  const rest = rawRest.trim()
+  return rest ? { num, rest } : null
+}
+
+function leadingYearBody(line: string): string | null {
+  const text = line.trim().replace(BULLET_RE, '').trim()
+  const match = COLUMN_INDEX_RE.exec(text)
+  if (!match) return null
+  const rawRest = text.slice(match[0].length)
+  if (!/^\d{4}(?!\d)/u.test(rawRest)) return null
+  return rawRest.trim() || null
+}
+
+export function ambiguousColumnTail(line: string, column: string[]): string | null {
+  const filled = column.map((item) => item.trim()).filter(Boolean)
+  if (filled.length < 2) return null
+  const rows = filled.map((item) => {
+    const clear = classifyLeadingIndex(item)
+    if (clear && !clear.maybe) return { num: clear.num, ambiguous: false }
+    const amb = ambiguousDigitTail(item)
+    return amb ? { num: amb.num, ambiguous: true } : null
+  })
+  if (rows.some((row) => !row)) return null
+  const typed = rows as Array<{ num: number; ambiguous: boolean }>
+  const witnessed = typed.every((row, index) => row.num === index + 1)
+    && typed[0]?.ambiguous === true
+    && typed.slice(1).every((row) => !row.ambiguous)
+  if (!witnessed) return null
+  return ambiguousDigitTail(line)?.rest ?? null
+}
+
+/** 漏交补回：1–3 位数字原样；四位年份和普通编号用剥过的正文。 */
+export function omittedColumnText(raw: string, shown: string): string {
+  if (ambiguousDigitTail(raw)) return strippedListLine(raw)
+  if (leadingYearBody(raw)) return shown
+  return shown
+}
+
 /**
  * 一整栏（技能、证书或一段描述）各行成套用「1. 2. 3.」「1、2、」「1）2）」这类递增编号时，只剥行首编号。
  * 只有一行、数字不连续、或「2.5D」「3.0版本」「1.5年」这种不成套的，原样留下。
@@ -204,7 +254,11 @@ export function alignOriginalList(
     const spaces = text.split(/\s+/u).map((part) => norm(part.trim())).filter(Boolean)
     return spaces.length > 1 && spaces.every((part) => covered.has(part))
   }
-  const originals = sourceLines.map((line) => line.trim()).filter(Boolean)
+  const paired = lines.flatMap((raw, index) => {
+    const text = raw.trim()
+    if (!text) return []
+    return [{ raw: text, shown: (sourceLines[index] ?? raw).trim() }]
+  })
   type Atom = { display: string; key: string; used: boolean }
   type Item = { display: string; key: string; atoms: Atom[]; used: boolean }
   const pool: Item[] = sourceModel.map((raw) => {
@@ -279,38 +333,50 @@ export function alignOriginalList(
   }
 
   type Slot = { display: string; key: string; out: string | null }
-  const rows: Array<{ whole: string; slots: Slot[] }> = []
-  for (const line of originals) {
+  const rows: Array<{ omitted: string; slots: Slot[] }> = []
+  for (const item of paired) {
+    const line = item.shown
     const usedOnly = modules.some((state) => state.used && lineCoveredByModule(line, state.module))
     const hit = moduleHit(line)
     if (usedOnly && !hit) continue
     if (hit) {
       const state = modules[hit.index]
       if (state) state.used = true
-      const found = pool.find((item) => !item.used && item.display === hit.display)
+      const found = pool.find((candidate) => !candidate.used && candidate.display === hit.display)
       if (found) claimWhole(found)
-      rows.push({ whole: hit.display, slots: [{ display: hit.display, key: norm(hit.display), out: hit.display }] })
+      rows.push({ omitted: hit.display, slots: [{ display: hit.display, key: norm(hit.display), out: hit.display }] })
       continue
     }
     const display = strippedListLine(line)
     if (!display) continue
-    const whole = pool.find((item) => !item.used && item.key === norm(display))
+    // 模型交回的行以模型写法为准：留下的「1.x」或去掉编号后的正文，都用模型那一行。
+    const tail = ambiguousColumnTail(item.raw, lines) ?? ''
+    const tailKey = tail ? norm(strippedListLine(tail)) : ''
+    const whole = pool.find((candidate) => !candidate.used && candidate.key === norm(display))
+      ?? (tailKey
+        ? pool.find((candidate) => {
+          if (candidate.used) return false
+          if (candidate.key === tailKey) return true
+          const rest = ambiguousDigitTail(candidate.display)?.rest ?? ''
+          return Boolean(rest && norm(strippedListLine(rest)) === tailKey)
+        })
+        : undefined)
     if (whole) {
       claimWhole(whole)
-      rows.push({ whole: display, slots: [{ display: whole.display, key: whole.key, out: whole.display }] })
+      rows.push({ omitted: display, slots: [{ display: whole.display, key: whole.key, out: whole.display }] })
       continue
     }
     // 「1、A，2、B」按顿号拆出来的纯数字段是下一项的编号，不单独成项。
     const segments = splitRestore(display).filter((part, index, all) => !(index < all.length - 1 && /^\d{1,2}$/u.test(part)))
     const slots = (segments.length > 0 ? segments : [display]).map((part) => {
-      const item = pool.find((candidate) => !candidate.used && candidate.key === norm(part))
-      if (item) {
-        claimWhole(item)
-        return { display: part, key: norm(part), out: item.display }
+      const piece = pool.find((candidate) => !candidate.used && candidate.key === norm(part))
+      if (piece) {
+        claimWhole(piece)
+        return { display: part, key: norm(part), out: piece.display }
       }
       return { display: part, key: norm(part), out: null }
     })
-    rows.push({ whole: display, slots })
+    rows.push({ omitted: omittedColumnText(item.raw, display), slots })
   }
 
   const open = rows.flatMap((row) => row.slots.filter((slot) => slot.out === null))
@@ -419,7 +485,7 @@ export function alignOriginalList(
   }
   for (const row of rows) {
     if (row.slots.every((slot) => slot.out === null)) {
-      push(row.whole, true)
+      push(row.omitted, true)
       continue
     }
     for (const slot of row.slots) {

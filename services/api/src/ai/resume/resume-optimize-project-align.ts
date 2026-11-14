@@ -1,6 +1,6 @@
 import type { GeneratedResume } from '../interfaces/ai-provider.interface'
 import { optimizeAfterNearlySame } from './resume-optimize-after-align'
-import { stripNumberedColumn, withoutLeadingIndex } from './resume-optimize-list-align'
+import { omittedColumnText, stripNumberedColumn, withoutLeadingIndex } from './resume-optimize-list-align'
 import { BULLET_RE, RESTORED_ROLE_MAX, RESTORED_TITLE_MAX, isTitleLike } from './resume-restored-text'
 import { normalizeResumeStructureText, splitResumeDateRange } from './resume-structure'
 
@@ -213,12 +213,15 @@ export function ensureProjectOriginalLines(
     const modelLines = description.split('\n').map((line) => line.trim()).filter(Boolean)
     const taken = new Set<number>()
     const out: string[] = []
-    for (const line of rest) {
+    for (let lineIndex = 0; lineIndex < rest.length; lineIndex += 1) {
+      const line = rest[lineIndex] ?? ''
+      const rawLine = rawRest[lineIndex] ?? line
       const text = projectBody(line)
       if (!text) continue
       if (role && projectLineKey(role) === projectLineKey(text)) continue
       if (!descriptionCovers(line, description, role, modules)) {
-        out.push(text)
+        // 编号后紧跟 1–3 位数字的漏交句原样补回；四位年份和普通编号仍用剥过的正文。
+        out.push(projectBody(omittedColumnText(rawLine, line)))
         continue
       }
       const multi = modules.filter((module) => moduleCoversLine(text, module, description) && afterLines(module).length > 1)
