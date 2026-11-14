@@ -191,6 +191,9 @@ export function PrintConfirmPage() {
   const [benefits, setBenefits] = useState<BenefitsView>({ status: 'loading' })
   const [priceCfg, setPriceCfg] = useState<PriceCfgView>({ status: 'loading' })
   const freePricing = quote.status === 'ready' ? quote.amountCents === 0 : priceCfg.status === 'ready' && priceCfg.unitCents === 0
+  // 409 之后公示价没读回来：不能再把 0 元报价说成免费试运营，也不能留着上一屏的金额。
+  const priceRereadFailed = Boolean(activeNotice) && priceCfg.status === 'error'
+  const displayFree = freePricing && !priceRereadFailed
 
   useEffect(() => {
     if (API_MODE !== 'http') return
@@ -231,7 +234,8 @@ export function PrintConfirmPage() {
     if (!benefitCardEnabled) return
     let cancelled = false
     setPriceCfg({ status: 'loading' })
-    void fetchPrintPriceConfig(priceNotice ? { force: true } : undefined)
+    // 确认页每次都现读。30 秒缓存里可能还是刚改价之前的单价，拿它和这次报价一比就会误报「本屏报价已不是现价」。
+    void fetchPrintPriceConfig({ force: true })
       .then((config) => {
         if (!cancelled) setPriceCfg({ status: 'ready', unitCents: unitCentsFor(config, params.colorMode) })
       })
@@ -241,8 +245,6 @@ export function PrintConfirmPage() {
     return () => {
       cancelled = true
     }
-    // 价格变更提示一出现就强制重读公示价，不走 30 秒终端配置缓存。
-    // 否则权益卡拿开页时的旧价比新报价，会误报「本屏报价已不是现价」。
   }, [benefitCardEnabled, params.colorMode, priceNotice, priceReadNonce])
 
   useEffect(() => {
@@ -514,7 +516,7 @@ export function PrintConfirmPage() {
     : [decisionSummary, redactionBadge?.text].filter(Boolean).join(' ') || null
   const amountText = quote.status === 'ready' ? formatCents(quote.amountCents).replace(/^¥/, '') : ''
   const pill = PILL[screen]
-  const pricingPill = !freePricing
+  const pricingPill = !displayFree
     ? pill
     : screen === 'quoting'
       ? { tone: 'unknown' as const, label: '正在核定页数' }
@@ -523,13 +525,14 @@ export function PrintConfirmPage() {
         : screen === 'capability-invalid-params'
           ? { tone: 'warn' as const, label: '已改回目前能打的参数' }
           : pill
-  const status = printerLoading && (screen === 'quoted' || screen === 'zero-amount')
-    ? { tone: 'unknown' as const, label: '状态未知' }
-    : pricingPill
+  const status = priceRereadFailed
+    ? { tone: 'bad' as const, label: '本机没能取到现行价目' }
+    : printerLoading && (screen === 'quoted' || screen === 'zero-amount')
+      ? { tone: 'unknown' as const, label: '状态未知' }
+      : pricingPill
 
   // 金额变了（服务端 409 或生成了合并版）：按钮写明新金额，用户再点的就是这一笔。
   // 重读公示价失败时不给确认金额的按钮，屏上只留「没取到现行价目」。
-  const priceRereadFailed = Boolean(activeNotice) && priceCfg.status === 'error'
   const reconfirmLabel = activeNotice && quote.status === 'ready' && !priceRereadFailed
     ? quote.amountCents === 0 ? `核对后确认打印${appendEligible ? '（合并版）' : ''}` : `按新金额 ${formatCents(quote.amountCents)} 确认${appendEligible ? '（合并版）' : ''}`
     : null
@@ -733,7 +736,8 @@ export function PrintConfirmPage() {
     >
       <PrintConfirmView
         step={4}
-        freePricing={freePricing}
+        freePricing={displayFree}
+        hideQuotedAmount={priceRereadFailed}
         screen={screen}
         invalidReason={
           (handoffInvalid ? problem : null)
@@ -749,7 +753,7 @@ export function PrintConfirmPage() {
         quote={quote}
         costCalcLabel={costCalcLabel}
         amountText={amountText}
-        benefitView={freePricing ? null : benefitView}
+        benefitView={displayFree ? null : benefitView}
         redactionText={privacySummary}
         materialDemo={materialCheck?.mode === 'demo'}
         printerBlocked={printerBlocked}

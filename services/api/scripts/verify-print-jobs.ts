@@ -67,7 +67,7 @@ function fixtureFileSignature(fileId: string, expiresAtMs: number): string {
   if (!secret) fail('测试签名密钥未设置')
   return createHmac('sha256', secret).update(`${fileId}.${expiresAtMs}`).digest('hex')
 }
-function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
+function fail(m: string): never { console.error(`  FAIL ${m}`); throw new Error(m) }
 
 function sliceBetween(source: string, startMarker: string, endMarker: string): string {
   const start = source.indexOf(startMarker)

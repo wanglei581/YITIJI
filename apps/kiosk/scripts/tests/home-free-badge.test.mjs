@@ -391,6 +391,26 @@ test('展示价读本机 pricing 的黑白和彩色，读不到就失败', async
   await assert.rejects(() => unreadable.fetchPrintPriceConfig(), /machine price missing/)
 })
 
+test('配置对象整个没有 pricing 时按读不到价处理，不当成 0 元', async () => {
+  const noPricing = load('src/services/print/priceConfigApi.ts', (name) => {
+    if (name === 'react') return { useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => undefined], useEffect: () => undefined }
+    if (name === '../api/client') return { API_MODE: 'http' }
+    if (name === '../api/terminalConfig') {
+      return {
+        getTerminalId: () => 'term-1',
+        getCachedKioskTerminalConfig: async () => ({ homeFreeBadge: true, terminalId: 'term-1' }),
+        refreshKioskTerminalConfig: async () => { throw new Error('不该走强制刷新') },
+      }
+    }
+    throw new Error(`Unexpected dependency ${name}`)
+  })
+  await assert.rejects(() => noPricing.fetchPrintPriceConfig(), /machine price missing/)
+  await assert.rejects(async () => {
+    const view = await noPricing.fetchPrintPriceConfig()
+    return noPricing.unitCentsFor(view, 'black_white')
+  }, /machine price missing/)
+})
+
 test('强制重读不走缓存', async () => {
   let cached = 0
   let refreshed = 0

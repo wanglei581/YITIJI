@@ -401,6 +401,66 @@ for (const scenario of [
   })
 }
 
+function registerHomeReads(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { asrEnabled: false, ttsEnabled: false },
+  })
+  for (const docType of ['terms_of_service', 'privacy_policy']) {
+    api.respond('GET', `/api/v1/kiosk/legal/${docType}`, {
+      status: 200,
+      json: { success: true, data: { version: '2026-09-01', title: docType, status: 'active' } },
+    })
+  }
+}
+
+test('first confirm visit reads the current machine price instead of the 30s cache @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  registerHomeReads(api)
+  let changed = false
+  api.respondWith('GET', KIOSK_CONFIG_PATH, () => {
+    const bw = changed ? 30 : 20
+    return {
+      status: 200,
+      json: withMachinePricing(terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'price-truth'), bw, UNIT_CENTS.color),
+    }
+  })
+  await routeQuote(page, () => ({ unitCents: changed ? 30 : 20, pages: W2_FILE.pages }))
+
+  // 先把交接写进这一页，再整页进入首页。首页这次加载会把改价前的单价放进 30 秒缓存。
+  // 之后只走站内跳转，不能再整页重载，否则缓存会被清掉，测不到「确认页第一次读价」。
+  await page.goto('/print/confirm')
+  await writePrintHandoff(page, { printParams: W2_PRINT_PARAMS, materialCheck: null })
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByTestId('home-device-status')).toBeVisible({ timeout: 20000 })
+  await expect.poll(() => api.requestCount('GET', '/api/v1/jobs'), { timeout: 30000 }).toBeGreaterThan(0)
+  await page.waitForTimeout(400)
+  const readsBefore = api.requestCount('GET', KIOSK_CONFIG_PATH)
+  changed = true
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/print/confirm')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+  })
+
+  await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible({ timeout: 20000 })
+  await expectConfirmAmount(page, 30 * W2_FILE.pages)
+  await expect(page.getByRole('button', { name: '去付款' })).toBeVisible()
+  await expect(page.getByText('价格刚更新过')).toHaveCount(0)
+  await expect(page.getByText('本屏报价已不是现价')).toHaveCount(0)
+  await expect(page.getByText('不要按本屏金额付款')).toHaveCount(0)
+  await expect(page.getByText('现行公示单价')).toHaveCount(0)
+  await expect.poll(() => api.requestCount('GET', KIOSK_CONFIG_PATH)).toBeGreaterThan(readsBefore)
+})
+
 test('price change re-read failure shows only the unavailable sentence @kiosk', async ({ page, api }) => {
   registerShell(api, [])
   const prices = registerPriceConfig(api, [20, 30], true)
@@ -414,11 +474,35 @@ test('price change re-read failure shows only the unavailable sentence @kiosk', 
   await originalConfirm(page).click()
 
   await expect.poll(() => api.requestCount('GET', KIOSK_CONFIG_PATH)).toBeGreaterThan(configReadsBeforeConfirm)
-  await expect(page.getByText('本机没能取到现行价目', { exact: true })).toBeVisible()
+  await expect(page.getByText('本机没能取到现行价目', { exact: true }).first()).toBeVisible()
+  await expect(page.locator('.qxt-status')).toContainText('本机没能取到现行价目')
+  await expect(page.locator('.pcf-benefit-detail')).toContainText('取不到就不显示金额')
+  await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  await expect(page.getByText('应付 0.60 元')).toHaveCount(0)
   await expect(page.getByText('本屏报价已不是现价')).toHaveCount(0)
   await expect(page.getByText('不要按本屏金额付款')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /按新金额/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '去付款' })).toHaveCount(0)
+})
+
+test('free order after a price change still explains a failed price reread @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  const prices = registerPriceConfig(api, [20, 0], true)
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  await routeJobs(page, [{ status: 409, unitCents: 0 }], prices.markChanged)
+
+  await openConfirm(page)
+  await expect(originalConfirm(page)).toBeEnabled()
+  await originalConfirm(page).click()
+
+  await expect(page.getByRole('button', { name: '重新报价' })).toBeVisible()
+  await expect(page.locator('.qxt-status')).toContainText('本机没能取到现行价目')
+  await expect(page.locator('.pcf-benefit-title')).toContainText('本机没能取到现行价目')
+  await expect(page.locator('.pcf-benefit-detail')).toContainText('取不到就不显示金额')
+  await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  await expect(page.getByText('免费试运营')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '去付款' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '确认并打印' })).toHaveCount(0)
 })
 
 test('rapid repeated confirm sends exactly one create request @kiosk', async ({ page, api }) => {

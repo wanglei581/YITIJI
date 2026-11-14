@@ -64,7 +64,7 @@ import {
   type MemberOrderTimelineStatusFilter,
 } from '../src/member-print-orders/member-print-orders.types'
 import { PackageOrderService } from '../src/member-print-orders/package-order.service'
-import { adoptDevPrintSeedPrices } from './support/terminal-charge-fixture'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
@@ -743,6 +743,12 @@ async function main(): Promise<void> {
     console.log(`\nALL PASS (${passed})`)
   } finally {
     setPrintScanCapabilityModeForTest(null)
+    let restoreError: unknown
+    try {
+      await restoreTerminalChargeFixture(prisma)
+    } catch (error) {
+      restoreError = error
+    }
     if (priorSwitch) {
       await prisma.platformSetting.upsert({
         where: { key: PERSONAL_CHARGE_SETTING_KEY },
@@ -757,6 +763,7 @@ async function main(): Promise<void> {
       try { rmSync(path.join(process.env.FILE_STORAGE_DIR!, key), { force: true }) } catch { /* ignore */ }
     }
     if (fallbackDbPath) rmSync(fallbackDbPath, { force: true })
+    if (restoreError) throw restoreError
   }
 }
 

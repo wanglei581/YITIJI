@@ -36,6 +36,7 @@ import {
   demoChargeSummary,
   demoChargeTerminals,
   rememberDemoTerminal,
+  resetDemoChargeOnOrgChange,
   seedDemoChargeTerminals,
 } from './terminalChargeDemo'
 import { ApiHttpError } from './client'
@@ -559,7 +560,9 @@ export const adminMockAdapter = {
       orgName = org.name
     }
     MOCK_TERMINAL_ORG[terminalId] = orgId
-    return { terminalId, terminalCode: terminalId, oldOrgId, newOrgId: orgId, orgName }
+    const chargeSettingsReset = oldOrgId !== orgId
+    if (chargeSettingsReset) resetDemoChargeOnOrgChange(terminalId, orgId !== null)
+    return { terminalId, terminalCode: terminalId, oldOrgId, newOrgId: orgId, orgName, chargeSettingsReset }
   },
 
   async updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult> {

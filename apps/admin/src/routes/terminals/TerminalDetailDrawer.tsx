@@ -98,6 +98,8 @@ export interface TerminalDetailDrawerProps {
   serverListIssuedAt: number
   onHomeFreeBadgeSaved: (terminalId: string, enabled: boolean) => void
   onChargeSaved: (terminalId: string, view: TerminalChargeSettingsView) => void
+  /** 本次改绑返回已复位才有字。关掉抽屉后由页面清掉。 */
+  chargeResetNotice: string | null
 }
 
 export function TerminalDetailDrawer({
@@ -132,6 +134,7 @@ export function TerminalDetailDrawer({
   serverListIssuedAt,
   onHomeFreeBadgeSaved,
   onChargeSaved,
+  chargeResetNotice,
 }: TerminalDetailDrawerProps) {
   if (!terminal) return <Drawer open={false} onClose={onClose} title="终端详情"><div /></Drawer>
 
@@ -182,7 +185,7 @@ export function TerminalDetailDrawer({
 
         <TerminalDailyFreeSidesSection terminalId={terminal.id} />
         <TerminalHomeFreeBadgeSection terminalId={terminal.id} enabled={homeFreeBadgeOn(terminal.homeFreeBadge)} listIssuedAt={serverListIssuedAt} onSaved={(savedTerminalId, enabled) => onHomeFreeBadgeSaved(savedTerminalId, enabled)} />
-        <TerminalChargeSettingsSection terminalId={terminal.id} onSaved={onChargeSaved} />
+        <TerminalChargeSettingsSection key={`${terminal.id}:${terminal.orgId ?? ''}`} terminalId={terminal.id} orgId={terminal.orgId} resetNotice={chargeResetNotice} onSaved={onChargeSaved} />
 
         <Section title="所属机构">
           {editingOrg ? (
