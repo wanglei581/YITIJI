@@ -1,4 +1,5 @@
 import type { GeneratedResume, ResumeOptimizeModule } from '@ai-job-print/shared'
+import { defineGeneratedEntryIndex, readGeneratedEntryIndex } from './generatedEntryIndex'
 import { detectUnconfirmedTextAdditions } from './facts'
 
 export type ResumeModuleDecision = 'original' | 'optimized'
@@ -48,6 +49,8 @@ export function replaceResumeTextWithStatus(resume: GeneratedResume, from: strin
     if (value && typeof value === 'object') {
       const out: Record<string, unknown> = {}
       for (const [key, nested] of Object.entries(value as Record<string, unknown>)) out[key] = walk(nested)
+      const generatedIndex = readGeneratedEntryIndex(value)
+      if (generatedIndex !== null) defineGeneratedEntryIndex(out, generatedIndex)
       return out
     }
     return value

@@ -58,7 +58,7 @@ function pass(m: string): void {
 }
 function fail(m: string): never {
   console.error(`  FAIL ${m}`)
-  process.exit(1)
+  throw new Error(m)
 }
 
 function errorCode(error: unknown): string | undefined {

@@ -23,12 +23,12 @@ import {
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
-import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
+import { appendSelfAssessmentToResume, SelfAssessmentApiError } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
 import { clearPrintMaterialSession, printUploadPathForSource, type PrintFileState } from './printMaterialSession'
-import { patchPrintHandoff } from './printHandoff'
+import { patchPrintHandoff, readPrintReturnCarry } from './printHandoff'
 import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
 import { printPrivacyDecisionSummary } from './printDeskModel'
 import { materialRedactionBadge } from './piiRedaction'
@@ -154,6 +154,8 @@ export function PrintConfirmPage() {
   const [quotaCode, setQuotaCode] = useState<string | undefined>()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
+  // 这份文件本页附不上：复选框停用。换文件或离开本页时状态自然丢掉。
+  const [appendBlocked, setAppendBlocked] = useState(false)
   const [quoteNonce, setQuoteNonce] = useState(0)
   const selfAssessmentSnapshot = useMemo(() => readSelfAssessmentSnapshot(), [])
   const appendEligible =
@@ -164,6 +166,7 @@ export function PrintConfirmPage() {
     (file.mimeType === undefined || file.mimeType === 'application/pdf')
 
   useEffect(() => subscribeTerminalSession(setTerminalSession), [])
+  useEffect(() => { setAppendBlocked(false) }, [file.fileId])
   // 自我探索合并版只生成一次；二次确认复用同一份材料，不重复生成。
   const [mergedMaterial, setMergedMaterial] = useState<{ printFileUrl: string; name: string } | null>(null)
   const mergedFileUrl = appendEligible ? mergedMaterial?.printFileUrl ?? null : null
@@ -191,6 +194,9 @@ export function PrintConfirmPage() {
   const [benefits, setBenefits] = useState<BenefitsView>({ status: 'loading' })
   const [priceCfg, setPriceCfg] = useState<PriceCfgView>({ status: 'loading' })
   const freePricing = quote.status === 'ready' ? quote.amountCents === 0 : priceCfg.status === 'ready' && priceCfg.unitCents === 0
+  // 409 之后公示价没读回来：不能再把 0 元报价说成免费试运营，也不能留着上一屏的金额。
+  const priceRereadFailed = Boolean(activeNotice) && priceCfg.status === 'error'
+  const displayFree = freePricing && !priceRereadFailed
 
   useEffect(() => {
     if (API_MODE !== 'http') return
@@ -231,7 +237,8 @@ export function PrintConfirmPage() {
     if (!benefitCardEnabled) return
     let cancelled = false
     setPriceCfg({ status: 'loading' })
-    void fetchPrintPriceConfig(priceNotice ? { force: true } : undefined)
+    // 确认页每次都现读。30 秒缓存里可能还是刚改价之前的单价，拿它和这次报价一比就会误报「本屏报价已不是现价」。
+    void fetchPrintPriceConfig({ force: true })
       .then((config) => {
         if (!cancelled) setPriceCfg({ status: 'ready', unitCents: unitCentsFor(config, params.colorMode) })
       })
@@ -241,8 +248,6 @@ export function PrintConfirmPage() {
     return () => {
       cancelled = true
     }
-    // 价格变更提示一出现就强制重读公示价，不走 30 秒终端配置缓存。
-    // 否则权益卡拿开页时的旧价比新报价，会误报「本屏报价已不是现价」。
   }, [benefitCardEnabled, params.colorMode, priceNotice, priceReadNonce])
 
   useEffect(() => {
@@ -336,9 +341,20 @@ export function PrintConfirmPage() {
     (API_MODE === 'http' && !confirmScreenAllowsOrder(screen)) ||
     (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
 
+  const returnWithCarry = (): boolean => {
+    const routeState = location.state
+    const raw = routeState && typeof routeState === 'object' && !Array.isArray(routeState)
+      ? (routeState as { printReturnState?: unknown }).printReturnState
+      : undefined
+    const carry = readPrintReturnCarry(raw)
+    if (!carry) return false
+    navigate({ pathname: carry.pathname, search: carry.search }, { state: carry.state })
+    return true
+  }
+
   const handleBack = async () => {
     if (!contractReport) {
-      navigate(-1)
+      if (!returnWithCarry()) navigate(-1)
       return
     }
     setAbandoning(true)
@@ -400,11 +416,26 @@ export function PrintConfirmPage() {
         let printFileMd5: string | undefined = file.fileMd5
         if (appendEligible && selfAssessmentSnapshot?.taskId && file.fileId) {
           if (!mergedMaterial) {
-            const merged = await appendSelfAssessmentToResume(
-              selfAssessmentSnapshot.taskId,
-              file.fileId,
-              { token: getToken(), accessToken: selfAssessmentSnapshot.accessToken ?? null },
-            )
+            let merged: Awaited<ReturnType<typeof appendSelfAssessmentToResume>>
+            try {
+              merged = await appendSelfAssessmentToResume(
+                selfAssessmentSnapshot.taskId,
+                file.fileId,
+                file.fileUrl,
+                { token: getToken(), accessToken: selfAssessmentSnapshot.accessToken ?? null },
+              )
+            } catch (err) {
+              // 附录接口还没建单。附不上就停用勾选；其它失败保持勾选，允许再试。
+              if (err instanceof SelfAssessmentApiError && (err.code === 'RESUME_FILE_NOT_FOUND' || err.status === 404)) {
+                setAppendSelfAssessment(false)
+                setMergedMaterial(null)
+                setAppendBlocked(true)
+                setSubmitError('这份文件不能附加自我探索，已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。')
+              } else {
+                setSubmitError('合并版没有生成，本次没有建单。可以再点一次确认重试，或取消勾选「附加自我探索」直接打印原文件。')
+              }
+              return
+            }
             if (!merged.printFileUrl) {
               setSubmitError('合并版文件还没有就绪，本次没有建单。请稍后再试。')
               return
@@ -514,7 +545,7 @@ export function PrintConfirmPage() {
     : [decisionSummary, redactionBadge?.text].filter(Boolean).join(' ') || null
   const amountText = quote.status === 'ready' ? formatCents(quote.amountCents).replace(/^¥/, '') : ''
   const pill = PILL[screen]
-  const pricingPill = !freePricing
+  const pricingPill = !displayFree
     ? pill
     : screen === 'quoting'
       ? { tone: 'unknown' as const, label: '正在核定页数' }
@@ -523,13 +554,14 @@ export function PrintConfirmPage() {
         : screen === 'capability-invalid-params'
           ? { tone: 'warn' as const, label: '已改回目前能打的参数' }
           : pill
-  const status = printerLoading && (screen === 'quoted' || screen === 'zero-amount')
-    ? { tone: 'unknown' as const, label: '状态未知' }
-    : pricingPill
+  const status = priceRereadFailed
+    ? { tone: 'bad' as const, label: '本机没能取到现行价目' }
+    : printerLoading && (screen === 'quoted' || screen === 'zero-amount')
+      ? { tone: 'unknown' as const, label: '状态未知' }
+      : pricingPill
 
   // 金额变了（服务端 409 或生成了合并版）：按钮写明新金额，用户再点的就是这一笔。
   // 重读公示价失败时不给确认金额的按钮，屏上只留「没取到现行价目」。
-  const priceRereadFailed = Boolean(activeNotice) && priceCfg.status === 'error'
   const reconfirmLabel = activeNotice && quote.status === 'ready' && !priceRereadFailed
     ? quote.amountCents === 0 ? `核对后确认打印${appendEligible ? '（合并版）' : ''}` : `按新金额 ${formatCents(quote.amountCents)} 确认${appendEligible ? '（合并版）' : ''}`
     : null
@@ -601,7 +633,7 @@ export function PrintConfirmPage() {
   ) : screen === 'invalid-context' && handoffInvalid ? (
     // 交接失效（上一位的、过期、被替换）：只给「回到上一步」和「重新选文件」，不提供切到别的那一份。
     <>
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => (returnPath ? navigate(returnPath) : navigate(-1))}>回到上一步</button>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => { if (returnWithCarry()) return; if (returnPath) navigate(returnPath); else navigate(-1) }}>回到上一步</button>
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>重新选文件</button>
     </>
   ) : screen === 'invalid-context' ? (
@@ -639,13 +671,14 @@ export function PrintConfirmPage() {
           type="checkbox"
           checked={appendSelfAssessment}
           onChange={(e) => setAppendSelfAssessment(e.target.checked)}
-          disabled={submitting || !file.fileId || file.mimeType === 'image/jpeg' || file.mimeType === 'image/png'}
+          disabled={submitting || appendBlocked || !file.fileId || file.mimeType === 'image/jpeg' || file.mimeType === 'image/png'}
         />
         <span>附加自我探索 · 倾向参考摘要</span>
       </label>
       <p>
         仅在本人简历下方合并一份本人自助参考摘要；勾选后系统会即时生成仅供本人打印的合并 PDF，文件名追加 <code>-self-assessment</code>；合并结果不会进入任何企业、合作机构、Partner 或第三方可见的分享链路。
       </p>
+      {appendBlocked ? <p role="status">这份文件不能附加自我探索。</p> : null}
       {appendSelfAssessment && !file.fileId ? (
         <p role="alert">当前文件不支持合并：请在简历页生成可合并的简历 PDF 后再勾选此项。</p>
       ) : null}
@@ -712,7 +745,7 @@ export function PrintConfirmPage() {
         onBack: () => {
           if (guestQuotaExceeded) navigate('/print/desk?step=preview')
           else if (isContractReport) void handleBack()
-          else navigate('/print/desk?step=preview')
+          else navigate('/print/desk?step=preview', { state: location.state })
         },
       }}
       nav
@@ -733,7 +766,8 @@ export function PrintConfirmPage() {
     >
       <PrintConfirmView
         step={4}
-        freePricing={freePricing}
+        freePricing={displayFree}
+        hideQuotedAmount={priceRereadFailed}
         screen={screen}
         invalidReason={
           (handoffInvalid ? problem : null)
@@ -749,7 +783,7 @@ export function PrintConfirmPage() {
         quote={quote}
         costCalcLabel={costCalcLabel}
         amountText={amountText}
-        benefitView={freePricing ? null : benefitView}
+        benefitView={displayFree ? null : benefitView}
         redactionText={privacySummary}
         materialDemo={materialCheck?.mode === 'demo'}
         printerBlocked={printerBlocked}

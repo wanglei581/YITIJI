@@ -9,6 +9,7 @@ import {
   beginPrintHandoff,
   printHandoffOwnerFor,
   printHandoffTarget,
+  readPrintReturnCarry,
   recordPrintHandoffService,
   type BeginPrintHandoffResult,
   type PrintHandoffInput,
@@ -32,10 +33,13 @@ export function useStartPrintHandoff(): (input: PrintHandoffInput) => BeginPrint
   const owner = usePrintHandoffOwner()
   return useCallback(
     (input: PrintHandoffInput) => {
+      const carry = readPrintReturnCarry(input.returnState)
       const result = beginPrintHandoff(input, owner)
       recordPrintHandoffService(result, windDownRoute(pathname)?.service ?? null)
       const target = printHandoffTarget(result)
-      navigate(target.path, { state: target.state })
+      navigate(target.path, {
+        state: carry ? { ...target.state, printReturnState: carry } : target.state,
+      })
       return result
     },
     [navigate, owner, pathname],

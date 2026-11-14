@@ -41,6 +41,7 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
 
   const oldOrgId = terminal.orgId
   const result = { terminalId: terminal.terminalCode, terminalCode: terminal.terminalCode, oldOrgId, newOrgId: orgId, orgName }
+  let chargeSettingsReset = false
   await prisma.$transaction(async (tx) => {
     const changed = await tx.terminal.updateMany({
       where: { id: terminal.id, orgId: oldOrgId },
@@ -58,7 +59,6 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
     const effectiveAt = new Date(Math.max((now ?? new Date()).getTime(), active?.startedAt.getTime() ?? 0,
       current.orgBoundAt?.getTime() ?? 0, latest?.endedAt?.getTime() ?? 0))
     await tx.terminal.update({ where: { id: terminal.id }, data: terminalOrgBindingWrite(oldOrgId, orgId, effectiveAt) })
-    let chargeSettingsReset = false
     if (oldOrgId !== orgId) {
       await revokeTerminalCopyAuthorization(tx, terminal.id)
       await tx.serviceDeployment.updateMany({
@@ -80,5 +80,5 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
     await retirePendingServiceOrders(prisma, { terminalId: terminal.id, closeReason: 'org_rebound' })
   }
 
-  return result
+  return { ...result, chargeSettingsReset }
 }

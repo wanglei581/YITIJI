@@ -41,6 +41,12 @@ import { SELF_ASSESSMENT_QUESTIONS_V1 } from '../src/ai/resume/self-assessment-q
 import { SELF_ASSESSMENT_CONSENT_VERSION } from '../src/ai/resume/self-assessment.types'
 import { AIGC_VISIBLE_HEADER, AIGC_RULE_SCORE_NOTICE, readPdfInfo } from '../src/common/pdf/aigc-label'
 import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
+import { signFileUrl } from '../src/files/signing'
+
+/** 夹具里的简历没有会员主人，合并时带上这份文件的签名地址。 */
+function ownerlessResumeBody(): { resumeFileId: string; resumeFileUrl: string } {
+  return { resumeFileId: 'resume-1', resumeFileUrl: signFileUrl('resume-1').url }
+}
 
 // unpdf 只发 ESM/CJS 混合包，与 verify-ai-safety-aigc.ts 同样用 require 取
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -115,7 +121,7 @@ function makeWorld(opts: { config?: AiAccessConfig; simulate?: Simulated; realLl
         rows.find((r) => r.taskId === where.taskId_kind.taskId && r.kind === where.taskId_kind.kind) ?? null,
       update: async ({ where, data }: { where: { id: string }; data: Partial<Row> }) => { const row = rows.find((r) => r.id === where.id); if (row) Object.assign(row, data); return row },
     },
-    fileObject: { findUnique: async () => ({ id: 'resume-1', filename: 'resume.pdf', mimeType: 'application/pdf', endUserId: null, deletedAt: null }) },
+    fileObject: { findUnique: async () => ({ id: 'resume-1', filename: 'resume.pdf', mimeType: 'application/pdf', purpose: 'resume_upload', endUserId: null, deletedAt: null }) },
     endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) },
     userAiConsent: { findFirst: async () => null },
   }
@@ -260,7 +266,7 @@ async function gateStates(): Promise<void> {
 
     let appended: { printFileUrl?: string } | null = null
     const appendCode = await codeOf(async () => {
-      appended = await w.call('appendToResume', { ...reader, body: { resumeFileId: 'resume-1' } }, () => w.controller.appendToResume(r.taskId, { resumeFileId: 'resume-1' } as never, reader))
+      appended = await w.call('appendToResume', { ...reader, body: ownerlessResumeBody() }, () => w.controller.appendToResume(r.taskId, ownerlessResumeBody() as never, reader))
     })
     check(`${tag}：只有打分时附加到简历照常`, appendCode === 'PASS' && Boolean((appended as { printFileUrl?: string } | null)?.printFileUrl), `实际 ${appendCode}`)
     const merged = w.uploads.find((u) => u.filename.startsWith('self-assessment-append-'))
@@ -292,21 +298,21 @@ async function normalState(): Promise<void> {
   w.setConfig({ ...OFF, paused: true })
   check('正常记录·AI 暂停：打印含 AI 解读的报告仍被拦（AI_PAUSED）', (await codeOf(() => w.call('print', reader, () => w.controller.print(r.taskId, reader)))) === 'AI_PAUSED')
   check('正常记录·AI 暂停：附加含 AI 解读的报告仍被拦（AI_PAUSED）',
-    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, { resumeFileId: 'resume-1' } as never, reader)))) === 'AI_PAUSED')
+    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, ownerlessResumeBody() as never, reader)))) === 'AI_PAUSED')
   check('正常记录·AI 暂停：读回照常', (await codeOf(() => w.call('latest', reader, () => w.controller.latest(r.taskId, reader)))) === 'PASS')
 
   // 附加含 AI 解读时按 export 档：不花钱、不要求使用声明；导出前登录仍拦匿名。
   w.setConfig(OFF)
   w.setSimulate('AI_BUDGET_EXHAUSTED')
   check('含 AI 解读的附加按 export：额度用完不拦',
-    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, { resumeFileId: 'resume-1' } as never, reader)))) === 'PASS')
+    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, ownerlessResumeBody() as never, reader)))) === 'PASS')
   w.setSimulate(null)
   w.setConfig({ ...OFF, loginGate: 'before_export' })
   check('含 AI 解读的附加按 export：导出前须登录时匿名被拦',
-    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, { resumeFileId: 'resume-1' } as never, reader)))) === 'AI_LOGIN_REQUIRED')
+    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, ownerlessResumeBody() as never, reader)))) === 'AI_LOGIN_REQUIRED')
   w.setConfig({ ...OFF, declarationEnforced: true })
   check('含 AI 解读的附加按 export：使用声明不拦导出',
-    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, { resumeFileId: 'resume-1' } as never, reader)))) === 'PASS')
+    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, ownerlessResumeBody() as never, reader)))) === 'PASS')
 
   const nc = makeWorld({ simulate: 'AI_PROVIDER_NOT_CONFIGURED' })
   const ncRes = await nc.call('submit', req, () => nc.controller.submit(BODY as never, req)).catch(() => null) as SubmitResult | null

@@ -50,7 +50,7 @@ import { CompaniesService } from '../src/companies/companies.service'
 import { FairMaterialService } from '../src/jobs/fair-material.service'
 import { OfflineAgenciesService } from '../src/offline-agencies/offline-agencies.service'
 import { BulkPublishService } from '../src/bulk-publish/bulk-publish.service'
-import { AdminOrgContentTrustService } from '../src/orgs/admin-org-content-trust.service'
+import { AdminOrgContentTrustService, type PublicContentCache } from '../src/orgs/admin-org-content-trust.service'
 import type { JobsService } from '../src/jobs/jobs.service'
 import type { PrismaService } from '../src/prisma/prisma.service'
 import type { AuditService } from '../src/audit/audit.service'
@@ -737,7 +737,8 @@ async function main(): Promise<void> {
   console.log('\n[6] 标记入口:Admin 标 active 之后,原本被拒的内容才能发布')
   {
     const f = buildFixture()
-    const trustSvc = new AdminOrgContentTrustService(f.prisma, fakeAudit)
+    const trustCache: PublicContentCache = { async deleteByPrefix() {} }
+    const trustSvc = new AdminOrgContentTrustService(f.prisma, fakeAudit, trustCache)
 
     await assertDeniedByGate('标记前:该机构的岗位发不了', () => f.jobsAdmin.publishJobSource('job-null', 'publish', user))
 

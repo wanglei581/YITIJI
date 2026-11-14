@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   VERIFIED_PRINT_PARAMETER_PROFILE,
   type ColorMode,
@@ -25,7 +25,7 @@ import {
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { printUploadPathForSource, type PrintFileState } from './printMaterialSession'
-import { patchPrintHandoff, type PrintHandoffContext } from './printHandoff'
+import { patchPrintHandoff, readPrintReturnCarry, type PrintHandoffContext } from './printHandoff'
 import { usePreviewPrintParams } from './usePreviewPrintParams'
 import { computePrintUsageEstimate } from './printUsageEstimate'
 import { countPagesInRange } from './pageRange'
@@ -146,6 +146,7 @@ export function PrintPreviewPage({
   onBackToCheck?: () => void
 } = {}) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { getToken } = useAuth()
 
   const emptyFile: PrintFile = { name: '', size: '', pages: null }
@@ -159,7 +160,19 @@ export function PrintPreviewPage({
   const exempt = handoff?.checkPolicy === 'exempt'
   const privacyGate = exempt ? { kind: 'ready' as const, confirmationLabel: null } : privacyPreviewGate(materialCheck, file)
   const materialCheckComplete = exempt || isPrintDeskPreviewAuthorized(materialCheck, file)
-  const backToPrevious = () => (handoff?.returnPath ? navigate(handoff.returnPath) : navigate(-1))
+  const backToPrevious = () => {
+    const routeState = location.state
+    const raw = routeState && typeof routeState === 'object' && !Array.isArray(routeState)
+      ? (routeState as { printReturnState?: unknown }).printReturnState
+      : undefined
+    const carry = readPrintReturnCarry(raw)
+    if (carry) {
+      navigate({ pathname: carry.pathname, search: carry.search }, { state: carry.state })
+      return
+    }
+    if (handoff?.returnPath) navigate(handoff.returnPath)
+    else navigate(-1)
+  }
   const [handoffError, setHandoffError] = useState<string | null>(null)
 
   const {

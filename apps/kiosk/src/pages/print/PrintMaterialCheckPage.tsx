@@ -365,6 +365,7 @@ export function PrintMaterialCheckPage({
           inspection = await createMaterialTask({
             kind: 'inspection',
             sourceFileId: fileId,
+            fileAccessUrl: file.fileUrl,
             params: { expectedPaperSize: 'A4', source: 'kiosk_print' },
           }, token)
         }
@@ -388,6 +389,7 @@ export function PrintMaterialCheckPage({
           normalize = await createMaterialTask({
             kind: 'normalize_a4',
             sourceFileId: fileId,
+            fileAccessUrl: file.fileUrl,
             params: { targetPaperSize: 'A4', source: 'kiosk_print' },
           }, token)
         }
@@ -410,6 +412,7 @@ export function PrintMaterialCheckPage({
           pii = await createMaterialTask({
             kind: 'pii_scan',
             sourceFileId: fileId,
+            fileAccessUrl: file.fileUrl,
             params: {
               scanScope: 'print_preview',
               ...(session?.contentCategory ? { contentCategory: session.contentCategory } : {}),
@@ -549,6 +552,7 @@ export function PrintMaterialCheckPage({
       const redactionTask = await createMaterialTask({
         kind: 'pii_redact',
         sourceFileId: file.fileId,
+        fileAccessUrl: file.fileUrl,
         params: { decisionTaskId: decidedTask.id },
       }, token, decidedTask.accessToken ?? piiTask.accessToken)
       persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: redactionTask })

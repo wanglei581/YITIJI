@@ -63,7 +63,7 @@ function pass(message: string): void {
 }
 function fail(message: string): never {
   console.error(`  FAIL ${message}`)
-  process.exit(1)
+  throw new Error(message)
 }
 function assert(cond: unknown, message: string): void {
   if (cond) pass(message)

@@ -90,7 +90,8 @@ async function main() {
 
   try {
     // ── 测试数据 ──────────────────────────────────────────────
-    await prisma.organization.create({ data: { id: orgId, name: `测试机构${tag}`, type: 'licensed_hr_agency' } })
+    // 公开读政策要求来源机构内容可信。不标的话第 5 步政策浏览会 NotFound。
+    await prisma.organization.create({ data: { id: orgId, name: `测试机构${tag}`, type: 'licensed_hr_agency', contentTrustStatus: 'active' } })
     const a = await prisma.endUser.create({ data: { phoneHash: `ha-${tag}`, phoneEnc: 'enc-a' } })
     const b = await prisma.endUser.create({ data: { phoneHash: `hb-${tag}`, phoneEnc: 'enc-b' } })
     userA = a.id; userB = b.id

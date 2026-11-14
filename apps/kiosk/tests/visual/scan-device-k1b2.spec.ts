@@ -268,6 +268,11 @@ test('feeder reports pages only from the cloud, reloads, then finishes for a gue
 
 test('flatbed asks for another page, then finishes without using 50 as the cap @w2', async ({ page, api }) => {
   test.setTimeout(120_000)
+  // 意图带右上角的钟（QxTouchClock）显示「时:分」。真实时间落在某点 50 分时它就是「19:50」，
+  // 下面那条宽断言 getByText('50') 撞上的是钟，不是上限（CI 运行 43590028686：11:50:25Z 即上海 19:50，
+  // 重试还在同一分钟，于是两次都红）。把页面时钟钉在上海 10:00 起照常走，
+  // 宽断言照旧管住页面上任何写法的 50（最多 50 页、/50、50 页）。
+  await page.clock.install({ time: new Date('2026-11-14T02:00:00.000Z') })
   const cloud: Cloud = {
     status: 'waiting',
     deviceState: 'ready',

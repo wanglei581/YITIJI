@@ -25,6 +25,8 @@ export type { SummaryRow }
 type Props = {
   step: 4
   freePricing: boolean
+  /** 公示价重读失败：费用区整段不画，避免「应付 x 元」或「免费试运营」和失败说明同时出现。 */
+  hideQuotedAmount?: boolean
   screen: PrintConfirmScreen
   invalidReason: string
   file: PrintFileState
@@ -76,7 +78,7 @@ function pagesCopies(quote: QuoteView, file: PrintFileState, copiesLabel?: strin
 
 export function PrintConfirmView(props: Props) {
   const {
-    freePricing, screen, invalidReason, file, summaryRows, adjustments, paperNote, pricedParamsLabel, quote, costCalcLabel,
+    freePricing, hideQuotedAmount = false, screen, invalidReason, file, summaryRows, adjustments, paperNote, pricedParamsLabel, quote, costCalcLabel,
     amountText, benefitView, redactionText, materialDemo, printerBlocked, printerBlockedReason,
     terminalFailed, terminalFailedText, selfAssessment, printNotes, actions,
     submitError, onLogin, preview = null, sheetsLabel = null, settingsLabel = null, copiesLabel = null, docked = false,
@@ -240,7 +242,7 @@ export function PrintConfirmView(props: Props) {
             </div>
           ) : null}
 
-          {freePricing ? (
+          {hideQuotedAmount ? null : freePricing ? (
             <section className="pdk-fee pct-fee" aria-label="页数核定" data-tone={readyZero ? undefined : 'warn'}>
               {readyZero ? (
                 <>
@@ -302,7 +304,7 @@ export function PrintConfirmView(props: Props) {
 
           {selfAssessment}
           <div className="pct-benefit-row">
-            {!freePricing && ready && (quotedLike || screen === 'capability-invalid-params') ? (
+            {!hideQuotedAmount && !freePricing && ready && (quotedLike || screen === 'capability-invalid-params') ? (
               <CouponUnavailable free={quote.amountCents === 0} />
             ) : null}
             {!freePricing && benefitView ? <BenefitCard view={{ ...benefitView, detail: preferUnattended(benefitView.detail, `价目与权益都来自机构配置。取不到就不显示金额、不试算抵扣，也不会拿上一次的价格当现价。请稍后重试。${helpNeededLine()}`) }} onLogin={onLogin} /> : null}

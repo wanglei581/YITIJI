@@ -214,6 +214,15 @@ function requireRow(terminalId: string): DemoRow {
   return row
 }
 
+/** 改绑或解绑后，演示底稿跟后端一样回到机构承担、五个价清空。按 id 或终端编号找。 */
+export function resetDemoChargeOnOrgChange(terminalKey: string, orgBound: boolean): void {
+  const row = rows.get(terminalKey) ?? [...rows.values()].find((item) => item.terminalCode === terminalKey)
+  if (!row) return
+  row.userChargeMode = 'org_pays'
+  row.configured = zeros()
+  row.orgBound = orgBound
+}
+
 export async function demoGetChargeSettings(terminalId: string): Promise<DemoChargeSettings> {
   return toView(requireRow(terminalId))
 }

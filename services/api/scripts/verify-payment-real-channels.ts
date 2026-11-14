@@ -76,7 +76,7 @@ function pass(message: string): void {
 }
 function fail(message: string): never {
   console.error(`  FAIL ${message}`)
-  process.exit(1)
+  throw new Error(message)
 }
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
   try {

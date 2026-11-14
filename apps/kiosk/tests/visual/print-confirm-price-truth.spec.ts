@@ -401,6 +401,66 @@ for (const scenario of [
   })
 }
 
+function registerHomeReads(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { asrEnabled: false, ttsEnabled: false },
+  })
+  for (const docType of ['terms_of_service', 'privacy_policy']) {
+    api.respond('GET', `/api/v1/kiosk/legal/${docType}`, {
+      status: 200,
+      json: { success: true, data: { version: '2026-09-01', title: docType, status: 'active' } },
+    })
+  }
+}
+
+test('first confirm visit reads the current machine price instead of the 30s cache @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  registerHomeReads(api)
+  let changed = false
+  api.respondWith('GET', KIOSK_CONFIG_PATH, () => {
+    const bw = changed ? 30 : 20
+    return {
+      status: 200,
+      json: withMachinePricing(terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'price-truth'), bw, UNIT_CENTS.color),
+    }
+  })
+  await routeQuote(page, () => ({ unitCents: changed ? 30 : 20, pages: W2_FILE.pages }))
+
+  // 先把交接写进这一页，再整页进入首页。首页这次加载会把改价前的单价放进 30 秒缓存。
+  // 之后只走站内跳转，不能再整页重载，否则缓存会被清掉，测不到「确认页第一次读价」。
+  await page.goto('/print/confirm')
+  await writePrintHandoff(page, { printParams: W2_PRINT_PARAMS, materialCheck: null })
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByTestId('home-device-status')).toBeVisible({ timeout: 20000 })
+  await expect.poll(() => api.requestCount('GET', '/api/v1/jobs'), { timeout: 30000 }).toBeGreaterThan(0)
+  await page.waitForTimeout(400)
+  const readsBefore = api.requestCount('GET', KIOSK_CONFIG_PATH)
+  changed = true
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/print/confirm')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+  })
+
+  await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible({ timeout: 20000 })
+  await expectConfirmAmount(page, 30 * W2_FILE.pages)
+  await expect(page.getByRole('button', { name: '去付款' })).toBeVisible()
+  await expect(page.getByText('价格刚更新过')).toHaveCount(0)
+  await expect(page.getByText('本屏报价已不是现价')).toHaveCount(0)
+  await expect(page.getByText('不要按本屏金额付款')).toHaveCount(0)
+  await expect(page.getByText('现行公示单价')).toHaveCount(0)
+  await expect.poll(() => api.requestCount('GET', KIOSK_CONFIG_PATH)).toBeGreaterThan(readsBefore)
+})
+
 test('price change re-read failure shows only the unavailable sentence @kiosk', async ({ page, api }) => {
   registerShell(api, [])
   const prices = registerPriceConfig(api, [20, 30], true)
@@ -414,11 +474,35 @@ test('price change re-read failure shows only the unavailable sentence @kiosk', 
   await originalConfirm(page).click()
 
   await expect.poll(() => api.requestCount('GET', KIOSK_CONFIG_PATH)).toBeGreaterThan(configReadsBeforeConfirm)
-  await expect(page.getByText('本机没能取到现行价目', { exact: true })).toBeVisible()
+  await expect(page.getByText('本机没能取到现行价目', { exact: true }).first()).toBeVisible()
+  await expect(page.locator('.qxt-status')).toContainText('本机没能取到现行价目')
+  await expect(page.locator('.pcf-benefit-detail')).toContainText('取不到就不显示金额')
+  await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  await expect(page.getByText('应付 0.60 元')).toHaveCount(0)
   await expect(page.getByText('本屏报价已不是现价')).toHaveCount(0)
   await expect(page.getByText('不要按本屏金额付款')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /按新金额/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '去付款' })).toHaveCount(0)
+})
+
+test('free order after a price change still explains a failed price reread @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  const prices = registerPriceConfig(api, [20, 0], true)
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  await routeJobs(page, [{ status: 409, unitCents: 0 }], prices.markChanged)
+
+  await openConfirm(page)
+  await expect(originalConfirm(page)).toBeEnabled()
+  await originalConfirm(page).click()
+
+  await expect(page.getByRole('button', { name: '重新报价' })).toBeVisible()
+  await expect(page.locator('.qxt-status')).toContainText('本机没能取到现行价目')
+  await expect(page.locator('.pcf-benefit-title')).toContainText('本机没能取到现行价目')
+  await expect(page.locator('.pcf-benefit-detail')).toContainText('取不到就不显示金额')
+  await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  await expect(page.getByText('免费试运营')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '去付款' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '确认并打印' })).toHaveCount(0)
 })
 
 test('rapid repeated confirm sends exactly one create request @kiosk', async ({ page, api }) => {
@@ -529,6 +613,72 @@ test('merged self-assessment file is quoted before submit, generated once, and i
   expect(jobs[0]?.['fileUrl']).toBe(MERGED_URL)
   expect(jobs[0]?.['quotedAmountCents']).toBe(120)
   expect(pageErrors).toEqual([])
+})
+
+const APPEND_UNAVAILABLE = '这份文件不能附加自我探索，已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。'
+const APPEND_UNAVAILABLE_SHORT = '这份文件不能附加自我探索。'
+const APPEND_RETRY = '合并版没有生成，本次没有建单。可以再点一次确认重试，或取消勾选「附加自我探索」直接打印原文件。'
+
+test('append 404 tells the truth, unchecks, and the next confirm prints the original file @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  registerCashier(api, 40)
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
+  await page.route(`**/api/v1/resume/self-assessment/${SA_TASK_ID}/append`, async (route: Route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'RESUME_FILE_NOT_FOUND', message: '简历文件不存在' } }),
+    })
+  })
+
+  await openConfirm(page, true)
+  const mergeToggle = page.getByRole('checkbox', { name: /附加自我探索/ })
+  await mergeToggle.check()
+  await page.getByRole('button', { name: '打印合并版（简历+自我探索）' }).click()
+
+  await expect(mergeToggle).not.toBeChecked()
+  await expect(mergeToggle).toBeDisabled()
+  await expect(page.getByText(APPEND_UNAVAILABLE, { exact: true })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: APPEND_UNAVAILABLE_SHORT })).toBeVisible()
+  await expect(page.getByText('稍后重试')).toHaveCount(0)
+  await expect(page.getByText('提交失败')).toHaveCount(0)
+  expect(jobs).toHaveLength(0)
+
+  await originalConfirm(page).click()
+  await page.waitForURL('**/print/cashier')
+  expect(jobs).toHaveLength(1)
+  expect(jobs[0]?.['fileUrl']).toBe(W2_FILE.fileUrl)
+})
+
+test('append 500 keeps the checkbox and a second confirm calls append again @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
+  let appendCalls = 0
+  await page.route(`**/api/v1/resume/self-assessment/${SA_TASK_ID}/append`, async (route: Route) => {
+    appendCalls += 1
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'INTERNAL_SERVER_ERROR', message: '服务器内部错误' } }),
+    })
+  })
+
+  await openConfirm(page, true)
+  const mergeToggle = page.getByRole('checkbox', { name: /附加自我探索/ })
+  await mergeToggle.check()
+  const mergeButton = page.getByRole('button', { name: '打印合并版（简历+自我探索）' })
+  await mergeButton.click()
+
+  await expect(page.getByText(APPEND_RETRY, { exact: true })).toBeVisible()
+  await expect(mergeToggle).toBeChecked()
+  await expect(mergeToggle).toBeEnabled()
+  expect(jobs).toHaveLength(0)
+
+  await mergeButton.click()
+  await expect.poll(() => appendCalls).toBe(2)
+  expect(jobs).toHaveLength(0)
 })
 
 for (const viewport of [

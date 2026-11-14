@@ -582,6 +582,7 @@ async function main(): Promise<void> {
     })
     const rebound = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: ORG_OTHER }, adminHeaders)
     expectStatus(rebound, 200, '公共点位改绑到非公共机构')
+    assert.equal(rebound.json.data?.chargeSettingsReset, true, '改绑机构的响应要标明收费设置已复位')
     const reboundView = await call('GET', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/charge-settings`, undefined, adminHeaders)
     const reboundData = reboundView.json.data as EffectiveBody
     assert.equal(reboundData.userChargeMode, 'org_pays')
@@ -604,6 +605,7 @@ async function main(): Promise<void> {
     })
     const sameOrg = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: ORG_OTHER }, adminHeaders)
     expectStatus(sameOrg, 200, '同一机构再绑一次')
+    assert.equal(sameOrg.json.data?.chargeSettingsReset, false, '机构没变，响应不能再说已复位')
     const kept = await prisma.terminal.findUnique({ where: { id: PUBLIC_TERMINAL }, select: { userChargeMode: true } })
     const keptScan = await prisma.terminalServicePrice.findUnique({
       where: { terminalId_serviceKey: { terminalId: PUBLIC_TERMINAL, serviceKey: 'scan' } },
@@ -621,6 +623,7 @@ async function main(): Promise<void> {
 
     const unbound = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: null }, adminHeaders)
     expectStatus(unbound, 200, '解绑机构')
+    assert.equal(unbound.json.data?.chargeSettingsReset, true, '解绑的响应要标明收费设置已复位')
     const unboundRow = await prisma.terminal.findUnique({
       where: { id: PUBLIC_TERMINAL },
       select: { userChargeMode: true, orgId: true, servicePrices: { select: { serviceKey: true } } },
@@ -641,6 +644,7 @@ async function main(): Promise<void> {
     })
     const bound = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: ORG_SCHOOL }, adminHeaders)
     expectStatus(bound, 200, '绑定机构')
+    assert.equal(bound.json.data?.chargeSettingsReset, true, '绑定的响应要标明收费设置已复位')
     const boundRow = await prisma.terminal.findUnique({
       where: { id: PUBLIC_TERMINAL },
       select: { userChargeMode: true, orgId: true, servicePrices: true },

@@ -53,7 +53,7 @@ function pass(message: string): void {
 
 function fail(message: string): never {
   console.error(`  FAIL ${message}`)
-  process.exit(1)
+  throw new Error(message)
 }
 
 async function main(): Promise<void> {

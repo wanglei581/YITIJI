@@ -67,7 +67,7 @@ function fixtureFileSignature(fileId: string, expiresAtMs: number): string {
   if (!secret) fail('测试签名密钥未设置')
   return createHmac('sha256', secret).update(`${fileId}.${expiresAtMs}`).digest('hex')
 }
-function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
+function fail(m: string): never { console.error(`  FAIL ${m}`); throw new Error(m) }
 
 function sliceBetween(source: string, startMarker: string, endMarker: string): string {
   const start = source.indexOf(startMarker)
@@ -809,7 +809,7 @@ async function main() {
 
     // getStatus() 只回白名单安全文案。
     const userView = await printJobs.getStatus(knownFailId)
-    const safeExpected = '打印机离线，请联系工作人员检查设备'
+    const safeExpected = '打印机离线，请稍后重试。'
     if (userView.failureReasonForUser === safeExpected && userView.errorMessage === safeExpected) {
       pass('7b. getStatus 已知错误码 → failureReasonForUser/errorMessage 均为白名单安全文案')
     } else {

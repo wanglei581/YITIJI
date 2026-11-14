@@ -8,6 +8,7 @@
 // 合规:info-only;政策说明 + 官方入口,不承诺补贴到账、不代申请。
 // ============================================================
 
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 
 export interface PolicyPostView {
@@ -74,7 +75,7 @@ async function fetchPolicies(params?: PolicyQueryParams): Promise<PublishedPolic
   if (params?.page) query.set('page', String(params.page))
   if (params?.pageSize) query.set('pageSize', String(params.pageSize))
   const qs = query.toString()
-  const res = await fetch(`${API_BASE_URL}/policies${qs ? `?${qs}` : ''}`, {
+  const res = await terminalAttributedFetch(`${API_BASE_URL}/policies${qs ? `?${qs}` : ''}`, {
     headers: { Accept: 'application/json' },
   })
   if (!res.ok) throw new Error(`请求失败（${res.status}）`)
@@ -145,7 +146,7 @@ export async function getPublishedPolicy(id: string): Promise<PublishedPolicyLoo
     return found ? { status: 'found', policy: found } : { status: 'missing' }
   }
   try {
-    const res = await fetch(`${API_BASE_URL}/policies/${encodeURIComponent(trimmed)}`, {
+    const res = await terminalAttributedFetch(`${API_BASE_URL}/policies/${encodeURIComponent(trimmed)}`, {
       headers: { Accept: 'application/json' },
     })
     if (res.status === 404) return { status: 'missing' }

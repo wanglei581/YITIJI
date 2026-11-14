@@ -279,6 +279,8 @@ export interface AssignTerminalOrgResult {
   oldOrgId: string | null
   newOrgId: string | null
   orgName: string | null
+  /** 这次归属变了，收费设置已复位。没变就是 false。 */
+  chargeSettingsReset: boolean
 }
 
 export interface UpdateTerminalProfileInput {
