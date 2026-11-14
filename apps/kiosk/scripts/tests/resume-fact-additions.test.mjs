@@ -986,6 +986,50 @@ test('第八版点名的三组混写仍整串读，和另一边对不上', () =>
   }
 })
 
+test('删掉后段仍要本人确认，段内补万和多段阿拉伯数字都算同一条', () => {
+  assertBothKeys('年营收2亿三千五百万', '', ['raw:2亿三千五百万'])
+  assertBothKeys('年营收两亿2千5百万', '', ['raw:两亿2千5百万'])
+  assertBothKeys('月薪一万2千5百', '', ['raw:一万2千5百'])
+  assertBothKeys('年营收2亿三千', '', ['num:200000000', 'num:3000'])
+  assertBothKeys('月薪1万两千三百万', '', ['num:10000', 'num:23000000'])
+  const shortened = [
+    ['年营收2亿三千五百万', '年营收2亿'],
+    ['年营收两亿2千5百万', '年营收两亿'],
+    ['月薪一万2千5百', '月薪一万2千'],
+    ['月薪两万5千3百', '月薪两万5千'],
+  ]
+  for (const [input, ai] of shortened) {
+    assert.equal(findFactAdditions(ai, input).length >= 1, true, `${input} -> ${ai}`)
+    assert.equal(apiFindFactAdditions(ai, input).length >= 1, true, `api ${input} -> ${ai}`)
+  }
+  assertBothEmpty('投入1万两千三百万', '投入1万，参与两千三百万项目')
+  assertBothEmpty('投入1万，参与两千三百万项目', '投入1万两千三百万')
+})
+
+test('同族混写删掉后段都不漏报', () => {
+  const family = [
+    [['3万', '1万'], ['两千', '两千五百', '五千三百', '两千零五十']],
+    [['5千', '3千'], ['三百', '三百五十', '五百二十']],
+    [['2亿', '1亿'], ['三千万', '三千五百万', '两千三百万', '一千零五十万']],
+    [['一万', '两万', '三万'], ['2千', '2千5百', '5千3百']],
+    [['三千', '五千'], ['5百', '5百3十']],
+    [['两亿', '一亿'], ['2千万', '2千5百万', '3千5百万']],
+  ]
+  let total = 0
+  for (const [heads, tails] of family) {
+    for (const head of heads) {
+      for (const tail of tails) {
+        total += 1
+        const input = `年营收${head}${tail}`
+        const ai = `年营收${head}`
+        assert.equal(findFactAdditions(ai, input).length >= 1, true, input)
+        assert.equal(apiFindFactAdditions(ai, input).length >= 1, true, `api ${input}`)
+      }
+    }
+  }
+  assert.equal(total, 41)
+})
+
 test('删掉第二条后把第一条里 AI 写大的数改短，仍要本人确认', () => {
   const base = '负责生鲜区上货和每晚盘点交接'
   const input = shellResume([
