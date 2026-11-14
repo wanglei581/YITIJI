@@ -63,6 +63,12 @@ function assertWired(): void {
   assert.match(read(join(REPO_ROOT, 'apps/admin/src/routes/print-scan/index.tsx')), /PrintQueueTimeoutCard/)
   assert.equal(failureReasonForUser(PRINT_QUEUE_TIMEOUT), SCREEN)
   assert.equal(failureReasonForUser(PRINT_QUEUE_TIMEOUT).includes('工作人员'), false)
+  assert.equal(failureReasonForUser('PRINTER_OFFLINE'), '打印机离线，请稍后重试。')
+  assert.equal(failureReasonForUser('PAPER_EMPTY'), '打印机缺纸，当前无法打印。')
+  assert.equal(failureReasonForUser('PRINTER_ERROR'), '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。')
+  for (const code of ['PRINTER_OFFLINE', 'PAPER_EMPTY', 'PRINTER_ERROR']) {
+    assert.equal(failureReasonForUser(code).includes('工作人员'), false, code)
+  }
   execFileSync(process.execPath, [join(REPO_ROOT, 'apps/kiosk/scripts/verify-print-queue-timeout-copy.cjs')], {
     stdio: 'inherit',
   })

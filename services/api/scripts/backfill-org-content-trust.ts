@@ -34,16 +34,23 @@
  *   - 已经是目标状态:报告 NOOP,仍然重写 reviewedBy/At(这是一次新的人工决策),
  *     但只在 --apply 时写。
  *   - 任何一条被拒绝,进程退出码为 1 —— 不允许「部分失败但看起来成功」。
+ *   - --apply 且至少改了一条时,清社区动态和早报的公开缓存。清失败只记警告和审计,
+ *     不把已经写进库的回填打成失败。dry-run 不清缓存。
  */
-import 'dotenv/config'
+import { Logger } from '@nestjs/common'
+import Redis from 'ioredis'
 import { PrismaService } from '../src/prisma/prisma.service'
-import { ORG_CONTENT_TRUST_STATUSES } from '../src/orgs/admin-org-content-trust.service'
-
-process.env['DATABASE_URL'] ||= 'file:./prisma/dev.db'
+import { AuditService } from '../src/audit/audit.service'
+import {
+  ORG_CONTENT_TRUST_STATUSES,
+  RedisPublicContentCache,
+  invalidatePublicContentCache,
+  type PublicContentCache,
+} from '../src/orgs/admin-org-content-trust.service'
 
 const SCRIPT_ACTOR_ROLE = 'script:backfill-org-content-trust'
 
-interface Args {
+interface CliArgs {
   ids: string[]
   reason: string
   status: string
@@ -52,7 +59,16 @@ interface Args {
   apply: boolean
 }
 
-function readArgs(argv: string[]): Args {
+export interface OrgContentTrustBackfillArgs {
+  ids: string[]
+  reason: string
+  status: string
+  actorId: string | null
+  operator: string
+  apply: boolean
+}
+
+function readArgs(argv: string[]): CliArgs {
   const ids: string[] = []
   let reason = ''
   let status = 'active'
@@ -82,7 +98,114 @@ function usage(message: string): never {
   process.exit(2)
 }
 
+/** dry-run 不调用。--apply 且至少写入一条之后清公开缓存；Redis 不可用也不抛。 */
+export async function applyOrgContentTrustBackfill(
+  prisma: PrismaService,
+  args: OrgContentTrustBackfillArgs,
+  cache: PublicContentCache,
+): Promise<{ changed: number; rejected: number; applied: number }> {
+  let changed = 0
+  let rejected = 0
+  let applied = 0
+  let appliedOrgId: string | null = null
+
+  for (const id of args.ids) {
+    const before = await prisma.organization.findUnique({ where: { id } })
+
+    if (!before) {
+      console.error(`  MISSING  ${id} —— 机构不存在,跳过(不会创建)`)
+      rejected++
+      continue
+    }
+    if (args.status === 'active' && before.archivedAt != null) {
+      console.error(
+        `  REJECT   ${id} (${before.name}) —— 已归档 archivedAt=${before.archivedAt.toISOString()},` +
+        '不得标记 active;请先取消归档再重跑',
+      )
+      rejected++
+      continue
+    }
+
+    const fromStatus = before.contentTrustStatus ?? 'null(未标记)'
+    const noop = before.contentTrustStatus === args.status ? '  [已是目标状态,仅刷新核验记录]' : ''
+
+    if (!args.apply) {
+      console.log(`  DRY-RUN  ${id} (${before.name}): ${fromStatus} -> ${args.status}${noop}`)
+      changed++
+      continue
+    }
+
+    const reviewedBy = args.actorId ?? (args.operator ? `${SCRIPT_ACTOR_ROLE}:${args.operator}` : SCRIPT_ACTOR_ROLE)
+    const after = await prisma.organization.update({
+      where: { id },
+      data: {
+        contentTrustStatus: args.status,
+        contentTrustReviewedBy: reviewedBy,
+        contentTrustReviewedAt: new Date(),
+        contentTrustReason: args.reason,
+      },
+    })
+    await prisma.auditLog.create({
+      data: {
+        actorId: args.actorId,
+        actorRole: args.actorId ? 'admin' : SCRIPT_ACTOR_ROLE,
+        action: 'organization.content_trust',
+        targetType: 'organization',
+        targetId: id,
+        payloadJson: JSON.stringify({
+          source: 'backfill-org-content-trust',
+          operator: args.operator || null,
+          fromContentTrustStatus: before.contentTrustStatus,
+          toContentTrustStatus: args.status,
+          reason: args.reason,
+        }),
+      },
+    })
+    console.log(`  APPLIED  ${id} (${before.name}): ${fromStatus} -> ${after.contentTrustStatus}${noop}`)
+    changed++
+    applied++
+    appliedOrgId ??= id
+  }
+
+  if (args.apply && applied > 0 && appliedOrgId) {
+    await invalidatePublicContentCache(
+      cache,
+      new Logger('backfill-org-content-trust'),
+      new AuditService(prisma),
+      { userId: args.actorId, role: args.actorId ? 'admin' : SCRIPT_ACTOR_ROLE },
+      appliedOrgId,
+    )
+  }
+
+  return { changed, rejected, applied }
+}
+
+function openContentTrustCache(): { cache: PublicContentCache; close: () => void } {
+  const url = process.env['REDIS_URL']?.trim()
+  if (!url) {
+    return {
+      cache: {
+        async deleteByPrefix(): Promise<void> {
+          throw new Error('REDIS_URL missing')
+        },
+      },
+      close() {},
+    }
+  }
+  const client = new Redis(url, {
+    maxRetriesPerRequest: 0,
+    connectTimeout: 500,
+    enableOfflineQueue: false,
+  })
+  return {
+    cache: new RedisPublicContentCache(client),
+    close() { client.disconnect() },
+  }
+}
+
 async function main(): Promise<void> {
+  await import('dotenv/config')
+  process.env['DATABASE_URL'] ||= 'file:./prisma/dev.db'
   const args = readArgs(process.argv.slice(2))
 
   if (args.ids.length === 0) usage('必须显式传 --ids=<机构id列表>,不接受空集合、不支持全量。')
@@ -103,6 +226,7 @@ async function main(): Promise<void> {
       console.error(`\n[backfill-org-content-trust] --actor=${args.actor} 不是存在的 User.id;`)
       console.error('AuditLog.actorId 有外键约束,传错会导致「库改了但审计没落」。')
       console.error('要么传真实管理员 User.id,要么不传 --actor(审计 actorId 落 null,执行人写 --operator)。')
+      await prisma.onModuleDestroy?.()
       process.exit(2)
     }
     actorId = actorRow.id
@@ -115,78 +239,35 @@ async function main(): Promise<void> {
   console.log(`审计 actorId: ${actorId ?? 'null(脚本执行)'}  operator: ${args.operator || '(未提供)'}`)
   console.log(`机构数量: ${args.ids.length}\n`)
 
-  let changed = 0
-  let rejected = 0
-
+  const cacheHandle = args.apply
+    ? openContentTrustCache()
+    : { cache: { async deleteByPrefix() {} }, close() {} }
+  let result = { changed: 0, rejected: 0, applied: 0 }
   try {
-    for (const id of args.ids) {
-      const before = await prisma.organization.findUnique({ where: { id } })
-
-      if (!before) {
-        console.error(`  MISSING  ${id} —— 机构不存在,跳过(不会创建)`)
-        rejected++
-        continue
-      }
-      if (args.status === 'active' && before.archivedAt != null) {
-        console.error(
-          `  REJECT   ${id} (${before.name}) —— 已归档 archivedAt=${before.archivedAt.toISOString()},` +
-          '不得标记 active;请先取消归档再重跑',
-        )
-        rejected++
-        continue
-      }
-
-      const fromStatus = before.contentTrustStatus ?? 'null(未标记)'
-      const noop = before.contentTrustStatus === args.status ? '  [已是目标状态,仅刷新核验记录]' : ''
-
-      if (!args.apply) {
-        console.log(`  DRY-RUN  ${id} (${before.name}): ${fromStatus} -> ${args.status}${noop}`)
-        changed++
-        continue
-      }
-
-      const reviewedBy = actorId ?? (args.operator ? `${SCRIPT_ACTOR_ROLE}:${args.operator}` : SCRIPT_ACTOR_ROLE)
-      const after = await prisma.organization.update({
-        where: { id },
-        data: {
-          contentTrustStatus: args.status,
-          contentTrustReviewedBy: reviewedBy,
-          contentTrustReviewedAt: new Date(),
-          contentTrustReason: args.reason,
-        },
-      })
-      await prisma.auditLog.create({
-        data: {
-          actorId,
-          actorRole: actorId ? 'admin' : SCRIPT_ACTOR_ROLE,
-          action: 'organization.content_trust',
-          targetType: 'organization',
-          targetId: id,
-          payloadJson: JSON.stringify({
-            source: 'backfill-org-content-trust',
-            operator: args.operator || null,
-            fromContentTrustStatus: before.contentTrustStatus,
-            toContentTrustStatus: args.status,
-            reason: args.reason,
-          }),
-        },
-      })
-      console.log(`  APPLIED  ${id} (${before.name}): ${fromStatus} -> ${after.contentTrustStatus}${noop}`)
-      changed++
-    }
+    result = await applyOrgContentTrustBackfill(prisma, {
+      ids: args.ids,
+      reason: args.reason,
+      status: args.status,
+      actorId,
+      operator: args.operator,
+      apply: args.apply,
+    }, cacheHandle.cache)
   } finally {
+    cacheHandle.close()
     await prisma.onModuleDestroy?.()
   }
 
-  console.log(`\n结果: ${args.apply ? '已写库' : '未写库(dry-run)'} ${changed} 条,拒绝/缺失 ${rejected} 条`)
+  console.log(`\n结果: ${args.apply ? '已写库' : '未写库(dry-run)'} ${result.changed} 条,拒绝/缺失 ${result.rejected} 条`)
   if (!args.apply) console.log('要真正写库,请在同样的参数后加 --apply 重跑。')
-  if (rejected > 0) {
+  if (result.rejected > 0) {
     console.error('存在被拒绝或缺失的机构 —— 退出码 1,请逐条处理后重跑。')
     process.exit(1)
   }
 }
 
-main().catch((e) => {
-  console.error(e)
-  process.exit(1)
-})
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
+}

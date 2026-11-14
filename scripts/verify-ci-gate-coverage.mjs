@@ -59,6 +59,8 @@ const REQUIRED_COMMANDS = [
   // 发布走完备份/构建/迁移后 API 启动即拒、pm2 崩溃循环。钉在这里，不许被悄悄摘掉。
   'pnpm verify:deploy-gates-in-sync',
   'pnpm verify:release-bundle',
+  // 2026-11-09：发布拉取超时后孤儿 ssh 占住会话，「Deploy via SSH」挂到手动取消。演练门禁钉在这里。
+  'pnpm verify:deploy-fetch-cleanup',
   'pnpm verify:prod-readonly-probe',
   'pnpm --filter @ai-job-print/miniapp verify:static',
   // X-01：terminal-agent 必须进 CI lint。摘掉这一行等于让 Agent 再回到「11 条 eslint error 无人拦」。

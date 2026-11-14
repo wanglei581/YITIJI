@@ -20,6 +20,7 @@ import { NestFactory } from '@nestjs/core'
 import { RedisService } from '../src/common/redis/redis.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { LlmConfigService } from '../src/ai/llm/llm-config.service'
 import { TrtcController } from '../src/trtc/trtc.controller'
 import { TrtcService } from '../src/trtc/trtc.service'
 import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
@@ -42,8 +43,11 @@ async function main(): Promise<void> {
   assert.match(startBlock, /@UseGuards\(TerminalIdentityGuard\)/, 'POST /trtc/session must use TerminalIdentityGuard')
   assert.doesNotMatch(stopBlock, /@UseGuards\(TerminalIdentityGuard\)/, 'POST /trtc/session/stop must stay open to the capability token')
   assert.match(moduleSource, /TerminalsModule/, 'TrtcModule must import TerminalsModule so the guard can be constructed')
+  assert.match(moduleSource, /AiModule/, 'TrtcModule must import AiModule so the digital_human switch can be read')
+  assert.match(startBlock, /getConfig\('digital_human'\)/, 'POST /trtc/session must read the digital_human enable bit before starting a billed session')
 
   const terminalA = 'trtc_http_terminal_a'
+  let digitalHumanEnabled = true
   const data = new Map<string, string>()
   let terminalEnabled = true
   const started: string[] = []
@@ -93,6 +97,7 @@ async function main(): Promise<void> {
       { provide: RedisService, useValue: redis },
       { provide: PrismaService, useValue: prisma },
       { provide: TrtcService, useValue: trtc },
+      { provide: LlmConfigService, useValue: { getConfig: () => ({ enabled: digitalHumanEnabled }) } },
       {
         provide: TERMINAL_TOKEN_VALIDATOR,
         useValue: {
@@ -130,7 +135,7 @@ async function main(): Promise<void> {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(5000),
       })
-      const payload = await response.json() as { error?: { code?: string }; taskId?: string; ok?: boolean }
+      const payload = await response.json() as { error?: { code?: string; message?: string }; taskId?: string; ok?: boolean }
       return { response, payload }
     }
 
@@ -142,6 +147,19 @@ async function main(): Promise<void> {
       assert.equal(started.length, before, 'missing session must not open a billed conversation')
       passed += 1
       console.log('PASS POST /trtc/session missing terminal session -> 401')
+    }
+
+    {
+      digitalHumanEnabled = false
+      const before = started.length
+      const { response, payload } = await post(base, validHeaders, {})
+      assert.equal(response.status, 503, 'digital_human off')
+      assert.equal(payload.error?.code, 'AI_PAUSED')
+      assert.equal(payload.error?.message, 'AI 服务暂停中，打印扫描照常')
+      assert.equal(started.length, before, 'disabled digital_human must not open a billed conversation')
+      digitalHumanEnabled = true
+      passed += 1
+      console.log('PASS POST /trtc/session digital_human off -> 503 AI_PAUSED')
     }
 
     let stopToken = ''
@@ -189,7 +207,7 @@ async function main(): Promise<void> {
       console.log('PASS POST /trtc/session/stop capability token without terminal session -> 200')
     }
 
-    assert.equal(passed, 5)
+    assert.equal(passed, 6)
   } finally {
     await app.close()
   }

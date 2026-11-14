@@ -66,7 +66,7 @@ test.describe('AI 服务 / 配置（mock 口径）', () => {
   test('规划中的功能标出暂不生效，不能保存或测试', async ({ page }) => {
     const guards = await openAuthed(page, '/ai-config')
     await settleAdminPage(page, guards)
-    for (const name of ['AI数字人引导', 'AI海报生成']) {
+    for (const name of ['AI海报生成']) {
       const card = page.getByRole('button', { name: new RegExp(name) })
       await expect(card).toContainText('规划中，暂不生效')
       await card.click()
@@ -74,6 +74,17 @@ test.describe('AI 服务 / 配置（mock 口径）', () => {
       await expect(page.getByRole('button', { name: '保存并测试连通' })).toBeDisabled()
       await expect(page.getByText('规划中，暂不生效：保存后没有任何功能会读取这项配置。')).toBeVisible()
     }
+  })
+
+  test('AI数字人引导的启用开关写明它管通话，并且可以保存', async ({ page }) => {
+    const guards = await openAuthed(page, '/ai-config')
+    await settleAdminPage(page, guards)
+    const card = page.getByRole('button', { name: /AI数字人引导/ })
+    await expect(card).toContainText('已接入')
+    await expect(card).toContainText('这个开关管一体机数字人语音通话')
+    await card.click()
+    await expect(page.getByRole('button', { name: '保存配置' })).toBeEnabled()
+    await expect(page.getByText('后续接入，目前还没有功能在用')).toHaveCount(0)
   })
 
   test('打印参数预填只让启用开关可改', async ({ page }) => {

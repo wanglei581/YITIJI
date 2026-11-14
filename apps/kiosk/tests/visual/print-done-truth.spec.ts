@@ -124,6 +124,46 @@ test('a plain failure is still shown as a confirmed failure @kiosk', async ({ pa
   await expect(page.getByText('打印结果未确认', { exact: true })).toHaveCount(0)
 })
 
+test('paper-out, jam, and offline each show that reason plus the next step @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  const cases = [
+    {
+      errorCode: 'PAPER_EMPTY',
+      staff: '打印机缺纸，请联系工作人员补纸',
+      reason: '打印机缺纸，当前无法打印。',
+    },
+    {
+      errorCode: 'PRINTER_ERROR',
+      staff: '打印机可能卡纸或发生设备故障，请联系工作人员处理',
+      reason: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。',
+    },
+    {
+      errorCode: 'PRINTER_OFFLINE',
+      staff: '打印机离线，请联系工作人员检查设备',
+      reason: '打印机离线，请稍后重试。',
+    },
+  ] as const
+
+  for (const item of cases) {
+    api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+      status: 200,
+      json: {
+        taskId: TASK_ID,
+        status: 'failed',
+        errorCode: item.errorCode,
+        failureReasonForUser: item.staff,
+      },
+    })
+    await openDoneWithState(page, taskState)
+    const summary = page.getByTestId('print-fulfill-list')
+    await expect(summary.getByText('设备上报', { exact: true })).toBeVisible()
+    await expect(summary).toContainText(item.reason)
+    await expect(summary).toContainText('打印有问题？')
+    await expect(summary).not.toContainText('工作人员')
+    await expect(page.getByText(item.staff, { exact: true })).toHaveCount(0)
+  }
+})
+
 test('completed backend status overrides a forged failure state @kiosk', async ({ page, api }) => {
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
