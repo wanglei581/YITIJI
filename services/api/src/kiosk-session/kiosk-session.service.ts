@@ -91,7 +91,13 @@ export class KioskSessionService {
 
   async end(terminalId: string, dto: EndKioskSessionDto, now = new Date()): Promise<KioskSessionAck> {
     const row = await this.find(terminalId, dto.clientSessionId)
-    if (row.endedAt) return { recorded: false }
+    if (row.endedAt) {
+      // 上次清场钩子抛错时 endedAt 已经写下。重发再跑一次，钩子本身按单幂等。
+      if (this.serviceOrders && typeof this.serviceOrders.onSessionEnded === 'function') {
+        await this.serviceOrders.onSessionEnded(terminalId, dto.clientSessionId)
+      }
+      return { recorded: false }
+    }
     const endedAt = clampReportedTime(dto.endedAt, now, row.startedAt)
     await this.prisma.kioskSession.update({
       where: { id: row.id },

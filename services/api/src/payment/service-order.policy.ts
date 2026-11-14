@@ -19,7 +19,7 @@ export const SERVICE_ORDER_NAMES: Record<ServiceOrderKey, string> = {
   scan: '扫描',
 }
 
-export const SERVICE_ORDER_STATUSES = ['pending', 'paid', 'consumed', 'refunding', 'refunded', 'closed'] as const
+export const SERVICE_ORDER_STATUSES = ['pending', 'paid', 'consumed', 'refunding', 'refunded', 'refund_failed', 'closed'] as const
 
 export type ServiceOrderStatus = (typeof SERVICE_ORDER_STATUSES)[number]
 
@@ -37,6 +37,30 @@ export const SERVICE_REFUND_RETRY_CAP = 8
 
 /** 两次自动退款尝试之间至少隔这么久，避免连打渠道。 */
 export const SERVICE_REFUND_RETRY_INTERVAL_MS = 2 * 60 * 1000
+
+/** 受理中再查时的退避：2、5、15、30 分钟。超过最后一档仍受理中就告警，并保持最后一档。 */
+export const SERVICE_REFUND_BACKOFF_MS = [2, 5, 15, 30].map((minutes) => minutes * 60 * 1000)
+
+/** 向渠道发退款前先占 60 秒。占不到就不再发，避免自动和手动各退一笔。 */
+export const SERVICE_REFUND_LEASE_MS = 60 * 1000
+
+/**
+ * 清扫每批多少张。低于列表截断门禁的 50。
+ * 扫描每一拍只取占用最早的这一批；做成的写下结案时间后离开，下一拍继续。
+ */
+export const SERVICE_SWEEP_BATCH = 30
+
+/** 扫描占单后至少等这么久再判有没有出文件，给文件落地留时间。 */
+export const SERVICE_SCAN_JUDGE_AFTER_MS = 15 * 1000
+
+/** 一直挂着 pending、或任务找不到，超过这个时间按没出文件。 */
+export const SERVICE_SCAN_PENDING_LIMIT_MS = 2 * 60 * 1000
+
+/**
+ * 简历、面试占单后，锁是 120 秒。再留 5 分钟才复核。
+ * 有结果算做成；没有就按没做成。避免请求中断后单永远停在 consumed。
+ */
+export const SERVICE_CONSUMED_REVIEW_AFTER_MS = 120_000 + 5 * 60 * 1000
 
 /** 过期未付、再试窗口、退款重试、扫描有没有出文件，都在这一拍里看。 */
 export const SERVICE_SWEEP_INTERVAL_MS = 30 * 1000
@@ -85,3 +109,5 @@ export const SERVICE_REFUND_REASON_LEFT = '人已离开，这一次还没用'
 export const SERVICE_REFUND_REASON_RETRY_EXPIRED = '免费再试已过期'
 export const SERVICE_REFUND_REASON_USER_CANCELLED = '用户取消，这一次还没用'
 export const SERVICE_REFUND_REASON_LATE_PAYMENT = '付款时这一单已经关闭'
+export const SERVICE_REFUND_REASON_NOW_FREE = '这台机器已改为免费'
+export const SERVICE_REFUND_REASON_ADMIN = '管理员原路退款'

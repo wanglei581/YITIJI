@@ -117,12 +117,19 @@ model ServiceOrder {
   /// 这一趟没做成的原因。还在免费再试窗口内时写这里，不写进退款原因。
   failureReason   String?
   retryUntil      DateTime?
+  /// 做成了才写。清扫只看还没结案的单，避免做成的扫描一直占着名额。
+  settledAt       DateTime?
   refundReason    String?
   refundedAt      DateTime?
   refundAttempts  Int       @default(0)
   refundNo        String?   @unique
   channelRefundNo String?
   nextRefundAt    DateTime?
+  /// 正在向渠道退款的短租约。自动和手动都要先拿到它，避免两笔一起打渠道。
+  refundLeaseUntil DateTime?
+  /// processing / failed / success。上次是受理中时，下一拍先查单，不再发一笔新退款。
+  refundChannelState String?
+  refundProcessingTries Int @default(0)
   /// user_cancelled / expired / session_ended / qr_failed
   closeReason     String?
   /// 渠道通知付款失败。单仍是 pending，钱没扣。

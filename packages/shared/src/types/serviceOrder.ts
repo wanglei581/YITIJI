@@ -9,6 +9,6 @@ export const SERVICE_ORDER_NAMES: Record<ServiceOrderKey, string> = {
   scan: '扫描',
 }
 
-export const SERVICE_ORDER_STATUSES = ['pending', 'paid', 'consumed', 'refunding', 'refunded', 'closed'] as const
+export const SERVICE_ORDER_STATUSES = ['pending', 'paid', 'consumed', 'refunding', 'refunded', 'refund_failed', 'closed'] as const
 
 export type ServiceOrderStatus = (typeof SERVICE_ORDER_STATUSES)[number]
