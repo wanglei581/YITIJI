@@ -4,7 +4,7 @@ import type { ServiceOrderService, TripHold } from './service-order.service'
 type Headers = Record<string, string | string[] | undefined> | undefined
 
 type HoldOrders = Pick<ServiceOrderService, 'beginTrip' | 'coversTrip' | 'noteLayoutOnly'> & Partial<
-  Pick<ServiceOrderService, 'replayOpenScan' | 'releasePendingConsume' | 'interviewHasOpening' | 'releaseStuckInterview'>
+  Pick<ServiceOrderService, 'replayOpenScan' | 'releasePendingConsume' | 'interviewHasOpening' | 'releaseStuckInterview' | 'scanConsumedRef'>
 >
 
 function errorCode(error: unknown): string | null {
@@ -92,11 +92,25 @@ export async function chargeInterviewStart<T>(
   }
 }
 
+function scanInUse(consumedRef: string): ConflictException {
+  return new ConflictException({
+    error: { code: 'SERVICE_ORDER_IN_USE', message: '这一次已经在进行', consumedRef },
+  })
+}
+
+/** 这张单已经挂上的任务。没有、或还是占位，就不当成已经在进行。 */
+async function heldScanRef(orders: HoldOrders | undefined, orderId: string): Promise<string | null> {
+  if (!orders || typeof orders.scanConsumedRef !== 'function') return null
+  const value = await orders.scanConsumedRef(orderId)
+  if (!value || value === 'pending') return null
+  return value
+}
+
 /** 扫描先占单，文件稍后才到。同一血缘上已经占着的单直接接着做，不再收第二笔。 */
 export async function chargeScanStart<T extends { scanTaskId: string }>(
   orders: HoldOrders | undefined,
   headers: Headers,
-  run: () => Promise<T>,
+  run: (phase?: 'preview' | 'commit') => Promise<T>,
 ): Promise<T> {
   const replayId = orders && typeof orders.replayOpenScan === 'function'
     ? await orders.replayOpenScan(headers)
@@ -106,19 +120,23 @@ export async function chargeScanStart<T extends { scanTaskId: string }>(
     : null
   if (replayId && hold) {
     hold.adopt(replayId)
-    const result = await run()
+    const held = await heldScanRef(orders, replayId)
+    if (held) {
+      const preview = await run('preview')
+      if (preview.scanTaskId !== held) throw scanInUse(held)
+    }
+    const result = await run('commit')
     const attached = await hold.attachRef(result.scanTaskId)
     if (!attached) {
-      throw new ConflictException({
-        error: { code: 'SERVICE_ORDER_IN_USE', message: '这一次已经在进行', consumedRef: result.scanTaskId },
-      })
+      const current = await heldScanRef(orders, replayId)
+      throw scanInUse(current ?? held ?? result.scanTaskId)
     }
     return result
   }
-  if (!hold?.required) return run()
+  if (!hold?.required) return run('commit')
   await hold.consume('pending')
   try {
-    const result = await run()
+    const result = await run('commit')
     const attached = await hold.attachRef(result.scanTaskId)
     if (!attached && hold.orderId && typeof orders?.releasePendingConsume === 'function') {
       await orders.releasePendingConsume(hold.orderId)

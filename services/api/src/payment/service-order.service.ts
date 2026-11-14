@@ -384,6 +384,15 @@ export class ServiceOrderService {
     return replayOpenScanOrder(this.prisma, headers)
   }
 
+  /** 这张单现在占着的扫描任务。重放前用来判断新请求会不会换成另一个任务。 */
+  async scanConsumedRef(orderId: string): Promise<string | null> {
+    const row = await this.prisma.serviceOrder.findUnique({
+      where: { id: orderId },
+      select: { consumedRef: true },
+    })
+    return row?.consumedRef ?? null
+  }
+
   /** 这次占用没挂上任务。退回已付。用过的次数还在的，必须留着再试期限，不能变成没人管。 */
   async releasePendingConsume(orderId: string): Promise<void> {
     return releasePendingServiceConsume(this.prisma, orderId)

@@ -59,11 +59,11 @@ export class ScanTasksController {
       })
     }
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
-    const result = await chargeScanStart(this.serviceOrders, req.headers, () => this.scanTasks.create(
-      dto,
-      endUser?.endUserId ?? null,
-      retryControlToken,
-    ))
+    const result = await chargeScanStart(this.serviceOrders, req.headers, (phase) => {
+      const endUserId = endUser?.endUserId ?? null
+      if (phase === 'preview') return this.scanTasks.previewCreate(dto, endUserId, retryControlToken)
+      return this.scanTasks.create(dto, endUserId, retryControlToken)
+    })
     return ApiResponse.ok(result)
   }
 

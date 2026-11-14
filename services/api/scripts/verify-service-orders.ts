@@ -38,6 +38,9 @@ import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from '../src/termina
 import { RedisInflightLock } from '../src/ai/redis-inflight-lock'
 import { setTerminalUserPrintPrices } from './support/terminal-charge-fixture'
 import { executeServiceOrderRefund, settleServiceRefundNotify } from '../src/payment/service-order.payment'
+import { SERVICE_SWEEP_BATCH } from '../src/payment/service-order.policy'
+import { RefundService } from '../src/payment/refund.service'
+import type { RefundNotifyEvent } from '../src/payment/payment-provider.types'
 import { collectDerivedAlerts } from '../src/admin-ops/derived-alerts'
 import { isServiceOrderOpenRefConflict } from '../src/payment/service-order.ref'
 import { TripCoverService } from '../src/payment/trip-cover.service'
@@ -350,10 +353,13 @@ async function main(): Promise<void> {
   let scanReturnId = 'scan-return'
   let scanCreates = 0
   const scans = {
+    async previewCreate() {
+      return { scanTaskId: scanReturnId, controlToken: '', expiresAt: '', instructions: [] as string[] }
+    },
     async create() {
       if (scanMode === 'throw') throw new Error('scan down')
       scanCreates += 1
-      return { scanTaskId: scanReturnId }
+      return { scanTaskId: scanReturnId, controlToken: '', expiresAt: '', instructions: [] as string[] }
     },
   }
   let jobFitReserves = 0
@@ -1545,11 +1551,8 @@ async function main(): Promise<void> {
     }
     const r17O2 = await paidOrder(r17Session, 'mock_interview', 'sbx_txn_r17_2')
     const r17Try1 = await call('POST', '/api/v1/mock-interviews/r17-iv/start', {}, termHeaders(TERM_CHARGE, chargeToken, r17Session, r17O2.id))
-    if (r17Try1.status !== 201) {
-      expectStatus(await call('POST', '/api/v1/mock-interviews/r17-iv/start', {}, termHeaders(TERM_CHARGE, chargeToken, r17Session, r17O2.id)), 201, 'R17 第二试开起来')
-    } else {
-      expectStatus(r17Try1, 201, 'R17 新单接手')
-    }
+    expectStatus(r17Try1, 201, 'R17 新单第一次就要开起来')
+    assert.equal((await loadOrder(r17O2.id)).attemptsUsed, 1, 'R17 第一次就要占上')
     interview.start = r17Original
     await serviceOrders.sweep(new Date(Date.now() + 8 * 60_000))
     await endKiosk(TERM_CHARGE, chargeToken, r17Session)
@@ -1848,6 +1851,429 @@ async function main(): Promise<void> {
     })
     assert.equal(r24Unknown.handled, true, 'R24 对不上的服务单退款通知也不再让渠道重发')
     pass('R24 退款通知只处理一次，对不上也回成功')
+
+    const originalCloseQr = SandboxPaymentProvider.prototype.closeExpiredQrPayment
+    const closeQr = SandboxPaymentProvider.prototype as unknown as {
+      closeExpiredQrPayment: (input: { attemptId: string; orderId: string }) => Promise<{ status: string; channelTxnNo: string | null; amountCents: number | null }>
+    }
+    try {
+      const g1 = await pendingChargeOrder()
+      await prisma.terminalServicePrice.update({
+        where: { terminalId_serviceKey: { terminalId: TERM_CHARGE, serviceKey: 'resume_optimize' } },
+        data: { unitCents: 180 },
+      })
+      await prisma.serviceOrder.update({
+        where: { id: g1.row.id },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      })
+      closeQr.closeExpiredQrPayment = async (input) => {
+        if (input.orderId !== g1.row.id) return originalCloseQr.call(SandboxPaymentProvider.prototype, input)
+        return { status: 'paid', channelTxnNo: 'sbx_txn_g1_expire', amountCents: g1.row.amountCents }
+      }
+      const g1Refunds = refundCalls
+      await serviceOrders.sweep(new Date())
+      const g1After = await loadOrder(g1.row.id)
+      assert.equal(g1After.status, 'refunded', 'G1 到期关码发现已付且价已变，必须当场退')
+      assert.equal(g1After.refundReason, '这一项的价格已经变了')
+      assert.equal(g1After.consumedAt, null, 'G1 退了就不能按旧价用掉')
+      assert.equal(refundCalls, g1Refunds + 1, 'G1 只退一次')
+      const g1Use = await call('GET', '/api/v1/resume/records/g1-task/optimize', undefined, termHeaders(TERM_CHARGE, chargeToken, g1.sessionId, g1.row.id))
+      expectStatus(g1Use, 402, 'G1 退掉的单不能再优化')
+      assert.equal((await loadOrder(g1.row.id)).status, 'refunded')
+      pass('G1 到期关码查到已付且价已变，当场退')
+    } finally {
+      closeQr.closeExpiredQrPayment = originalCloseQr
+      await prisma.terminalServicePrice.update({
+        where: { terminalId_serviceKey: { terminalId: TERM_CHARGE, serviceKey: 'resume_optimize' } },
+        data: { unitCents: 100 },
+      }).catch(() => undefined)
+    }
+
+    const g10Session = await openKiosk(TERM_CHARGE, chargeToken)
+    const g10When = new Date(Date.now() - 2 * 60 * 60_000)
+    await prisma.serviceOrder.create({
+      data: {
+        id: 'g10-old',
+        terminalId: TERM_CHARGE,
+        serviceKey: 'resume_optimize',
+        amountCents: 100,
+        status: 'consumed',
+        attemptsUsed: 1,
+        consumedRef: 'g10-task',
+        consumedAt: g10When,
+        settledAt: g10When,
+        kioskSessionId: g10Session,
+        provider: 'sandbox',
+        providerOrderNo: 'g10-old-no',
+        expiresAt: new Date(Date.now() + 60_000),
+        paidAt: g10When,
+        channelTxnNo: 'g10-old-txn',
+      },
+    })
+    const g10New = await paidOrder(g10Session, 'resume_optimize', 'sbx_txn_g10')
+    const g10Res = await call('GET', '/api/v1/resume/records/g10-task/optimize', undefined, termHeaders(TERM_CHARGE, chargeToken, g10Session, g10New.id))
+    expectStatus(g10Res, 409, 'G10 结案的旧单不能让新单接手')
+    assert.equal(g10Res.json.error?.code, 'SERVICE_ORDER_REF_OCCUPIED')
+    assert.equal(g10Res.json.error?.existingOrderId, 'g10-old')
+    const g10OldAfter = await loadOrder('g10-old')
+    assert.equal(g10OldAfter.status, 'consumed', 'G10 旧单保持已占用')
+    assert.ok(g10OldAfter.settledAt, 'G10 旧单仍然结案')
+    assert.equal(g10OldAfter.refundReason, null, 'G10 不能把做成的旧单退掉')
+    const g10NewAfter = await loadOrder(g10New.id)
+    assert.equal(g10NewAfter.status, 'paid')
+    assert.equal(g10NewAfter.attemptsUsed, 0)
+    pass('G10 已经结案的旧单不许退，新单进不去')
+
+    const g2Session = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    await prisma.scanTask.create({
+      data: { id: 'g2-live', terminalId: TERM_CHARGE, scanType: 'resume', status: 'waiting', expiresAt: new Date(Date.now() + 3600_000) },
+    })
+    scanReturnId = 'g2-live'
+    const g2 = await paidOrder(g2Session, 'scan', 'sbx_txn_g2')
+    expectStatus(await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, g2Session, g2.id)), 201, 'G2 第一次扫描')
+    assert.equal((await loadOrder(g2.id)).consumedRef, 'g2-live')
+    await prisma.scanTask.create({
+      data: { id: 'g2-other', terminalId: TERM_CHARGE, scanType: 'resume', status: 'waiting', expiresAt: new Date(Date.now() + 3600_000) },
+    })
+    scanReturnId = 'g2-other'
+    const g2Before = scanCreates
+    const g2Replay = await call('POST', '/api/v1/scan/sessions', { scanType: 'resume', terminalId: TERM_CHARGE }, termHeaders(TERM_CHARGE, chargeToken, g2Session, g2.id))
+    expectStatus(g2Replay, 409, 'G2 换任务号要拒绝')
+    assert.equal(g2Replay.json.error?.code, 'SERVICE_ORDER_IN_USE')
+    assert.equal(g2Replay.json.error?.consumedRef, 'g2-live', 'G2 拒绝时要带这张单正在占的任务')
+    assert.equal(scanCreates, g2Before, 'G2 拒绝前不能再建扫描任务')
+    assert.equal((await loadOrder(g2.id)).consumedRef, 'g2-live')
+    pass('G2 重放换成另一个任务时，不建新任务，409 带原来的任务号')
+
+    const g9Session = await openKiosk(TERM_CHARGE, chargeToken)
+    await prisma.aiResumeResult.upsert({
+      where: { taskId_kind: { taskId: 'g9-task', kind: 'optimize' } },
+      create: { taskId: 'g9-task', kind: 'optimize', status: 'completed', provider: 'rules' },
+      update: { status: 'completed' },
+    })
+    const g9Old = await prisma.serviceOrder.create({
+      data: {
+        id: 'g9-old',
+        terminalId: TERM_CHARGE,
+        serviceKey: 'resume_optimize',
+        amountCents: 100,
+        status: 'consumed',
+        attemptsUsed: 1,
+        consumedRef: 'g9-task',
+        consumedAt: new Date(),
+        kioskSessionId: g9Session,
+        provider: 'sandbox',
+        providerOrderNo: 'g9-old-no',
+        expiresAt: new Date(Date.now() + 60_000),
+        paidAt: new Date(),
+        channelTxnNo: 'g9-old-txn',
+      },
+    })
+    const g9New = await paidOrder(g9Session, 'resume_optimize', 'sbx_txn_g9')
+    const g9Res = await call('GET', '/api/v1/resume/records/g9-task/optimize', undefined, termHeaders(TERM_CHARGE, chargeToken, g9Session, g9New.id))
+    expectStatus(g9Res, 409, 'G9 判不了的旧单要拦住新单')
+    assert.equal(g9Res.json.error?.code, 'SERVICE_ORDER_REF_OCCUPIED')
+    assert.equal(g9Res.json.error?.existingOrderId, g9Old.id, 'G9 要告诉是哪张旧单占着')
+    const g9NewHeld = await loadOrder(g9New.id)
+    assert.equal(g9NewHeld.status, 'paid', 'G9 新单仍是已付')
+    assert.equal(g9NewHeld.attemptsUsed, 0, 'G9 新单一次都没用')
+    expectStatus(await endKiosk(TERM_CHARGE, chargeToken, g9Session), 200, 'G9 人离开')
+    const g9NewLeft = await loadOrder(g9New.id)
+    assert.equal(g9NewLeft.status, 'refunded', 'G9 会话结束要把没用的新单退掉')
+    assert.equal(g9NewLeft.refundReason, '人已离开，这一次还没用')
+    assert.equal((await loadOrder(g9Old.id)).status, 'consumed', 'G9 旧单不动')
+    pass('G9 任务还被旧单占着时，新单保持已付，人走了再退')
+
+    let nextRefundEvent: RefundNotifyEvent | null = null
+    const serviceRefunds = new RefundService(prisma, audit, {
+      get(channel: string) {
+        if (channel !== 'wechat') return undefined
+        return {
+          async verifyRefundNotify() {
+            if (!nextRefundEvent) return { ok: false as const, code: 'CALLBACK_SIGNATURE_INVALID' }
+            return { ok: true as const, event: nextRefundEvent }
+          },
+        }
+      },
+    } as unknown as PaymentProviderRegistry, redis as unknown as RedisService)
+    async function notifyServiceRefund(event: Omit<RefundNotifyEvent, 'channel' | 'outTradeNo' | 'nonce' | 'timestampMs'>): Promise<void> {
+      nextRefundEvent = {
+        channel: 'wechat',
+        outTradeNo: 'svc-out',
+        nonce: randomUUID().replace(/-/g, ''),
+        timestampMs: Date.now(),
+        ...event,
+      }
+      const notified = await serviceRefunds.processWechatRefundNotify(Buffer.from('{}'), {})
+      assert.equal(notified.ok, true)
+    }
+    const rfdSession = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    const rfdOk = await paidOrder(rfdSession, 'scan', 'sbx_txn_rfd_ok')
+    refundMode = 'processing'
+    await executeServiceOrderRefund(prisma, registry, audit, redis as unknown as RedisService, rfdOk.id, '人已离开，这一次还没用')
+    refundMode = 'ok'
+    await notifyServiceRefund({ refundNo: `svc-rfd-${rfdOk.id}`, channelRefundNo: 'wx-rfd-svc-ok', refundAmountCents: 100, status: 'success' })
+    assert.equal((await loadOrder(rfdOk.id)).status, 'refunded', '成功通知要记成已退')
+    assert.equal(await prisma.auditLog.count({ where: { action: 'service_order.refunded', targetId: rfdOk.id } }), 1)
+    await notifyServiceRefund({ refundNo: `svc-rfd-${rfdOk.id}`, channelRefundNo: 'wx-rfd-svc-ok', refundAmountCents: 100, status: 'success' })
+    assert.equal((await loadOrder(rfdOk.id)).status, 'refunded')
+    assert.equal(await prisma.auditLog.count({ where: { action: 'service_order.refunded', targetId: rfdOk.id } }), 1, '同一条成功通知不能再记一次')
+    const rfdFail = await paidOrder(rfdSession, 'scan', 'sbx_txn_rfd_fail')
+    refundMode = 'processing'
+    await executeServiceOrderRefund(prisma, registry, audit, redis as unknown as RedisService, rfdFail.id, '人已离开，这一次还没用')
+    refundMode = 'ok'
+    await notifyServiceRefund({ refundNo: `svc-rfd-${rfdFail.id}`, channelRefundNo: null, refundAmountCents: null, status: 'failed' })
+    const rfdFailOnce = await loadOrder(rfdFail.id)
+    await notifyServiceRefund({ refundNo: `svc-rfd-${rfdFail.id}`, channelRefundNo: null, refundAmountCents: null, status: 'failed' })
+    const rfdFailTwice = await loadOrder(rfdFail.id)
+    assert.equal(rfdFailTwice.refundAttempts, rfdFailOnce.refundAttempts, '同一条失败通知不能记两次')
+    assert.equal(rfdFailTwice.refundAttempts, 1)
+    assert.notEqual(rfdFailTwice.status, 'refunded')
+    const rfdBad = await paidOrder(rfdSession, 'scan', 'sbx_txn_rfd_bad')
+    refundMode = 'processing'
+    await executeServiceOrderRefund(prisma, registry, audit, redis as unknown as RedisService, rfdBad.id, '人已离开，这一次还没用')
+    refundMode = 'ok'
+    await notifyServiceRefund({ refundNo: `svc-rfd-${rfdBad.id}`, channelRefundNo: 'wx-rfd-svc-bad', refundAmountCents: 1, status: 'success' })
+    const rfdBadRow = await loadOrder(rfdBad.id)
+    assert.notEqual(rfdBadRow.status, 'refunded', '金额不符不能记成已退')
+    assert.ok(rfdBadRow.refundAnomaly, '金额不符要记下来')
+    pass('服务单退款通知经退款服务分派：成功、失败、重复、金额不符')
+
+    try {
+      const g5 = await pendingChargeOrder()
+      closeQr.closeExpiredQrPayment = async (input) => {
+        if (input.orderId === g5.row.id) throw new Error('channel close down')
+        return { status: 'closed', channelTxnNo: null, amountCents: null }
+      }
+      await saveTerminalChargeSettings(prisma, TERM_CHARGE, {
+        userChargeMode: 'user_pays',
+        prices: { ...DEMO_PRICES, resume_optimize: 180 },
+      }, ADMIN)
+      const g5Closed = await loadOrder(g5.row.id)
+      assert.equal(g5Closed.status, 'closed', '关单失败也要先把这一单关掉')
+      assert.equal(g5Closed.closeReason, 'price_changed')
+      assert.equal(g5Closed.channelClosePending, true, '渠道没关上，要留下重试')
+      const g5Price = await prisma.terminalServicePrice.findUnique({
+        where: { terminalId_serviceKey: { terminalId: TERM_CHARGE, serviceKey: 'resume_optimize' } },
+      })
+      assert.equal(g5Price?.unitCents, 180, '关单失败不能把改价滚回去')
+      assert.equal(await prisma.auditLog.count({
+        where: { action: 'service_order.channel_close_failed', targetId: g5.row.id },
+      }), 1, '关单失败要记一笔')
+      closeQr.closeExpiredQrPayment = async (input) => {
+        if (input.orderId === g5.row.id) {
+          return { status: 'paid', channelTxnNo: 'sbx_txn_g5', amountCents: g5.row.amountCents }
+        }
+        return { status: 'closed', channelTxnNo: null, amountCents: null }
+      }
+      const g5Refunds = refundCalls
+      await serviceOrders.sweep()
+      const g5Paid = await loadOrder(g5.row.id)
+      assert.equal(g5Paid.status, 'refunded', '清扫重试发现已付必须退')
+      assert.equal(g5Paid.refundReason, '付款时这一单已经关闭')
+      assert.equal(refundCalls, g5Refunds + 1, '这一张只退一次')
+      await serviceOrders.sweep()
+      assert.equal(refundCalls, g5Refunds + 1, '下一拍不能再退')
+      assert.equal((await loadOrder(g5.row.id)).status, 'refunded')
+      pass('改价时渠道关单失败，清扫重试发现已付就退一次')
+
+      await setTerminalUserPrintPrices(prisma, TERM_CHARGE, DEMO_PRICES)
+      const g5Bind = await pendingChargeOrder()
+      closeQr.closeExpiredQrPayment = async (input) => {
+        if (input.orderId === g5Bind.row.id) {
+          return { status: 'paid', channelTxnNo: 'sbx_txn_g5_bind', amountCents: g5Bind.row.amountCents }
+        }
+        return { status: 'closed', channelTxnNo: null, amountCents: null }
+      }
+      await assignTerminalOrganization(prisma, TERM_CHARGE, ORG_SCHOOL, new Date(), async () => undefined)
+      const g5BindAfter = await loadOrder(g5Bind.row.id)
+      assert.equal(g5BindAfter.status, 'refunded', '改绑时渠道说已付必须退')
+      assert.equal(g5BindAfter.refundReason, '这台机器已改为免费')
+      assert.equal(await prisma.auditLog.count({
+        where: { action: 'service_order.refunded', targetId: g5Bind.row.id },
+      }), 1, '改绑这一张只退一次')
+      assert.equal((await prisma.terminal.findUnique({ where: { id: TERM_CHARGE } }))?.orgId, ORG_SCHOOL, '退款不能把改绑滚回去')
+      await setTerminalUserPrintPrices(prisma, TERM_CHARGE, DEMO_PRICES)
+      const g5Retry = await pendingChargeOrder()
+      closeQr.closeExpiredQrPayment = async (input) => {
+        if (input.orderId === g5Retry.row.id) throw new Error('channel close down')
+        return { status: 'closed', channelTxnNo: null, amountCents: null }
+      }
+      await assignTerminalOrganization(prisma, TERM_CHARGE, null, new Date(), async () => undefined)
+      const g5RetryClosed = await loadOrder(g5Retry.row.id)
+      assert.equal(g5RetryClosed.status, 'closed')
+      assert.equal(g5RetryClosed.closeReason, 'org_rebound')
+      assert.equal(g5RetryClosed.channelClosePending, true)
+      closeQr.closeExpiredQrPayment = async () => ({ status: 'closed', channelTxnNo: null, amountCents: null })
+      const g5RetryRefunds = refundCalls
+      await serviceOrders.sweep()
+      const g5RetryAfter = await loadOrder(g5Retry.row.id)
+      assert.equal(g5RetryAfter.status, 'closed', '渠道确认没付就保持关闭')
+      assert.equal(g5RetryAfter.channelClosePending, false, '重试关上之后不再挂着')
+      assert.equal(g5RetryAfter.refundedAt, null)
+      assert.equal(refundCalls, g5RetryRefunds, '没付不能退')
+      assert.equal((await prisma.terminal.findUnique({ where: { id: TERM_CHARGE } }))?.orgId, null)
+      pass('改绑时渠道说已付要退；关不上就清扫重试')
+    } finally {
+      closeQr.closeExpiredQrPayment = originalCloseQr
+      await assignTerminalOrganization(prisma, TERM_CHARGE, null, new Date(), async () => undefined).catch(() => undefined)
+      await setTerminalUserPrintPrices(prisma, TERM_CHARGE, DEMO_PRICES).catch(() => undefined)
+    }
+
+    await prisma.$transaction((tx) => tx.$executeRaw`DROP INDEX IF EXISTS "ServiceOrder_open_consumed_ref_key"`)
+    try {
+      const reviewSession = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+      const reviewWhen = new Date('2019-06-01T00:00:00.000Z')
+      await prisma.scanTask.create({
+        data: {
+          id: 'p2a4-scan-ref',
+          terminalId: TERM_CHARGE,
+          scanType: 'resume',
+          status: 'completed',
+          fileId: 'file-p2a4-scan',
+          expiresAt: new Date(Date.now() + 3600_000),
+        },
+      })
+      const scanReviewBase = {
+        terminalId: TERM_CHARGE,
+        serviceKey: 'scan',
+        amountCents: 100,
+        status: 'consumed',
+        attemptsUsed: 1,
+        consumedRef: 'p2a4-scan-ref',
+        consumedAt: reviewWhen,
+        kioskSessionId: reviewSession,
+        provider: 'sandbox',
+        expiresAt: new Date(Date.now() + 60_000),
+        paidAt: reviewWhen,
+      }
+      await prisma.serviceOrder.create({
+        data: { ...scanReviewBase, id: 'p2a4-scan-a', providerOrderNo: 'p2a4-scan-a-no', channelTxnNo: 'p2a4-scan-a-txn' },
+      })
+      await prisma.serviceOrder.create({
+        data: { ...scanReviewBase, id: 'p2a4-scan-b', providerOrderNo: 'p2a4-scan-b-no', channelTxnNo: 'p2a4-scan-b-txn' },
+      })
+      await serviceOrders.sweep(new Date())
+      const scanA = await loadOrder('p2a4-scan-a')
+      const scanB = await loadOrder('p2a4-scan-b')
+      assert.equal(scanA.status, 'refunded', '扫描复核先看到的那张要退')
+      assert.equal(scanA.refundReason, '这一趟已经算在另一张单上')
+      assert.equal(scanB.status, 'consumed', '扫描复核留下做成的那张')
+      assert.ok(scanB.settledAt, '留下的扫描要结案')
+      pass('扫描复核看到同一任务两张单时只留一笔')
+
+      await prisma.mockInterviewSession.create({
+        data: {
+          id: 'p2a4-iv-ref',
+          status: 'in_progress',
+          interviewerType: 'hr',
+          industry: '仓储',
+          position: '管理员',
+          experience: 'y1_3',
+          difficulty: 'standard',
+          expiresAt: new Date(Date.now() + 3600_000),
+        },
+      })
+      await prisma.mockInterviewTurn.create({
+        data: { sessionId: 'p2a4-iv-ref', idx: 0, role: 'interviewer', content: '请先做个自我介绍' },
+      })
+      const interviewReviewBase = {
+        terminalId: TERM_CHARGE,
+        serviceKey: 'mock_interview',
+        amountCents: 200,
+        status: 'consumed',
+        attemptsUsed: 1,
+        consumedRef: 'p2a4-iv-ref',
+        consumedAt: reviewWhen,
+        kioskSessionId: reviewSession,
+        provider: 'sandbox',
+        expiresAt: new Date(Date.now() + 60_000),
+        paidAt: reviewWhen,
+      }
+      await prisma.serviceOrder.create({
+        data: { ...interviewReviewBase, id: 'p2a4-iv-a', providerOrderNo: 'p2a4-iv-a-no', channelTxnNo: 'p2a4-iv-a-txn' },
+      })
+      await prisma.serviceOrder.create({
+        data: { ...interviewReviewBase, id: 'p2a4-iv-b', providerOrderNo: 'p2a4-iv-b-no', channelTxnNo: 'p2a4-iv-b-txn' },
+      })
+      await serviceOrders.sweep(new Date())
+      const ivA = await loadOrder('p2a4-iv-a')
+      const ivB = await loadOrder('p2a4-iv-b')
+      assert.equal(ivA.status, 'refunded', '面试复核先看到的那张要退')
+      assert.equal(ivA.refundReason, '这一趟已经算在另一张单上')
+      assert.equal(ivB.status, 'consumed', '面试复核留下开过的那张')
+      assert.ok(ivB.settledAt, '留下的面试要结案')
+      pass('模拟面试复核看到同一场两张单时只留一笔')
+    } finally {
+      applyOpenRefIndex(databasePath)
+    }
+
+    const sweepSession = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    const sweepOldest = new Date('2020-01-01T00:00:00.000Z')
+    await prisma.scanTask.create({
+      data: {
+        id: 'p2a4-sweep-old',
+        terminalId: TERM_CHARGE,
+        scanType: 'resume',
+        status: 'failed',
+        expiresAt: new Date(Date.now() - 1000),
+      },
+    })
+    await prisma.serviceOrder.create({
+      data: {
+        id: 'p2a4-sweep-old',
+        terminalId: TERM_CHARGE,
+        serviceKey: 'scan',
+        amountCents: 100,
+        status: 'consumed',
+        attemptsUsed: 2,
+        consumedRef: 'p2a4-sweep-old',
+        consumedAt: sweepOldest,
+        kioskSessionId: sweepSession,
+        provider: 'sandbox',
+        providerOrderNo: 'p2a4-sweep-old-no',
+        expiresAt: new Date(Date.now() + 60_000),
+        paidAt: sweepOldest,
+        channelTxnNo: 'p2a4-sweep-old-txn',
+      },
+    })
+    for (let i = 0; i < SERVICE_SWEEP_BATCH; i += 1) {
+      const taskId = `p2a4-sweep-live-${i}`
+      await prisma.scanTask.create({
+        data: {
+          id: taskId,
+          terminalId: TERM_CHARGE,
+          scanType: 'resume',
+          status: 'waiting',
+          expiresAt: new Date(Date.now() + 3600_000),
+        },
+      })
+      await prisma.serviceOrder.create({
+        data: {
+          id: taskId,
+          terminalId: TERM_CHARGE,
+          serviceKey: 'scan',
+          amountCents: 100,
+          status: 'consumed',
+          attemptsUsed: 1,
+          consumedRef: taskId,
+          consumedAt: new Date(sweepOldest.getTime() + (i + 1) * 1000),
+          kioskSessionId: sweepSession,
+          provider: 'sandbox',
+          providerOrderNo: `${taskId}-no`,
+          expiresAt: new Date(Date.now() + 60_000),
+          paidAt: sweepOldest,
+          channelTxnNo: `${taskId}-txn`,
+        },
+      })
+    }
+    await serviceOrders.sweep(new Date())
+    const sweepVictim = await loadOrder('p2a4-sweep-old')
+    const sweepNewest = await loadOrder(`p2a4-sweep-live-${SERVICE_SWEEP_BATCH - 1}`)
+    assert.equal(sweepVictim.status, 'refunded', '最早那张没出文件的扫描这一拍就要退')
+    assert.equal(sweepNewest.status, 'consumed', '还活着的新扫描不能被这一拍退掉')
+    assert.equal(sweepNewest.settledAt, null, '还活着的新扫描不能被这一拍结案')
+    pass('扫描清扫先看占用更早的，活着的新扫描留到后面')
   } catch (error) {
     failed = true
     console.error(error)
