@@ -56,6 +56,8 @@ export interface ErrorResponseBody {
     serviceName?: string
     /** 仅 SERVICE_ORDER_IN_USE：这一张单正在占用的任务或扫描号。 */
     consumedRef?: string
+    /** 仅 SERVICE_ORDER_REF_OCCUPIED：还没结案的那张旧单。新单保持已付未用。 */
+    existingOrderId?: string
   }
   requestId?: string
 }

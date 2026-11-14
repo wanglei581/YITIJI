@@ -17,7 +17,7 @@ import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { closeSync, mkdtempSync, openSync, rmSync } from 'node:fs'
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -38,6 +38,7 @@ import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from '../src/termina
 import { RedisInflightLock } from '../src/ai/redis-inflight-lock'
 import { setTerminalUserPrintPrices } from './support/terminal-charge-fixture'
 import { executeServiceOrderRefund } from '../src/payment/service-order.payment'
+import { isServiceOrderOpenRefConflict } from '../src/payment/service-order.ref'
 import { TripCoverService } from '../src/payment/trip-cover.service'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
@@ -116,12 +117,20 @@ function pushSchema(url: string): void {
   ], { cwd: API_ROOT, env: { ...process.env, DATABASE_URL: url }, stdio: 'inherit' })
 }
 
+/** db push 不会建 schema 表达不了的部分唯一索引。索引只从迁移里取，迁移删了这里就不再建。 */
+function applyOpenRefIndex(databasePath: string): void {
+  const sql = readFileSync(join(API_ROOT, 'prisma/migrations/20261114170000_service_order_open_ref/migration.sql'), 'utf8')
+  const match = sql.match(/CREATE UNIQUE INDEX "ServiceOrder_open_consumed_ref_key"[\s\S]*?;/)
+  if (!match) return
+  execFileSync('sqlite3', [databasePath], { input: match[0], encoding: 'utf8' })
+}
+
 interface CallResult {
   status: number
   json: {
     success?: boolean
     data?: Record<string, unknown>
-    error?: { code?: string; message?: string; amountCents?: number; serviceKey?: string; serviceName?: string; consumedRef?: string }
+    error?: { code?: string; message?: string; amountCents?: number; serviceKey?: string; serviceName?: string; consumedRef?: string; existingOrderId?: string }
     items?: Array<Record<string, unknown>>
     pagination?: { total?: number }
     ok?: boolean
@@ -232,6 +241,7 @@ async function main(): Promise<void> {
   assertIsolatedVerificationDatabase()
   closeSync(openSync(databasePath, 'wx'))
   pushSchema(databaseUrl)
+  applyOpenRefIndex(databasePath)
 
   const store = new Map<string, string>()
   const redis = {
@@ -1345,6 +1355,176 @@ async function main(): Promise<void> {
     const settled = await call('POST', `/api/v1/admin/orders/${createdRow.id}/refund-service`, { confirm: true }, adminHeaders)
     expectStatus(settled, 409, '做成的单不能从后台退')
     pass('后台对卡住的已付单可以原路退，做成的不行')
+
+    function stillCharged(row: { status: string }): boolean {
+      return row.status === 'paid' || row.status === 'consumed' || row.status === 'refunding' || row.status === 'refund_failed'
+    }
+
+    const uniqRef = `open-ref-${randomUUID()}`
+    const uniqSession = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
+    const uniqFirst = randomUUID()
+    const uniqSecond = randomUUID()
+    await prisma.serviceOrder.create({
+      data: {
+        id: uniqFirst,
+        terminalId: TERM_CHARGE,
+        serviceKey: 'scan',
+        amountCents: 100,
+        status: 'consumed',
+        attemptsUsed: 1,
+        kioskSessionId: uniqSession,
+        provider: 'sandbox',
+        providerOrderNo: `uniq-a-${uniqFirst}`,
+        consumedRef: uniqRef,
+        consumedAt: new Date(),
+        expiresAt: new Date(Date.now() + 60_000),
+        paidAt: new Date(),
+        channelTxnNo: `uniq-txn-a-${uniqFirst}`,
+      },
+    })
+    await prisma.serviceOrder.create({
+      data: {
+        id: uniqSecond,
+        terminalId: TERM_CHARGE,
+        serviceKey: 'scan',
+        amountCents: 100,
+        status: 'consumed',
+        attemptsUsed: 1,
+        kioskSessionId: uniqSession,
+        provider: 'sandbox',
+        providerOrderNo: `uniq-b-${uniqSecond}`,
+        consumedRef: `other-${uniqSecond}`,
+        consumedAt: new Date(),
+        expiresAt: new Date(Date.now() + 60_000),
+        paidAt: new Date(),
+        channelTxnNo: `uniq-txn-b-${uniqSecond}`,
+      },
+    })
+    let uniqRejected = false
+    try {
+      await prisma.$transaction((tx) => tx.$executeRaw`UPDATE "ServiceOrder" SET "consumedRef" = ${uniqRef} WHERE "id" = ${uniqSecond}`)
+    } catch (error) {
+      uniqRejected = isServiceOrderOpenRefConflict(error)
+      if (!uniqRejected) throw error
+    }
+    assert.equal(uniqRejected, true, '同一没结案任务的第二张单必须被唯一索引拒绝')
+    assert.equal(await prisma.serviceOrder.count({
+      where: { consumedRef: uniqRef, status: { in: ['pending', 'paid', 'consumed'] } },
+    }), 1, '唯一索引拒绝后只剩一张')
+    pass('a 同一任务的第二张没结案单写不进去')
+
+    const r16Releases: Array<() => void> = []
+    const r16Session = await openKiosk(TERM_CHARGE, chargeToken)
+    const r16O1 = await paidOrder(r16Session, 'resume_optimize', 'sbx_txn_r16_1')
+    const r16Original = ai.getResumeOptimize.bind(ai)
+    ai.getResumeOptimize = async (taskId, _requester, _existingOnly, _req, beforeGenerate) => {
+      if (beforeGenerate) await beforeGenerate()
+      await new Promise<void>((resolve) => { r16Releases.push(resolve) })
+      return { taskId, status: 'failed' }
+    }
+    const r16Abort = new AbortController()
+    const r16Hung = fetch(`${base}/api/v1/resume/records/r16-task/optimize`, {
+      headers: termHeaders(TERM_CHARGE, chargeToken, r16Session, r16O1.id),
+      signal: r16Abort.signal,
+    }).catch(() => null)
+    for (let i = 0; i < 100; i += 1) {
+      if ((await loadOrder(r16O1.id)).status === 'consumed') break
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    assert.equal((await loadOrder(r16O1.id)).status, 'consumed', 'R16 第一张单已经占上任务')
+    r16Abort.abort()
+    await r16Hung
+    ai.getResumeOptimize = async (taskId, _requester, existingOnly, _req, beforeGenerate) => {
+      if (existingOnly) return { taskId, status: 'completed' }
+      if (beforeGenerate) await beforeGenerate()
+      await prisma.aiResumeResult.upsert({
+        where: { taskId_kind: { taskId, kind: 'optimize' } },
+        create: { taskId, kind: 'optimize', status: 'completed', provider: 'rules' },
+        update: { status: 'completed' },
+      })
+      return { taskId, status: 'completed' }
+    }
+    const r16NoOrder = await call('GET', '/api/v1/resume/records/r16-task/optimize', undefined, termHeaders(TERM_CHARGE, chargeToken, r16Session))
+    expectStatus(r16NoOrder, 402, 'R16 丢了单号要再付')
+    const r16O2 = await paidOrder(r16Session, 'resume_optimize', 'sbx_txn_r16_2')
+    expectStatus(await call('GET', '/api/v1/resume/records/r16-task/optimize', undefined, termHeaders(TERM_CHARGE, chargeToken, r16Session, r16O2.id)), 200, 'R16 第二张单做出稿')
+    ai.getResumeOptimize = r16Original
+    await serviceOrders.sweep(new Date(Date.now() + 8 * 60_000))
+    await endKiosk(TERM_CHARGE, chargeToken, r16Session)
+    await serviceOrders.sweep(new Date(Date.now() + 24 * 60 * 60_000))
+    const r16A = await loadOrder(r16O1.id)
+    const r16B = await loadOrder(r16O2.id)
+    assert.equal([r16A, r16B].filter(stillCharged).length, 1, 'R16 同一份优化稿只收一笔')
+    assert.equal([r16A, r16B].filter((row) => row.status === 'refunded').length, 1, 'R16 另一张要退')
+    for (const release of r16Releases) release()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    pass('R16 简历中断后再付，只收做出稿的那一笔')
+
+    const r17Releases: Array<() => void> = []
+    const r17Session = await openKiosk(TERM_CHARGE, chargeToken, 'interview')
+    await prisma.mockInterviewSession.create({
+      data: {
+        id: 'r17-iv',
+        status: 'configured',
+        interviewerType: 'hr',
+        industry: '仓储',
+        position: '管理员',
+        experience: 'y1_3',
+        difficulty: 'standard',
+        expiresAt: new Date(Date.now() + 3600_000),
+      },
+    })
+    const r17O1 = await paidOrder(r17Session, 'mock_interview', 'sbx_txn_r17_1')
+    const r17Original = interview.start.bind(interview)
+    interview.start = async (id: string) => {
+      await prisma.mockInterviewSession.update({ where: { id }, data: { status: 'in_progress', startedAt: new Date() } })
+      await new Promise<void>((resolve) => { r17Releases.push(resolve) })
+      return { id, status: 'started' }
+    }
+    const r17Abort = new AbortController()
+    const r17Hung = fetch(`${base}/api/v1/mock-interviews/r17-iv/start`, {
+      method: 'POST',
+      headers: { ...termHeaders(TERM_CHARGE, chargeToken, r17Session, r17O1.id), 'content-type': 'application/json' },
+      body: '{}',
+      signal: r17Abort.signal,
+    }).catch(() => null)
+    for (let i = 0; i < 100; i += 1) {
+      if ((await loadOrder(r17O1.id)).status === 'consumed') break
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    assert.equal((await loadOrder(r17O1.id)).status, 'consumed', 'R17 第一张单已经占上场次')
+    r17Abort.abort()
+    await r17Hung
+    interview.start = async (id: string) => {
+      const current = await prisma.mockInterviewSession.findUnique({ where: { id } })
+      if (current?.status === 'in_progress') {
+        throw new BadRequestException({ error: { code: 'INTERVIEW_ALREADY_STARTED', message: '本场练习已开始或已结束' } })
+      }
+      await prisma.mockInterviewSession.update({ where: { id }, data: { status: 'in_progress', startedAt: new Date() } })
+      await prisma.mockInterviewTurn.create({
+        data: { sessionId: id, idx: 0, role: 'interviewer', content: '请先做个自我介绍' },
+      })
+      openedInterviews.add(id)
+      return { id, status: 'started' }
+    }
+    const r17O2 = await paidOrder(r17Session, 'mock_interview', 'sbx_txn_r17_2')
+    const r17Try1 = await call('POST', '/api/v1/mock-interviews/r17-iv/start', {}, termHeaders(TERM_CHARGE, chargeToken, r17Session, r17O2.id))
+    if (r17Try1.status !== 201) {
+      expectStatus(await call('POST', '/api/v1/mock-interviews/r17-iv/start', {}, termHeaders(TERM_CHARGE, chargeToken, r17Session, r17O2.id)), 201, 'R17 第二试开起来')
+    } else {
+      expectStatus(r17Try1, 201, 'R17 新单接手')
+    }
+    interview.start = r17Original
+    await serviceOrders.sweep(new Date(Date.now() + 8 * 60_000))
+    await endKiosk(TERM_CHARGE, chargeToken, r17Session)
+    await serviceOrders.sweep(new Date(Date.now() + 24 * 60 * 60_000))
+    const r17A = await loadOrder(r17O1.id)
+    const r17B = await loadOrder(r17O2.id)
+    assert.equal([r17A, r17B].filter(stillCharged).length, 1, 'R17 同一场面试只收一笔')
+    assert.equal([r17A, r17B].filter((row) => row.status === 'refunded').length, 1, 'R17 另一张要退')
+    for (const release of r17Releases) release()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    pass('R17 面试中断后再付，只收开起来的那一笔')
   } catch (error) {
     failed = true
     console.error(error)

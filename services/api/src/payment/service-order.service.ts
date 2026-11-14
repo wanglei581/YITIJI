@@ -19,6 +19,12 @@ import {
   executeServiceOrderRefund,
   newProviderOrderNo,
 } from './service-order.payment'
+import {
+  attachServiceOrderConsumedRef,
+  displaceOrBlockOpenRef,
+  isServiceOrderOpenRefConflict,
+  serviceOrderRefOccupied,
+} from './service-order.ref'
 import { drainServiceOrderSweep, releaseInterviewSession } from './service-order.sweep'
 import {
   SERVICE_ORDER_NAMES,
@@ -483,26 +489,15 @@ export class ServiceOrderService {
   ): Promise<string> {
     if (!kioskSessionId || !serviceOrderId) throw paymentRequired(amountCents, serviceKey)
     const now = new Date()
-    const claimed = await this.prisma.serviceOrder.updateMany({
-      where: {
-        id: serviceOrderId,
-        terminalId,
-        kioskSessionId,
-        serviceKey,
-        status: 'paid',
-        attemptsUsed: { lt: 2 },
-        OR: [{ attemptsUsed: 0 }, { retryUntil: { gt: now } }],
-      },
-      data: {
-        attemptsUsed: { increment: 1 },
-        status: 'consumed',
-        consumedAt: now,
-        consumedRef,
-        failureReason: null,
-        retryUntil: null,
-      },
-    })
-    if (claimed.count === 1) return serviceOrderId
+    await this.yieldOpenRef(serviceKey, consumedRef, serviceOrderId, now)
+    const claimed = await this.claimConsume(terminalId, kioskSessionId, serviceKey, serviceOrderId, consumedRef, now)
+    if (claimed === 1) return serviceOrderId
+    if (claimed < 0) {
+      await this.yieldOpenRef(serviceKey, consumedRef, serviceOrderId, now)
+      const again = await this.claimConsume(terminalId, kioskSessionId, serviceKey, serviceOrderId, consumedRef, now)
+      if (again === 1) return serviceOrderId
+      throw await this.refOccupiedBy(serviceKey, consumedRef, serviceOrderId)
+    }
     const row = await this.prisma.serviceOrder.findUnique({ where: { id: serviceOrderId } })
     const sameTrip = Boolean(
       row && row.terminalId === terminalId && row.kioskSessionId === kioskSessionId && row.serviceKey === serviceKey,
@@ -510,26 +505,10 @@ export class ServiceOrderService {
     if (sameTrip && row?.status === 'consumed' && serviceKey === 'scan') {
       const reclaimed = await this.reclaimFailedScan(row)
       if (reclaimed) {
-        const again = await this.prisma.serviceOrder.updateMany({
-          where: {
-            id: serviceOrderId,
-            terminalId,
-            kioskSessionId,
-            serviceKey,
-            status: 'paid',
-            attemptsUsed: { lt: 2 },
-            OR: [{ attemptsUsed: 0 }, { retryUntil: { gt: now } }],
-          },
-          data: {
-            attemptsUsed: { increment: 1 },
-            status: 'consumed',
-            consumedAt: now,
-            consumedRef,
-            failureReason: null,
-            retryUntil: null,
-          },
-        })
-        if (again.count === 1) return serviceOrderId
+        await this.yieldOpenRef(serviceKey, consumedRef, serviceOrderId, now)
+        const again = await this.claimConsume(terminalId, kioskSessionId, serviceKey, serviceOrderId, consumedRef, now)
+        if (again === 1) return serviceOrderId
+        if (again < 0) throw await this.refOccupiedBy(serviceKey, consumedRef, serviceOrderId)
       }
     }
     const fresh = sameTrip ? await this.prisma.serviceOrder.findUnique({ where: { id: serviceOrderId } }) : row
@@ -605,23 +584,70 @@ export class ServiceOrderService {
     })
   }
 
-  /** 一个扫描任务只能挂在一张还没关闭的单上。已经挂过就拒绝，调用方退回这一次占用。 */
+  /** 同一任务上还有没结案的旧单时，能判没做成就退掉，判不了就留给认领回 409。 */
+  private async yieldOpenRef(serviceKey: ServiceOrderKey, consumedRef: string, incomingOrderId: string, now: Date): Promise<void> {
+    await displaceOrBlockOpenRef({
+      prisma: this.prisma,
+      now,
+      refund: (orderId, reason) => executeServiceOrderRefund(
+        this.prisma, this.registry, this.audit, this.redis ?? null, orderId, reason,
+      ),
+      releaseInterview: (sessionId) => releaseInterviewSession(this.prisma, sessionId),
+    }, { serviceKey, consumedRef, incomingOrderId })
+  }
+
+  private async claimConsume(
+    terminalId: string,
+    kioskSessionId: string,
+    serviceKey: ServiceOrderKey,
+    serviceOrderId: string,
+    consumedRef: string,
+    now: Date,
+  ): Promise<number> {
+    try {
+      const claimed = await this.prisma.serviceOrder.updateMany({
+        where: {
+          id: serviceOrderId,
+          terminalId,
+          kioskSessionId,
+          serviceKey,
+          status: 'paid',
+          attemptsUsed: { lt: 2 },
+          OR: [{ attemptsUsed: 0 }, { retryUntil: { gt: now } }],
+        },
+        data: {
+          attemptsUsed: { increment: 1 },
+          status: 'consumed',
+          consumedAt: now,
+          consumedRef,
+          failureReason: null,
+          retryUntil: null,
+        },
+      })
+      return claimed.count
+    } catch (error) {
+      if (isServiceOrderOpenRefConflict(error)) return -1
+      throw error
+    }
+  }
+
+  private async refOccupiedBy(serviceKey: ServiceOrderKey, consumedRef: string, incomingOrderId: string): Promise<HttpException> {
+    const holder = await this.prisma.serviceOrder.findFirst({
+      where: {
+        serviceKey,
+        consumedRef,
+        id: { not: incomingOrderId },
+        status: { in: ['pending', 'paid', 'consumed'] },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    })
+    return serviceOrderRefOccupied(holder?.id ?? incomingOrderId)
+  }
+
+  /** 一个扫描任务只能挂在一张还没结案的单上。已经挂过就拒绝，调用方退回这一次占用。 */
   private async attachRef(orderId: string, consumedRef: string): Promise<boolean> {
-    if (!consumedRef || consumedRef === 'pending') return false
-    const changed = await this.prisma.$transaction((tx) => tx.$executeRaw`
-      UPDATE "ServiceOrder"
-      SET "consumedRef" = ${consumedRef}, "updatedAt" = ${new Date()}
-      WHERE "id" = ${orderId}
-        AND "status" = 'consumed'
-        AND ("consumedRef" IS NULL OR "consumedRef" = 'pending' OR "consumedRef" = ${consumedRef})
-        AND NOT EXISTS (
-          SELECT 1 FROM "ServiceOrder" AS other
-          WHERE other."consumedRef" = ${consumedRef}
-            AND other."id" <> ${orderId}
-            AND other."status" <> 'closed'
-        )
-    `)
-    return Number(changed) === 1
+    return attachServiceOrderConsumedRef(this.prisma, orderId, consumedRef)
   }
 
   /** 同一张已占用的扫描单重放时直接接着做，不再占一张新单。任务已经失败则交给认领失败后的当场复核。 */

@@ -1,7 +1,9 @@
 import type { PrismaService } from '../prisma/prisma.service'
 import { KIOSK_SESSION_IDLE_EXPIRY_MS } from '../kiosk-session/kiosk-session.types'
+import { anotherOpenOrderHoldsRef } from './service-order.ref'
 import {
   SERVICE_CONSUMED_REVIEW_AFTER_MS,
+  SERVICE_REFUND_REASON_DISPLACED,
   SERVICE_REFUND_REASON_LEFT,
   SERVICE_REFUND_REASON_RETRY_EXPIRED,
   SERVICE_REFUND_RETRY_CAP,
@@ -137,6 +139,10 @@ async function sweepConsumedTrips(deps: ServiceOrderSweepDeps): Promise<void> {
 }
 
 async function judgeResume(deps: ServiceOrderSweepDeps, orderId: string, consumedRef: string | null): Promise<void> {
+  if (await anotherOpenOrderHoldsRef(deps.prisma, orderId, 'resume_optimize', consumedRef)) {
+    await deps.refund(orderId, SERVICE_REFUND_REASON_DISPLACED)
+    return
+  }
   if (!consumedRef) {
     await deps.markNotMade(orderId, 'optimize_failed')
     return
@@ -150,6 +156,10 @@ async function judgeResume(deps: ServiceOrderSweepDeps, orderId: string, consume
 }
 
 async function judgeInterview(deps: ServiceOrderSweepDeps, orderId: string, consumedRef: string | null): Promise<void> {
+  if (await anotherOpenOrderHoldsRef(deps.prisma, orderId, 'mock_interview', consumedRef)) {
+    await deps.refund(orderId, SERVICE_REFUND_REASON_DISPLACED)
+    return
+  }
   if (!consumedRef) {
     await deps.markNotMade(orderId, 'interview_not_opened')
     return
@@ -217,6 +227,10 @@ async function judgeScan(
   row: { id: string; consumedRef: string | null; consumedAt: Date | null },
 ): Promise<void> {
   const ref = row.consumedRef
+  if (await anotherOpenOrderHoldsRef(deps.prisma, row.id, 'scan', ref)) {
+    await deps.refund(row.id, SERVICE_REFUND_REASON_DISPLACED)
+    return
+  }
   if (!ref || ref === 'pending') {
     if (row.consumedAt && row.consumedAt.getTime() < deps.now.getTime() - SERVICE_SCAN_PENDING_LIMIT_MS) {
       await deps.markNotMade(row.id, 'scan_no_file')

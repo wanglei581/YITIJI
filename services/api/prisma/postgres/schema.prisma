@@ -135,13 +135,25 @@ model ServiceOrder {
   /// processing / failed / success。上次是受理中时，下一拍先查单，不再发一笔新退款。
   refundChannelState String?
   refundProcessingTries Int @default(0)
-  /// user_cancelled / expired / session_ended / qr_failed
+  /// user_cancelled / expired / session_ended / qr_failed / personal_charge_changed / price_changed / org_rebound
   closeReason     String?
   /// 渠道通知付款失败。单仍是 pending，钱没扣。
   paymentFailed   Boolean   @default(false)
+  /// 最近一次已处理的退款通知指纹。同一通知只记一次。
+  refundNotifyKey String?
+  /// 退款通知金额等对不上。单不靠渠道重发，告警中心能看见。
+  refundAnomaly   String?
+  /// 库里已经关掉，渠道关单还没成功。清扫重试，不回滚已经改过的价或绑定。
+  channelClosePending Boolean @default(false)
   expiresAt       DateTime
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  // 数据库层另有 partial unique index `ServiceOrder_open_consumed_ref_key`
+  // （migration 20261114170000_service_order_open_ref）：同一 serviceKey + consumedRef
+  // 同时只能有一张 status IN ('pending','paid','consumed') 且 consumedRef 不是 pending 的单。
+  // Prisma `@@unique` 表达不了 WHERE，故不在此声明。结案后仍是 consumed 的继续占着；
+  // 退款中及之后腾出名额。违反时认领与挂任务都按冲突处理，不能收两笔。
 
   @@index([terminalId, kioskSessionId, status])
   @@index([status, expiresAt])
