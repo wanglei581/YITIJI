@@ -42,20 +42,36 @@ let apiStream = null
 const PASSTHROUGH_ENV = ['PATH', 'HOME', 'LANG', 'LC_ALL', 'CI', 'PLAYWRIGHT_BROWSERS_PATH', 'TMPDIR', 'TMP', 'TEMP']
 
 function playwrightArgs() {
-  const forward = []
   const argv = process.argv.slice(2)
+  let spec = 'tests/interaction/ai-resume-journey.spec.ts'
+  let config = 'playwright.interaction.config.ts'
+  const forward = []
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--grep' && argv[i + 1]) {
-      forward.push('--grep', argv[i + 1])
+    const arg = argv[i]
+    if (arg === '--grep') {
+      const value = argv[i + 1]
+      if (!value || value.startsWith('--')) throw new Error('--grep 缺少模式')
+      forward.push('--grep', value)
       i += 1
+      continue
     }
+    if (arg === '--config') {
+      const value = argv[i + 1]
+      if (!value || value.startsWith('--')) throw new Error('--config 缺少配置文件')
+      config = value
+      i += 1
+      continue
+    }
+    if (arg.startsWith('--config=')) {
+      const value = arg.slice('--config='.length)
+      if (!value) throw new Error('--config 缺少配置文件')
+      config = value
+      continue
+    }
+    if (arg.startsWith('-')) throw new Error(`启动脚本不认识这个参数：${arg}`)
+    spec = arg
   }
-  return [
-    'tests/interaction/ai-resume-journey.spec.ts',
-    '--config',
-    'playwright.interaction.config.ts',
-    ...forward,
-  ]
+  return [spec, '--config', config, ...forward]
 }
 
 function childEnv(extra) {

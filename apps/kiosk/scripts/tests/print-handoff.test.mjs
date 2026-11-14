@@ -76,6 +76,50 @@ async function loadHandoff() {
   return { ...mod, session: sessionMod, policy: policyMod, storage }
 }
 
+/** 走 kioskSensitiveSession 那一份清场，不在测试里另抄键表。重模块换成只导出清场要用的名字的替身。 */
+async function loadKioskClear() {
+  seq += 1
+  const mark = `\n// clear-${seq}\n`
+  const stub = (code) => toDataUrl(`${code}${mark}`)
+  const transpileFile = (relativePath) => ts.transpileModule(readFileSync(join(kioskRoot, relativePath), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: relativePath,
+  }).outputText
+  const leaf = (relativePath) => stub(transpileFile(relativePath))
+  const questionsStub = stub('export const SELF_ASSESSMENT_QUESTIONS_V1 = { dimensions: [] }\n')
+  const selfCode = transpileFile('src/pages/resume/selfAssessmentSession.ts')
+    .replaceAll("from '@ai-job-print/shared'", `from '${questionsStub}'`)
+  const declarationVersions = leaf('src/ai/aiDeclarationVersions.ts')
+  const declarationCode = transpileFile('src/ai/aiDeclarationSession.ts')
+    .replaceAll("from './aiDeclarationVersions'", `from '${declarationVersions}'`)
+  const replacements = {
+    '../pages/resume/resumeGenerateDraft': stub('export function clearResumeGenerateDraft() {}\nexport function hasResumeGenerateDraft() { return false }\n'),
+    '../pages/print/printMaterialSession': leaf('src/pages/print/printMaterialSession.ts'),
+    '../pages/print/pickupClaimResume': leaf('src/pages/print/pickupClaimResume.ts'),
+    '../pages/resume/aiResumeSession': leaf('src/pages/resume/aiResumeSession.ts'),
+    '../services/resumeParseIntent': leaf('src/services/resumeParseIntent.ts'),
+    '../pages/resume/jobMaterialDraft': leaf('src/pages/resume/jobMaterialDraft.ts'),
+    '../services/assistantDraft': stub("export const ASSISTANT_DRAFT_KEY = 'kiosk-assistant-draft'\nexport const ASSISTANT_POLICY_KEY = 'kiosk-assistant-policy'\nexport function clearAssistantDraft() {}\nexport function clearAssistantPolicyContext() {}\n"),
+    '../pages/resume/selfAssessmentSession': stub(selfCode),
+    '../pages/interview/interviewWorkbenchSession': stub("export const INTERVIEW_WORKBENCH_SESSION_KEY = 'ai-job-print:current-interview-workbench'\nexport function clearInterviewWorkbenchSession() {}\n"),
+    '../pages/scan/scanWorkbenchSession': stub("export const SCAN_WORKBENCH_SESSION_KEY = 'ai-job-print:current-scan-workbench'\nexport function clearScanWorkbenchSession() {}\n"),
+    '../pages/scan/scanHowContinue': stub("export const SCAN_HOW_CONTINUE_KEY = 'ai-job-print:scan-how-continue'\nexport function clearScanHowContinue() {}\n"),
+    '../pages/scan/scanCleanupGate': stub('export function beginScanSessionCleanup() {}\n'),
+    '../favorites/localFavorites': leaf('src/favorites/localFavorites.ts'),
+    '../pages/contract-review/contractReviewSession': leaf('src/pages/contract-review/contractReviewSession.ts'),
+    '../ai/aiDeclarationSession': stub(declarationCode),
+    '../ai/aiDeclarationVersions': declarationVersions,
+    '../pages/copy/copySession': leaf('src/pages/copy/copySession.ts'),
+  }
+  let out = transpileFile('src/auth/kioskSensitiveSession.ts')
+  for (const [specifier, url] of Object.entries(replacements)) {
+    out = out.split(`'${specifier}'`).join(`'${url}'`).split(`"${specifier}"`).join(`"${url}"`)
+  }
+  const leftover = [...out.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((match) => match[1]).filter((specifier) => !specifier.startsWith('data:'))
+  assert.deepEqual(leftover, [], `清场模块还有没接上的依赖：${leftover.join(', ')}`)
+  return import(`${toDataUrl(out)}#${seq}`)
+}
+
 const GUEST = { kind: 'guest' }
 const MEMBER_A = { kind: 'member', mark: 'mark-a-0001' }
 const MEMBER_B = { kind: 'member', mark: 'mark-b-0002' }
@@ -272,9 +316,13 @@ test('U6b 入口策略表：原件去打印台检查，派生产物直达报价�
   assert.deepEqual(h.printHandoffTarget(begun), { ok: true, path: '/print/desk?step=check', state: { printContextId: begun.context.contextId } })
 })
 
-test('U6d 返回状态只留在调用方内存，不进打印交接存储', async () => {
+test('U6d 返回状态只留在调用方内存，清场后不留带姓名的文件名', async () => {
   const h = await loadHandoff()
-  const filename = '林晓舟-仓储管理员-诊断报告.pdf'
+  globalThis.sessionStorage = h.storage
+  const local = memoryStorage()
+  globalThis.window.localStorage = local
+  globalThis.localStorage = local
+  const filename = 'AI诊断报告_林晓舟.pdf'
   const returnState = {
     pathname: '/resume/report',
     search: '?taskId=task-1',
@@ -282,14 +330,14 @@ test('U6d 返回状态只留在调用方内存，不进打印交接存储', asyn
   }
   const begun = h.beginPrintHandoff({
     origin: 'resume_report',
-    file: fileB(),
+    file: { ...fileB(), name: filename },
     returnPath: '/resume/report?taskId=task-1',
     returnState,
   }, GUEST, NOW)
   assert.equal(begun.ok, true)
   const raw = h.storage.getItem(STORAGE_KEY)
   assert.ok(raw)
-  assert.equal(raw.includes(filename), false, '带姓名的文件名不得进打印交接存储')
+  assert.equal(raw.includes(filename), true, '打印交接会记下这份带姓名的文件名')
   assert.equal(raw.includes('reportTakeaway'), false)
   assert.equal(raw.includes('files.example'), false)
   assert.deepEqual(Object.keys(h.printHandoffTarget(begun).state), ['printContextId'])
@@ -299,6 +347,10 @@ test('U6d 返回状态只留在调用方内存，不进打印交接存储', asyn
   assert.equal(h.readPrintReturnCarry({ pathname: '/login', search: '', state: {} }), null)
   assert.equal(h.readPrintReturnCarry({ pathname: '/resume/report', search: '?taskId=1#x', state: {} }), null)
   assert.equal(h.readPrintReturnCarry({ pathname: '/resume/report?taskId=1', search: '', state: {} }), null)
+  const sensitive = await loadKioskClear()
+  sensitive.clearKioskSensitiveSession(null)
+  const left = Object.values(h.storage.dump()).join('\n')
+  assert.equal(left.includes(filename), false, '清场后不留带姓名的文件名')
 })
 
 test('U6c 政策清单直达报价并只保留公开政策编号用于返回，其他来源仍去掉查询串', async () => {
