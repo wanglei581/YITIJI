@@ -117,6 +117,8 @@ jobs:
           pnpm verify:legal-docs-preflight
           pnpm verify:ci-main-runs-complete
           pnpm verify:release-bundle
+          # 发布时 GitHub 拉取超时或被打断，不得留进程占住 SSH 会话（2026-11-09 孤儿 ssh 让发布步骤一直挂着）
+          pnpm verify:deploy-fetch-cleanup
           pnpm verify:prod-readonly-probe
           pnpm verify:ci-gate-coverage
           pnpm verify:fixture-time-bombs
@@ -1582,12 +1584,19 @@ jobs:
 
   release-bundle:
     # BOS failure must not prevent Deploy from receiving a successful CI workflow_run.
+    # 上传失败也不让本作业变红：发布（自动发布和手动补发）只认 conclusion=success 的 CI 运行，
+    # 标红会把这个提交整个挡在发布之外，连服务器直连 GitHub 的回退和手动补发都用不了。
+    # 失败时做两件事：BOS 请求遇到超时、断连、408/429/5xx 自动重试（BOS_RELEASE_RETRIES）；
+    # 最终仍失败，由末尾「Warn when BOS bundle is missing」打 warning 注解并写作业摘要。
+    # 2026-11-09 run 42562877308：PUT 回 HTTP 408，包没传上去，作业却是绿的，发布时才发现。
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build-and-verify, postgres-readiness, kiosk-browser-smoke]
     # 11/12 起 GitHub 的 ubuntu-latest 换成 26.04；Playwright 1.55.1 在 26.04 上装不了 chromium
     #（kiosk-browser-smoke「Install Playwright Chromium」报 does not support chromium on ubuntu26.04-x64），
     # 四个作业一起钉回此前一直验证通过的 24.04。升级 Playwright 并验过之后再改回 ubuntu-latest。
     runs-on: ubuntu-24.04
+    env:
+      BOS_RELEASE_RETRIES: '2'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1607,6 +1616,7 @@ jobs:
           fi
 
       - name: Create and upload release bundle
+        id: publish
         continue-on-error: true
         env:
           BOS_RELEASE_ACCESS_KEY: ${{ secrets.BOS_RELEASE_ACCESS_KEY }}
@@ -1681,3 +1691,20 @@ jobs:
           echo "release-bundle uploaded=$BUNDLE checksum=$CHECKSUM"
           printf 'release-bundle uploaded=%s checksum=%s\n' "$BUNDLE" "$CHECKSUM" >> "$GITHUB_STEP_SUMMARY"
           # release-bundle-publish:end
+
+      - name: Warn when BOS bundle is missing
+        # 上一步任何一处失败（打包、上传、HEAD 校验、整包回读）都意味着 BOS 上没有可用的本次包。
+        if: steps.publish.outcome == 'failure'
+        run: |
+          summary='BOS 上没有本次包，发布会改走服务器直连 GitHub 拉取（已知不稳）'
+          echo "::warning title=BOS 发布包上传失败::${summary}。提交 ${GITHUB_SHA}；原因见本作业「Create and upload release bundle」步骤日志，发布前可以单独重跑本作业补传。"
+          {
+            echo '### ⚠️ BOS 发布包上传失败'
+            echo
+            echo "${summary}。"
+            echo
+            echo "- 提交：\`${GITHUB_SHA}\`"
+            echo '- 原因：见本作业「Create and upload release bundle」步骤日志（超时、断连、408/429/5xx 已自动重试，最多 2 次）。'
+            echo '- 本作业仍显示成功：发布只认 conclusion=success 的 CI，标红会连 GitHub 回退和手动补发一起挡掉。'
+            echo '- 发布前可以单独重跑本作业补传；补传成功后摘要里会出现 release-bundle uploaded=…'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -11947,8 +11947,10 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
+          "KioskJobBoardConfig",
           "PolicyPost",
-          "PrintTask"
+          "PrintTask",
+          "Terminal"
         ],
         "path": "/api/v1/policies/:id/checklist",
         "roles": [],
@@ -20309,6 +20311,7 @@
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-deploy-authorization-gate.mjs",
+      "scripts/verify-deploy-fetch-cleanup.mjs",
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
       "scripts/verify-release-bundle.mjs",
@@ -24047,9 +24050,15 @@
     "apps/kiosk/src/services/api/pendingTasks.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
+    "apps/kiosk/src/services/api/policies.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
+    ],
     "apps/kiosk/src/services/api/policy-eligibility.ts": [
       "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
+    ],
+    "apps/kiosk/src/services/api/policyChecklist.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "apps/kiosk/src/services/api/printConversion.ts": [
       "scripts/verify-no-raw-error-render.mjs"
@@ -25985,6 +25994,9 @@
     "services/api/prisma/seed.ts": [
       "services/api/scripts/verify-partner-account-action-schema.ts"
     ],
+    "services/api/scripts/backfill-org-content-trust.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
+    ],
     "services/api/scripts/backfill-terminal-credentials.ts": [
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
@@ -26271,6 +26283,7 @@
       "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-queue-timeout.ts",
@@ -26387,6 +26400,9 @@
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions-signature.ts",
       "services/api/scripts/verify-upload-sessions.ts"
+    ],
+    "services/api/scripts/support/verify-policy-scope-env.cjs": [
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/scripts/unpublish-demo-companies.ts": [
       "services/api/scripts/verify-demo-company-unpublish.ts"
@@ -26903,7 +26919,8 @@
       "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
-      "services/api/scripts/verify-self-assessment-ai-gate.ts"
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "services/api/scripts/verify-trtc-ownership.ts"
     ],
     "services/api/src/ai/ai.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -27018,7 +27035,8 @@
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
     "services/api/src/ai/llm/assistant-policy-context.ts": [
-      "services/api/scripts/verify-assistant-policy-context.ts"
+      "services/api/scripts/verify-assistant-policy-context.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/ai/llm/deepseek-thinking.ts": [
       "services/api/scripts/verify-llm-thinking-off.ts"
@@ -27055,7 +27073,9 @@
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-llm-connectivity.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
-      "services/api/scripts/verify-print-param-suggestion.ts"
+      "services/api/scripts/verify-print-param-suggestion.ts",
+      "services/api/scripts/verify-trtc-ownership.ts",
+      "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/ai/llm/llm-failure.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
@@ -27528,7 +27548,8 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-device-fault.ts",
-      "services/api/scripts/verify-assistant-policy-context.ts"
+      "services/api/scripts/verify-assistant-policy-context.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/ai/usage/ai-usage-meter.ts": [
       "services/api/scripts/verify-admin-ops.ts",
@@ -27593,6 +27614,7 @@
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/audit/audit.module.ts": [
@@ -27700,6 +27722,7 @@
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-queue-timeout.ts",
@@ -27920,6 +27943,9 @@
     ],
     "services/api/src/common/constants/internal-session.constants.ts": [
       "services/api/scripts/verify-file-internal-auth.ts"
+    ],
+    "services/api/src/common/content-trust-cache-keys.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/common/content-trust.ts": [
       "services/api/scripts/verify-content-trust-publish-gate.ts",
@@ -28227,6 +28253,7 @@
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
@@ -28276,6 +28303,7 @@
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts",
@@ -28607,6 +28635,7 @@
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policy-checklist.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
@@ -29707,7 +29736,8 @@
     ],
     "services/api/src/orgs/admin-org-content-trust.service.ts": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
-      "services/api/scripts/verify-content-trust-publish-gate.ts"
+      "services/api/scripts/verify-content-trust-publish-gate.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/orgs/admin-orgs.controller.ts": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
@@ -29728,7 +29758,8 @@
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
-      "services/api/scripts/verify-pg-serialization-conflict.ts"
+      "services/api/scripts/verify-pg-serialization-conflict.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/orgs/contact-phone-change.ts": [
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
@@ -30060,19 +30091,25 @@
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts"
     ],
     "services/api/src/policies/policy-checklist-layout.ts": [
       "services/api/scripts/verify-policy-checklist.ts"
     ],
+    "services/api/src/policies/policy-checklist-metadata.ts": [
+      "services/api/scripts/verify-policy-scope.ts"
+    ],
     "services/api/src/policies/policy-checklist-pdf.ts": [
       "services/api/scripts/verify-policy-checklist.ts"
     ],
     "services/api/src/policies/policy-checklist.controller.ts": [
-      "services/api/scripts/verify-policy-checklist.ts"
+      "services/api/scripts/verify-policy-checklist.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policy-checklist.service.ts": [
-      "services/api/scripts/verify-policy-checklist.ts"
+      "services/api/scripts/verify-policy-checklist.ts",
+      "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policy-eligibility.engine.ts": [
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
@@ -30478,6 +30515,7 @@
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-completion-evidence.ts",
@@ -30753,6 +30791,7 @@
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policy-checklist.ts",
+      "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts",
@@ -31135,6 +31174,7 @@
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/trtc/trtc.module.ts": [
+      "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/trtc/trtc.service.ts": [
@@ -31145,6 +31185,7 @@
       "services/api/scripts/verify-assistant-device-fault.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
+      "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-session-deadline.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -38222,6 +38263,24 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:deploy-authorization-gate"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/deploy.yml"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-deploy-fetch-cleanup.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:deploy-fetch-cleanup"
       ],
       "wired": true
     },
@@ -46078,14 +46137,35 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/services/api/policies.ts",
+          "apps/kiosk/src/services/api/policyChecklist.ts",
+          "services/api/scripts/backfill-org-content-trust.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/verify-policy-scope-env.cjs",
           "services/api/src/activity/me-activity.controller.ts",
+          "services/api/src/ai/llm/assistant-policy-context.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/assistant/daily-brief.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/content-trust-cache-keys.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/common/redis/redis.service.ts",
           "services/api/src/community/community.module.ts",
           "services/api/src/community/community.service.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/member-favorites/member-favorites.controller.ts",
+          "services/api/src/orgs/admin-org-content-trust.service.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
           "services/api/src/policies/policies.controller.ts",
           "services/api/src/policies/policies.module.ts",
+          "services/api/src/policies/policies.service.ts",
+          "services/api/src/policies/policy-checklist-metadata.ts",
+          "services/api/src/policies/policy-checklist.controller.ts",
+          "services/api/src/policies/policy-checklist.service.ts",
           "services/api/src/policies/policy-public-visibility.ts",
-          "services/api/src/policies/policy-scope.service.ts"
+          "services/api/src/policies/policy-scope.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
         ],
         "missing": []
       },
@@ -48793,9 +48873,13 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/ai.module.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
           "services/api/src/app.module.ts",
           "services/api/src/common/redis/redis.service.ts",
-          "services/api/src/trtc/trtc.controller.ts"
+          "services/api/src/trtc/trtc.controller.ts",
+          "services/api/src/trtc/trtc.module.ts",
+          "services/api/src/trtc/trtc.service.ts"
         ],
         "missing": []
       },
@@ -48832,6 +48916,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/llm/llm-config.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/prisma/prisma.service.ts",
