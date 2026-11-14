@@ -120,12 +120,13 @@ export function withdrawSelfAssessment(taskId: string, access: SelfAssessmentAcc
 export function appendSelfAssessmentToResume(
   taskId: string,
   resumeFileId: string,
+  resumeFileUrl: string,
   access: SelfAssessmentAccess,
 ): Promise<SelfAssessmentPrintResponse> {
   if (API_MODE !== 'http') return Promise.reject(new SelfAssessmentApiError('MOCK_MODE', '演示模式不生成合并 PDF', 0))
   return call<SelfAssessmentPrintResponse>(
     `/resume/self-assessment/${encodeURIComponent(taskId)}/append`,
     access,
-    { method: 'POST', body: { resumeFileId } },
+    { method: 'POST', body: { resumeFileId, resumeFileUrl } },
   )
 }
