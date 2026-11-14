@@ -18,7 +18,7 @@ export interface AlignOriginalListOptions {
 }
 
 type ColumnKind = 'dot' | 'dun' | 'paren'
-type ColumnHit = { kind: ColumnKind; num: number; maybe: boolean; rest: string }
+type ColumnHit = { kind: ColumnKind; num: number; maybe: boolean; rest: string; keep?: boolean }
 
 /** 行首像编号时拆开。点号后 1–3 位再接普通字算「可能是小数」（「1.3D」「2.5D」）；紧跟「年 / 版本 / 寸」或不是这种形状就不当编号。四位年份仍是明确编号。 */
 function classifyLeadingIndex(line: string): ColumnHit | null {
@@ -36,16 +36,17 @@ function classifyLeadingIndex(line: string): ColumnHit | null {
   if (/^\d{4}(?!\d)/u.test(rawRest)) return { kind, num, maybe: false, rest }
   const short = /^(\d{1,3})(?!\d)/u.exec(rawRest)
   if (!short) return null
-  // 「1.0架构重构」「2.05」：点号后是 0 打头的数字，是小数或版本号，不当编号。
-  if (short[1]?.startsWith('0')) return null
+  // 「1.0架构重构」「2.05」：点号后 0 打头是小数或版本号，这一行原样留（keep），只给整栏当旁证。
+  if (short[1]?.startsWith('0')) return { kind, num, maybe: true, rest, keep: true }
   const tail = rawRest.slice(short[0].length)
   if (/^(?:年|寸|版本)/u.test(tail)) return null
   return { kind, num, maybe: true, rest }
 }
 
-/** 比对用：行首像编号（含「1.3D」这种可能是小数的）时给出去掉编号后的正文，不像编号原样返回。只用于比对，不进成品。 */
+/** 比对用：行首像编号（含「1.3D」这种可能是小数的）时给出去掉编号后的正文。0 打头要原样留的版本号，以及根本不像编号的，原样返回。只用于比对，不进成品。 */
 export function withoutLeadingIndex(line: string): string {
-  return classifyLeadingIndex(line)?.rest ?? line
+  const hit = classifyLeadingIndex(line)
+  return hit && !hit.keep ? hit.rest : line
 }
 
 /** 点号后紧跟 1–3 位数字（「1.5倍」「1.3年」「1.0」「1.3D」）。四位年份不算。 */
@@ -62,15 +63,6 @@ function ambiguousDigitTail(line: string): { num: number; rest: string } | null 
   if (!/^(\d{1,3})(?!\d)/u.test(rawRest)) return null
   const rest = rawRest.trim()
   return rest ? { num, rest } : null
-}
-
-function leadingYearBody(line: string): string | null {
-  const text = line.trim().replace(BULLET_RE, '').trim()
-  const match = COLUMN_INDEX_RE.exec(text)
-  if (!match) return null
-  const rawRest = text.slice(match[0].length)
-  if (!/^\d{4}(?!\d)/u.test(rawRest)) return null
-  return rawRest.trim() || null
 }
 
 export function ambiguousColumnTail(line: string, column: string[]): string | null {
@@ -94,7 +86,6 @@ export function ambiguousColumnTail(line: string, column: string[]): string | nu
 /** 漏交补回：1–3 位数字原样；四位年份和普通编号用剥过的正文。 */
 export function omittedColumnText(raw: string, shown: string): string {
   if (ambiguousDigitTail(raw)) return strippedListLine(raw)
-  if (leadingYearBody(raw)) return shown
   return shown
 }
 
@@ -102,6 +93,7 @@ export function omittedColumnText(raw: string, shown: string): string {
  * 一整栏（技能、证书或一段描述）各行成套用「1. 2. 3.」「1、2、」「1）2）」这类递增编号时，只剥行首编号。
  * 只有一行、数字不连续、或「2.5D」「3.0版本」「1.5年」这种不成套的，原样留下。
  * 「1.3D」只有在同栏其余行是明确的 2. 3. … 时才剥，剥完正文仍是「3D」。
+ * 点号后 0 打头（「1.0架构」「1.05亿」）这一行原样留，只给整栏当旁证，其余行照旧剥编号。
  */
 export function stripNumberedColumn(lines: string[]): string[] {
   const prepared = lines.map((line) => ({ line, hit: classifyLeadingIndex(line), empty: !line.trim() }))
@@ -113,7 +105,7 @@ export function stripNumberedColumn(lines: string[]): string[] {
   const maybes = filled.filter((row) => row.hit?.maybe)
   const witnessed = maybes.length === 1 && filled[0]?.hit?.maybe === true && filled.slice(1).every((row) => row.hit?.maybe === false)
   if (maybes.length > 0 && !witnessed) return lines
-  return prepared.map((row) => (row.hit && !row.empty ? row.hit.rest : row.line))
+  return prepared.map((row) => (row.hit && !row.empty && !row.hit.keep ? row.hit.rest : row.line))
 }
 
 /** 短的一边至少 2 字，且不短于长的一边的一半，才算同一小项的改写。 */
@@ -211,7 +203,7 @@ function lineCoveredByModule(line: string, module: AlignModule): boolean {
   const matches = (raw: string) => {
     if (listLineKey(raw) === key) return true
     const hit = classifyLeadingIndex(raw)
-    return Boolean(hit && listLineKey(hit.rest) === key)
+    return Boolean(hit && !hit.keep && listLineKey(hit.rest) === key)
   }
   const before = module.before ?? ''
   if (matches(before)) return true
@@ -349,7 +341,7 @@ export function alignOriginalList(
     }
     const display = strippedListLine(line)
     if (!display) continue
-    // 模型交回的行以模型写法为准：留下的「1.x」或去掉编号后的正文，都用模型那一行。
+    // 模型交回的行以模型写法为准：留下的同号「1.x」或去掉编号后的正文，都用模型那一行；调换顺序重新编号的「2.x」不算。
     const tail = ambiguousColumnTail(item.raw, lines) ?? ''
     const tailKey = tail ? norm(strippedListLine(tail)) : ''
     const whole = pool.find((candidate) => !candidate.used && candidate.key === norm(display))
@@ -357,8 +349,8 @@ export function alignOriginalList(
         ? pool.find((candidate) => {
           if (candidate.used) return false
           if (candidate.key === tailKey) return true
-          const rest = ambiguousDigitTail(candidate.display)?.rest ?? ''
-          return Boolean(rest && norm(strippedListLine(rest)) === tailKey)
+          const amb = ambiguousDigitTail(candidate.display)
+          return Boolean(amb && amb.num === ambiguousDigitTail(item.raw)?.num && norm(strippedListLine(amb.rest)) === tailKey)
         })
         : undefined)
     if (whole) {
