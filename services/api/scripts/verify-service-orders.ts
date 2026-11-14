@@ -1138,6 +1138,8 @@ async function main(): Promise<void> {
     assert.equal((await loadOrder(c3Victim)).status, 'refunded', 'C-3 没出文件的最老一张要退')
     const c3Settled = await prisma.serviceOrder.count({ where: { id: { in: c3Made }, settledAt: { not: null } } })
     assert.equal(c3Settled, 29, '这一拍只结案最早的 30 张里做成的那 29 张')
+    const c3LateSettled = await prisma.serviceOrder.count({ where: { id: { in: c3Made.slice(29) }, settledAt: { not: null } } })
+    assert.equal(c3LateSettled, 0, '更晚做成的这一拍不能插到更早的前面')
     pass('C-3 做成的扫描让出名额，没出文件的能退')
 
     const n1Session = await openKiosk(TERM_CHARGE, chargeToken, 'scan')
@@ -1280,6 +1282,29 @@ async function main(): Promise<void> {
     ])
     assert.equal((await loadOrder(dualRow.id)).status, 'refunded')
     assert.equal(await prisma.auditLog.count({ where: { action: 'service_order.refunded', targetId: dualRow.id } }), 1, '并发退款只记一条已退')
+    // 已付认领靠状态本身互斥。租约要挡的是两路同时看到「退款中」后再打渠道。
+    const leaseSession = await openKiosk(TERM_CHARGE, chargeToken)
+    const leaseRow = await paidOrder(leaseSession, 'scan', 'sbx_txn_d2_lease')
+    await prisma.serviceOrder.update({
+      where: { id: leaseRow.id },
+      data: {
+        status: 'refunding',
+        refundNo: `svc-rfd-${leaseRow.id}`,
+        refundReason: '并发退款',
+        nextRefundAt: new Date(Date.now() - 1000),
+        refundLeaseUntil: null,
+        refundAttempts: 0,
+        refundChannelState: null,
+      },
+    })
+    const leaseCalls = refundCalls
+    // 手动重试不看 nextRefundAt，只有租约能挡住第二路再打渠道。
+    await Promise.all([
+      executeServiceOrderRefund(prisma, registry, audit, redis as unknown as RedisService, leaseRow.id, '并发退款', { manual: true }),
+      executeServiceOrderRefund(prisma, registry, audit, redis as unknown as RedisService, leaseRow.id, '并发退款', { manual: true }),
+    ])
+    assert.equal(refundCalls, leaseCalls + 1, '并发退款只打一次渠道')
+    assert.equal(await prisma.auditLog.count({ where: { action: 'service_order.refunded', targetId: leaseRow.id } }), 1, '退款中并发也只记一条已退')
     pass('D-2 自动退款并发只写一条审计')
 
     const nowFreeSession = await openKiosk(TERM_CHARGE, chargeToken)
