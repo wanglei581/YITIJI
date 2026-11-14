@@ -889,7 +889,8 @@ test('预览页互换两条公司名后，AI 加的数仍待确认，本人写�
   await expect(pending).toContainText('周更 2 篇')
   await page.getByRole('textbox', { name: '第 1 条经历的公司' }).fill('灯塔书店')
   await page.getByRole('textbox', { name: '第 2 条经历的公司' }).fill('海岸超市')
-  await page.getByRole('textbox', { name: '工作经历描述 1' }).fill(shelf.replace(/。$/, '，另记 3 项。'))
+  // 整段换成和两条生成稿都不像的句子。只在句尾加几个字时，相似度仍能配回原行，丢掉下标也不会红。
+  await page.getByRole('textbox', { name: '工作经历描述 1' }).fill('另记 3 项。')
   await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue('灯塔书店')
   await expect(page.getByRole('textbox', { name: '第 2 条经历的公司' })).toHaveValue('海岸超市')
   await expect(pending).toContainText('周更 2 篇')
