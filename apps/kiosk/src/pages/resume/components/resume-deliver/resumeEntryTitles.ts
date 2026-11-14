@@ -128,6 +128,50 @@ export function focusResumeOriginalField(resume: GeneratedResume, original: stri
       return true
     }
   }
+  if (el instanceof HTMLElement && needle && selectElementText(el, needle)) {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    el.focus()
+    return true
+  }
   scrollResumeEditorToTop()
+  return true
+}
+
+/** 只读栏不是输入框。按原文在文本节点里的位置选中，调用方读 getSelection。 */
+function selectElementText(el: HTMLElement, needle: string): boolean {
+  const full = el.textContent ?? ''
+  const start = full.indexOf(needle)
+  if (start < 0 || typeof document === 'undefined') return false
+  const stop = start + needle.length
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  let seen = 0
+  let startNode: Text | null = null
+  let startOffset = 0
+  let endNode: Text | null = null
+  let endOffset = 0
+  let current = walker.nextNode()
+  while (current) {
+    const text = current as Text
+    const next = seen + text.data.length
+    if (!startNode && start < next) {
+      startNode = text
+      startOffset = start - seen
+    }
+    if (startNode && stop <= next) {
+      endNode = text
+      endOffset = stop - seen
+      break
+    }
+    seen = next
+    current = walker.nextNode()
+  }
+  if (!startNode || !endNode) return false
+  const range = document.createRange()
+  range.setStart(startNode, startOffset)
+  range.setEnd(endNode, endOffset)
+  const selection = window.getSelection()
+  if (!selection) return false
+  selection.removeAllRanges()
+  selection.addRange(range)
   return true
 }

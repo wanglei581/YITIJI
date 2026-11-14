@@ -240,14 +240,6 @@ export function OptimizedResumeEditor({
                       name={p.name}
                       role={p.role ?? ''}
                       className={`${taCls} mt-1 min-h-12`}
-                      onName={(name) => onChange({
-                        ...resume,
-                        projects: resume.projects.map((row, idx) => idx === i ? { ...row, name } : row),
-                      })}
-                      onRole={(role) => onChange({
-                        ...resume,
-                        projects: resume.projects.map((row, idx) => idx === i ? { ...row, role } : row),
-                      })}
                     />
                     <textarea
                       className={`${taCls} mt-1.5 min-h-24 resize-y`}
@@ -283,7 +275,8 @@ export function OptimizedResumeEditor({
               items={resume.certificates}
               field="certificate"
               appearance="chip"
-              onChange={(certificates) => onChange({ ...resume, certificates })}
+              readOnly
+              onChange={() => undefined}
             />
           </div>
         </div>

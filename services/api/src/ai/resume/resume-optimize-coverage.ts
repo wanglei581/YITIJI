@@ -2,6 +2,7 @@ import type { GeneratedResume, ResumeReport } from '../interfaces/ai-provider.in
 import type { OptimizeResult } from './llm-resume-optimize.service'
 import { RESUME_DOC_LIMITS, fitResumeToDocLimits } from './resume-doc-limits'
 import { alignOriginalList, ensureProjectOriginalLines } from './resume-optimize-list-align'
+import { BULLET_RE, RESTORED_ROLE_MAX, RESTORED_TITLE_MAX, isTitleLike } from './resume-restored-text'
 import { detectResumeName, extractResumeExperienceCandidates, normalizeResumeStructureText, splitResumeDateRange } from './resume-structure'
 
 export { alignOriginalList }
@@ -93,7 +94,6 @@ const UNKNOWN_HEADING_RE = /^[一-鿿]{2,8}$/u
 const UNKNOWN_HEADING_WORD_RE = /(经历|经验|背景|信息|资料|意向|评价|简介|总结|技能|证书|荣誉|奖项|爱好|特长|培训|语言|作品|其他|附加)$/u
 /** 联系方式、住址这类行属于基本信息，不是任何一条经历的描述。 */
 const CONTACT_LINE_RE = /(?<!\d)1[3-9]\d{9}(?!\d)|[\w.+-]+@[\w-]+\.[\w.-]+|^(手机|电话|联系电话|联系方式|邮箱|电子邮箱|微信|地址|住址|现住址|现居|通讯地址)/u
-const BULLET_RE = /^[\s·•●▪■◆*\-–—]+/u
 
 function headingOf(line: string): [RegExp, ListKey | null] | undefined {
   const known = HEADINGS.find(([pattern]) => pattern.test(line))
@@ -180,13 +180,6 @@ export function buildOriginalCoverage(
     active.overflow ||= overflow
   }
   return entries
-}
-
-/** 补回时单位 / 项目名称、职务能当标题的最大字数；超过或带句读就整句放进描述。 */
-const RESTORED_TITLE_MAX = 40
-const RESTORED_ROLE_MAX = 20
-function isTitleLike(text: string, max: number): boolean {
-  return text.length > 0 && text.length <= max && !/[，。；,;!！?？\n]/u.test(text)
 }
 
 /** 回配主事实；主字段缺失时才允许用其他原文事实定位。 */
@@ -332,11 +325,17 @@ export function preserveOriginalEntries(
   }
   const skillLines = baseline.filter((entry) => entry.key === 'skills' && !entry.overflow).flatMap((entry) => entry.lines)
   const certificateLines = baseline.filter((entry) => entry.key === 'certificates' && !entry.overflow).flatMap((entry) => entry.lines)
-  if (skillLines.length > 0) {
-    result.optimizedResume.skills = alignOriginalList(skillLines, result.optimizedResume.skills, RESUME_DOC_LIMITS.skills).list
-  }
   if (certificateLines.length > 0) {
-    result.optimizedResume.certificates = alignOriginalList(certificateLines, result.optimizedResume.certificates, RESUME_DOC_LIMITS.certificates).list
+    result.optimizedResume.certificates = alignOriginalList(
+      certificateLines, result.optimizedResume.certificates, RESUME_DOC_LIMITS.certificates,
+      { modules: result.modules },
+    ).list
+  }
+  if (skillLines.length > 0) {
+    result.optimizedResume.skills = alignOriginalList(
+      skillLines, result.optimizedResume.skills, RESUME_DOC_LIMITS.skills,
+      { modules: result.modules, coveredElsewhere: result.optimizedResume.certificates },
+    ).list
   }
   ensureProjectOriginalLines(result.optimizedResume, baseline, result.modules)
   // 出口收口：优化接口吐出来的任何结果，原样交给导出 / 排版调整 / 存草稿都必须过校验。

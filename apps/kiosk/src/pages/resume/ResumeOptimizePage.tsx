@@ -32,7 +32,7 @@ import { RESUME_AI_CONSENT_NEEDED_COPY } from './resumeAiConsentPrompt'
 import { useInlineResumeAiConsent } from './useInlineResumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
-import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
+import { locateLockedCopy, optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
 import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
 import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOptimizeLeaveDialog'
@@ -45,7 +45,6 @@ import { printFileSizeLabel, useOptimizeSession } from './components/resume-deli
 import {
   applyDecisionChanges,
   applyResumeDecisions,
-  applyResumeDecisionsWithStatus,
   defaultModuleDecision,
   moduleKeyOf,
   parseDecisionMap,
@@ -58,7 +57,7 @@ import {
 } from './components/resume-deliver/resumeDecisions'
 import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
 import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
-import { focusResumeOriginalField, focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
+import { findResumeOriginalField, focusResumeOriginalField, focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-optimize-qx.css'
 import './touch/optimize.css'
@@ -115,6 +114,7 @@ export function ResumeOptimizePage() {
   const [factsConfirmed, setFactsConfirmed] = useState<{ at: string; sig: string } | null>(null)
   const editOriginalRef = useRef<string | null>(typeof state?.editOriginal === 'string' ? state.editOriginal : null)
   const [editFocusNonce, setEditFocusNonce] = useState(0)
+  const [lockedNote, setLockedNote] = useState<string | null>(null)
   const openEditorAtOriginal = (original: string) => {
     if (viewOnly) return
     editOriginalRef.current = original
@@ -155,8 +155,8 @@ export function ResumeOptimizePage() {
   const resolved = resolveOptimizeView(query, live)
   const view = resolved.view
   const resume = optimizedResume
-  const assembledResult = resume ? applyResumeDecisionsWithStatus(resume, modules, decisions) : null
-  const assembled = assembledResult?.resume ?? null
+  // 编辑区里的稿已经是裁决之后的样子。导出用这一份，不再对全文做第二次替换。
+  const assembled = resume
   const unconfirmed = assembled ? detectUnconfirmedAdditions(assembled, modules) : []
   const facts = assembled ? extractConfirmableFacts(assembled) : []
   const factsValid = Boolean(factsConfirmed && assembled && factsConfirmed.sig === JSON.stringify(assembled))
@@ -359,6 +359,8 @@ export function ResumeOptimizePage() {
     const tick = () => {
       if (editOriginalRef.current !== text) return
       if (focusResumeOriginalField(resume, text)) {
+        const hit = findResumeOriginalField(resume, text)
+        setLockedNote(hit ? locateLockedCopy(hit.fieldId) : null)
         editOriginalRef.current = null
         return
       }
@@ -368,6 +370,19 @@ export function ResumeOptimizePage() {
     handle = window.requestAnimationFrame(tick)
     return () => window.cancelAnimationFrame(handle)
   }, [editorOpen, pane, resume, editFocusNonce])
+  useEffect(() => {
+    if (pane !== 'editor') return
+    const editor = document.querySelector('[data-resume-editor]')
+    if (!(editor instanceof HTMLElement)) return
+    const onFocus = (event: FocusEvent) => {
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      const field = target.closest('[data-entry-field]')
+      setLockedNote(locateLockedCopy(field?.getAttribute('data-entry-field') ?? ''))
+    }
+    editor.addEventListener('focusin', onFocus)
+    return () => editor.removeEventListener('focusin', onFocus)
+  }, [pane, resume])
   const qxPage = pane === 'export' ? 'resume-export' : pane === 'editor' ? 'resume-edit' : 'optimize'
   const leaveDirty = draft.unsaved || (isDirty && !exported && !token)
   const askFor = (label: string, text: string) => ({
@@ -532,6 +547,7 @@ export function ResumeOptimizePage() {
         {editorOpen && resume && assembled && pane === 'editor' && (
           <OptimizeEditView
             resume={resume}
+            lockedNote={lockedNote}
             onResumeChange={(next) => { if (viewOnly) return; markEdited(); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setOptimizedResume(next) }}
             unconfirmed={unconfirmed}
             layout={layout}

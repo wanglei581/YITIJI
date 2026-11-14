@@ -225,14 +225,6 @@ export function GenerateResumeEditor(props: {
                   className={`${taCls} qx-rg-title`}
                   captionClassName="qx-rg-cap"
                   onFocus={mark}
-                  onName={(name) => onChange({
-                    ...resume,
-                    projects: resume.projects.map((row, idx) => idx === i ? { ...row, name } : row),
-                  })}
-                  onRole={(role) => onChange({
-                    ...resume,
-                    projects: resume.projects.map((row, idx) => idx === i ? { ...row, role } : row),
-                  })}
                 />
                 <textarea
                   className={taCls}
@@ -264,7 +256,8 @@ export function GenerateResumeEditor(props: {
             items={resume.certificates}
             field="certificate"
             appearance="inline"
-            onChange={(certificates) => { mark(); onChange({ ...resume, certificates }) }}
+            readOnly
+            onChange={() => undefined}
           />
         </Block>
       </div>

@@ -399,21 +399,47 @@ export function applyDecisionChanges(
   return { resume: nextResume, decisions: nextDecisions, failures }
 }
 
+function fieldTextAt(resume: unknown, path: string): string | null {
+  let current = resume
+  for (const part of path.split(/[./]/u).filter(Boolean)) {
+    if (Array.isArray(current)) {
+      const index = Number(part)
+      if (!Number.isInteger(index)) return null
+      current = current[index]
+    } else if (current && typeof current === 'object' && part in current) {
+      current = (current as Record<string, unknown>)[part]
+    } else return null
+  }
+  return typeof current === 'string' ? current : null
+}
+
+/** 这一处前后都是字段边界或句末，才算这一条自己的整句。嵌在别的句子里的子串不算。 */
+function isWholeSentence(field: string, start: number, length: number): boolean {
+  const prev = start === 0 ? '' : field[start - 1] ?? ''
+  const end = start + length
+  const next = end >= field.length ? '' : field[end] ?? ''
+  const edge = (ch: string) => ch === '' || ch === '\n' || ch === '。' || ch === '！' || ch === '？'
+  return edge(prev) && edge(next)
+}
+
 /**
- * 保留原文时按这一条的改写定位，整句换成原文。
+ * 保留原文时只在这一条自己的字段里整句定位，整句换成原文。
  * 改写是原句的一部分、正文里已经是原句时不再替换，避免「主要主要负责……」。
- * 改写出现多处且分不清是哪一条时不取全文第一处。
+ * 整句找不到，或不止一处，就不改任何条目。
  */
 function replaceSentenceOnce(resume: GeneratedResume, after: string, before: string): ResumeTextReplacement {
   const from = after.trim()
   const to = before.trim()
   if (!from || from === to) return { resume, applied: false }
-  const fromSpots = findTextSpots(resume, from)
+  const fromSpots = findTextSpots(resume, from).filter((spot) => {
+    const field = fieldTextAt(resume, spot.path)
+    return field != null && isWholeSentence(field, spot.start, from.length)
+  })
   const toSpots = findTextSpots(resume, to)
   const insideOriginal = (spot: TextSpot) => toSpots.some((origin) =>
     origin.path === spot.path && origin.start <= spot.start && spot.start + from.length <= origin.start + to.length,
   )
-  if (toSpots.length > 0 && fromSpots.every(insideOriginal)) return { resume, applied: false }
+  if (toSpots.length > 0 && fromSpots.length > 0 && fromSpots.every(insideOriginal)) return { resume, applied: false }
   const uncovered = fromSpots.filter((spot) => !insideOriginal(spot))
   if (uncovered.length !== 1) return { resume, applied: false }
   const spot = uncovered[0]

@@ -1,6 +1,7 @@
 import { COMPLIANCE_COPY, type ResumeOptimizeModule } from '@ai-job-print/shared'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../../../copy/unattendedCopy'
 import { detectUnconfirmedTextAdditions } from './facts'
+import { optimizeManualOriginalLine } from './optimizeOverviewCopy'
 import { isNoActionModule, moduleKeyOf, type ResumeDecisionMap, type ResumeModuleDecision, type ResumeSwitchBlock } from './resumeDecisions'
 
 const DECISION_LABEL: Record<ResumeModuleDecision, string> = { optimized: '用改写', original: '保留原文' }
@@ -99,7 +100,7 @@ export function OptimizeOverview(props: {
           const originalLine = row.noAction
             ? (snippet ? `原文：${snippet}。这一段保持原文。` : '原文：这一段保持原文。')
             : row.manual
-              ? `${snippet ? `原文：${snippet}。` : '原文：这一条没有留下原句。'}这一条只能在编辑区里改。${factNote}`
+              ? optimizeManualOriginalLine(row.module.before, factNote)
               : `原文：${snippet || '这一条没有留下原句。'}${factNote}`
           return (
             <li key={row.key} className={row.noAction ? 'qxt-row qxt-keeprow' : 'qxt-row'} data-decision={row.noAction ? 'keep' : row.switchable ? row.decision : 'manual'} data-pending={row.additions.length}>

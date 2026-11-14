@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import ts from 'typescript'
+import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
 import { LIVE_SAMPLES, MAX_LLM_CALLS, PRIVATE_SENTENCE, createCallBudget, main } from './check-resume-optimize-live'
 
 export async function verifyResumeOptimizeLiveGate(): Promise<void> {
@@ -87,22 +88,38 @@ export async function verifyResumeOptimizeLiveGate(): Promise<void> {
   } finally {
     LIVE_SAMPLES[1]!.text = saved
   }
-  const educationSaved = LIVE_SAMPLES[1]!.text
+  const skillSaved = LIVE_SAMPLES[1]!.text
   try {
-    const extraSchools = Array.from({ length: 12 }, (_, index) => `补${index}虚构大学 信息管理 本科 2010.09-2014.06`)
-    LIVE_SAMPLES[1]!.text += `\n教育经历\n${extraSchools.join('\n')}`
+    const extraSkills = Array.from({ length: 60 }, (_, index) => `技能补项${String(index + 1).padStart(2, '0')}`)
+    const droppedSkill = extraSkills[59]!
+    LIVE_SAMPLES[1]!.text += `\n${extraSkills.join('\n')}`
     const droppedLines: string[] = []
     const emptyResume: typeof fetch = async () => new Response(JSON.stringify({
       choices: [{ message: { content: JSON.stringify({ resume: {
         basic: {}, intention: {}, summary: '', education: [], experience: [], projects: [], skills: [], certificates: [],
       }, modules: [] }) } }], usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
     }), { status: 200 })
-    // 教育经历超过导出上限 12：补回后仍被收成 12 条，条数少于原件，必须判丢内容并退出 1。
+    // 原有 1 项技能再加 60 项，共 61 项。对齐只留前 60 项，第 61 项从成品消失，必须判丢内容。
     assert.equal(await main({ config, fetch: emptyResume, write: (line) => droppedLines.push(line) }), 1)
-    assert(droppedLines[1]!.endsWith('结果:丢内容'), '教育条数少于原件时必须判丢内容')
+    assert(droppedLines[1]!.endsWith('结果:丢内容'), '技能超过 60 项时必须判丢内容')
     assert(droppedLines[4]!.endsWith('结论:有丢失'))
+    const previousFetch = globalThis.fetch
+    globalThis.fetch = emptyResume
+    try {
+      const inspected = await new LlmResumeOptimizeService(config).optimize(
+        LIVE_SAMPLES[1]!.text,
+        { sections: [], suggestions: [] } as never,
+      )
+      const blob = JSON.stringify(inspected.optimizedResume)
+      assert(blob.includes('Excel 资料整理'), '上限内的技能必须留下')
+      assert(!blob.includes(droppedSkill), '第 61 项技能必须从成品里消失')
+      assert(inspected.optimizedResume.skills.includes('Excel 资料整理'))
+      assert(!inspected.optimizedResume.skills.includes(droppedSkill))
+    } finally {
+      globalThis.fetch = previousFetch
+    }
   } finally {
-    LIVE_SAMPLES[1]!.text = educationSaved
+    LIVE_SAMPLES[1]!.text = skillSaved
   }
   const faultLines: string[] = []
   assert.equal(await main({ config, fetch: async () => { throw new Error(PRIVATE_SENTENCE + marker) }, write: (line) => faultLines.push(line) }), 1)

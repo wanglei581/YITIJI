@@ -14785,7 +14785,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 825,
+      "reachableFileCount": 826,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17866,7 +17866,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1014
+      "sourceFileCount": 1015
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -27301,6 +27301,7 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
+      "services/api/scripts/verify-resume-optimize-live-gate.ts",
       "services/api/scripts/verify-resume-optimize.ts",
       "services/api/scripts/verify-resume-radical-fold.ts",
       "services/api/scripts/verify-resume-radical-font-fold.ts"
@@ -47471,7 +47472,8 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "services/api/scripts/check-resume-optimize-live.ts"
+          "services/api/scripts/check-resume-optimize-live.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts"
         ],
         "missing": []
       },

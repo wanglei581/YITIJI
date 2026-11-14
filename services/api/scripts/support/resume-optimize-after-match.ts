@@ -584,6 +584,156 @@ export function verifyOptimizeSkillAtoms(): void {
   expectList('乱序漏交补在原位', ['Excel', 'Word', 'PPT'], ['PPT', 'Excel'], ['Excel', 'Word', 'PPT'])
   expectList('丢二编二', ['Excel', 'Word', 'PPT', '用友 U8'], ['Excel', 'Word', 'Python', 'SQL'], ['Excel', 'Word', 'PPT', '用友 U8'])
   pass('拆项、并项、标题同行、项目符号、乱序漏交、丢二编二都不重复，漏项留在原稿的位置')
+  expectList(
+    '改写没配 module',
+    ['熟练使用Excel数据透视表做月度报表'],
+    ['精通数据透视表与经营分析'],
+    ['熟练使用Excel数据透视表做月度报表'],
+  )
+  const moduleRewrite = alignOriginalList(
+    ['熟练使用 Excel、Word、PPT'],
+    ['精通 Excel、Word、PowerPoint 办公软件'],
+    60,
+    { modules: [{ before: '熟练使用 Excel、Word、PPT', after: '精通 Excel、Word、PowerPoint 办公软件' }] },
+  )
+  if (moduleRewrite.list.length !== 1 || moduleRewrite.list[0] !== '精通 Excel、Word、PowerPoint 办公软件') {
+    fail(`有 module 撑腰应整句用改写，实际 ${JSON.stringify(moduleRewrite.list)}`)
+  }
+  pass('有 module 撑腰的整行用改写；没配 module 的改写不进成品，原稿留下')
+}
+
+const PERSON = {
+  basic: { name: '韩雨桐', phone: '13912345678', email: '', city: '' },
+  intention: { position: '财务助理', city: '' },
+  summary: '两年会计助理经验，熟悉凭证录入与月末结账。',
+  education: [{ school: '青州财经学院', major: '会计学', degree: '本科', period: '2017.09 - 2021.06', description: '' }],
+  experience: [{ company: '青州市恒达贸易有限公司', role: '会计助理', period: '2021.07 - 至今', description: '负责凭证录入与月末结账，协助编制月度报表。' }],
+}
+
+function writingOriginal(skills: string[], certs: string[], projectLines: string[] = []): string {
+  return [
+    '韩雨桐', '手机：13912345678', '求职意向：财务助理',
+    '工作经历', '青州市恒达贸易有限公司 2021.07 - 至今 会计助理', '负责凭证录入与月末结账，协助编制月度报表。',
+    ...(projectLines.length ? ['项目经历', ...projectLines] : []),
+    '教育经历', '青州财经学院 会计学 本科 2017.09 - 2021.06',
+    ...(skills.length ? ['专业技能', ...skills] : []),
+    ...(certs.length ? ['证书', ...certs] : []),
+  ].join('\n')
+}
+
+/** 第 1、2 条口径和真实写法：走 optimize()，期望按规格而不是按改前的成品。 */
+export async function verifyOptimizeRealWriting(): Promise<void> {
+  console.log('\n=== 技能、证书、项目按真实写法对齐 ===')
+  const countOf = (hay: string, needle: string) => {
+    let count = 0
+    let from = 0
+    while (needle && from <= hay.length) {
+      const at = hay.indexOf(needle, from)
+      if (at < 0) break
+      count += 1
+      from = at + needle.length
+    }
+    return count
+  }
+  const run = async (
+    label: string,
+    skills: string[],
+    certs: string[],
+    model: { skills?: string[]; certs?: string[]; projects?: Array<{ name: string; role?: string; description: string }>; modules?: Array<{ title: string; before: string; after: string }> },
+    projectLines: string[] = [],
+  ) => {
+    const result = await runOptimize(writingOriginal(skills, certs, projectLines), JSON.stringify({
+      resume: { ...PERSON, projects: model.projects ?? [], skills: model.skills ?? [], certificates: model.certs ?? [] },
+      modules: model.modules ?? [],
+    }), [])
+    return result.optimizedResume
+  }
+  const expectSkills = async (label: string, skills: string[], modelSkills: string[], expected: string[], modules?: Array<{ title: string; before: string; after: string }>, certs: string[] = [], modelCerts: string[] = []) => {
+    const resume = await run(label, skills, certs, { skills: modelSkills, certs: modelCerts, modules })
+    const same = resume.skills.length === expected.length && expected.every((item, index) => resume.skills[index] === item)
+    if (!same) fail(`${label} 技能应为 ${JSON.stringify(expected)}，实际 ${JSON.stringify(resume.skills)}`)
+    if (new Set(resume.skills).size !== resume.skills.length) fail(`${label} 技能有重复`)
+    return resume
+  }
+  const expectCerts = async (label: string, certs: string[], modelCerts: string[], expected: string[]) => {
+    const resume = await expectSkills(label, ['Excel'], ['Excel'], ['Excel'], undefined, certs, modelCerts)
+    const same = resume.certificates.length === expected.length && expected.every((item, index) => resume.certificates[index] === item)
+    if (!same) fail(`${label} 证书应为 ${JSON.stringify(expected)}，实际 ${JSON.stringify(resume.certificates)}`)
+  }
+  await expectCerts('C1', ['初级会计职称; 全国计算机等级考试二级'], ['初级会计职称', '全国计算机等级考试二级'], ['初级会计职称', '全国计算机等级考试二级'])
+  await expectCerts('C2', ['A / B'], ['A', 'B'], ['A', 'B'])
+  await expectCerts('C3', ['CET-4 CET-6'], ['CET-4', 'CET-6'], ['CET-4', 'CET-6'])
+  await expectCerts('C4', ['普通话二级甲等（2019年，87.5分）'], ['普通话二级甲等'], ['普通话二级甲等（2019年，87.5分）'])
+  await expectSkills('K1', ['熟练使用Excel数据透视表和WPS表格'], ['熟练使用Excel数据透视表', 'WPS表格'], ['熟练使用Excel数据透视表', 'WPS表格'])
+  await expectSkills('K2', ['Excel', 'Word'], ['Excel和Word'], ['Excel', 'Word'])
+  await expectSkills('K3', ['Photoshop', 'Illustrator'], ['Photoshop及Illustrator'], ['Photoshop', 'Illustrator'])
+  await expectSkills('K4', ['1、熟练使用Excel办公软件', '2、会用用友U8做凭证'], ['熟练使用Excel办公软件', '会用用友U8做凭证'], ['熟练使用Excel办公软件', '会用用友U8做凭证'])
+  await expectSkills('K5', ['熟练使用Office（Word、Excel、PPT）'], ['熟练使用Office（Word、Excel、PPT）软件'], ['熟练使用Office（Word、Excel、PPT）'])
+  await expectSkills('K6', ['Python', 'Python 爬虫', 'SQL'], ['Python 爬虫', 'SQL'], ['Python', 'Python 爬虫', 'SQL'])
+  await expectSkills('K8', ['熟练使用 Excel、Word、PPT'], ['精通 Excel、Word、PowerPoint 办公软件'], ['精通 Excel、Word、PowerPoint 办公软件'], [{ title: '专业技能', before: '熟练使用 Excel、Word、PPT', after: '精通 Excel、Word、PowerPoint 办公软件' }])
+  await expectSkills('K9', ['熟练使用 Excel，能用数据透视表做月度报表'], ['熟练运用 Excel 数据透视表完成月度报表'], ['熟练运用 Excel 数据透视表完成月度报表'], [{ title: '专业技能', before: '熟练使用 Excel，能用数据透视表做月度报表', after: '熟练运用 Excel 数据透视表完成月度报表' }])
+  const k10 = await expectSkills(
+    'K10',
+    ['英语六级、全国计算机等级考试二级', '熟练使用 Excel、Word、PPT'],
+    ['熟练使用 Excel、Word、PPT'],
+    ['熟练使用 Excel、Word、PPT'],
+    undefined,
+    [],
+    ['英语六级', '全国计算机等级考试二级'],
+  )
+  if (k10.certificates.filter((item) => item === '英语六级').length !== 1 || k10.skills.includes('英语六级')) {
+    fail(`K10 证书不应再补进技能，实际技能 ${JSON.stringify(k10.skills)} 证书 ${JSON.stringify(k10.certificates)}`)
+  }
+  const noModule = await run('改写没配 module', ['熟练使用Excel数据透视表做月度报表'], [], { skills: ['精通数据透视表与经营分析'] })
+  if (noModule.skills.some((item) => item.includes('精通数据透视表与经营分析')) || noModule.skills[0] !== '熟练使用Excel数据透视表做月度报表') {
+    fail(`没配 module 的改写不进成品，实际 ${JSON.stringify(noModule.skills)}`)
+  }
+
+  const projectOf = async (label: string, lines: string[], project: { name: string; role?: string; description: string }, modules: Array<{ title: string; before: string; after: string }> = []) => {
+    const resume = await run(label, ['Excel'], [], { skills: ['Excel'], projects: [project], modules }, lines)
+    return resume.projects[0]
+  }
+  const p1 = await projectOf('P1', ['2023.05 - 2023.11 社区团购自提试点项目 项目组长', '· 设计自提点交接单，签收差错率降到0.8%'], { name: '社区团购自提试点项目', role: '项目组长', description: '设计自提点交接单，签收差错率降到0.8%' })
+  if (!p1 || p1.name !== '社区团购自提试点项目' || p1.role !== '项目组长' || (p1.description ?? '').includes('2023.05')) {
+    fail(`P1 名称被整行覆盖：${JSON.stringify(p1)}`)
+  }
+  const p6 = await projectOf('P6', ['社区团购自提试点项目 | 项目组长 | 2023.05 - 2023.11', '· 设计自提点交接单，签收差错率降到0.8%'], { name: '社区团购自提试点项目', role: '项目组长', description: '设计自提点交接单，签收差错率降到0.8%' })
+  if (!p6 || p6.name !== '社区团购自提试点项目' || (p6.name ?? '').includes('|')) fail(`P6 名称被整行覆盖：${JSON.stringify(p6)}`)
+  const middle = '签收差错率降到0.8%。'
+  const head = '设计自提点交接单。'
+  const tail = '周末复盘团长到岗情况。'
+  const p6order = await projectOf('P6 行序', ['社区团购自提试点项目 | 项目组长 | 2023.05 - 2023.11', head, middle, tail], { name: '社区团购自提试点项目', role: '项目组长', description: `${head}\n${tail}` })
+  if (!p6order || p6order.description !== `${head}\n${middle}\n${tail}`) fail(`补回的句子没按原稿行序插回：${p6order?.description}`)
+  const p7 = await projectOf('P7', ['项目名称：社区团购自提试点项目 2023.05 - 2023.11', '担任角色：项目组长', '项目描述：设计自提点交接单，签收差错率降到0.8%'], { name: '社区团购自提试点项目', role: '项目组长', description: '设计自提点交接单，签收差错率降到0.8%' })
+  const p7text = JSON.stringify(p7 ?? {})
+  if (!p7 || p7.name !== '社区团购自提试点项目' || p7text.includes('项目名称：') || countOf(p7text, '担任角色：') !== 0 || countOf(p7.description ?? '', '签收差错率降到0.8%') !== 1) {
+    fail(`P7 标签没去掉或描述重复：${p7text}`)
+  }
+  const duty = '带着门店和仓配两个小组，跑通次日自提流程'
+  const gain = '签收差错率降到0.8%'
+  const p4 = await projectOf('P4', ['社区团购自提试点项目 2023.05 - 2023.11 项目组长', `项目职责：${duty}`, `项目成果：${gain}`], { name: '社区团购自提试点项目', role: '项目组长', description: `${duty}\n${gain}` })
+  if (!p4 || countOf(p4.description ?? '', duty) !== 1 || countOf(p4.description ?? '', gain) !== 1) fail(`P4 职责或成果出现两遍：${p4?.description}`)
+  const originalDuty = '带着门店和仓配两个小组，跑通次日自提流程'
+  const rewrittenAnd = '牵头门店和仓配两个小组，打通次日自提全流程'
+  const rewrittenYu = '牵头门店与仓配两个小组，打通次日自提全流程'
+  const kept = '设计自提点交接单，签收差错率降到0.8%'
+  const p5 = await projectOf('P5', ['社区团购自提试点项目 2023.05 - 2023.11 项目组长', `· ${originalDuty}`, `· ${kept}`], { name: '社区团购自提试点项目', role: '项目组长', description: `${rewrittenAnd}\n${kept}` }, [{ title: '项目经历', before: originalDuty, after: rewrittenYu }])
+  if (!p5 || countOf(p5.description ?? '', originalDuty) !== 0 || countOf(p5.description ?? '', rewrittenAnd) !== 1) {
+    fail(`P5 改写与原句并存：${p5?.description}`)
+  }
+  const p8 = await projectOf('P8', ['2023.05 - 2023.11 社区团购自提试点项目 项目组长', '· 设计自提点交接单，签收差错率降到0.8%'], { name: '社区团购自提试点项目', role: '', description: '设计自提点交接单，签收差错率降到0.8%' })
+  if (!p8 || p8.role !== '项目组长' || (p8.role ?? '').includes('社区团购') || p8.name !== '社区团购自提试点项目') fail(`P8 角色变成了名称加角色：${JSON.stringify(p8)}`)
+  const p8prefix = await projectOf('P8 名前缀', ['社区团购自提试点项目 2023.05 - 2023.11 项目组长', '· 设计自提点交接单，签收差错率降到0.8%'], { name: '社区团购自提', role: '项目组长', description: '设计自提点交接单，签收差错率降到0.8%' })
+  if (!p8prefix || p8prefix.name !== '社区团购自提试点项目' || p8prefix.role !== '项目组长' || (p8prefix.name ?? '').includes('2023')) {
+    fail(`P8 名前缀没补全：${JSON.stringify(p8prefix)}`)
+  }
+  const p9 = await projectOf('P9', ['社区团购自提试点项目（项目组长） 2023.05 - 2023.11', '· 设计自提点交接单，签收差错率降到0.8%'], { name: '社区团购自提试点项目', role: '项目组长', description: '设计自提点交接单，签收差错率降到0.8%' })
+  if (!p9 || p9.role !== '项目组长' || countOf(p9.description ?? '', '项目组长') !== 0) fail(`P9 角色重复：${JSON.stringify(p9)}`)
+  const half = '负责点位选址，每周汇总订单、核对团长佣金并整理对账表。'
+  const halfAfter = '主导自提点位选址，每周汇总订单、核对团长佣金并整理对账表。'
+  const p10 = await projectOf('P10', ['社区团购自提试点项目 2023.05 - 2023.11 项目组长', half], { name: '社区团购自提试点项目', role: '项目组长', description: halfAfter }, [{ title: '项目经历', before: '负责点位选址', after: '主导自提点位选址' }])
+  if (!p10 || countOf(p10.description ?? '', half) !== 0 || countOf(p10.description ?? '', halfAfter) !== 1) fail(`P10 半句改写重复：${p10?.description}`)
+  pass('C1–C4、K1–K6、K8–K10、P1、P4–P10 按规格对齐')
 }
 
 if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
@@ -594,6 +744,7 @@ if (process.argv[1]?.endsWith('resume-optimize-after-match.ts')) {
     .then(() => verifyOptimizeLongCertificateKept())
     .then(() => verifyOptimizeEntryCountsKept())
     .then(() => verifyOptimizeSkillAtoms())
+    .then(() => verifyOptimizeRealWriting())
     .catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : error)
       process.exit(1)

@@ -48,6 +48,8 @@ export function OptimizeEditView(props: {
   saveText: string
   saveTone: 'bad' | 'plain'
   hasModules: boolean
+  /** 证书、项目名称或角色被定位时，用现成的两句说明去哪改。 */
+  lockedNote?: string | null
   onBackToOverview: () => void
   token: string | null
   taskId?: string
@@ -62,6 +64,7 @@ export function OptimizeEditView(props: {
     <div className="qxt-edit">
       <div className="qxt-paperbox">
         <p className="qxt-paperbox-note">{AIGC_SCREEN_MARK} · {HTML_PREVIEW_NOTE} · 导出后的 PDF 才是打印稿。</p>
+        {props.lockedNote ? <p className="qxt-note" role="status">{props.lockedNote}</p> : null}
         <div className="qxt-paperbox-in">
           <OptimizedResumeEditor
             resume={props.resume}

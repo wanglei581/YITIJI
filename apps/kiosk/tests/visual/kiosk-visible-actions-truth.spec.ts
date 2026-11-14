@@ -495,11 +495,10 @@ test('生成预览页改公司名后预览和导出都用改后的短名 @kiosk'
   await expect(page.getByRole('textbox', { name: '第 1 条教育的学校' })).toHaveValue('青岛大学')
   await expect(page.getByRole('textbox', { name: '第 1 条教育的专业' })).toHaveValue('工商管理')
   await expect(page.getByText('本科 · 2018-2022', { exact: true })).toBeVisible()
-  // 与 resume-optimize-draft.spec.ts 同一处：R-6（8b871fef19）曾要求这里 0 个「项目的名称|项目的职务」输入框。
-  // 项目名称、角色现在是带栏名的输入，无障碍名含这两个词，护栏改为数到 2，不再靠改名绕开。
-  await expect(page.getByRole('textbox', { name: '第 1 条项目的名称' })).toHaveValue('门店陈列项目')
-  await expect(page.getByRole('textbox', { name: '第 1 条项目的职务' })).toHaveValue('执行')
-  await expect(page.getByRole('textbox', { name: /项目的名称|项目的职务/ })).toHaveCount(2)
+  // R-6：项目名称、角色只读。护栏回到 0 个「项目的名称|项目的职务」输入框。
+  await expect(page.locator('[data-entry-field="projects-0-name"]')).toHaveText('门店陈列项目')
+  await expect(page.locator('[data-entry-field="projects-0-role"]')).toHaveText('执行')
+  await expect(page.getByRole('textbox', { name: /项目的名称|项目的职务/ })).toHaveCount(0)
 
   await company.fill(SHORT_COMPANY)
   await expect(company).toHaveValue(SHORT_COMPANY)

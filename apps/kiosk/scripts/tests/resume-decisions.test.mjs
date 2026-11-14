@@ -687,9 +687,12 @@ test('去编辑区改这一条：同一句出现多处停在第一栏，没有�
 })
 
 test('总览手改行在摘录后保留句号', () => {
-  const source = readFileSync(join(kioskRoot, 'src/pages/resume/components/resume-deliver/OptimizeOverview.tsx'), 'utf8')
-  const manual = '原文：${snippet}。` : \'原文：这一条没有留下原句。\'}这一条只能在编辑区里改。'
-  assert.equal(source.includes(manual), true)
+  const { optimizeManualOriginalLine } = loadTs(join(kioskRoot, 'src/pages/resume/components/resume-deliver/optimizeOverviewCopy.ts')).exports
+  assert.equal(optimizeManualOriginalLine('完成门店日结并核对收银。'), '原文：完成门店日结并核对收银。这一条只能在编辑区里改。')
+  assert.equal(optimizeManualOriginalLine('完成门店日结并核对收银'), '原文：完成门店日结并核对收银。这一条只能在编辑区里改。')
+  assert.equal(optimizeManualOriginalLine('完成门店日结。。'), '原文：完成门店日结。这一条只能在编辑区里改。')
+  assert.equal(optimizeManualOriginalLine(''), '原文：这一条没有留下原句。这一条只能在编辑区里改。')
+  assert.equal(optimizeManualOriginalLine('完成门店日结。', ' 待确认：负责'), '原文：完成门店日结。这一条只能在编辑区里改。 待确认：负责')
 })
 
 test('对照页逐条序号跳过无需操作条目，focusIndex 按原序号映射', () => {
@@ -952,4 +955,45 @@ test('批量提示只因事实跳过时保持原句，有只能手改时改用�
   assert.equal(adoptEligibleBatchNote({ adopted: 1, skipped: 1, skippedManual: 0 }), factsOnly)
   assert.equal(adoptEligibleBatchNote({ adopted: 2, skipped: 1, skippedManual: 1 }), withManual)
   assert.equal(adoptEligibleBatchNote({ adopted: 0, skipped: 2, skippedManual: 2 }), '已采纳 0 条；跳过 2 条（有待确认事实、只能手改的那几条）。')
+})
+
+test('两段相似经历只换屏上选定的那一段，导出不改另一段', () => {
+  const beforeA = '主要负责门店排班和订货。'
+  const afterA = '负责门店排班和订货。'
+  const afterB = '协助店长负责门店排班和订货。'
+  const itemA = moduleOf(beforeA, afterA, '甲店')
+  const job = (description) => ({ company: '门店', role: '店员', period: '', description })
+  const already = {
+    ...makeResume(''),
+    experience: [job(beforeA), job(afterB)],
+  }
+  const key = moduleKeyOf(itemA, 0)
+  const kept = applyResumeDecisionsWithStatus(already, [itemA], { [key]: 'original' })
+  assert.equal(kept.resume.experience[0].description, beforeA)
+  assert.equal(kept.resume.experience[1].description, afterB)
+  assert.equal(kept.resume.experience[1].description.includes('主要主要'), false)
+  assert.deepEqual(kept.failures, [])
+  const stillRewrite = {
+    ...makeResume(''),
+    experience: [job(afterA), job(afterB)],
+  }
+  const switched = applyResumeDecisionsWithStatus(stillRewrite, [itemA], { [key]: 'original' })
+  assert.equal(switched.resume.experience[0].description, beforeA)
+  assert.equal(switched.resume.experience[1].description, afterB)
+  assert.equal(switched.resume.experience[1].description.includes('主要'), false)
+  assert.deepEqual(switched.failures, [])
+})
+
+test('K8 技能整句改写配了 module 时一体机判为可切换', () => {
+  const before = '熟练使用 Excel、Word、PPT'
+  const after = '精通 Excel、Word、PowerPoint 办公软件'
+  const item = moduleOf(before, after, '专业技能')
+  const base = { ...makeResume(''), skills: [after] }
+  assert.equal(moduleBaseState(base, item).kind, 'A')
+  assert.equal(moduleSwitchBlock(base, item), null)
+  const toggled = toggleModuleDecision(base, item, 'optimized', 'original', base, {
+    modules: [item], decisions: {}, index: 0,
+  })
+  assert.equal(toggled.applied, true)
+  assert.deepEqual(toggled.resume.skills, [before])
 })

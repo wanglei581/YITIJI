@@ -27,6 +27,7 @@ import { ResumeAigcBadge } from './components/resume-deliver/ResumeAigcBadge'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
 import { ResumeStatePanel } from './components/resume-deliver/ResumeStatePanel'
 import { GenerateResumeEditor } from './components/resume-deliver/GenerateResumeEditor'
+import { RESUME_FILL_PAGE_HINT } from './components/resume-deliver/optimizeStateCopy'
 import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { ResumeFormatChooser } from './components/resume-deliver/ResumeFormatChooser'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
@@ -482,7 +483,7 @@ export function ResumeGeneratePreviewPage() {
               <p>{token ? '这一页先在屏幕上核对。导出之后可以扫码带走，登录状态下按保存期限留在账号里。' : '这一页只在屏幕上。没登录时导出的文件不会进账号，事后登录也不补绑。要留底就先登录，再生成、再导出。'}</p>
               <ResumeHelpLine onHelp={() => go('/help')} />
             </div>
-            <p className="qx-rg-reason">学校、专业、公司和职务改完就留在这一份上。学历、时间段、项目名和证书要改，得回填写页。</p>
+            <p className="qx-rg-reason">{RESUME_FILL_PAGE_HINT}</p>
           </div>
         )}
         {showWorkspace && onExportScreen && (
