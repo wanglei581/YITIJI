@@ -30,6 +30,11 @@ function noticeSentence(html: string): string {
   return paragraphs[0] ?? ''
 }
 
+/** 整段渲染去掉所有标签后的可见文字。<p> 外面多出任何字都不能通过。 */
+function visibleText(html: string): string {
+  return html.replace(/<[^>]*>/g, '')
+}
+
 test('有自报内容时提示条整句等于源码全文，且不出现已认证、已核验', () => {
   const html = markup(ready({ name: NAME, licenseNumber: LICENSE }))
   assert.equal(noticeSentence(html), EXACT, html)
@@ -38,6 +43,7 @@ test('有自报内容时提示条整句等于源码全文，且不出现已认�
   assert.ok(html.includes('本软件未核验。'), html)
   assert.equal(html.includes('已认证'), false, html)
   assert.equal(html.includes('已核验'), false, html)
+  assert.equal(visibleText(html), EXACT, html)
 })
 
 test('自报为空时提示条不出现', () => {

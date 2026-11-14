@@ -684,6 +684,50 @@ function assertRecruitmentLockCopy(): void {
   console.log('  PASS 自报文案含「本软件未核验」、不含禁用词，编号为全文')
 }
 
+/** 键名像密钥。从用例实际写给预检的 .env 文本里取，不手抄值。 */
+const PREFLIGHT_SECRET_KEY = /SECRET|_KEY|TOKEN|PASSWORD|DATABASE_URL|REDIS_URL/
+
+function unquoteEnvValue(raw: string): string {
+  const trimmed = raw.trim()
+  if (trimmed.length >= 2) {
+    const quote = trimmed[0]
+    if ((quote === '"' || quote === "'") && trimmed.endsWith(quote)) return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
+/**
+ * 按行解析这条用例喂给预检的 .env。命中密钥键的值（去掉引号）都不许出现在输出里。
+ * DATABASE_URL 的账号口令段（夹具里是 user:pass）单独再罩一层。
+ */
+function secretValuesFromEnvText(envText: string): string[] {
+  const values: string[] = []
+  const seen = new Set<string>()
+  const add = (value: string) => {
+    if (!value || seen.has(value)) return
+    seen.add(value)
+    values.push(value)
+  }
+  for (const rawLine of envText.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const body = /^export\s+/.test(line) ? line.replace(/^export\s+/, '') : line
+    const eq = body.indexOf('=')
+    if (eq <= 0) continue
+    const key = body.slice(0, eq).trim()
+    if (!PREFLIGHT_SECRET_KEY.test(key)) continue
+    const value = unquoteEnvValue(body.slice(eq + 1))
+    add(value)
+    if (!/DATABASE_URL/.test(key)) continue
+    const scheme = value.indexOf('://')
+    if (scheme < 0) continue
+    const rest = value.slice(scheme + 3)
+    const at = rest.indexOf('@')
+    if (at > 0) add(rest.slice(0, at))
+  }
+  return values
+}
+
 function assertPreflightForceValue(): void {
   console.log('\n=== 预检 --force-value ===')
   const script = join(__dirname, 'preflight-production-gates.mjs')
@@ -699,8 +743,10 @@ function assertPreflightForceValue(): void {
     }
   }
   const expectFail = (extraArgs: string[], needle: string, label: string, hiddenValues: string[] = [], envBody?: string) => {
-    const result = envBody === undefined ? run(extraArgs) : run(extraArgs, envBody)
-    const leaked = hiddenValues.find((value) => result.output.includes(value))
+    const body = envBody ?? 'RECRUITMENT_CONTENT_HOSTING_ENABLED=true\n'
+    const result = run(extraArgs, body)
+    const forbidden = hiddenValues.concat(secretValuesFromEnvText(body).filter((value) => !hiddenValues.includes(value)))
+    const leaked = forbidden.find((value) => result.output.includes(value))
     if (result.status === 0 || !result.output.includes(needle) || leaked) {
       throw new Error(`${label}: 期望失败且含 ${needle}，status=${result.status} leaked=${leaked ?? ''} output=${result.output.slice(0, 500)}`)
     }
