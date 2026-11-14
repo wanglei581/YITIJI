@@ -1,6 +1,6 @@
 import type { GeneratedResume } from '../interfaces/ai-provider.interface'
 import { optimizeAfterNearlySame } from './resume-optimize-after-align'
-import { stripNumberedColumn } from './resume-optimize-list-align'
+import { stripNumberedColumn, withoutLeadingIndex } from './resume-optimize-list-align'
 import { BULLET_RE, RESTORED_ROLE_MAX, RESTORED_TITLE_MAX, isTitleLike } from './resume-restored-text'
 import { normalizeResumeStructureText, splitResumeDateRange } from './resume-structure'
 
@@ -65,9 +65,17 @@ function separateTrailingRole(namePart: string, modelName: string): { name: stri
   return { name, role }
 }
 
+/** 全角半角圆括号、方头与方括号各自开合数相等。 */
+function bracketsPaired(text: string): boolean {
+  const count = (re: RegExp) => (text.match(re) ?? []).length
+  return count(/[（(]/gu) === count(/[）)]/gu) && count(/[【[]/gu) === count(/[】\]]/gu)
+}
+
 function safeProjectName(name: string, role: string): boolean {
   if (!isTitleLike(name, RESTORED_TITLE_MAX) || splitResumeDateRange(name)) return false
   if (/[|丨：:]/u.test(name)) return false
+  // 括号没配对（「智慧商城系统（时间」）是标题被日期切开的半截，不拿来补全名称。
+  if (!bracketsPaired(name)) return false
   if (role && name.includes(role)) return false
   return true
 }
@@ -104,7 +112,12 @@ function moduleCoversLine(text: string, module: AlignModule, description: string
   const descRows = description.split('\n').map((line) => line.trim()).filter(Boolean)
   if (!parts.every((part) => descRows.some((row) => textNear(row, part)))) return false
   const key = projectLineKey(text)
-  const befores = module.before.split(/\n/u).map((line) => projectBody(line)).filter(Boolean)
+  // 原稿描述成套编号时比对用的是剥掉编号的原句；module.before 常照抄带编号的原句，两种写法都认，原样在前。
+  const befores = module.before.split(/\n/u).flatMap((line) => {
+    const body = projectBody(line)
+    const bare = projectBody(withoutLeadingIndex(line))
+    return bare && bare !== body ? [body, bare] : [body]
+  }).filter(Boolean)
   const source = befores.find((before) => {
     const beforeKey = projectLineKey(before)
     return beforeKey === key || (beforeKey.length > 0 && key.includes(beforeKey))

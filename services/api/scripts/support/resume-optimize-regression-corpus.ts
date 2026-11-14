@@ -99,6 +99,8 @@ const LIST: ListCase[] = [
   { id: 'agy9', source: 'r1h/agy/agy-verify-3ver.log agy9', lines: ['熟练掌握Vue以及React'], model: ['Vue', 'React'], expected: ['熟练掌握Vue以及React'] },
   { id: 'agy10', source: 'r1h/agy/agy-verify-3ver.log agy10', lines: ['参与微服务架构设计与技术选型'], model: ['微服务架构设计', '技术选型'], expected: ['参与微服务架构设计与技术选型'] },
   { id: 'agy12', source: 'r1h/agy/agy-verify-3ver.log agy12', lines: ['全国计算机等级考试二级 MS Office'], model: ['全国计算机等级考试二级', 'MS Office'], expected: ['全国计算机等级考试二级 MS Office'] },
+  { id: 'agy3z', source: 'r17-1114/r1j/agy/agy-verify-3ver.log agy3（75b603a1f 对、e3f630a43 剥成「0架构…」并丢模型项）', lines: ['1.0架构重构与微服务拆分', '2.高并发接口性能调优'], model: ['1.0架构重构与微服务拆分', '高并发接口性能调优'], expected: ['1.0架构重构与微服务拆分', '高并发接口性能调优'] },
+  { id: 'agy3zb', source: 'r17-1114/r1j/agy/agy-verify-3ver.log agy3b（模型漏交第一项）', lines: ['1.0架构重构与微服务拆分', '2.高并发接口性能调优'], model: ['高并发接口性能调优'], expected: ['1.0架构重构与微服务拆分', '高并发接口性能调优'] },
   { id: 'set3d', source: '本包第2条；r1i 的 1.3D 成套才剥', lines: ['1.3D角色建模', '2.贴图绘制', '3.场景搭建'], model: ['3D角色建模', '贴图绘制', '场景搭建'], expected: ['3D角色建模', '贴图绘制', '场景搭建'] },
 ]
 
@@ -126,6 +128,11 @@ const PROJECT: ProjectCase[] = [
   { id: 'K方头', source: 'r1i/own-probe-r1i-3ver.log K 【毕业设计】', lines: ['2022.09 - 2023.05 校园二手交易平台 【毕业设计】', '· 负责商品发布与订单模块开发'], project: { name: '校园二手交易平台', role: '', description: '负责商品发布与订单模块开发' }, name: '校园二手交易平台 【毕业设计】', role: '', description: '负责商品发布与订单模块开发' },
   { id: 'K方括', source: 'r1i/own-probe-r1i-3ver.log K [V2.0]', lines: ['2023.03 - 2023.09 门店巡检小程序 [V2.0]', '· 负责商品发布与订单模块开发'], project: { name: '门店巡检小程序', role: '', description: '负责商品发布与订单模块开发' }, name: '门店巡检小程序 [V2.0]', role: '', description: '负责商品发布与订单模块开发' },
   { id: 'K竖线方头', source: 'r1i/own-probe-r1i-3ver.log K 竖线【毕业设计】', lines: ['校园二手交易平台 | 【毕业设计】 | 2023.03 - 2023.09', '· 负责商品发布与订单模块开发'], project: { name: '校园二手交易平台', role: '', description: '负责商品发布与订单模块开发' }, name: '校园二手交易平台', role: '', description: '负责商品发布与订单模块开发' },
+  { id: 'agy8', source: 'r1i/agy/agy-verify-3ver.log agy8；r17-1114/r1j/r1i-probes/agy-verify-r1i-3ver.log（75b603a1f 对、e3f630a43 名称带出「（时间」半截）', lines: ['智慧商城系统（时间：2023.01 - 2023.06） | 全栈开发', '· 负责端到端全栈开发'], project: { name: '智慧商城系统', role: '全栈开发', description: '负责端到端全栈开发' }, name: '智慧商城系统', role: '全栈开发', description: '负责端到端全栈开发' },
+  { id: 'E6',source: 'r17-1114/r1j/own-probe-r1j-3ver.log E6；e2e-r1j-3ver.log E6（描述「1、」成套、改写说明 before 带编号、全交）', lines: ['2023.05 - 2023.11 智慧电商平台 后端开发', '1、负责订单模块核心开发', '2、负责支付模块核心开发'], project: { name: '智慧电商平台', role: '后端开发', description: '主导订单模块研发\n负责支付模块核心开发' }, modules: [{ before: '1、负责订单模块核心开发', after: '主导订单模块研发' }], name: '智慧电商平台', role: '后端开发', description: '主导订单模块研发\n负责支付模块核心开发' },
+  { id: 'E6a', source: 'r17-1114/r1j/e2e-r1j-3ver.log E6a（描述「1.」成套、改写说明 before 带编号、全交）', lines: ['2023.05 - 2023.11 智慧电商平台 后端开发', '1.负责订单模块核心开发', '2.负责支付模块核心开发'], project: { name: '智慧电商平台', role: '后端开发', description: '主导订单模块研发\n负责支付模块核心开发' }, modules: [{ before: '1.负责订单模块核心开发', after: '主导订单模块研发' }], name: '智慧电商平台', role: '后端开发', description: '主导订单模块研发\n负责支付模块核心开发' },
+  { id: 'E3', source: 'r17-1114/r1j/own-probe-r1j-3ver.log E3（跨行改写说明 before 带编号、第三行漏交）', lines: ['2023.05 - 2023.11 智慧电商平台 后端开发', '1.负责订单模块核心开发', '2.负责支付模块核心开发', '3.负责系统日常监控与维护'], project: { name: '智慧电商平台', role: '后端开发', description: '主导订单与支付核心模块研发' }, modules: [{ before: '1.负责订单模块核心开发\n2.负责支付模块核心开发', after: '主导订单与支付核心模块研发' }], name: '智慧电商平台', role: '后端开发', description: '主导订单与支付核心模块研发\n负责系统日常监控与维护' },
+  { id: 'E4', source: 'r17-1114/r1j/own-probe-r1j-3ver.log E4（单行改写说明 before 带编号、第三行漏交）', lines: ['2023.05 - 2023.11 智慧电商平台 后端开发', '1.负责订单模块核心开发', '2.负责支付模块核心开发', '3.负责系统日常监控与维护'], project: { name: '智慧电商平台', role: '后端开发', description: '主导订单模块研发\n负责支付模块核心开发' }, modules: [{ before: '1.负责订单模块核心开发', after: '主导订单模块研发' }], name: '智慧电商平台', role: '后端开发', description: '主导订单模块研发\n负责支付模块核心开发\n负责系统日常监控与维护' },
   { id: 'descNum', source: '本包第2条 描述栏成套编号', lines: ['智慧园区管理系统 | 2023.03 - 2023.09 | 前端开发', '1.负责前端架构与页面开发', '2.负责首屏性能优化，加载时间缩短40%'], project: { name: '智慧园区管理系统', role: '前端开发', description: '负责前端架构与页面开发' }, name: '智慧园区管理系统', role: '前端开发', description: '负责前端架构与页面开发\n负责首屏性能优化，加载时间缩短40%' },
 ]
 

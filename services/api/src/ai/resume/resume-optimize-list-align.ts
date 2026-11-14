@@ -36,9 +36,16 @@ function classifyLeadingIndex(line: string): ColumnHit | null {
   if (/^\d{4}(?!\d)/u.test(rawRest)) return { kind, num, maybe: false, rest }
   const short = /^(\d{1,3})(?!\d)/u.exec(rawRest)
   if (!short) return null
+  // 「1.0架构重构」「2.05」：点号后是 0 打头的数字，是小数或版本号，不当编号。
+  if (short[1]?.startsWith('0')) return null
   const tail = rawRest.slice(short[0].length)
   if (/^(?:年|寸|版本)/u.test(tail)) return null
   return { kind, num, maybe: true, rest }
+}
+
+/** 比对用：行首像编号（含「1.3D」这种可能是小数的）时给出去掉编号后的正文，不像编号原样返回。只用于比对，不进成品。 */
+export function withoutLeadingIndex(line: string): string {
+  return classifyLeadingIndex(line)?.rest ?? line
 }
 
 /**
