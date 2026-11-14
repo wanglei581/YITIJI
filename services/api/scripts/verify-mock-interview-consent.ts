@@ -13,6 +13,7 @@
  */
 process.env['OCR_PROVIDER'] = process.env['OCR_PROVIDER'] ?? 'disabled'
 require('dotenv').config()
+process.env['FILE_SIGNING_SECRET'] ||= 'verify-mock-interview-consent-secret-32'
 
 import { createServer, type Server } from 'http'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -25,6 +26,7 @@ import { AiLogService } from '../src/ai/ai-log.service'
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { AiBudgetService } from '../src/ai/usage/ai-budget.service'
 import { flushAiUsageMeter } from '../src/ai/usage/ai-usage-meter'
+import { signFileUrl } from '../src/files/signing'
 
 let passCount = 0
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
@@ -152,7 +154,7 @@ async function main() {
 
   try {
     await prisma.endUser.create({ data: { id: endUserA, phoneHash: `hash_${endUserA}`, phoneEnc: `enc_${endUserA}` } })
-    // 夹具里的简历有会员主人。签名地址检查因此不拦，授权断言仍发生在出题时。
+    // 会员夹具的简历有会员主人，授权断言发生在出题时。
     const resumeFileId = `resume_${suffix}`
     await prisma.fileObject.create({
       data: {
@@ -166,6 +168,22 @@ async function main() {
         endUserId: endUserA,
         ownerType: 'user',
         ownerId: endUserA,
+        status: 'active',
+      },
+    })
+    const guestResumeFileId = `resume_guest_${suffix}`
+    await prisma.fileObject.create({
+      data: {
+        id: guestResumeFileId,
+        storageKey: `verify/mock-interview-consent/${guestResumeFileId}`,
+        filename: 'guest-resume.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        sizeBytes: 32,
+        sha256: 'c'.repeat(64),
+        purpose: 'resume_upload',
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
         status: 'active',
       },
     })
@@ -201,7 +219,7 @@ async function main() {
     pass('22a. 带简历未同意 → 403，模型、日志、计量未增加，会话未停在进行中')
 
     const guestCreated = await svc.createSession(
-      { ...baseCfg, resumeFileId },
+      { ...baseCfg, resumeFileId: guestResumeFileId, fileAccessUrl: signFileUrl(guestResumeFileId).url },
       { endUserId: null, accessToken: null },
     )
     cleanupSessionIds.push(guestCreated.sessionId)
@@ -314,7 +332,7 @@ async function main() {
     await prisma.auditLog.deleteMany({ where: { targetType: 'mock_interview_session', targetId: { in: cleanupSessionIds } } }).catch(() => undefined)
     await prisma.aiServiceLog.deleteMany({ where: { endUserId: endUserA } }).catch(() => undefined)
     await prisma.aiUsageRecord.deleteMany({ where: { featureKey: 'mock_interview', createdAt: { gte: startedAt } } }).catch(() => undefined)
-    await prisma.fileObject.deleteMany({ where: { endUserId: endUserA } }).catch(() => undefined)
+    await prisma.fileObject.deleteMany({ where: { OR: [{ endUserId: endUserA }, { id: { startsWith: `resume_guest_${suffix}` } }] } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: endUserA } }).catch(() => undefined)
     server.close()
     await prisma.onModuleDestroy?.()

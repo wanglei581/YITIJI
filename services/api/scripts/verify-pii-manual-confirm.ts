@@ -271,7 +271,8 @@ async function main(): Promise<void> {
     }
     const ownedDenied = await outcome(async () => assertCanAccessTask({ endUserId: 'other-owner' }, { ...member, accessToken: 'wrong-token' }))
     check('有归属任务拒绝其他会员', !ownedDenied.ok && ownedDenied.status === 403, describe(ownedDenied))
-    const missing = { kind: 'pii_scan', sourceFileId: `no-such-file-${suffix}` } as never
+    const missingId = `no-such-file-${suffix}`
+    const missing = { kind: 'pii_scan', sourceFileId: missingId, fileAccessUrl: signFileUrl(missingId).url } as never
     const m1 = await outcome(() => dedupe.createTask(missing, anon)); const m2 = await outcome(() => dedupe.createTask(missing, anon))
     check('建任务失败不留在去重表里（两次都如实报错）', !m1.ok && !m2.ok && ![...(dedupe as unknown as { recentPiiScans: Map<string, unknown> }).recentPiiScans.keys()].some((key) => key.includes('no-such-file')))
     const otherKind = await Promise.all([1, 2].map(() => outcome(() => dedupe.createTask({ kind: 'inspection', sourceFileId: dedupeFile.id, fileAccessUrl: signFileUrl(dedupeFile.id).url } as never, anon))))

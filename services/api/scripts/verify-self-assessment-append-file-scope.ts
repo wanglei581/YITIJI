@@ -15,15 +15,23 @@ require('dotenv').config()
 process.env['FILE_STORAGE_DRIVER'] = 'local'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-self-assessment-append-file-scope-secret-32'
 
+import 'reflect-metadata'
 import { createHash, createHmac, randomBytes } from 'crypto'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Logger, Module, NotFoundException, ValidationPipe } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
+import { JwtService } from '@nestjs/jwt'
 import { PDFDocument } from 'pdf-lib'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
+import { RedisService } from '../src/common/redis/redis.service'
+import { AiAccessService } from '../src/ai-access/ai-access.service'
+import { SelfAssessmentController } from '../src/ai/self-assessment.controller'
+import { SelfAssessmentService } from '../src/ai/resume/self-assessment.service'
 import { AppendedSelfAssessmentService } from '../src/ai/resume/appended-self-assessment.service'
 import { signFileUrl } from '../src/files/signing'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -106,6 +114,17 @@ async function main(): Promise<void> {
   const audit = new AuditService(prisma)
   const storage = new StorageService()
   const files = new FilesService(prisma, audit, storage)
+  const contentReads = { n: 0 }
+  const readContent = files.readContent.bind(files)
+  const readContentForEndUser = files.readContentForEndUser.bind(files)
+  files.readContent = async (fileId) => {
+    contentReads.n += 1
+    return readContent(fileId)
+  }
+  files.readContentForEndUser = async (fileId, endUserId) => {
+    contentReads.n += 1
+    return readContentForEndUser(fileId, endUserId)
+  }
   const appendix = await onePagePdf()
   const service = new AppendedSelfAssessmentService(
     prisma,
@@ -152,6 +171,7 @@ async function main(): Promise<void> {
   async function expectRejected(label: string, run: () => Promise<unknown>): Promise<void> {
     const filesBefore = await prisma.fileObject.count()
     const auditsBefore = await appendAuditCount()
+    const readsBefore = contentReads.n
     let caught: unknown
     try {
       const result = await run()
@@ -174,6 +194,7 @@ async function main(): Promise<void> {
     const auditsAfter = await appendAuditCount()
     if (filesAfter !== filesBefore) fail(`${label}：FileObject 条数从 ${filesBefore} 变成 ${filesAfter}`)
     if (auditsAfter !== auditsBefore) fail(`${label}：写了成功审计`)
+    if (contentReads.n !== readsBefore) fail(`${label}：拒绝时读了文件内容`)
     pass(label)
   }
 
@@ -201,6 +222,7 @@ async function main(): Promise<void> {
   /** 认人通过之后才轮到格式：持有有效签名地址的调用方会被告知不是 PDF。 */
   async function expectNotPdf(label: string, run: () => Promise<unknown>): Promise<void> {
     const filesBefore = await prisma.fileObject.count()
+    const readsBefore = contentReads.n
     let caught: unknown
     try {
       const result = await run()
@@ -215,6 +237,7 @@ async function main(): Promise<void> {
       fail(`${label}：应当是不是 PDF，实际 status=${status} code=${payload.error?.code ?? ''}`)
     }
     if ((await prisma.fileObject.count()) !== filesBefore) fail(`${label}：多出了文件`)
+    if (contentReads.n !== readsBefore) fail(`${label}：拒绝时读了文件内容`)
     pass(label)
   }
 
@@ -340,6 +363,47 @@ async function main(): Promise<void> {
     for (const purpose of ['resume_upload', 'resume_scan'] as const) {
       const fileId = await uploadPdf(null, purpose)
       await expectAppended(`场景3 用途 ${purpose} 照常合并（对照）`, anon, fileId, signFileUrl(fileId).url, 'signed_url')
+    }
+
+    // 场景4 的请求体此前只扫源码。这里按实际路由打一次，确认签名地址过了校验管道并交给合并。
+    const routeFileId = await uploadPdf(null)
+    const routeUrl = signFileUrl(routeFileId).url
+    @Module({
+      controllers: [SelfAssessmentController],
+      providers: [
+        { provide: AppendedSelfAssessmentService, useValue: service },
+        { provide: SelfAssessmentService, useValue: {} },
+        { provide: JwtService, useValue: { verify() { throw new Error('unused') } } },
+        { provide: RedisService, useValue: {} },
+        { provide: PrismaService, useValue: prisma },
+        { provide: AiAccessService, useValue: { enforce: async () => undefined } },
+      ],
+    })
+    class AppendRouteModule {}
+    const app = await NestFactory.create(AppendRouteModule, { logger: false, abortOnError: false })
+    try {
+      app.setGlobalPrefix('api/v1')
+      app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+      app.useGlobalFilters(new HttpExceptionFilter())
+      await app.listen(0, '127.0.0.1')
+      const base = await app.getUrl()
+      const res = await fetch(`${base}/api/v1/resume/self-assessment/${encodeURIComponent(taskId)}/append`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-resume-access-token': accessToken,
+        },
+        body: JSON.stringify({ resumeFileId: routeFileId, resumeFileUrl: routeUrl }),
+      })
+      const body = await res.json() as { fileId?: string; printFileUrl?: string; error?: { code?: string; message?: string } }
+      // 这条路由没有 @HttpCode，Nest 对 POST 的默认成功状态是 201。
+      if ((res.status !== 200 && res.status !== 201) || !body.printFileUrl || !PRINT_URL.test(body.printFileUrl)) {
+        fail(`场景4 实际路由合并：应当成功，实际 ${res.status} ${JSON.stringify(body).slice(0, 400)}`)
+      }
+      if (body.fileId) createdFileIds.push(body.fileId)
+      pass('场景4 实际路由把签名地址交给合并')
+    } finally {
+      await app.close()
     }
   } finally {
     await cleanup()

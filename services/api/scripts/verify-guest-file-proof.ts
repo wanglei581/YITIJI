@@ -154,6 +154,51 @@ function assertParser(): void {
     if (sample.firstExpires && parsed.expires !== sample.firstExpires) fail('公用函数重复查询参数应取第一组')
     pass(`公用函数 ${sample.label}`)
   }
+
+  // 路径必须恰好是这份文件的内容地址。多一段、编号里含斜杠、缺参数、改签名，都不能用。
+  function assertUnusable(label: string, fileId: string, url: string, grantExpected: boolean): void {
+    const grant = parseSignedContentUrl(url)
+    if (grantExpected) {
+      if (!grant || grant.fileId !== fileId) fail(`公用函数 ${label}：应当解析出这份文件`)
+    } else if (grant) {
+      fail(`公用函数 ${label}：不应当解析出地址`)
+    }
+    if (assertGuestFileProof(fileId, url)) fail(`公用函数 ${label}：不应当通过`)
+    pass(`公用函数 ${label}`)
+  }
+  function queryOf(fileId: string): { id: string; query: string } {
+    const signed = signFileUrl(fileId)
+    return { id: fileId, query: signed.url.slice(signed.url.indexOf('?')) }
+  }
+  {
+    const { id, query } = queryOf('path-before')
+    assertUnusable('前面多一段', id, `/api/v1/extra/files/${id}/content${query}`, false)
+  }
+  {
+    const { id, query } = queryOf('path-after')
+    assertUnusable('后面多一段', id, `/api/v1/files/${id}/content/extra${query}`, false)
+  }
+  {
+    const id = 'ab/cd'
+    const { query } = queryOf(id)
+    assertUnusable('编号里含 %2F', id, `/api/v1/files/${encodeURIComponent(id)}/content${query}`, false)
+  }
+  {
+    const id = 'no-expires'
+    const parsed = new URL(signFileUrl(id).url, 'http://local')
+    parsed.searchParams.delete('expires')
+    assertUnusable('缺 expires', id, `${parsed.pathname}?${parsed.searchParams.toString()}`, false)
+  }
+  {
+    const id = 'no-sig'
+    const parsed = new URL(signFileUrl(id).url, 'http://local')
+    parsed.searchParams.delete('sig')
+    assertUnusable('缺 sig', id, `${parsed.pathname}?${parsed.searchParams.toString()}`, false)
+  }
+  {
+    const id = 'flip-sig'
+    assertUnusable('sig 改一位', id, flippedGrant(id), true)
+  }
 }
 
 function flattenValidationErrors(errors: ValidationError[], parent = ''): string[] {
@@ -313,11 +358,20 @@ async function main(): Promise<void> {
     { record: () => undefined } as never,
   )
   const ocrCalls = { n: 0 }
+  const contentReads = { n: 0 }
+  const readObject = storage.getObject.bind(storage)
+  storage.getObject = (objectKey: string, bucket?: string | null) => {
+    contentReads.n += 1
+    return readObject(objectKey, bucket)
+  }
   const materials = new MaterialsService(
     prisma,
     storage,
     { recognize: async () => { ocrCalls.n += 1; throw new Error('ocr') } } as never,
-    {} as never,
+    { evaluate: async (sourceFile: { storageKey: string; bucket?: string | null }) => {
+      await storage.getObject(sourceFile.storageKey, sourceFile.bucket)
+      return { claim: 'not_supported' }
+    } } as never,
   )
 
   const interviewBase = {
@@ -654,6 +708,10 @@ async function main(): Promise<void> {
       parseBody(memberResume),
       req({ authorization: `Bearer ${memberB}`, ...intentHeaders() }),
     ), { task: true })
+    await expectResumeReject('简历诊断别的会员带着这份文件的签名地址', () => controller.submitResumeParse(
+      parseBody(memberResume, signFileUrl(memberResume).url),
+      req({ authorization: `Bearer ${memberB}`, ...intentHeaders() }),
+    ), { task: true })
     await expectResumeReject('简历诊断未登录访问会员文件', () => controller.submitResumeParse(
       parseBody(memberResume),
       req(intentHeaders()),
@@ -751,6 +809,14 @@ async function main(): Promise<void> {
       parseBody(guestResume, signFileUrl(otherResume).url),
       req({}),
     ))
+    await expectLegacyReject('旧路径签名过期', () => controller.submitResumeParse(
+      parseBody(guestResume, expiredGrant(guestResume)),
+      req({}),
+    ))
+    await expectLegacyReject('旧路径签名改一位', () => controller.submitResumeParse(
+      parseBody(guestResume, flippedGrant(guestResume)),
+      req({}),
+    ))
     // 有会员主人的文件不要求签名地址，靠旧路径扣次数之前的文件可用性检查兜住：
     // 别的会员、未登录拿会员文件，回应同样与旧路径文件不存在一致，且不扣次数。
     await expectLegacyReject('旧路径别的会员拿会员文件', () => controller.submitResumeParse(
@@ -821,6 +887,10 @@ async function main(): Promise<void> {
       { ...interviewBase, resumeFileId: memberResume },
       { endUserId: memberB, accessToken: null },
     ), true)
+    await expectInterviewReject('模拟面试别的会员带着这份文件的签名地址', () => interview.createSession(
+      { ...interviewBase, resumeFileId: memberResume, fileAccessUrl: signFileUrl(memberResume).url },
+      { endUserId: memberB, accessToken: null },
+    ), true)
     await expectInterviewReject('模拟面试未登录访问会员文件', () => interview.createSession(
       { ...interviewBase, resumeFileId: memberResume },
       { endUserId: null, accessToken: null },
@@ -883,6 +953,7 @@ async function main(): Promise<void> {
     async function expectMaterialReject(label: string, run: () => Promise<unknown>): Promise<void> {
       const tasks = await countTasks()
       const beforeOcr = ocrCalls.n
+      const beforeReads = contentReads.n
       let caught: unknown
       try {
         const result = await run()
@@ -896,6 +967,7 @@ async function main(): Promise<void> {
       }
       if (await countTasks() !== tasks) fail(`${label}：拒时建了任务`)
       if (ocrCalls.n !== beforeOcr) fail(`${label}：拒时调了识别`)
+      if (contentReads.n !== beforeReads) fail(`${label}：拒时读了文件内容`)
       pass(label)
     }
 
@@ -912,6 +984,7 @@ async function main(): Promise<void> {
     ]) {
       const tasks = await countTasks()
       const beforeOcr = ocrCalls.n
+      const beforeReads = contentReads.n
       let caught: unknown
       try {
         await materials.createTask({ kind: 'inspection', sourceFileId: memberMaterial }, requester)
@@ -926,6 +999,32 @@ async function main(): Promise<void> {
       }
       if (await countTasks() !== tasks) fail(`${label}：拒时建了任务`)
       if (ocrCalls.n !== beforeOcr) fail(`${label}：拒时调了识别`)
+      if (contentReads.n !== beforeReads) fail(`${label}：拒时读了文件内容`)
+      pass(label)
+    }
+    {
+      const label = '材料检查别的会员带着这份文件的签名地址'
+      const tasks = await countTasks()
+      const beforeOcr = ocrCalls.n
+      const beforeReads = contentReads.n
+      let caught: unknown
+      try {
+        await materials.createTask(
+          { kind: 'inspection', sourceFileId: memberMaterial, fileAccessUrl: signFileUrl(memberMaterial).url },
+          { kind: 'member', endUserId: memberB },
+        )
+        fail(`${label}：应当拒绝`)
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('VERIFY_FAILED')) throw error
+        caught = error
+      }
+      const shape = rejectionShape(caught)
+      if (!shape.includes('"status":403') || !shape.includes('SOURCE_FILE_ACCESS_DENIED')) {
+        fail(`${label}：应当拒绝 ${shape}`)
+      }
+      if (await countTasks() !== tasks) fail(`${label}：拒时建了任务`)
+      if (ocrCalls.n !== beforeOcr) fail(`${label}：拒时调了识别`)
+      if (contentReads.n !== beforeReads) fail(`${label}：拒时读了文件内容`)
       pass(label)
     }
 
@@ -967,6 +1066,21 @@ async function main(): Promise<void> {
       { kind: 'inspection', sourceFileId: platformFile.id },
       { kind: 'member', endUserId: memberA },
     ))
+    for (const kind of ['normalize_a4', 'pii_redact'] as const) {
+      const params = kind === 'normalize_a4' ? { targetPaperSize: 'A4' } : {}
+      await expectMaterialReject(`材料检查 ${kind} 不带签名地址`, () => materials.createTask(
+        { kind, sourceFileId: guestMaterial, params },
+        { kind: 'anonymous' },
+      ))
+      await expectMaterialReject(`材料检查 ${kind} 别的文件的签名`, () => materials.createTask(
+        { kind, sourceFileId: guestMaterial, params, fileAccessUrl: signFileUrl(otherMaterial).url },
+        { kind: 'anonymous' },
+      ))
+      await expectMaterialReject(`材料检查 ${kind} 签名过期`, () => materials.createTask(
+        { kind, sourceFileId: guestMaterial, params, fileAccessUrl: expiredGrant(guestMaterial) },
+        { kind: 'anonymous' },
+      ))
+    }
     const scanParams = {}
     const firstScan = await materials.createTask(
       { kind: 'pii_scan', sourceFileId: guestMaterial, params: scanParams, fileAccessUrl: signFileUrl(guestMaterial).url },
