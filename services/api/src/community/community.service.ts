@@ -4,11 +4,24 @@ import { RedisService } from '../common/redis/redis.service'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { listPolicyHoldIds, publicPolicyWhere, type PolicyPublicScope } from '../policies/policy-public-visibility'
 import { COMMUNITY_FEED_CACHE_PREFIX, PUBLIC_CONTENT_CACHE_STALE_WINDOW_SECONDS } from '../common/content-trust-cache-keys'
+import { formatBeijingDate } from '../common/beijing-display-time'
 import type { CommunityFeedItem, CommunityFeedKind, CommunityFeedPage } from './community.types'
 
-export function communityFeedCacheKey(hostingKey: string, scope: PolicyPublicScope, cursorValue: string | undefined, limit: number): string {
+/**
+ * 缓存键带上北京日期。截止日期按自然日算，同一天里的缓存结果仍然有效。
+ * 动态条目本身不带截止日期，命中后无法再滤掉过期政策；
+ * 把日期放进键里，跨过零点就是另一次查询，公开条件会用新的一天做阈值。
+ * 旧键留到原来的 900 秒自己过期，但不会再被读出来。
+ */
+export function communityFeedCacheKey(
+  hostingKey: string,
+  scope: PolicyPublicScope,
+  cursorValue: string | undefined,
+  limit: number,
+  beijingDate: string,
+): string {
   const scopeKey = scope.mode === 'org' ? `${scope.state}:${scope.orgId ?? 'none'}` : 'all'
-  return `${COMMUNITY_FEED_CACHE_PREFIX}${hostingKey}:${scopeKey}:${cursorValue ?? 'first'}:${limit}`
+  return `${COMMUNITY_FEED_CACHE_PREFIX}${hostingKey}:${beijingDate}:${scopeKey}:${cursorValue ?? 'first'}:${limit}`
 }
 const MAX_SUMMARY_LENGTH = 120
 
@@ -24,8 +37,10 @@ export class CommunityService {
   async list(cursorValue?: string, requestedLimit?: number, scope: PolicyPublicScope = { mode: 'all' }): Promise<CommunityFeedPage> {
     const cursor = cursorValue ? this.parseCursor(cursorValue) : null
     const limit = requestedLimit ?? 20
+    const now = new Date()
     const hostingKey = isRecruitmentContentHostingEnabled() ? 'hosting' : 'closed'
-    const cacheKey = communityFeedCacheKey(hostingKey, scope, cursorValue, limit)
+    const beijingDate = formatBeijingDate(now)
+    const cacheKey = communityFeedCacheKey(hostingKey, scope, cursorValue, limit, beijingDate)
     const heldIds = await listPolicyHoldIds(this.prisma)
     const held = new Set(heldIds)
 
@@ -35,6 +50,7 @@ export class CommunityService {
         { reviewStatus: 'approved', publishStatus: 'published' },
         heldIds,
         scope,
+        now,
       )
       const [policies, benefits, broadcasts] = await Promise.all([
         this.prisma.policyPost.findMany({

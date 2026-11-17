@@ -93,8 +93,9 @@ export function publicPolicyWhere(
   extra: Prisma.PolicyPostWhereInput,
   heldIds: string[],
   scope: PolicyPublicScope = { mode: 'all' },
+  now: Date = new Date(),
 ): Prisma.PolicyPostWhereInput {
-  const parts: Prisma.PolicyPostWhereInput[] = [extra, recruitmentCategoryExclusion(), trustedSourceOrg(), policyStillValidWhere()]
+  const parts: Prisma.PolicyPostWhereInput[] = [extra, recruitmentCategoryExclusion(), trustedSourceOrg(), policyStillValidWhere(now)]
   if (scope.mode === 'org') {
     parts.push(scope.orgId ? { sourceOrgId: scope.orgId } : { sourceOrgId: '__no_public_terminal__' })
   }
@@ -108,6 +109,7 @@ export async function publicPolicyLookupWhere(
   prisma: HoldReader,
   extra: Prisma.PolicyPostWhereInput,
   scope: PolicyPublicScope = { mode: 'all' },
+  now: Date = new Date(),
 ): Promise<Prisma.PolicyPostWhereInput> {
-  return publicPolicyWhere(extra, await listPolicyHoldIds(prisma), scope)
+  return publicPolicyWhere(extra, await listPolicyHoldIds(prisma), scope, now)
 }

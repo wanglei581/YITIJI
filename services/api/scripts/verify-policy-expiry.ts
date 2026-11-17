@@ -363,6 +363,35 @@ async function main(): Promise<void> {
     assert.equal(afterDeadline.data.some((row) => row.id === pageIds[0]), false)
     console.log('  PASS 关键词按字面匹配，通配符、撇号、分页和截止日期一起生效')
 
+    const redisUrl = process.env['REDIS_URL']?.trim()
+    if (!redisUrl) throw new Error('REDIS_URL is required for the community cache deadline check')
+    redis = new Redis(redisUrl, { maxRetriesPerRequest: 1, connectTimeout: 2_000 })
+    const community = new CommunityService(prisma, new RedisService(redis))
+    const cachedPolicy = await seedPublished(`社区跨日_${suffix}`, '缓存里的政策', {
+      validThrough: new Date('2026-11-17T00:00:00.000Z'),
+      createdAt: new Date('2099-01-01T00:00:00.000Z'),
+    })
+    const hostingKey = isRecruitmentContentHostingEnabled() ? 'hosting' : 'closed'
+    const eveningKey = communityFeedCacheKey(hostingKey, { mode: 'all' }, undefined, 20, '2026-11-17')
+    redisKeys.push(eveningKey)
+    await withFrozenNow(new Date('2026-11-17T15:59:59.000Z'), async () => {
+      const page = await community.list(undefined, 20)
+      assert.ok(page.items.some((item) => item.id === `policy:${cachedPolicy}`), '北京时间当天 23:59:59 社区动态仍包含这条政策')
+    })
+    const cachedRaw = await redis.get(eveningKey)
+    assert.ok(cachedRaw?.includes(`policy:${cachedPolicy}`), '当天的缓存里确实有这条政策')
+    const cachedTtl = await redis.ttl(eveningKey)
+    assert.ok(cachedTtl > 60, `当天缓存应还剩大半个 900 秒窗口，实际 TTL ${cachedTtl}`)
+    await withFrozenNow(new Date('2026-11-17T16:00:00.000Z'), async () => {
+      const page = await community.list(undefined, 20)
+      assert.equal(page.items.some((item) => item.id === `policy:${cachedPolicy}`), false, '跨过北京时间零点后社区动态不得再返回这条政策')
+      await expectCode(() => policies.getPublishedPolicyById(cachedPolicy), 'POLICY_NOT_FOUND', '同一时刻详情已经拒绝')
+    })
+    const staleAfter = await redis.get(eveningKey)
+    assert.ok(staleAfter?.includes(`policy:${cachedPolicy}`), '旧缓存可以留到 TTL，但不得再被读出来')
+    assert.ok((await redis.ttl(eveningKey)) > 60, '旧缓存不能靠删键来掩盖跨日问题')
+    console.log('  PASS 社区动态缓存跨过北京时间零点不再返回过期政策')
+
     console.log('PASS verify:policy-expiry')
   } finally {
     try {
