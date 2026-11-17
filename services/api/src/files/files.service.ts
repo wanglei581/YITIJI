@@ -62,6 +62,7 @@ import {
   ORDER_ONLY_INHERITING_DERIVATIONS,
   UPLOAD_SESSION_ORDER_ONLY_REASON,
 } from './retention-policy'
+import { filePurposeWhere } from './file-list-purpose'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
 import { parseContentFileId, PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from './signing'
 import { assertFileContentIntegrity, DIRECT_UPLOAD_COMPLETE_ACTION } from './file-content-integrity'
@@ -828,9 +829,7 @@ export class FilesService {
         : deleted === true
           ? { deletedAt: { not: null } }
           : { deletedAt: null }),
-      ...(args.purpose
-        ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
-        : { purpose: { not: 'contract_review_report' } }),
+      ...filePurposeWhere(args.purpose),
       ...(sensitiveLevel ? { sensitiveLevel } : {}),
       ...(retentionPolicy ? { retentionPolicy } : {}),
       ...(expiry === 'expired' ? { expiresAt: { lte: now } } : {}),
