@@ -156,22 +156,42 @@ async function readEditorValues(page: Page): Promise<string[]> {
 }
 
 /**
- * 地址先变成预览，确认页底栏还在时点到的是确认页自己的按钮。
- * 等预览正文出现后再取主按钮。走查没有终端心跳，这个按钮是原生 disabled；
- * React 按 props.disabled 丢掉点击，只改 DOM 再 click() 到不了 handleNext。
- * handleNext 自己不看打印机是否可用，所以直接调用按钮上的处理函数。
+ * 走查默认没有本机终端身份，预览主按钮会停在「打印机不可用」。
+ * 简历已经上传之后才装上身份和在线打印机，再等按钮自己变成可点。
+ * 身份装得太早会把本机文件选择藏掉，诊断那一步就传不了简历。
  */
+async function armPreviewPrinter(page: Page): Promise<void> {
+  const cors = { 'Access-Control-Allow-Origin': '*' }
+  await page.route('http://127.0.0.1:9527/local/terminal-identity', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.fulfill({ status: 204, headers: { ...cors, 'Access-Control-Allow-Methods': 'GET, OPTIONS' } })
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: cors,
+      body: JSON.stringify({ success: true, data: { terminalId: 'KSK-001', terminalCode: 'KSK-001' } }),
+    })
+  })
+  await page.route('**/api/v1/terminals/*/printer-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: cors,
+      body: JSON.stringify({ printerStatus: 'ready', isOnline: true, paperLevel: 'sufficient' }),
+    })
+  })
+}
+
+/** 等预览正文出现、主按钮可点后，用 Playwright 真点「下一步」。 */
 async function clickPreviewNext(page: Page): Promise<void> {
+  await armPreviewPrinter(page)
   await expect(page.locator('[data-w2-page="print-preview"]'), '应先进入预览页再去确认').toBeVisible({ timeout: 15_000 })
   const next = page.locator('footer.qxt-dock button.qxt-btn-pri')
   await expect(next, '预览页应有去确认页的主按钮').toBeVisible({ timeout: 15_000 })
-  await next.evaluate((el) => {
-    const button = el as HTMLButtonElement & Record<string, { onClick?: () => void }>
-    const key = Object.getOwnPropertyNames(button).find((name) => name.startsWith('__reactProps$'))
-    const onClick = key ? button[key]?.onClick : undefined
-    if (typeof onClick !== 'function') throw new Error('预览主按钮没有可调用的处理函数')
-    onClick()
-  })
+  await expect(next, '打印机在线后，去确认页的主按钮应可点').toBeEnabled({ timeout: 20_000 })
+  await next.click()
 }
 
 /** 确认页回到预览，再进确认，再回预览，再回报告。验回执在来回一趟之后还在。 */
