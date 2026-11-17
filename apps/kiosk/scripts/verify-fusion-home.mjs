@@ -317,12 +317,25 @@ check(
 )
 
 
-// C 批：价格说明只认公开价目，不将免费或读取失败当成收费状态。
-check(viewOnly.includes('usePrintPriceConfig()') && viewOnly.includes("unitCentsFor(price.config, 'black_white')") && viewOnly.includes("unitCentsFor(price.config, 'color')"), '首页复用真实打印价目，两种单价都要读取')
-check(viewOnly.includes("price.status === 'ready' && bwUnit !== null && colorUnit !== null") && viewOnly.includes('priceKnown && (bwUnit > 0 || colorUnit > 0)') && viewOnly.includes('priceKnown && bwUnit === 0 && colorUnit === 0'), '收费、免费与未知价目分开，不把缺价当成免费')
+// C 批：角标和页脚收费句读同一轮五个生效价，不把只在挂载时读一次的打印价当成收费句。
+const priceReader = read('src/hooks/kioskHomeFreeBadgeReader.ts')
 check(
-  viewOnly.includes("paidPrint && !freePrint ? '收费以现场公示为准'") &&
-    viewOnly.includes('先选材料再出纸 · 带走：打印件') &&
+  viewOnly.includes('useKioskHomePriceSnapshot()') &&
+    viewOnly.includes('priceSnapshot.badge') &&
+    viewOnly.includes("priceSnapshot.charged ? '收费以现场公示为准'"),
+  '首页角标和收费句读同一份价格快照'
+)
+check(
+  !viewOnly.includes('usePrintPriceConfig') && !viewOnly.includes('useHomeEffectivePriceCharged'),
+  '首页收费句不再另读只在挂载时取一次的价'
+)
+check(
+  priceReader.includes('publish(kioskHomeFreeBadgeVisible({ config }), kioskEffectivePricesCharged(config))') &&
+    priceReader.includes('publish(false, false)'),
+  '每一轮用同一份配置同时给出角标和是否收费，新一轮先都不显示'
+)
+check(
+  viewOnly.includes('先选材料再出纸 · 带走：打印件') &&
     !viewOnly.includes('免费打印') &&
     !viewOnly.includes('先看价格再出纸'),
   '有价才写收费以现场公示为准，卡上不写免费或先看价格'

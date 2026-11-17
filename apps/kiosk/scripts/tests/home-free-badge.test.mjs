@@ -104,7 +104,8 @@ test('五个生效价里有一个大于 0 才算在收费，读不齐不算', ()
 
 test('钩子接线只启动轮询，不自己读价目、不用 window 定时器', () => {
   const hook = read('src/hooks/useKioskHomeFreeBadge.ts')
-  assert.match(hook, /startKioskHomeFreeBadgePolling\(setVisible\)/)
+  assert.match(hook, /startKioskHomeFreeBadgePolling\(\(badge, charged = false\) => \{/)
+  assert.match(hook, /setSnapshot\(\{ badge, charged \}\)/)
   assert.match(hook, /export \{ kioskHomeFreeBadgeVisible, REFRESH_MS, startKioskHomeFreeBadgePolling \}/)
   assert.doesNotMatch(hook, /usePrintPriceConfig/)
   assert.doesNotMatch(hook, /window\.setInterval|window\.clearInterval/)

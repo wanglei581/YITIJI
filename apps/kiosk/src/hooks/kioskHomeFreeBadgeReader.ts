@@ -1,10 +1,11 @@
 // 一体机首页「免费使用」的读取与判定。不依赖 React，钩子只负责接线。
 //
-// 价在本机终端配置的 pricing.effective 上，五个键都要读到。
-// 开关为真，并且五个生效价都是 0，才返回 true。
-// 任一价大于 0、价读不齐、配置读不到或没有开关，一律 false。
-// 新一轮先不显示。30 秒没回来按失败，之后才到的成功也不再显示。
-// 终端号变了立刻不显示并重读；不是当前终端的结果丢掉。
+// 价在本机终端配置的 pricing.effective 上。
+// 角标：开关为真，并且五个生效价都读到、且都是 0，才返回 true。
+// 任一价大于 0、价读不齐、配置读不到或没有开关，角标一律 false。
+// 同一轮配置同时给出「是否收费」。角标和收费句都用这一对结果，不各读一次。
+// 新一轮两个都先不显示。30 秒没回来按失败，之后才到的成功也不再采用。
+// 终端号变了立刻两个都撤下并重读；不是当前终端的结果丢掉。
 
 import { TERMINAL_CHARGE_SERVICE_KEYS } from '@ai-job-print/shared'
 import { subscribeTerminalIdentity } from '../services/api/screensaver'
@@ -72,7 +73,7 @@ function settle<T>(load: () => Promise<T> | T): Promise<T> {
  * 返回停止函数：清掉定时器，在途结果不再公布。
  */
 export function startKioskHomeFreeBadgePolling(
-  onVisible: (visible: boolean) => void,
+  onVisible: (badge: boolean, charged: boolean) => void,
   overrides: KioskHomeFreeBadgePollingOverrides = {},
 ): () => void {
   const getId = overrides.getTerminalId ?? getTerminalId
@@ -87,9 +88,9 @@ export function startKioskHomeFreeBadgePolling(
   let watchedId = getId()
   let roundTimer: ReturnType<typeof setTimeout> | null = null
 
-  const publish = (visible: boolean) => {
+  const publish = (badge: boolean, charged: boolean) => {
     if (stopped) return
-    onVisible(visible)
+    onVisible(badge, charged)
   }
 
   const clearRoundTimer = () => {
@@ -105,7 +106,7 @@ export function startKioskHomeFreeBadgePolling(
     clearRoundTimer()
     const terminalId = getId()
     watchedId = terminalId
-    publish(false)
+    publish(false, false)
     if (!terminalId) return
 
     const still = () => !stopped && ticket === round && getId() === terminalId
@@ -115,7 +116,7 @@ export function startKioskHomeFreeBadgePolling(
     roundTimer = setTimeout(() => {
       if (!still() || settled) return
       failed = true
-      publish(false)
+      publish(false, false)
     }, HOME_FREE_BADGE_ROUND_TIMEOUT_MS)
 
     void settle(() => loadConfig(terminalId))
@@ -123,14 +124,14 @@ export function startKioskHomeFreeBadgePolling(
         if (!still() || failed) return
         settled = true
         clearRoundTimer()
-        publish(kioskHomeFreeBadgeVisible({ config }))
+        publish(kioskHomeFreeBadgeVisible({ config }), kioskEffectivePricesCharged(config))
       })
       .catch(() => {
         if (!still()) return
         failed = true
         settled = true
         clearRoundTimer()
-        publish(false)
+        publish(false, false)
       })
   }
 
@@ -139,7 +140,7 @@ export function startKioskHomeFreeBadgePolling(
     const next = getId()
     if (next === watchedId) return
     watchedId = next
-    publish(false)
+    publish(false, false)
     load()
   })
 
