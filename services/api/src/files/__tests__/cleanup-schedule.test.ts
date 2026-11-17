@@ -12,8 +12,8 @@ import { FilesModule } from '../files.module'
 const EVERY_MINUTE = '*/1 * * * *'
 const EVERY_HOUR = '0 0-23/1 * * *'
 
-function cronTimeOf(type: { prototype: Record<string, unknown> }, method: string): unknown {
-  const handler = type.prototype[method]
+function cronTimeOf(type: { prototype: object; name: string }, method: string): unknown {
+  const handler = (type.prototype as Record<string, unknown>)[method]
   assert.equal(typeof handler, 'function', `${type.name}.${method} 不是方法`)
   const options = Reflect.getMetadata(SCHEDULE_CRON_OPTIONS, handler) as { cronTime?: unknown } | undefined
   assert.ok(options, `${type.name}.${method} 没有定时元数据`)
