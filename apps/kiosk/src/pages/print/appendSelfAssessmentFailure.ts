@@ -1,4 +1,5 @@
 import { SelfAssessmentApiError } from '../../services/api/selfAssessment'
+import { isMemberSessionInvalidError } from '../../services/auth/memberSessionEvents'
 
 const CONTINUE_ORIGINAL = '已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。'
 
@@ -11,9 +12,11 @@ export const APPEND_RETRY =
   '合并版没有生成，本次没有建单。可以再点一次确认重试，或取消勾选「附加自我探索」直接打印原文件。'
 
 /**
- * 401。前半句是现成的 `MEMBER_SESSION_EXPIRED`
+ * 游客（这次请求没带会员令牌）的 401。人还留在确认页，取消勾选后可以按原文件打印。
+ * 带会员令牌的 401 会清场并跳到登录页，不走这句。
+ * 前半句是现成的 `MEMBER_SESSION_EXPIRED`
  * （`apps/kiosk/src/services/api/userErrorMessage.ts`：「登录状态已失效，请重新登录后重试」）。
- * 触屏定稿没有确认页这句。后半句沿用原来的取消勾选、按原文件打印。
+ * 触屏定稿没有确认页这句。
  */
 export const APPEND_LOGIN_EXPIRED = `登录状态已失效，请重新登录后重试。${CONTINUE_ORIGINAL}`
 
@@ -38,13 +41,27 @@ export type AppendFailureAction = {
   uncheck: boolean
   /** 停用勾选。只用于这份文件本身附不上。 */
   block: boolean
+  /**
+   * 会员令牌已经失效。全站过期出口会清场并离开确认页，
+   * 屏上不再写「再点一次确认，就按原文件打印」。
+   */
+  silent?: boolean
 }
 
-/** 错误码到屏上那一句。过期记录要先于普通 404，否则会被说成「这份文件不能附加」。 */
-export function appendSelfAssessmentFailure(err: unknown): AppendFailureAction {
+/**
+ * 错误码到屏上那一句。过期记录要先于普通 404，否则会被说成「这份文件不能附加」。
+ * `memberTokenUsed` 是这次请求发出前有没有会员令牌。有令牌的会话失效不在本页说「可以继续打印」。
+ */
+export function appendSelfAssessmentFailure(
+  err: unknown,
+  options?: { memberTokenUsed?: boolean },
+): AppendFailureAction {
   if (err instanceof SelfAssessmentApiError) {
     if (err.code === 'SELF_ASSESSMENT_NOT_FOUND') {
       return { message: APPEND_ASSESSMENT_MISSING, uncheck: true, block: false }
+    }
+    if (isMemberSessionInvalidError(err.status, err.code, Boolean(options?.memberTokenUsed))) {
+      return { message: '', uncheck: true, block: false, silent: true }
     }
     if (err.status === 401) return { message: APPEND_LOGIN_EXPIRED, uncheck: true, block: false }
     if (err.status === 429) return { message: APPEND_TOO_FREQUENT, uncheck: true, block: false }

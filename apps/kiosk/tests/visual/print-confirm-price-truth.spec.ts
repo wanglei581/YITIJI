@@ -655,6 +655,7 @@ const APPEND_ASSESSMENT_MISSING = '自我探索结果找不到或已过期，已
 const APPEND_LOGIN_EXPIRED = '登录状态已失效，请重新登录后重试。已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。'
 const APPEND_TOO_FREQUENT = '操作太频繁，请稍后再试。已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。'
 
+// 这一组不登录。401 没带会员令牌，人留在确认页，所以仍说再点一次就按原文件打印。
 for (const scenario of [
   { code: 'SELF_ASSESSMENT_NOT_FOUND', status: 404, serverMessage: '自我探索记录不存在或已过期', expected: APPEND_ASSESSMENT_MISSING },
   { code: 'MEMBER_SESSION_EXPIRED', status: 401, serverMessage: '登录状态已失效', expected: APPEND_LOGIN_EXPIRED },
@@ -692,6 +693,74 @@ for (const scenario of [
     expect(jobs[0]?.['fileUrl']).toBe(W2_FILE.fileUrl)
   })
 }
+
+const MEMBER_TOKEN = 'confirm-member-token'
+
+/** 会员短信登录，以及登录后外壳、确认页会读的会员接口。 */
+function registerMemberLogin(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: { success: true, data: { token: MEMBER_TOKEN, user: { id: 'member-confirm', phoneMasked: '138****8000', nickname: '确认页会员' } } },
+  })
+  api.respond('POST', '/api/v1/member/auth/logout', { status: 200, json: { success: true, data: { loggedOut: true } } })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/benefits', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+}
+
+/** 用屏幕键盘走可见的手机号 + 验证码登录，再等回跳。不整页刷新，内存里的令牌还在。 */
+async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
+  await page.waitForURL((url) => `${url.pathname}${url.search}` === returnTo)
+}
+
+test('append 401 for a signed-in member leaves through login and does not offer another confirm @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  registerMemberLogin(api)
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
+  let usedMemberToken = false
+  await page.route(`**/api/v1/resume/self-assessment/${SA_TASK_ID}/append`, async (route: Route) => {
+    usedMemberToken = (route.request().headers()['authorization'] ?? '').startsWith('Bearer ')
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'MEMBER_SESSION_EXPIRED', message: '登录状态已失效' } }),
+    })
+  })
+
+  await openConfirm(page, true)
+  await loginThroughVisibleUi(page, '/print/confirm')
+  await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
+  const retryCopy = page.getByText('再点一次确认')
+  const retryFlashed = retryCopy.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)
+  const mergeToggle = page.getByRole('checkbox', { name: /附加自我探索/ })
+  await mergeToggle.check()
+  await page.getByRole('button', { name: '打印合并版（简历+自我探索）' }).click()
+
+  await page.waitForURL((url) => url.pathname === '/login' && url.searchParams.get('from') === '/print/confirm')
+  await expect(page.getByText('登录后继续办理', { exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText('再点一次确认')
+  await expect(page.locator('body')).not.toContainText(APPEND_LOGIN_EXPIRED)
+  expect(await Promise.race([retryFlashed, page.waitForTimeout(500).then(() => false)])).toBe(false)
+  expect(usedMemberToken).toBe(true)
+  expect(jobs).toHaveLength(0)
+})
 
 test('append 500 keeps the checkbox and a second confirm calls append again @kiosk', async ({ page, api }) => {
   registerShell(api, [])

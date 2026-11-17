@@ -397,22 +397,25 @@ export function PrintConfirmPage() {
         if (appendEligible && selfAssessmentSnapshot?.taskId && file.fileId) {
           if (!mergedMaterial) {
             let merged: Awaited<ReturnType<typeof appendSelfAssessmentToResume>>
+            // 401 清场发生在抛错之前，这里先记下这次有没有会员令牌。
+            const memberToken = getToken()
             try {
               merged = await appendSelfAssessmentToResume(
                 selfAssessmentSnapshot.taskId,
                 file.fileId,
                 file.fileUrl,
-                { token: getToken(), accessToken: selfAssessmentSnapshot.accessToken ?? null },
+                { token: memberToken, accessToken: selfAssessmentSnapshot.accessToken ?? null },
               )
             } catch (err) {
-              // 附录接口还没建单。文件附不上就停用勾选；记录过期、登录过期、太频繁只取消勾选；其它失败保持勾选。
-              const failure = appendSelfAssessmentFailure(err)
+              // 附录接口还没建单。文件附不上就停用勾选；记录过期、游客登录过期、太频繁只取消勾选；其它失败保持勾选。
+              // 会员令牌失效由全站过期出口离开本页，不在这里写「再点一次确认」。
+              const failure = appendSelfAssessmentFailure(err, { memberTokenUsed: Boolean(memberToken) })
               if (failure.uncheck) {
                 setAppendSelfAssessment(false)
                 setMergedMaterial(null)
               }
               if (failure.block) setAppendBlocked(true)
-              setSubmitError(failure.message)
+              if (!failure.silent) setSubmitError(failure.message)
               return
             }
             if (!merged.printFileUrl) {
