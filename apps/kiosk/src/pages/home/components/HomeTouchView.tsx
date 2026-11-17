@@ -13,6 +13,7 @@ import { QxTouchTask } from '../../../components/qingxu/touch/QxTouchTask'
 import { QxTouchTile } from '../../../components/qingxu/touch/QxTouchTile'
 import { hasKioskSensitiveSession } from '../../../auth/kioskSensitiveSession'
 import { homeStandbyNote, publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
+import { useKioskHomeFreeBadge } from '../../../hooks/useKioskHomeFreeBadge'
 import type { RecruitmentHostingState } from '../../../hooks/useRecruitmentHosting'
 import type { TerminalDeviceStatusView } from '../../../hooks/useTerminalDeviceStatus'
 import { rememberAssistantDraft } from '../../../services/assistantDraft'
@@ -24,6 +25,8 @@ import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
 import { campusCopy, greetingWord, jobCopy } from '../homeTouchCopy'
 import '../styles/home-touch.css'
+import { useHomeEffectivePriceCharged } from '../hooks/useHomeEffectivePriceCharged'
+import { HomeFreeBadge } from './HomeFreeBadge'
 import { HomeIdentityActions } from './HomeIdentityActions'
 
 const RETRY_CUE = '点这里重新读取'
@@ -82,7 +85,12 @@ export function HomeTouchView({
   const priceKnown = price.status === 'ready' && bwUnit !== null && colorUnit !== null
   const paidPrint = priceKnown && (bwUnit > 0 || colorUnit > 0)
   const freePrint = priceKnown && bwUnit === 0 && colorUnit === 0
-  const priceNotice = paidPrint && !freePrint ? '收费以现场公示为准' : null
+  const showFreeBadge = useKioskHomeFreeBadge()
+  const anyPriceCharged = useHomeEffectivePriceCharged()
+  // 标识每 5 分钟重读五个生效价；打印价只在挂载时读一次。后一轮变成全 0 时标识会亮，页脚仍可能留着上一轮的收费句。
+  // 标识亮着就不再写那句。五个价里有一个大于 0（不限打印）也写那句，这时标识不会亮。
+  const printNotice = paidPrint && !freePrint ? '收费以现场公示为准' : null
+  const priceNotice = showFreeBadge ? null : (printNotice ?? (anyPriceCharged ? '收费以现场公示为准' : null))
   const [now, setNow] = useState(() => new Date())
   const [introDone, setIntroDone] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -177,6 +185,7 @@ export function HomeTouchView({
             title="我是小青"
             sub="今天想办哪件事？下面选一项，或者直接问我"
             status={{ text: deviceStatus.label, tone: deviceStatus.tone }}
+            greetMark={showFreeBadge ? <HomeFreeBadge /> : null}
           />
           <LicenseLock>
           <QxTouchAskBar

@@ -621,6 +621,108 @@ test('home tiles: every sub-line keeps its font content area inside its own clip
   expect(await findClippedText(page), '首页磁贴的字不得被 overflow:hidden 贴着裁').toEqual([])
 })
 
+const HOME_CONFIG = '/api/v1/terminals/KSK-001/config'
+const PRICE_NOTICE = '收费以现场公示为准'
+
+function withFreeSwitch(api: ApiRouter, enabled: boolean, pricing: Record<string, unknown>): void {
+  registerHomeApi(api, [homeFair()], pricing)
+  api.mapJson('GET', HOME_CONFIG, (json) => {
+    const base = json && typeof json === 'object' ? json as Record<string, unknown> : {}
+    return { ...base, homeFreeBadge: enabled }
+  })
+}
+
+/** 五个生效价里只抬高一项，打印两行保持 0。用来证明「任一价大于 0」不靠黑白或彩色。 */
+function chargeScan(cents: number): Record<string, unknown> {
+  const pricing = machinePricing(0, 0)
+  const effective = { ...(pricing.effective as Record<string, number>), scan: cents }
+  return { ...pricing, effective }
+}
+
+async function shotHome(page: Page, name: string): Promise<void> {
+  const dir = process.env.F41_SHOT_DIR
+  if (!dir) return
+  await page.screenshot({ path: `${dir}/${name}` })
+}
+
+async function expectFreeAndNoticeApart(home: Locator): Promise<void> {
+  const badge = await home.locator('.qxt-greet').getByLabel('免费使用').count()
+  const notice = await home.locator('.qxt-home-foot').getByText(PRICE_NOTICE).count()
+  expect(badge > 0 && notice > 0, '「免费使用」与「收费以现场公示为准」不同屏').toBe(false)
+}
+
+test('首页免费使用：开关开且五个生效价全 0，标识在问候块右上角，页脚不写收费句 @w1-kiosk', async ({ page, api }) => {
+  withFreeSwitch(api, true, machinePricing(0, 0))
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  await expect(home.locator('[data-action="jobs-hub"]')).toBeVisible()
+  const badge = home.locator('.qxt-greet').getByLabel('免费使用')
+  await expect(badge).toBeVisible()
+  await expect(badge).toHaveText('免费使用')
+  await expect(badge.locator('svg')).toHaveAttribute('aria-hidden', 'true')
+  expect(await badge.evaluate((el) => getComputedStyle(el).animationName)).toBe('none')
+  const place = await badge.evaluate((el) => {
+    const greet = el.closest('.qxt-greet')
+    const text = greet?.querySelector('.qxt-ask-t')
+    if (!greet || !text) return null
+    const greetBox = greet.getBoundingClientRect()
+    const badgeBox = el.getBoundingClientRect()
+    const textBox = text.getBoundingClientRect()
+    return {
+      position: getComputedStyle(el).position,
+      greetPosition: getComputedStyle(greet).position,
+      rightGap: greetBox.right - badgeBox.right,
+      topGap: badgeBox.top - greetBox.top,
+      textReachesGreetRight: Math.abs(textBox.right - greetBox.right) < 2,
+    }
+  })
+  expect(place).not.toBeNull()
+  expect(place!.position).toBe('absolute')
+  expect(place!.greetPosition).toBe('relative')
+  expect(place!.rightGap).toBeGreaterThanOrEqual(-1)
+  expect(place!.rightGap).toBeLessThanOrEqual(2)
+  expect(place!.topGap).toBeGreaterThanOrEqual(4)
+  expect(place!.topGap).toBeLessThanOrEqual(8)
+  expect(place!.textReachesGreetRight).toBe(true)
+  await expect(home.locator('.qxt-home-foot')).not.toContainText(PRICE_NOTICE)
+  await expectFreeAndNoticeApart(home)
+  await assertNoHorizontalOverflow(page)
+  await shotHome(page, 'run-free.png')
+})
+
+test('首页免费使用：开关关则不画 @w1-kiosk', async ({ page, api }) => {
+  withFreeSwitch(api, false, machinePricing(0, 0))
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  await expect(home.locator('[data-action="jobs-hub"]')).toBeVisible()
+  await expect(home.getByLabel('免费使用')).toHaveCount(0)
+  await expect(home.locator('.qxt-home-foot')).not.toContainText(PRICE_NOTICE)
+  await expectFreeAndNoticeApart(home)
+})
+
+test('首页免费使用：任一价大于 0 不画标识，页脚写收费以现场公示为准 @w1-kiosk', async ({ page, api }) => {
+  withFreeSwitch(api, true, chargeScan(100))
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  await expect(home.locator('[data-action="jobs-hub"]')).toBeVisible()
+  await expect(home.getByLabel('免费使用')).toHaveCount(0)
+  await expect(home.locator('.qxt-home-foot')).toContainText(PRICE_NOTICE)
+  await expectFreeAndNoticeApart(home)
+  await assertNoHorizontalOverflow(page)
+  await shotHome(page, 'run-paid.png')
+})
+
+test('首页免费使用：本机配置读失败则不画 @w1-kiosk', async ({ page, api }) => {
+  registerHomeApi(api)
+  api.respond('GET', HOME_CONFIG, { status: 503, json: {} })
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  await expect(home.getByTestId('home-recruitment-boundary')).toContainText('本终端未开放岗位与招聘会信息')
+  await expect(home.getByLabel('免费使用')).toHaveCount(0)
+  await expect(home.locator('.qxt-home-foot')).not.toContainText(PRICE_NOTICE)
+  await expectFreeAndNoticeApart(home)
+})
+
 // 2026-11-08：本轮八个旧地址及各自深链均 replace 回首页。
 for (const prefix of [
   '/resume/career-plan', '/resume/self-assessment', '/resume/job-fit', '/resume/materials',

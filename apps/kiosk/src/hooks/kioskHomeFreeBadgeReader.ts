@@ -45,6 +45,13 @@ export function kioskHomeFreeBadgeVisible(input: KioskHomeFreeBadgeInput): boole
   return cents.every((value) => value === 0)
 }
 
+/** 五个生效价都读到，并且至少有一个大于 0。读不齐、读不到不当成在收费。 */
+export function kioskEffectivePricesCharged(config: unknown): boolean {
+  const cents = readEffectiveCents(config)
+  if (!cents) return false
+  return cents.some((value) => value > 0)
+}
+
 export interface KioskHomeFreeBadgePollingOverrides {
   getTerminalId?: () => string | null
   peekConfig?: (terminalId: string, maxAgeMs: number) => unknown

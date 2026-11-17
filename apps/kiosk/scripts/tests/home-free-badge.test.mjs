@@ -92,6 +92,16 @@ test('扫描价大于 0 时不显示', () => {
   assert.equal(kioskHomeFreeBadgeVisible({ config: configWith({ scan: 100, print_bw_page: 0, print_color_page: 0 }) }), false)
 })
 
+test('五个生效价里有一个大于 0 才算在收费，读不齐不算', () => {
+  const { kioskEffectivePricesCharged } = reader
+  assert.equal(kioskEffectivePricesCharged(allFree), false)
+  assert.equal(kioskEffectivePricesCharged(configWith({ scan: 100 })), true)
+  assert.equal(kioskEffectivePricesCharged(configWith({ print_bw_page: 20 })), true)
+  assert.equal(kioskEffectivePricesCharged(configWith({ resume_optimize: 100 })), true)
+  assert.equal(kioskEffectivePricesCharged({ homeFreeBadge: true }), false)
+  assert.equal(kioskEffectivePricesCharged(null), false)
+})
+
 test('钩子接线只启动轮询，不自己读价目、不用 window 定时器', () => {
   const hook = read('src/hooks/useKioskHomeFreeBadge.ts')
   assert.match(hook, /startKioskHomeFreeBadgePolling\(setVisible\)/)
