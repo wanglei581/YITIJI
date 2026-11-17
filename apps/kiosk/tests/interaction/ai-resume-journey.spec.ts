@@ -117,8 +117,9 @@ async function assertDownloaded(page: Page, signedUrl: string, mime: RegExp, pdf
 /**
  * 回执只许留在这次跳转的内存里。会话在、任务对得上时写进任一浏览器存储，这里都要红。
  * 不查文件名：打印交接本来就会记下 file.name。
- * 交接里的 fileUrl 只有和这次的 printFileUrl 相同，才从这一处拿开再查取回链接。
+ * 交接里的 fileUrl 只有和这次的 printFileUrl 相同，才从这一处的值里拿开再查取回链接。
  * 对不上就不拿开：这次的签名地址不该出现在别的交接里。
+ * 键名一律原样查。取回链接只写进键名也要红。
  */
 async function assertTakeawayNotStored(page: Page, signedUrl: string, where: string, printFileUrl: string): Promise<void> {
   const entries = await page.evaluate(() => {
@@ -134,17 +135,20 @@ async function assertTakeawayNotStored(page: Page, signedUrl: string, where: str
   const stored = entries.map((entry) => `${entry.key}=${entry.value}`).join('\n')
   expect(stored, `${where}：回执不得进任何浏览器存储`).not.toContain('reportTakeaway')
   const withoutPrintFileUrl = entries.map((entry) => {
-    if (entry.key !== 'ai-job-print:current-print-material-check') return entry.value
-    try {
-      const parsed = JSON.parse(entry.value) as { file?: { fileUrl?: unknown } }
-      const fileUrl = parsed.file && typeof parsed.file.fileUrl === 'string' ? parsed.file.fileUrl : ''
-      if (!printFileUrl || fileUrl !== printFileUrl) return entry.value
-      const at = entry.value.indexOf(fileUrl)
-      if (at < 0) return entry.value
-      return `${entry.value.slice(0, at)}${entry.value.slice(at + fileUrl.length)}`
-    } catch {
-      return entry.value
+    let value = entry.value
+    if (entry.key === 'ai-job-print:current-print-material-check') {
+      try {
+        const parsed = JSON.parse(entry.value) as { file?: { fileUrl?: unknown } }
+        const fileUrl = parsed.file && typeof parsed.file.fileUrl === 'string' ? parsed.file.fileUrl : ''
+        if (printFileUrl && fileUrl === printFileUrl) {
+          const at = entry.value.indexOf(fileUrl)
+          if (at >= 0) value = `${entry.value.slice(0, at)}${entry.value.slice(at + fileUrl.length)}`
+        }
+      } catch {
+        value = entry.value
+      }
     }
+    return `${entry.key}=${value}`
   }).join('\n')
   expect(withoutPrintFileUrl, `${where}：取回链接不得进任何浏览器存储`).not.toContain(signedUrl)
 }
