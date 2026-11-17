@@ -15,7 +15,7 @@ import {
 import { ApiHttpError } from '../../services/api/client'
 import { AI_CONTENT_COMPLAINT_SLA_WORKDAYS } from '../member-feedback/feedbackSla'
 import { alertDetailText } from './alertDetailText'
-import { ALERT_AUTO_REFRESH_MS, useAutoRefresh } from './useAutoRefresh'
+import { ALERT_AUTO_REFRESH_MS, useAutoRefresh, type AutoRefreshContext } from './useAutoRefresh'
 
 const TYPE_META: Record<
   AdminAlertItem['type'],
@@ -147,7 +147,8 @@ export default function AlertsPage() {
   const hasSnapshotRef = useRef(false)
   const requestSeq = useRef(0)
 
-  const load = useCallback(async (nextView: AlertListView, kind: 'user' | 'auto') => {
+  const load = useCallback(async (nextView: AlertListView, kind: 'user' | 'auto', ctx?: AutoRefreshContext) => {
+    if (ctx?.disposed()) return false
     const seq = ++requestSeq.current
     const keep = hasSnapshotRef.current
     if (!keep) {
@@ -157,6 +158,7 @@ export default function AlertsPage() {
     }
     try {
       const res = await adminOpsService.listAlerts(nextView)
+      if (ctx?.disposed()) return false
       if (seq !== requestSeq.current) return true
       setAlerts(res.data)
       setDerivedAt(res.derivedAt)
@@ -176,6 +178,7 @@ export default function AlertsPage() {
       setState('ready')
       return true
     } catch (err) {
+      if (ctx?.disposed()) return false
       if (seq !== requestSeq.current) return true
       if (!hasSnapshotRef.current) {
         setAutoRefreshFailed(false)
@@ -192,7 +195,7 @@ export default function AlertsPage() {
   const refresh = useAutoRefresh({
     intervalMs: ALERT_AUTO_REFRESH_MS,
     resetKey: `${view}\u0000${typeFilter}`,
-    reload: (kind) => load(view, kind),
+    reload: (kind, ctx) => load(view, kind, ctx),
   })
 
   useEffect(() => {
