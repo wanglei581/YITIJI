@@ -106,13 +106,17 @@ function cryptoRandom(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-export function downloadBindCodeCsv(rows: TerminalBatchIssuedCode[]): void {
+export function formatBindCodeCsv(rows: TerminalBatchIssuedCode[]): string {
   const header = ['终端号', '名称', '点位', '绑定码', '到期时间']
   const lines = [
     header,
     ...rows.map((row) => [row.terminalCode, row.displayName ?? '', row.locationLabel ?? '', row.bindCode, row.expiresAt]),
   ]
-  const csv = `\uFEFF${lines.map((columns) => columns.map(escapeCsv).join(',')).join('\r\n')}`
+  return `\uFEFF${lines.map((columns) => columns.map(escapeCsv).join(',')).join('\r\n')}`
+}
+
+export function downloadBindCodeCsv(rows: TerminalBatchIssuedCode[]): void {
+  const csv = formatBindCodeCsv(rows)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -122,7 +126,14 @@ export function downloadBindCodeCsv(rows: TerminalBatchIssuedCode[]): void {
   URL.revokeObjectURL(url)
 }
 
-function escapeCsv(value: string): string {
-  if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`
+/** 表格软件会把 = + - @ 以及制表符、回车开头的单元格当成公式。先加单引号，再按 CSV 规则转义。 */
+function neutralizeSpreadsheetFormula(value: string): string {
+  if (/^[=+\-@\t\r]/.test(value)) return `'${value}`
   return value
+}
+
+function escapeCsv(value: string): string {
+  const safe = neutralizeSpreadsheetFormula(value)
+  if (/[",\r\n]/.test(safe)) return `"${safe.replace(/"/g, '""')}"`
+  return safe
 }
