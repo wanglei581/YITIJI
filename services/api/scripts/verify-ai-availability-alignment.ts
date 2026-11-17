@@ -1,10 +1,9 @@
 /**
  * 小青文字对话、数字人通话、模拟面试：「能不能用」与真实调用是同一个判断。
  *
- * 本文件按任务包分段长出来。当前段只守小青文字对话：
- *   GET /assistant/availability 与 POST /assistant/chat 共用 assistantChatRefusal。
- *   没配、全站暂停、当天预算到顶、配好，探针与对话入口双向一致。
- *   顾问作业面 advisor_work 配好不能把 assistant_chat 说成能用。
+ * 小青文字对话：GET /assistant/availability 与 POST /assistant/chat 共用 assistantChatRefusal。
+ * 数字人通话：能力表 digital_human 与 POST /trtc/session 共用 digitalHumanVerdict。
+ *   没配、全站暂停、当天预算到顶、配好，两边双向一致。能力表原因不含凭证字段名。
  *
  * 不连数据库、不调用计费模型。临时目录里的真实 LlmConfigService。
  * 运行：pnpm --filter @ai-job-print/api verify:ai-availability-alignment
@@ -19,7 +18,9 @@ import { AiAccessService } from '../src/ai-access/ai-access.service'
 import { AiController } from '../src/ai/ai.controller'
 import { AssistantAvailabilityController } from '../src/ai/assistant-availability.controller'
 import { AssistantChatAvailability } from '../src/ai/assistant-chat-availability.service'
+import { listKioskAiCapabilities } from '../src/ai/kiosk-ai-capabilities'
 import { LlmConfigService } from '../src/ai/llm/llm-config.service'
+import { TrtcController } from '../src/trtc/trtc.controller'
 
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'q22-avail-'))
 const SAVED_ENV = {
@@ -72,6 +73,48 @@ function sourceContracts(): void {
   assert.match(moduleSrc, /AssistantChatAvailability/, '生产模块必须提供共用判断')
   assert.match(moduleSrc, /AssistantAvailabilityController/, '生产模块必须挂上探针')
   console.log('  PASS 小青：源码共用 assistant_chat 判断')
+
+  const trtc = read('src/trtc/trtc.controller.ts')
+  const start = trtc.slice(trtc.indexOf("@Post('session')"), trtc.indexOf("@Post('session/stop')"))
+  assert.match(start, /digitalHumanVerdict\(/, '建会话必须调用共用判断')
+  assert.doesNotMatch(start, /getConfig\('digital_human'\)/, '建会话不得另读一遍启用位')
+  const verdictSrc = read('src/trtc/digital-human-availability.ts')
+  assert.match(verdictSrc, /getConfig\('digital_human'\)/, '启用位只在共用判断里读')
+  assert.match(verdictSrc, /paidAiRefusal\('voice'\)/, '暂停和预算走同一道')
+  assert.match(verdictSrc, /trtcConfigGap\(/, '凭证缺口走同一道')
+  assert.match(read('src/ai/kiosk-ai-capabilities.ts'), /digitalHumanVerdict\(/, '能力表必须调用同一个判断')
+  assert.match(read('src/trtc/trtc.service.ts'), /trtcConfigGap\(/, '建会话服务不得再把缺凭证报成 500')
+  console.log('  PASS 数字人：源码共用一个判断')
+}
+
+const TRTC_FIXTURE: Record<string, string> = {
+  TRTC_SDK_APP_ID: '1400000001',
+  TRTC_SDK_SECRET_KEY: 'verify-trtc-sdk-key-not-real',
+  TENCENT_SECRET_ID: 'verify-tencent-id-not-real',
+  TENCENT_SECRET_KEY: 'verify-tencent-key-not-real',
+  TRTC_LLM_API_KEY: 'verify-trtc-llm-key-not-real',
+  TRTC_TTS_CONFIG_JSON: '{"TTSType":"tencent"}',
+}
+
+function withoutTrtcEnv(): () => void {
+  const saved = new Map<string, string | undefined>()
+  for (const key of Object.keys(TRTC_FIXTURE)) {
+    saved.set(key, process.env[key])
+    delete process.env[key]
+  }
+  delete process.env['TRTC_TTS_TYPE']
+  delete process.env['TRTC_TTS_APP_ID']
+  delete process.env['TENCENT_APP_ID']
+  return () => {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+}
+
+function withTrtcEnv(): void {
+  for (const [key, value] of Object.entries(TRTC_FIXTURE)) process.env[key] = value
 }
 
 function fakeRedis(store: Map<string, string>) {
@@ -173,6 +216,59 @@ async function main(): Promise<void> {
   budgetExhausted = false
   access.clearCache()
   await pair('assistant_chat 配好且未暂停、未到顶', null)
+
+  const restoreTrtc = withoutTrtcEnv()
+  let starts = 0
+  const session = new TrtcController(
+    { startSession: async (userId: string) => { starts += 1; return { taskId: 'bill', sdkAppId: 1, userId, userSig: 's', roomId: 'r', maxSessionSeconds: 60, expiresAt: new Date().toISOString() } }, stopSession: async () => undefined } as never,
+    fakeRedis(new Map()) as never,
+    llm,
+    access,
+  )
+  const both = async (label: string, expectCode: string | null) => {
+    access.clearCache()
+    const before = starts
+    const listed = await listKioskAiCapabilities(llm, access)
+    const item = listed.items.find((entry) => entry.key === 'digital_human')
+    assert.ok(item, `${label} 能力表缺 digital_human`)
+    assert.doesNotMatch(JSON.stringify(item), /secret|apikey/i, `${label} 能力表带出凭证字段名`)
+    let code: string | null = null
+    try {
+      await session.startSession({ userId: 'caller' }, {} as never, 'terminal-1')
+    } catch (error) {
+      if (!(error instanceof ServiceUnavailableException)) throw error
+      const body = error.getResponse() as { error?: { code?: string } }
+      code = body.error?.code ?? 'missing'
+      assert.notEqual(error.getStatus(), 500, `${label} 不得回 500`)
+    }
+    if (expectCode === null) {
+      assert.equal(item.status, 'available', `${label} 能力表应可用`)
+      assert.equal(code, null, `${label} 建会话应放行`)
+      assert.equal(starts, before + 1, `${label} 应真正调用通话`)
+    } else {
+      assert.equal(item.status, 'off', `${label} 能力表应不可用`)
+      assert.equal(code, expectCode, `${label} 建会话拒绝码`)
+      assert.equal(starts, before, `${label} 不得开始计费`)
+    }
+    console.log(`  PASS 数字人双向 ${label}`)
+  }
+  try {
+    llm.update({ enabled: true }, 'digital_human')
+    await both('音视频凭证没配', 'AI_NOT_CONFIGURED')
+    withTrtcEnv()
+    llm.update({ enabled: false }, 'digital_human')
+    await both('功能位关掉', 'AI_PAUSED')
+    llm.update({ enabled: true }, 'digital_human')
+    store.set('system:ai-access:paused', 'on')
+    await both('全站暂停', 'AI_PAUSED')
+    store.set('system:ai-access:paused', 'off')
+    budgetExhausted = true
+    await both('当天预算到顶', 'AI_BUDGET_EXHAUSTED')
+    budgetExhausted = false
+    await both('凭证齐、开着、未暂停、未到顶', null)
+  } finally {
+    restoreTrtc()
+  }
 
   console.log('\n=== ALL PASS ===')
 }

@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common'
+import { trtcConfigGap } from './digital-human-availability'
 import { describeBackgroundError, runBackground, scheduleBackground } from '../common/process/background-task'
 import { randomUUID } from 'node:crypto'
 import { TrtcSessionRegistry, readTrtcMaxSessionSeconds } from './trtc-session-registry.service'
@@ -177,14 +178,13 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
   private buildTtsConfig(secretId: string, cloudKey: string): string {
     const explicitConfig = process.env['TRTC_TTS_CONFIG_JSON']?.trim()
     if (explicitConfig) return explicitConfig
+    const gap = trtcConfigGap()
+    if (gap) throw new ServiceUnavailableException({ error: gap.http })
 
     const ttsType = (process.env['TRTC_TTS_TYPE'] ?? 'tencent').toLowerCase()
 
     if (ttsType === 'tencent') {
       const appId = Number(process.env['TRTC_TTS_APP_ID'] ?? process.env['TENCENT_APP_ID'])
-      if (!Number.isFinite(appId) || appId <= 0) {
-        throw new InternalServerErrorException('腾讯 TTS AppId 未配置（TRTC_TTS_APP_ID 或 TENCENT_APP_ID）')
-      }
 
       return JSON.stringify({
         TTSType:         'tencent',
@@ -198,7 +198,8 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
       })
     }
 
-    throw new InternalServerErrorException(`不支持的 TRTC_TTS_TYPE: ${ttsType}，请使用 tencent 或 TRTC_TTS_CONFIG_JSON`)
+    const unsupported = trtcConfigGap()
+    throw new ServiceUnavailableException({ error: unsupported?.http ?? { code: 'AI_NOT_CONFIGURED', message: `不支持的 TRTC_TTS_TYPE: ${ttsType}，请使用 tencent 或 TRTC_TTS_CONFIG_JSON` } })
   }
 
   /**
@@ -207,13 +208,12 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
    *  2. 调用腾讯云 StartAIConversation 把 AI 拉进房间
    */
   async startSession(userId: string): Promise<StartSessionResult> {
+    const gap = trtcConfigGap()
+    if (gap) throw new ServiceUnavailableException({ error: gap.http })
     const { sdkAppId, secretKey, secretId, cloudKey, region } = this.cfg()
-
-    if (!sdkAppId || !secretKey) {
-      throw new InternalServerErrorException('TRTC 应用凭证未配置')
-    }
-    if (!secretId || !cloudKey) {
-      throw new InternalServerErrorException('腾讯云 API 凭证（SecretId/SecretKey）未配置')
+    if (!sdkAppId || !secretKey || !secretId || !cloudKey) {
+      const again = trtcConfigGap()
+      throw new ServiceUnavailableException({ error: again?.http ?? { code: 'AI_NOT_CONFIGURED', message: 'TRTC 应用凭证未配置' } })
     }
 
     // 房间号：用时间戳派生，保证每次唯一（字符串房间）
@@ -231,7 +231,8 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
     const llmApiUrl = process.env['TRTC_LLM_API_URL'] ?? 'https://api.deepseek.com/v1/chat/completions'
 
     if (!llmApiKey) {
-      throw new InternalServerErrorException('LLM API Key 未配置（TRTC_LLM_API_KEY）')
+      const missingKey = trtcConfigGap()
+      throw new ServiceUnavailableException({ error: missingKey?.http ?? { code: 'AI_NOT_CONFIGURED', message: 'LLM API Key 未配置（TRTC_LLM_API_KEY）' } })
     }
 
     const promptConfig = {

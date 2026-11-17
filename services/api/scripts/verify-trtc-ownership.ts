@@ -212,6 +212,19 @@ async function main() {
     stopSession: async (taskId: string) => { stopped.push(taskId) },
   }
 
+  const trtcFixture: Record<string, string> = {
+    TRTC_SDK_APP_ID: '1400000001',
+    TRTC_SDK_SECRET_KEY: 'verify-trtc-sdk-key-not-real',
+    TENCENT_SECRET_ID: 'verify-tencent-id-not-real',
+    TENCENT_SECRET_KEY: 'verify-tencent-key-not-real',
+    TRTC_LLM_API_KEY: 'verify-trtc-llm-key-not-real',
+    TRTC_TTS_CONFIG_JSON: '{"TTSType":"tencent"}',
+  }
+  const savedTrtc = new Map<string, string | undefined>()
+  for (const [key, value] of Object.entries(trtcFixture)) {
+    savedTrtc.set(key, process.env[key])
+    process.env[key] = value
+  }
   const controller = new TrtcController(stubTrtc as never, redis)
   const issuedTokens: string[] = []
 
@@ -292,6 +305,10 @@ async function main() {
     else fail(`重放导致二次调用: stopped=${JSON.stringify(stopped)}`)
 
   } finally {
+    for (const [key, value] of savedTrtc) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
     for (const t of issuedTokens) await redis.del(OWNER_KEY(t))
     info('测试数据已清理。')
     await app.close()
