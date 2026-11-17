@@ -32,9 +32,10 @@ test.describe('文件管理（mock 口径）', () => {
     const guards = await openAuthed(page, '/files')
     await settleAdminPage(page, guards)
     await page.getByRole('button', { name: '招聘会资料', exact: true }).click()
+    // 点下去之前整表里两种资料都在。先等不属于这一类的行消失，再看两种招聘会资料。
+    await expect(page.getByText('王某某_简历_2026.pdf')).toHaveCount(0)
     await expect(page.getByText('招聘会资料_2026春招.pdf')).toBeVisible()
     await expect(page.getByText('场次资料_春季招聘会.pdf')).toBeVisible()
-    await expect(page.getByText('王某某_简历_2026.pdf')).toHaveCount(0)
   })
 
   test('1280 宽操作可达，策略来源与同意信息保留在详情', async ({ page }) => {
