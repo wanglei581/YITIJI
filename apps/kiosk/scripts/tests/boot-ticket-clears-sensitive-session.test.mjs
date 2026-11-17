@@ -175,6 +175,7 @@ export function useState(initial) { return [typeof initial === 'function' ? init
     .replaceAll("from '../pages/scan/scanCleanupGate'", `from '${cleanupStub}'`)
     .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)
+    .replaceAll("from '../services/api/aiSessionForget'", `from '${toDataUrl('export function forgetAiSessions() {}\n')}'`)
   const recoveryUrl = toDataUrl(`${transpile('src/services/terminalSessionRecovery.ts')}\n// ${seed}\n`)
   const authCode = `${transpile('src/services/terminalAuth.ts')}\n// ${seed}\n`
     .replaceAll('import.meta.env', `globalThis[${JSON.stringify(envName)}]`)
@@ -309,6 +310,7 @@ export function useState(initial) { return [typeof initial === 'function' ? init
     .replaceAll("from '../pages/scan/scanCleanupGate'", `from '${cleanupStub}'`)
     .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)
+    .replaceAll("from '../services/api/aiSessionForget'", `from '${toDataUrl('export function forgetAiSessions() {}\n')}'`)
   const sensitive = await import(toDataUrl(sensitiveCode))
   const contract = await import(leaf('src/pages/contract-review/contractReviewSession.ts'))
   return {

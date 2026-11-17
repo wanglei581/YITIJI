@@ -110,6 +110,7 @@ async function loadKioskClear() {
     '../ai/aiDeclarationSession': stub(declarationCode),
     '../ai/aiDeclarationVersions': declarationVersions,
     '../pages/copy/copySession': leaf('src/pages/copy/copySession.ts'),
+    '../services/api/aiSessionForget': stub('export function forgetAiSessions() {}\n'),
   }
   let out = transpileFile('src/auth/kioskSensitiveSession.ts')
   for (const [specifier, url] of Object.entries(replacements)) {

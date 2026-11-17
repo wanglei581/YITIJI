@@ -30,6 +30,7 @@ import {
 import { clearAiDeclarationSession } from '../ai/aiDeclarationSession'
 import { clearCopySession, hasCopySession } from '../pages/copy/copySession'
 import { AI_DECLARATION_SESSION_KEY } from '../ai/aiDeclarationVersions'
+import { forgetAiSessions } from '../services/api/aiSessionForget'
 
 /** 打印材料。范围判断里单独算「只有打印材料」；仍只登记在下面那份键表里。 */
 const PRINT_MATERIAL_SESSION_KEY = 'ai-job-print:current-print-material-check'
@@ -133,6 +134,8 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   // clearScanWorkbenchSession() 一旦先跑，就再也找不到要撤谁。
   beginScanSessionCleanup(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
+  // 上面两行必须相邻。失败不抛错，不拦清场；先取走登记再清空。
+  forgetAiSessions(outgoingMemberToken ?? null)
   clearScanHowContinue()
   clearListeners.forEach((listener) => listener())
 }
