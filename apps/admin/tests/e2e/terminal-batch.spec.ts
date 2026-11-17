@@ -96,6 +96,45 @@ test('勾选 A 批后再筛到 B 批，勾选归零且按钮写本批', async ({
   await assertNoTechLeak(page)
 })
 
+test('第 1 页勾选后翻到第 2 页，勾选归零且按钮写本批', async ({ page }) => {
+  const guards = await openAuthed(page, '/devices')
+  await settleAdminPage(page, guards)
+  await page.getByRole('button', { name: '终端', exact: true }).click()
+
+  await page.getByRole('button', { name: '批量预建', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '批量预建' })
+  await dialog.getByLabel('编号前缀').fill('PG-')
+  await dialog.getByLabel('起始编号').fill('1')
+  await dialog.getByLabel('结束编号').fill('21')
+  await dialog.getByRole('button', { name: '开始预建', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+
+  const firstOnPage = page.getByRole('checkbox', { name: '选择 PG-21' })
+  await expect(firstOnPage).toBeVisible()
+  await firstOnPage.check()
+  await expect(page.getByTestId('terminal-batch-selected-count')).toHaveText('已勾选 1 台')
+  await expect(page.getByRole('button', { name: '批量生成绑定码（已选 1 台）', exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '下一页', exact: true }).click()
+  await expect(page.getByRole('checkbox', { name: '选择 PG-21' })).toHaveCount(0)
+  await expect(page.getByTestId('terminal-batch-selected-count')).toHaveText('已勾选 0 台')
+  await expect(page.getByRole('button', { name: '批量生成绑定码（本批 21 台）', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '作废绑定码（本批 21 台）', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新生成绑定码（本批 21 台）', exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '上一页', exact: true }).click()
+  await expect(page.getByRole('checkbox', { name: '选择 PG-21' })).not.toBeChecked()
+  await expect(page.getByTestId('terminal-batch-selected-count')).toHaveText('已勾选 0 台')
+
+  await page.getByRole('checkbox', { name: '选择 PG-21' }).check()
+  await expect(page.getByTestId('terminal-batch-selected-count')).toHaveText('已勾选 1 台')
+  await page.getByRole('combobox').selectOption('10')
+  await expect(page.getByTestId('terminal-batch-selected-count')).toHaveText('已勾选 0 台')
+  await expect(page.getByRole('checkbox', { name: '选择 PG-21' })).not.toBeChecked()
+  await expect(page.getByRole('button', { name: '批量生成绑定码（本批 21 台）', exact: true })).toBeVisible()
+  await assertNoTechLeak(page)
+})
+
 test('粘贴 121 字名称会标出第 1 行超长，开始预建不可用', async ({ page }) => {
   const guards = await openAuthed(page, '/devices')
   await settleAdminPage(page, guards)

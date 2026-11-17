@@ -291,7 +291,7 @@ export default function TerminalsPage() {
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
   const counts = { 全部: terminals.length, 在线: terminals.filter((terminal) => terminal.online).length, 离线: terminals.filter((terminal) => !terminal.online).length }
   const trimmedBatchId = batchIdFilter.trim()
-  const visibleSelectedIds = filtered.filter((terminal) => selectedIds.includes(terminal.id)).map((terminal) => terminal.id)
+  const visibleSelectedIds = paginated.filter((terminal) => selectedIds.includes(terminal.id)).map((terminal) => terminal.id)
   const currentBatchCount = trimmedBatchId
     ? terminals.filter((terminal) => terminal.provisionBatchId === trimmedBatchId).length
     : 0
@@ -382,7 +382,7 @@ export default function TerminalsPage() {
       </div>
       {notice && <div className={`mb-3 rounded-[9px] border px-4 py-3 text-sm ${notice.type === 'success' ? 'border-success/20 bg-success-bg text-success-fg' : 'border-error/20 bg-error-bg text-error-fg'}`}>{notice.text}</div>}
       <Card className="overflow-hidden p-0">
-        <ConsoleTable items={paginated} columns={columns} loading={loading} error={failed ? { title: '终端数据加载失败', message: '请稍后重试', onRetry: () => void refresh() } : null} empty={{ title: search ? '未找到匹配的终端' : '该分类暂无终端', description: search ? '请尝试其他关键词' : undefined }} page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
+        <ConsoleTable items={paginated} columns={columns} loading={loading} error={failed ? { title: '终端数据加载失败', message: '请稍后重试', onRetry: () => void refresh() } : null} empty={{ title: search ? '未找到匹配的终端' : '该分类暂无终端', description: search ? '请尝试其他关键词' : undefined }} page={page} pageSize={pageSize} total={filtered.length} onPageChange={(next) => { setPage(next); setSelectedIds([]) }} onPageSizeChange={(size) => { setPageSize(size); setPage(1); setSelectedIds([]) }} />
       </Card>
       <ReleaseObservationPanel terminals={terminals} onNotice={setNotice} />
       <p className="mt-3 text-xs text-neutral-500">终端在线状态、链路诊断、打印机状态、扫描输入、版本、IP、磁盘均来自终端程序（Terminal Agent）的定时上报；链路诊断不展示 WiFi 名称、密码、网关或打印机地址{API_MODE !== 'http' && '（当前为 mock 演示数据，归属变更不写数据库）'}</p>
