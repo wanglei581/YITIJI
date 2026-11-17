@@ -172,7 +172,7 @@ export const adminDeviceMock = {
 }
 
 function selectHeld(input: TerminalBatchSelectionInput): Array<HeldTerminal | null> {
-  const ids = input.terminalIds?.filter((id) => id.trim().length > 0) ?? []
+  const ids = uniqueInOrder(input.terminalIds?.map((id) => id.trim()).filter((id) => id.length > 0) ?? [])
   if (ids.length > 200) throw new ApiHttpError('TERMINAL_BATCH_TOO_LARGE', '一次最多处理 200 台', 400)
   if (ids.length > 0) return ids.map((id) => held.find((terminal) => terminal.id === id) ?? null)
   const batchId = input.batchId?.trim()
@@ -209,6 +209,17 @@ function issueHeld(input: TerminalBatchSelectionInput, alreadyRevoked: boolean):
     })
   }
   return { issued, skipped }
+}
+
+function uniqueInOrder(ids: string[]): string[] {
+  const seen = new Set<string>()
+  const unique: string[] = []
+  for (const id of ids) {
+    if (seen.has(id)) continue
+    seen.add(id)
+    unique.push(id)
+  }
+  return unique
 }
 
 function mockCode(): string {

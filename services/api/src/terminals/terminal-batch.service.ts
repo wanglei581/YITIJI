@@ -363,7 +363,7 @@ export class TerminalBatchService {
   }
 
   private async selectTerminals(dto: TerminalBatchSelectionDto): Promise<Array<SelectedTerminal | null>> {
-    const ids = dto.terminalIds?.map((id) => id.trim()).filter((id) => id.length > 0) ?? []
+    const ids = uniqueInOrder(dto.terminalIds?.map((id) => id.trim()).filter((id) => id.length > 0) ?? [])
     if (ids.length > TERMINAL_BATCH_LIMIT) {
       throw fail('TERMINAL_BATCH_TOO_LARGE', `一次最多处理 ${TERMINAL_BATCH_LIMIT} 台`)
     }
@@ -413,6 +413,17 @@ const terminalSelect = {
   lifecycleStatus: true,
   provisionBatchId: true,
 } as const
+
+function uniqueInOrder(ids: string[]): string[] {
+  const seen = new Set<string>()
+  const unique: string[] = []
+  for (const id of ids) {
+    if (seen.has(id)) continue
+    seen.add(id)
+    unique.push(id)
+  }
+  return unique
+}
 
 function skipReason(target: SelectedTerminal | null): string | null {
   if (!target) return '终端不存在'

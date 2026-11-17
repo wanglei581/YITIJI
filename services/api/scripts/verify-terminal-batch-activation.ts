@@ -394,6 +394,55 @@ async function main(): Promise<void> {
     }
     console.log('PASS 列表带批次号、激活状态、首次激活、最后心跳和程序版本；没有心跳则为空')
 
+    const dupPrefix = `U${suffix}`
+    prefixes.push(dupPrefix)
+    const dupA = `t_dup_a_${suffix}`
+    const dupB = `t_dup_b_${suffix}`
+    const dupC = `t_dup_c_${suffix}`
+    const dupD = `t_dup_d_${suffix}`
+    await prisma.terminal.create({ data: { id: dupA, terminalCode: `${dupPrefix}A`, agentToken: `${PLANNED_CREDENTIAL_PREFIX}ua-${suffix}`, deviceFingerprint: `fp-ua-${suffix}`, lifecycleStatus: 'planned' } })
+    await prisma.terminal.create({ data: { id: dupB, terminalCode: `${dupPrefix}B`, agentToken: `${PLANNED_CREDENTIAL_PREFIX}ub-${suffix}`, deviceFingerprint: `fp-ub-${suffix}`, lifecycleStatus: 'planned' } })
+    await prisma.terminal.create({ data: { id: dupC, terminalCode: `${dupPrefix}C`, agentToken: `${PLANNED_CREDENTIAL_PREFIX}uc-${suffix}`, deviceFingerprint: `fp-uc-${suffix}`, lifecycleStatus: 'planned' } })
+    await prisma.terminal.create({ data: { id: dupD, terminalCode: `${dupPrefix}D`, agentToken: `${PLANNED_CREDENTIAL_PREFIX}ud-${suffix}`, deviceFingerprint: `fp-ud-${suffix}`, lifecycleStatus: 'planned' } })
+    const duplicated = await batches.issue({ terminalIds: [dupB, dupA, dupB] }, actor)
+    assert.deepEqual(duplicated.issued.map((item) => item.terminalId), [dupB, dupA])
+    assert.equal(duplicated.skipped.length, 0)
+    for (const item of duplicated.issued) {
+      const exchangedDup = await credentials.exchangeBindCode({
+        bindCode: item.bindCode,
+        deviceFingerprint: `fp-ex-${item.terminalCode}-${suffix}`,
+      })
+      assert.equal(exchangedDup.terminalCode, item.terminalCode)
+    }
+    const dupFirst = (await batches.issue({ terminalIds: [dupC] }, actor)).issued[0]?.bindCode
+    assert.ok(dupFirst)
+    const dupReissued = await batches.reissue({ terminalIds: [dupC, dupC] }, actor)
+    assert.equal(dupReissued.issued.length, 1)
+    const dupSecond = dupReissued.issued[0]?.bindCode
+    assert.ok(dupSecond)
+    assert.notEqual(dupSecond, dupFirst)
+    await expectCode(
+      () => credentials.exchangeBindCode({ bindCode: dupFirst, deviceFingerprint: `fp-ex-old-c-${suffix}` }),
+      'BIND_CODE_REVOKED',
+      '重复编号重发后旧码',
+    )
+    const dupReissueExchanged = await credentials.exchangeBindCode({
+      bindCode: dupSecond,
+      deviceFingerprint: `fp-ex-new-c-${suffix}`,
+    })
+    assert.equal(dupReissueExchanged.terminalCode, `${dupPrefix}C`)
+    const dupIssued = (await batches.issue({ terminalIds: [dupD] }, actor)).issued[0]?.bindCode
+    assert.ok(dupIssued)
+    const dupRevoked = await batches.revoke({ terminalIds: [dupD, dupD] }, actor)
+    assert.equal(dupRevoked.terminalCount, 1)
+    assert.equal(dupRevoked.revokedCount, 1)
+    await expectCode(
+      () => credentials.exchangeBindCode({ bindCode: dupIssued, deviceFingerprint: `fp-ex-d-${suffix}` }),
+      'BIND_CODE_REVOKED',
+      '重复编号作废后兑换',
+    )
+    console.log('PASS 同一终端编号重复出现时只保留第一次，每个返回的码都能兑换')
+
     const forbiddenPrefix = `F${suffix}`
     prefixes.push(forbiddenPrefix)
     const response = await fetch(`http://127.0.0.1:${port}/api/v1/admin/terminals/batches`, {
