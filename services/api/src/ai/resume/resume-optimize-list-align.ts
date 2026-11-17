@@ -1,0 +1,491 @@
+import { BULLET_RE } from './resume-restored-text'
+import { normalizeResumeStructureText } from './resume-structure'
+
+type AlignModule = { before: string; after: string }
+
+/** 只去掉技能、证书栏目标题。词表与 resume-optimize-coverage 的 HEADINGS 里这两栏一致。 */
+const LIST_HEADING_RE = /^(专业技能|技能证书|技能与证书|技能特长|技能)(?=$|[\s:：])|^(证书资质|证书|资格证书|获奖情况)(?=$|[\s:：])/u
+const LEADING_INDEX_RE = /^(?:\d{1,2}\s*[、.．)）](?!\d)|[一二三四五六七八九十]{1,3}\s*[、.．]|[（(]\s*\d{1,2}\s*[）)]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*/u
+const COLUMN_INDEX_RE = /^(\d{1,2})\s*([、.．)）])/u
+const BRACKET_TITLE_RE = /^【[^】]{0,20}】\s*/u
+const RESTORE_SEP = new Set(['、', '，', ',', '；'])
+const COMPARE_SEP = new Set(['、', '，', ',', '；', ';', '/', '和', '及', '与'])
+
+export interface AlignOriginalListOptions {
+  modules?: AlignModule[]
+  /** 已经落在别的栏里的小项（技能对齐时传入证书），不再补进这一栏。 */
+  coveredElsewhere?: string[]
+}
+
+type ColumnKind = 'dot' | 'dun' | 'paren'
+type ColumnHit = { kind: ColumnKind; num: number; maybe: boolean; rest: string; keep?: boolean }
+
+/** 行首像编号时拆开。点号后 1–3 位再接普通字算「可能是小数」（「1.3D」「2.5D」）；紧跟「年 / 版本 / 寸」或不是这种形状就不当编号。四位年份仍是明确编号。 */
+function classifyLeadingIndex(line: string): ColumnHit | null {
+  const text = line.trim().replace(BULLET_RE, '').trim()
+  const match = COLUMN_INDEX_RE.exec(text)
+  const digits = match?.[1]
+  const mark = match?.[2]
+  if (!match || digits === undefined || mark === undefined) return null
+  const num = Number(digits)
+  if (!Number.isInteger(num) || num < 1) return null
+  const rawRest = text.slice(match[0].length)
+  const rest = rawRest.trim()
+  const kind: ColumnKind = mark === '、' ? 'dun' : mark === '.' || mark === '．' ? 'dot' : 'paren'
+  if (kind !== 'dot' || !/^\d/u.test(rawRest)) return { kind, num, maybe: false, rest }
+  if (/^\d{4}(?!\d)/u.test(rawRest)) return { kind, num, maybe: false, rest }
+  const short = /^(\d{1,3})(?!\d)/u.exec(rawRest)
+  if (!short) return null
+  // 「1.0架构重构」「2.05」：点号后 0 打头是小数或版本号，这一行原样留（keep），只给整栏当旁证。
+  if (short[1]?.startsWith('0')) return { kind, num, maybe: true, rest, keep: true }
+  const tail = rawRest.slice(short[0].length)
+  if (/^(?:年|寸|版本)/u.test(tail)) return null
+  return { kind, num, maybe: true, rest }
+}
+
+/** 比对用：行首像编号（含「1.3D」这种可能是小数的）时给出去掉编号后的正文。0 打头要原样留的版本号，以及根本不像编号的，原样返回。只用于比对，不进成品。 */
+export function withoutLeadingIndex(line: string): string {
+  const hit = classifyLeadingIndex(line)
+  return hit && !hit.keep ? hit.rest : line
+}
+
+/** 点号后紧跟 1–3 位数字（「1.5倍」「1.3年」「1.0」「1.3D」）。四位年份不算。 */
+function ambiguousDigitTail(line: string): { num: number; rest: string } | null {
+  const text = line.trim().replace(BULLET_RE, '').trim()
+  const match = COLUMN_INDEX_RE.exec(text)
+  const digits = match?.[1]
+  const mark = match?.[2]
+  if (!match || digits === undefined || mark === undefined || (mark !== '.' && mark !== '．')) return null
+  const num = Number(digits)
+  if (!Number.isInteger(num) || num < 1) return null
+  const rawRest = text.slice(match[0].length)
+  if (!/^\d/u.test(rawRest) || /^\d{4}(?!\d)/u.test(rawRest)) return null
+  if (!/^(\d{1,3})(?!\d)/u.test(rawRest)) return null
+  const rest = rawRest.trim()
+  return rest ? { num, rest } : null
+}
+
+export function ambiguousColumnTail(line: string, column: string[]): string | null {
+  const filled = column.map((item) => item.trim()).filter(Boolean)
+  if (filled.length < 2) return null
+  const rows = filled.map((item) => {
+    const clear = classifyLeadingIndex(item)
+    if (clear && !clear.maybe) return { num: clear.num, ambiguous: false }
+    const amb = ambiguousDigitTail(item)
+    return amb ? { num: amb.num, ambiguous: true } : null
+  })
+  if (rows.some((row) => !row)) return null
+  const typed = rows as Array<{ num: number; ambiguous: boolean }>
+  const witnessed = typed.every((row, index) => row.num === index + 1)
+    && typed[0]?.ambiguous === true
+    && typed.slice(1).every((row) => !row.ambiguous)
+  if (!witnessed) return null
+  return ambiguousDigitTail(line)?.rest ?? null
+}
+
+/** 漏交补回：1–3 位数字原样；四位年份和普通编号用剥过的正文。 */
+export function omittedColumnText(raw: string, shown: string): string {
+  if (ambiguousDigitTail(raw)) return strippedListLine(raw)
+  return shown
+}
+
+/**
+ * 一整栏（技能、证书或一段描述）各行成套用「1. 2. 3.」「1、2、」「1）2）」这类递增编号时，只剥行首编号。
+ * 只有一行、数字不连续、或「2.5D」「3.0版本」「1.5年」这种不成套的，原样留下。
+ * 「1.3D」只有在同栏其余行是明确的 2. 3. … 时才剥，剥完正文仍是「3D」。
+ * 点号后 0 打头（「1.0架构」「1.05亿」）这一行原样留，只给整栏当旁证，其余行照旧剥编号。
+ */
+export function stripNumberedColumn(lines: string[]): string[] {
+  const prepared = lines.map((line) => ({ line, hit: classifyLeadingIndex(line), empty: !line.trim() }))
+  const filled = prepared.filter((row) => !row.empty)
+  if (filled.length < 2 || filled.some((row) => !row.hit)) return lines
+  const kind = filled[0]?.hit?.kind
+  if (!kind || !filled.every((row) => row.hit?.kind === kind)) return lines
+  if (!filled.every((row, index) => row.hit?.num === index + 1)) return lines
+  const maybes = filled.filter((row) => row.hit?.maybe)
+  const witnessed = maybes.length === 1 && filled[0]?.hit?.maybe === true && filled.slice(1).every((row) => row.hit?.maybe === false)
+  if (maybes.length > 0 && !witnessed) return lines
+  return prepared.map((row) => (row.hit && !row.empty && !row.hit.keep ? row.hit.rest : row.line))
+}
+
+/** 短的一边至少 2 字，且不短于长的一边的一半，才算同一小项的改写。 */
+export function similarListAtom(left: string, right: string): boolean {
+  if (!left || !right || left === right) return left === right && left.length > 0
+  const shorter = Math.min(left.length, right.length)
+  const longer = Math.max(left.length, right.length)
+  return shorter >= 2 && shorter / longer >= 0.5 && (left.includes(right) || right.includes(left))
+}
+
+/** 技能、证书比对前去掉行首项目符号、栏目标题、【】标题和行首编号。编号和【】谁先谁后都剥。 */
+export function strippedListLine(line: string): string {
+  let text = line.trim().replace(BULLET_RE, '').trim()
+  for (let guard = 0; guard < 8; guard += 1) {
+    if (LIST_HEADING_RE.test(text)) {
+      text = text.replace(LIST_HEADING_RE, '').replace(/^[\s:：]+/u, '').trim()
+      continue
+    }
+    if (LEADING_INDEX_RE.test(text)) {
+      text = text.replace(LEADING_INDEX_RE, '').trim()
+      continue
+    }
+    if (BRACKET_TITLE_RE.test(text)) {
+      text = text.replace(BRACKET_TITLE_RE, '').trim()
+      continue
+    }
+    break
+  }
+  return text
+}
+
+/** 全角半角括号都配对。没闭合的后半段不当分隔，避免拆出「PPT)」。 */
+function maskParens(text: string): string {
+  const chars = [...text]
+  let depth = 0
+  return chars.map((ch) => {
+    if (ch === '（' || ch === '(') {
+      depth += 1
+      return ' '
+    }
+    if ((ch === '）' || ch === ')') && depth > 0) {
+      depth -= 1
+      return ' '
+    }
+    return depth > 0 ? ' ' : ch
+  }).join('')
+}
+
+function splitOutside(text: string, sep: Set<string>): string[] {
+  const chars = [...text]
+  const masked = [...maskParens(text)]
+  const parts: string[] = []
+  let start = 0
+  for (let i = 0; i < chars.length; i += 1) {
+    if (!sep.has(masked[i] ?? '')) continue
+    const piece = chars.slice(start, i).join('').trim()
+    if (piece) parts.push(piece)
+    start = i + 1
+  }
+  const tail = chars.slice(start).join('').trim()
+  if (tail) parts.push(tail)
+  return parts
+}
+
+/** 补回只按顿号、逗号和中文分号拆。`; / 和 及 与` 不改原稿样子。 */
+function splitRestore(text: string): string[] {
+  const parts = splitOutside(text, RESTORE_SEP)
+  return parts.length > 0 ? parts : []
+}
+
+/** 比对键多用 `; / 和 及 与`。不按空格拆，避免「Python」抢走「Python 爬虫」。 */
+function splitCompare(text: string): string[] {
+  const parts = splitOutside(text, COMPARE_SEP)
+  return parts.length > 0 ? parts : [text.trim()].filter(Boolean)
+}
+
+function stripParenText(text: string): string {
+  let depth = 0
+  let out = ''
+  for (const ch of text) {
+    if (ch === '（' || ch === '(') { depth += 1; continue }
+    if ((ch === '）' || ch === ')') && depth > 0) { depth -= 1; continue }
+    if (depth === 0) out += ch
+  }
+  return out.trim()
+}
+
+function listLineKey(text: string): string {
+  return normalizeResumeStructureText(strippedListLine(text))
+}
+
+function lineCoveredByModule(line: string, module: AlignModule): boolean {
+  const key = listLineKey(line)
+  if (!key) return false
+  const matches = (raw: string) => {
+    if (listLineKey(raw) === key) return true
+    const hit = classifyLeadingIndex(raw)
+    return Boolean(hit && !hit.keep && listLineKey(hit.rest) === key)
+  }
+  const before = module.before ?? ''
+  if (matches(before)) return true
+  return before.split(/\n/u).some((beforeLine) => matches(beforeLine))
+}
+
+/**
+ * 按原稿顺序对齐技能或证书。
+ * `; / 空格 和 及 与` 只参与比对。一整行一个小项都没配上时，按原稿整行补回。
+ * 有 module 撑腰、且 after 在模型列表里的行用改写；这条 module 用过之后，后一行不再补原稿。
+ */
+export function alignOriginalList(
+  lines: string[],
+  model: string[],
+  max: number,
+  options?: AlignOriginalListOptions,
+): { list: string[]; missing: string[] } {
+  const sourceLines = stripNumberedColumn(lines)
+  const sourceModel = stripNumberedColumn(model)
+  const norm = normalizeResumeStructureText
+  const modules = (options?.modules ?? []).map((module) => ({ module, used: false }))
+  const covered = new Set<string>()
+  const remember = (raw: string) => {
+    const display = strippedListLine(raw)
+    if (!display) return
+    covered.add(norm(display))
+    const bare = stripParenText(display)
+    if (bare) covered.add(norm(bare))
+    for (const atom of splitCompare(display)) covered.add(norm(atom))
+  }
+  for (const raw of options?.coveredElsewhere ?? []) remember(raw)
+  const coveredText = (text: string): boolean => {
+    const key = norm(text)
+    if (!key) return true
+    if (covered.has(key)) return true
+    const bare = stripParenText(text)
+    if (bare && covered.has(norm(bare))) return true
+    const atoms = splitCompare(text).map((part) => norm(part)).filter(Boolean)
+    if (atoms.length > 1 && atoms.every((part) => covered.has(part))) return true
+    const spaces = text.split(/\s+/u).map((part) => norm(part.trim())).filter(Boolean)
+    return spaces.length > 1 && spaces.every((part) => covered.has(part))
+  }
+  const paired = lines.flatMap((raw, index) => {
+    const text = raw.trim()
+    if (!text) return []
+    return [{ raw: text, shown: (sourceLines[index] ?? raw).trim() }]
+  })
+  type Atom = { display: string; key: string; used: boolean }
+  type Item = { display: string; key: string; atoms: Atom[]; used: boolean }
+  const pool: Item[] = sourceModel.map((raw) => {
+    const display = strippedListLine(raw)
+    const atoms = splitCompare(display).map((part) => ({ display: part, key: norm(part), used: false }))
+    return { display, key: norm(display), atoms, used: false }
+  }).filter((item) => item.display)
+  const list: string[] = []
+  const missing: string[] = []
+  const push = (text: string, wasMissing = false) => {
+    const display = text.trim()
+    if (!display || coveredText(display)) return
+    list.push(display)
+    if (wasMissing) missing.push(display)
+  }
+  const takeExactRef = (key: string): { item: Item; atom: Atom } | null => {
+    for (const item of pool) {
+      if (item.used) continue
+      const atom = item.atoms.find((part) => !part.used && part.key === key)
+      if (!atom) continue
+      atom.used = true
+      if (item.atoms.every((part) => part.used)) item.used = true
+      return { item, atom }
+    }
+    return null
+  }
+  const takeExact = (key: string): string | null => takeExactRef(key)?.atom.display ?? null
+  // 一槽用到同一个模型项拆出的全部小块（「CI/CD」→「CI」「CD」，「亲和力」→「亲」「力」，「及时响应」→「时响应」）时，按模型整项输出。
+  const joinTaken = (taken: Array<{ item: Item; atom: Atom }>): string => {
+    const out: string[] = []
+    const done = new Set<Item>()
+    for (const { item, atom } of taken) {
+      if (done.has(item)) continue
+      const whole = item.atoms.every((part) => taken.some((step) => step.atom === part))
+      if (whole && (item.atoms.length > 1 || atom.display !== item.display)) {
+        out.push(item.display)
+        done.add(item)
+        continue
+      }
+      out.push(atom.display)
+    }
+    return out.join('\u0001')
+  }
+  const canTakeAll = (keys: string[]): boolean => {
+    const used = new Set<string>()
+    return keys.every((key) => {
+      for (const item of pool) {
+        if (item.used) continue
+        const index = item.atoms.findIndex((part, atomIndex) => !part.used && part.key === key && !used.has(`${pool.indexOf(item)}:${atomIndex}`))
+        if (index < 0) continue
+        used.add(`${pool.indexOf(item)}:${index}`)
+        return true
+      }
+      return false
+    })
+  }
+  const claimWhole = (item: Item) => {
+    item.used = true
+    item.atoms.forEach((atom) => { atom.used = true })
+  }
+  const moduleHit = (line: string): { index: number; display: string } | null => {
+    for (let index = 0; index < modules.length; index += 1) {
+      const state = modules[index]
+      if (!state || state.used || !lineCoveredByModule(line, state.module)) continue
+      const after = state.module.after?.trim() ?? ''
+      if (!after) continue
+      const found = pool.find((item) => !item.used && (item.key === norm(strippedListLine(after)) || item.key === norm(after)))
+      if (!found) continue
+      return { index, display: found.display }
+    }
+    return null
+  }
+
+  type Slot = { display: string; key: string; out: string | null }
+  const rows: Array<{ omitted: string; slots: Slot[] }> = []
+  for (const item of paired) {
+    const line = item.shown
+    const usedOnly = modules.some((state) => state.used && lineCoveredByModule(line, state.module))
+    const hit = moduleHit(line)
+    if (usedOnly && !hit) continue
+    if (hit) {
+      const state = modules[hit.index]
+      if (state) state.used = true
+      const found = pool.find((candidate) => !candidate.used && candidate.display === hit.display)
+      if (found) claimWhole(found)
+      rows.push({ omitted: hit.display, slots: [{ display: hit.display, key: norm(hit.display), out: hit.display }] })
+      continue
+    }
+    const display = strippedListLine(line)
+    if (!display) continue
+    // 模型交回的行以模型写法为准：留下的同号「1.x」或去掉编号后的正文，都用模型那一行；调换顺序重新编号的「2.x」不算。
+    const tail = ambiguousColumnTail(item.raw, lines) ?? ''
+    const tailKey = tail ? norm(strippedListLine(tail)) : ''
+    const whole = pool.find((candidate) => !candidate.used && candidate.key === norm(display))
+      ?? (tailKey
+        ? pool.find((candidate) => {
+          if (candidate.used) return false
+          if (candidate.key === tailKey) return true
+          const amb = ambiguousDigitTail(candidate.display)
+          return Boolean(amb && amb.num === ambiguousDigitTail(item.raw)?.num && norm(strippedListLine(amb.rest)) === tailKey)
+        })
+        : undefined)
+    if (whole) {
+      claimWhole(whole)
+      rows.push({ omitted: display, slots: [{ display: whole.display, key: whole.key, out: whole.display }] })
+      continue
+    }
+    // 「1、A，2、B」按顿号拆出来的纯数字段是下一项的编号，不单独成项。
+    const segments = splitRestore(display).filter((part, index, all) => !(index < all.length - 1 && /^\d{1,2}$/u.test(part)))
+    const slots = (segments.length > 0 ? segments : [display]).map((part) => {
+      const piece = pool.find((candidate) => !candidate.used && candidate.key === norm(part))
+      if (piece) {
+        claimWhole(piece)
+        return { display: part, key: norm(part), out: piece.display }
+      }
+      return { display: part, key: norm(part), out: null }
+    })
+    rows.push({ omitted: omittedColumnText(item.raw, display), slots })
+  }
+
+  const open = rows.flatMap((row) => row.slots.filter((slot) => slot.out === null))
+  for (const slot of open) {
+    const hit = takeExact(slot.key)
+    if (hit) slot.out = hit
+  }
+  // 比对小项：按 `; / 和 及 与` 拆开、每段再剥行首编号（「2.」）。小项要么全部配上（逐字或相似），要么一个都不认，
+  // 整段按原稿补回——不许只配上一半、把另一半丢掉。
+  const piecesOf = (text: string) => splitCompare(text).map((part) => strippedListLine(part)).filter(Boolean)
+  for (const slot of open) {
+    if (slot.out !== null) continue
+    const keys = piecesOf(slot.display).map((part) => norm(part)).filter(Boolean)
+    if (keys.length < 2 || !canTakeAll(keys)) continue
+    const got: Array<{ item: Item; atom: Atom }> = []
+    for (const key of keys) {
+      const hit = takeExactRef(key)
+      if (!hit) break
+      got.push(hit)
+    }
+    if (got.length === keys.length) slot.out = joinTaken(got)
+  }
+  const pieceReserved = new Set(open.filter((slot) => slot.out === null).flatMap((slot) => [slot.key, ...piecesOf(slot.display).map((part) => norm(part))]))
+  for (const slot of open) {
+    if (slot.out !== null) continue
+    const pieces = piecesOf(slot.display)
+    if (pieces.length < 2) continue
+    const taken: Array<{ item: Item; atom: Atom; itemWasUsed: boolean }> = []
+    const displays: string[] = []
+    const own = new Set(pieces.map((part) => norm(part)))
+    for (const piece of pieces) {
+      const key = norm(piece)
+      let found: { item: Item; atom: Atom } | null = null
+      for (const item of pool) {
+        if (item.used) continue
+        const atom = item.atoms.find((part) => !part.used && part.key === key)
+        if (atom) { found = { item, atom }; break }
+      }
+      if (!found) {
+        let bestGap = Number.POSITIVE_INFINITY
+        for (const item of pool) {
+          if (item.used) continue
+          for (const atom of item.atoms) {
+            if (atom.used || (pieceReserved.has(atom.key) && !own.has(atom.key))) continue
+            if (!key.includes(atom.key) || !similarListAtom(key, atom.key)) continue
+            const gap = Math.abs(atom.key.length - key.length)
+            if (gap < bestGap) { found = { item, atom }; bestGap = gap }
+          }
+        }
+      }
+      if (!found) break
+      taken.push({ item: found.item, atom: found.atom, itemWasUsed: found.item.used })
+      found.atom.used = true
+      if (found.item.atoms.every((part) => part.used)) found.item.used = true
+      displays.push(found.atom.display)
+    }
+    if (displays.length === pieces.length) {
+      slot.out = joinTaken(taken)
+      continue
+    }
+    for (const step of taken.reverse()) {
+      step.atom.used = false
+      step.item.used = step.itemWasUsed
+    }
+  }
+  for (const slot of open) {
+    if (slot.out !== null || !/\s/u.test(slot.display)) continue
+    const pieces = slot.display.split(/\s+/u).map((part) => strippedListLine(part.trim())).filter(Boolean)
+    if (pieces.length < 2) continue
+    const keys = pieces.map((part) => norm(part))
+    if (!canTakeAll(keys)) continue
+    const got: Array<{ item: Item; atom: Atom }> = []
+    for (const key of keys) {
+      const hit = takeExactRef(key)
+      if (!hit) break
+      got.push(hit)
+    }
+    if (got.length === keys.length) slot.out = joinTaken(got)
+  }
+  const reserved = new Set(open.filter((slot) => slot.out === null).map((slot) => slot.key))
+  for (const row of rows) {
+    if (row.slots.length < 2) continue
+    for (const slot of row.slots) {
+      if (slot.out !== null || piecesOf(slot.display).length > 1) continue
+      let bestItem: Item | null = null
+      let bestIndex = -1
+      let bestGap = Number.POSITIVE_INFINITY
+      for (const item of pool) {
+        if (item.used) continue
+        for (let partIndex = 0; partIndex < item.atoms.length; partIndex += 1) {
+          const part = item.atoms[partIndex]
+          if (!part || part.used || part.key === slot.key || reserved.has(part.key)) continue
+          if (!slot.key.includes(part.key) || !similarListAtom(slot.key, part.key)) continue
+          const gap = Math.abs(part.key.length - slot.key.length)
+          if (gap < bestGap) { bestItem = item; bestIndex = partIndex; bestGap = gap }
+        }
+      }
+      if (!bestItem || bestIndex < 0) continue
+      const part = bestItem.atoms[bestIndex]
+      if (!part) continue
+      part.used = true
+      if (bestItem.atoms.every((candidate) => candidate.used)) bestItem.used = true
+      slot.out = part.display
+      reserved.delete(slot.key)
+    }
+  }
+  for (const row of rows) {
+    if (row.slots.every((slot) => slot.out === null)) {
+      push(row.omitted, true)
+      continue
+    }
+    for (const slot of row.slots) {
+      // 部分漏交时，补回的那项去掉「2.」「2）」这类编号；整行一个都没配上仍走上面的原稿整行。
+      const value = slot.out ?? strippedListLine(slot.display)
+      const wasMissing = slot.out === null
+      for (const piece of value.split('\u0001')) push(piece, wasMissing)
+    }
+  }
+  return { list: list.length > max ? list.slice(0, max) : list, missing }
+}

@@ -22,7 +22,8 @@ export default defineConfig({
   // 匹配走绝对路径 + minimatch（Playwright 会自动补 `**/` 前缀），故写全相对段。
   // alerts.auto-refresh 要 HTTP 拦截和页面时钟，mock 构建数不到请求。
   // files.actions 要看失败响应体。两套都由各自的 config 单独跑，避免默认 mock 套件收进去。
-  testIgnore: ['**/tests/e2e/screen/**', '**/tests/e2e/users.closure.spec.ts', '**/tests/e2e/alerts.auto-refresh.spec.ts', '**/tests/e2e/files.actions.spec.ts'],
+  // capability-target 依赖 HTTP 构建里的 page.route，放在 playwright.users.config.ts，这里排除以免 mock 包空跑。
+  testIgnore: ['**/tests/e2e/screen/**', '**/tests/e2e/users.closure.spec.ts', '**/tests/e2e/alerts.auto-refresh.spec.ts', '**/tests/e2e/files.actions.spec.ts', '**/tests/e2e/print-scan.capability-target.spec.ts'],
   outputDir: '../../test-results/admin-e2e',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

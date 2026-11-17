@@ -11,7 +11,7 @@ ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 flowchart TD
   EndUser["EndUser<br/><small>34 字段</small>"]
   Organization["Organization<br/><small>35 字段</small>"]
-  Terminal["Terminal<br/><small>35 字段</small>"]
+  Terminal["Terminal<br/><small>36 字段</small>"]
   FileObject["FileObject<br/><small>50 字段</small>"]
   Job["Job<br/><small>47 字段</small>"]
   JobFair["JobFair<br/><small>39 字段</small>"]
@@ -93,7 +93,7 @@ flowchart TD
 | **FairCompanyBooth** | 9 | — | **无代码读写** |
 | **FairCompanyPosition** | 16 | FairCompany | **无代码读写** |
 | **FairMaterial** | 19 | FairMaterialPrintBridge、JobFair | 5 个文件<br/>`console-screen/console-screen.queries.ts`<br/>`jobs/admin-fairs.service.ts`<br/>`jobs/fair-material-print-bridge.service.ts`<br/>… |
-| **FairMaterialPrintBridge** | 17 | FairMaterial、FileObject | 3 个文件<br/>`files/files.service.ts`<br/>`jobs/fair-material-print-bridge.service.ts`<br/>`print-jobs/print-jobs.service.ts` |
+| **FairMaterialPrintBridge** | 17 | FairMaterial、FileObject | 4 个文件<br/>`files/admin-required-audit.ts`<br/>`files/files.service.ts`<br/>`jobs/fair-material-print-bridge.service.ts`<br/>… |
 | **FairVenueFacility** | 10 | FairVenueGuide | 1 个文件<br/>`jobs/fair-venue-guide.service.ts` |
 | **FairVenueGuide** | 8 | FairVenueFacility、FairVenueHall、JobFair | 1 个文件<br/>`jobs/fair-venue-guide.service.ts` |
 | **FairVenueHall** | 12 | FairVenueGuide、FairVenueHallCompany | 1 个文件<br/>`jobs/fair-venue-guide.service.ts` |
@@ -103,7 +103,7 @@ flowchart TD
 | **FeedbackReply** | 8 | FeedbackTicket、User | 2 个文件<br/>`member-feedback/member-feedback.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **FeedbackTicket** | 17 | EndUser、FeedbackReply | 5 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`member-feedback/kiosk-feedback.service.ts`<br/>`member-feedback/member-feedback.service.ts`<br/>… |
 | **FieldMappingRule** | 9 | JobSource | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
-| **FileObject** | 50 | DocumentProcessTask、EndUser、FairMaterialPrintBridge、OnlinePlatformDirectory、PlatformQualification、PrintTask、QualificationRecord、User | 43 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>… |
+| **FileObject** | 50 | DocumentProcessTask、EndUser、FairMaterialPrintBridge、OnlinePlatformDirectory、PlatformQualification、PrintTask、QualificationRecord、User | 44 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>… |
 | **HelpItem** | 8 | — | **无代码读写** |
 | **ImportBatch** | 17 | ImportRecord、JobSource | 2 个文件<br/>`jobs/jobs-admin.service.ts`<br/>`jobs/jobs-excel.service.ts` |
 | **ImportRecord** | 10 | ImportBatch | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
@@ -162,7 +162,7 @@ flowchart TD
 | **StorageDeletion** | 6 | — | 2 个文件<br/>`files/closure-file-deletion.ts`<br/>`member-privacy/member-closure-redis.service.ts` |
 | **SyncLog** | 15 | JobSource | 6 个文件<br/>`console-screen/console-screen.queries.ts`<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 3 个文件<br/>`assistant/daily-brief.service.ts`<br/>`community/community.service.ts`<br/>`member-notifications/member-notifications.service.ts` |
-| **Terminal** | 35 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、ServiceDeployment、ServiceOrder、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit、TerminalServicePrice | 51 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-ops/derived-print-quota-alerts.ts`<br/>… |
+| **Terminal** | 36 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、ServiceDeployment、ServiceOrder、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit、TerminalServicePrice | 51 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-ops/derived-print-quota-alerts.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 5 个文件<br/>`admin-ops/derived-scan-device-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>`copy-jobs/copy-job-store.service.ts`<br/>… |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
