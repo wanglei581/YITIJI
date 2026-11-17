@@ -1,6 +1,6 @@
 import type { GeneratedResume } from '../interfaces/ai-provider.interface'
 import { optimizeAfterNearlySame } from './resume-optimize-after-align'
-import { omittedColumnText, stripNumberedColumn, withoutLeadingIndex } from './resume-optimize-list-align'
+import { omittedColumnText, sequentialIndexColumn, stripClearLeadingIndex, stripNumberedColumn, withoutLeadingIndex } from './resume-optimize-list-align'
 import { BULLET_RE, RESTORED_ROLE_MAX, RESTORED_TITLE_MAX, isTitleLike } from './resume-restored-text'
 import { normalizeResumeStructureText, splitResumeDateRange } from './resume-structure'
 
@@ -129,6 +129,60 @@ function moduleCoversLine(text: string, module: AlignModule, description: string
   return !rest || descKey.includes(projectLineKey(rest))
 }
 
+/** 「（1）」「(2)」成套递增。点号分类器认不出这种括号，单独看。 */
+function bracketNumberedColumn(lines: string[]): boolean {
+  const filled = lines.map((line) => line.trim()).filter(Boolean)
+  if (filled.length < 2) return false
+  return filled.every((line, index) => {
+    const match = /^[（(]\s*(\d{1,2})\s*[）)]/u.exec(line)
+    return Number(match?.[1]) === index + 1
+  })
+}
+
+/** 原稿描述被认成整栏编号（剥过至少一行，或是「（1）（2）」）时，模型行上的「1.」「（2）」才可以按编号剥。 */
+function numberedSourceColumn(lines: string[]): boolean {
+  if (bracketNumberedColumn(lines) || sequentialIndexColumn(lines)) return true
+  const stripped = stripNumberedColumn(lines)
+  return lines.some((line, index) => (stripped[index] ?? line) !== line)
+}
+
+const NUMBERED_LINE_RE = /^\s*(?:\d{1,2}\s*[.．、)）]|[（(]\s*\d{1,2}\s*[）)])/u
+
+/** 与批量检查同一套写法：全角点号、顿号、右括号都看成半角点，行首「（1）」看成「1.」。 */
+function numberedLineCanon(text: string): string {
+  return text.trim().replace(/[．、)）]/gu, '.').replace(/^[（(]\s*(\d{1,2})\s*[）)]/u, '$1.')
+}
+
+/** 这一行的正文来自原稿描述或 module 改写。对不上的（模型另加的一句）不留。 */
+function groundedDescriptionLine(line: string, originals: string[], modules: AlignModule[]): boolean {
+  const body = projectBody(line)
+  // 「2.5倍」「2.10倍」「1.0版本」仍带编号，又和原稿任何一行都不是同一句时，不能靠较短正文算作已落地。
+  if (NUMBERED_LINE_RE.test(body)) {
+    const canon = numberedLineCanon(body)
+    if (!originals.some((raw) => numberedLineCanon(projectBody(raw)) === canon)) return false
+  }
+  const key = projectLineKey(body)
+  if (!key) return false
+  const pools: string[] = []
+  for (const raw of originals) {
+    const rawBody = projectBody(raw)
+    const bare = projectBody(withoutLeadingIndex(raw))
+    for (const text of bare !== rawBody ? [rawBody, bare] : [rawBody]) {
+      const pool = projectLineKey(text)
+      if (pool) pools.push(pool)
+    }
+  }
+  for (const module of modules) {
+    const whole = projectLineKey(module.after ?? '')
+    if (whole) pools.push(whole)
+    for (const part of afterLines(module)) {
+      const pool = projectLineKey(projectBody(part))
+      if (pool) pools.push(pool)
+    }
+  }
+  return pools.some((pool) => pool === key || pool.includes(key) || key.includes(pool))
+}
+
 function descriptionCovers(line: string, description: string, role: string, modules: AlignModule[]): boolean {
   const text = projectBody(line)
   const key = projectLineKey(text)
@@ -202,7 +256,12 @@ export function ensureProjectOriginalLines(
     ) item.name = namePart
     if (!item.role?.trim() && roleFromTitle && isTitleLike(roleFromTitle, RESTORED_ROLE_MAX)) item.role = roleFromTitle
     const rawDescription = item.description ?? ''
-    const description = stripNumberedColumn(rawDescription.split('\n')).join('\n')
+    const rawRows = rawDescription.split('\n')
+    // 先按整栏剥（「1.5倍」打头且后面是 2. 3. 时仍剥成「5倍」）。整栏认不出来时，再逐行剥明确编号，点号后的小数和「1.0」不动。
+    const columnStripped = stripNumberedColumn(rawRows)
+    const preparedRows = numberedSourceColumn(rawRest) ? columnStripped.map((line) => stripClearLeadingIndex(line)) : columnStripped
+    const keptRows = preparedRows.filter((line) => !line.trim() || groundedDescriptionLine(line, rawRest, modules))
+    const description = keptRows.join('\n')
     if (description !== rawDescription) item.description = description
     const role = item.role?.trim() ?? ''
     const uncovered = rest.filter((line) => {

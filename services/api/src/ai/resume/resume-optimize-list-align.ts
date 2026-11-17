@@ -49,6 +49,37 @@ export function withoutLeadingIndex(line: string): string {
   return hit && !hit.keep ? hit.rest : line
 }
 
+/**
+ * 各行同一种标点、编号从 1 递增。中间可以夹「1.5倍」「1.0架构」这种点号后紧跟数字的行。
+ * 只用来判断「这栏是编号」，不决定哪一行可以剥。
+ */
+export function sequentialIndexColumn(lines: string[]): boolean {
+  const filled = lines.map((line) => line.trim()).filter(Boolean)
+  if (filled.length < 2) return false
+  const hits = filled.map((line) => classifyLeadingIndex(line))
+  if (hits.some((hit) => !hit)) return false
+  const kind = hits[0]?.kind
+  if (!kind || !hits.every((hit) => hit?.kind === kind)) return false
+  return hits.every((hit, index) => hit?.num === index + 1)
+}
+
+/**
+ * 只剥明确的行首编号（「1.」「2、」「3）」「（1）」）。
+ * 点号后紧跟数字的（「1.5倍」「1.0架构」「4.05亿」）原样留，避免把版本号或小数改掉。
+ */
+export function stripClearLeadingIndex(line: string): string {
+  const text = line.trim().replace(BULLET_RE, '').trim()
+  const bracket = /^(?:[（(]\s*\d{1,2}\s*[）)])\s*/u.exec(text)
+  if (bracket) {
+    const rest = text.slice(bracket[0].length).trim()
+    return rest || line
+  }
+  const hit = classifyLeadingIndex(text)
+  if (!hit || hit.maybe || hit.keep) return line
+  const rest = hit.rest.trim()
+  return rest || line
+}
+
 /** 点号后紧跟 1–3 位数字（「1.5倍」「1.3年」「1.0」「1.3D」）。四位年份不算。 */
 function ambiguousDigitTail(line: string): { num: number; rest: string } | null {
   const text = line.trim().replace(BULLET_RE, '').trim()
