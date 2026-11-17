@@ -651,6 +651,48 @@ test('append 404 tells the truth, unchecks, and the next confirm prints the orig
   expect(jobs[0]?.['fileUrl']).toBe(W2_FILE.fileUrl)
 })
 
+const APPEND_ASSESSMENT_MISSING = '自我探索结果找不到或已过期，已帮你取消勾选。本次没有建单；可以不附，再点一次确认就按原文件打印。'
+const APPEND_LOGIN_EXPIRED = '登录状态已失效，请重新登录后重试。已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。'
+const APPEND_TOO_FREQUENT = '操作太频繁，请稍后再试。已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。'
+
+for (const scenario of [
+  { code: 'SELF_ASSESSMENT_NOT_FOUND', status: 404, serverMessage: '自我探索记录不存在或已过期', expected: APPEND_ASSESSMENT_MISSING },
+  { code: 'MEMBER_SESSION_EXPIRED', status: 401, serverMessage: '登录状态已失效', expected: APPEND_LOGIN_EXPIRED },
+  { code: 'RATE_LIMITED', status: 429, serverMessage: '操作太频繁', expected: APPEND_TOO_FREQUENT },
+] as const) {
+  test(`append ${scenario.code} unchecks and the next confirm prints the original file @kiosk`, async ({ page, api }) => {
+    registerShell(api, [])
+    registerCashier(api, 40)
+    await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+    const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
+    await page.route(`**/api/v1/resume/self-assessment/${SA_TASK_ID}/append`, async (route: Route) => {
+      await route.fulfill({
+        status: scenario.status,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: scenario.code, message: scenario.serverMessage } }),
+      })
+    })
+
+    await openConfirm(page, true)
+    const mergeToggle = page.getByRole('checkbox', { name: /附加自我探索/ })
+    await mergeToggle.check()
+    await page.getByRole('button', { name: '打印合并版（简历+自我探索）' }).click()
+
+    await expect(mergeToggle).not.toBeChecked()
+    await expect(mergeToggle).toBeEnabled()
+    await expect(page.getByText(scenario.expected, { exact: true })).toBeVisible()
+    await expect(page.getByText(APPEND_UNAVAILABLE, { exact: true })).toHaveCount(0)
+    await expect(page.getByText(APPEND_RETRY, { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('status').filter({ hasText: APPEND_UNAVAILABLE_SHORT })).toHaveCount(0)
+    expect(jobs).toHaveLength(0)
+
+    await originalConfirm(page).click()
+    await page.waitForURL('**/print/cashier')
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0]?.['fileUrl']).toBe(W2_FILE.fileUrl)
+  })
+}
+
 test('append 500 keeps the checkbox and a second confirm calls append again @kiosk', async ({ page, api }) => {
   registerShell(api, [])
   await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
