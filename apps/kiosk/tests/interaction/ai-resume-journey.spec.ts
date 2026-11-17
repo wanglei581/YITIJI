@@ -58,7 +58,7 @@ async function assertNotProduction(collectors: ReturnType<typeof attachCollector
   expect(collectors.productionHits, '禁止访问生产 zyidai.cn / 120.48.13.190').toEqual([])
 }
 
-type ExportedFile = { fileId: string; filename: string; signedUrl: string }
+type ExportedFile = { fileId: string; filename: string; signedUrl: string; printFileUrl: string }
 type ExportedReport = ExportedFile & { taskId: string }
 
 function asExportFile(body: unknown): ExportedFile {
@@ -67,11 +67,13 @@ function asExportFile(body: unknown): ExportedFile {
   const fileId = typeof nested.fileId === 'string' ? nested.fileId : ''
   const filename = typeof nested.filename === 'string' ? nested.filename : ''
   const signedUrl = typeof nested.signedUrl === 'string' ? nested.signedUrl : ''
+  const printFileUrl = typeof nested.printFileUrl === 'string' ? nested.printFileUrl : ''
   expect(fileId, '导出响应应带本次文件编号').not.toBe('')
   expect(filename, '导出响应应带本次文件名').not.toBe('')
   expect(signedUrl, '导出响应应带本次取回链接').not.toBe('')
   expect(signedUrl, '取回链接应指向本次文件').toContain(fileId)
-  return { fileId, filename, signedUrl }
+  expect(printFileUrl, '导出响应应带本次打印链接').not.toBe('')
+  return { fileId, filename, signedUrl, printFileUrl }
 }
 
 function localRetrievalUrl(signedUrl: string): string {
@@ -115,9 +117,10 @@ async function assertDownloaded(page: Page, signedUrl: string, mime: RegExp, pdf
 /**
  * 回执只许留在这次跳转的内存里。会话在、任务对得上时写进任一浏览器存储，这里都要红。
  * 不查文件名：打印交接本来就会记下 file.name。
- * 打印交接的 fileUrl 是打印链接，会员这次可能和取回链接同一串，只把这一处拿开再查。
+ * 交接里的 fileUrl 只有和这次的 printFileUrl 相同，才从这一处拿开再查取回链接。
+ * 对不上就不拿开：这次的签名地址不该出现在别的交接里。
  */
-async function assertTakeawayNotStored(page: Page, signedUrl: string, where: string): Promise<void> {
+async function assertTakeawayNotStored(page: Page, signedUrl: string, where: string, printFileUrl: string): Promise<void> {
   const entries = await page.evaluate(() => {
     const dump: Array<{ key: string; value: string }> = []
     for (const store of [sessionStorage, localStorage]) {
@@ -135,7 +138,8 @@ async function assertTakeawayNotStored(page: Page, signedUrl: string, where: str
     try {
       const parsed = JSON.parse(entry.value) as { file?: { fileUrl?: unknown } }
       const fileUrl = parsed.file && typeof parsed.file.fileUrl === 'string' ? parsed.file.fileUrl : ''
-      const at = fileUrl ? entry.value.indexOf(fileUrl) : -1
+      if (!printFileUrl || fileUrl !== printFileUrl) return entry.value
+      const at = entry.value.indexOf(fileUrl)
       if (at < 0) return entry.value
       return `${entry.value.slice(0, at)}${entry.value.slice(at + fileUrl.length)}`
     } catch {
@@ -385,7 +389,7 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
     expect(carriedTaskId, '预览 → 确认 → 回预览 → 回报告，本次 taskId 还在').toBe(reportPdf.taskId)
     await expect(reportResult, '从打印页回来，这份报告的导出结果还在').toContainText(reportPdf.filename)
     await expect(page.getByRole('button', { name: '生成二维码带走' })).toBeVisible()
-    await assertTakeawayNotStored(page, reportPdf.signedUrl, '从打印页回来')
+    await assertTakeawayNotStored(page, reportPdf.signedUrl, '从打印页回来', reportPdf.printFileUrl)
     await recordStep({
       page, journey, step: 'report-生成二维码带走', control: '生成二维码带走',
       selectorHint: 'button:生成二维码带走', kind: 'click', collectors,
@@ -410,6 +414,7 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
     await expect(page.getByRole('button', { name: '打印修改清单' }), '应能打印这次的修改清单').toBeVisible()
     await clickReportButton(page, journey, collectors, /打印修改清单/, '打印修改清单')
     await expect(reportResult, '修改清单打印回来，这次的结果还在').toContainText(changeList.filename)
+    await assertTakeawayNotStored(page, changeList.signedUrl, '修改清单打印回来', changeList.printFileUrl)
     await page.getByRole('button', { name: '生成二维码带走' }).click()
     await assertQrEncodes(page, changeList.signedUrl, changeList.filename)
     await closePreviewIfOpen(page)
@@ -1059,7 +1064,7 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
         expect(sessionText, '回执不得写进简历会话').not.toContain('reportTakeaway')
         expect(sessionText, '带姓名的文件名不得进会话').not.toContain(historyPdf.filename)
         expect(sessionText, '取回链接不得进会话').not.toContain(historyPdf.signedUrl)
-        await assertTakeawayNotStored(page, historyPdf.signedUrl, '从我的简历打开的报告')
+        await assertTakeawayNotStored(page, historyPdf.signedUrl, '从我的简历打开的报告', historyPdf.printFileUrl)
         await returnToMemberResumes(page)
       } else {
         await expect(page.getByText(optimizeFile.filename, { exact: true }), '我的文档应有这次优化导出的文件').toBeVisible()

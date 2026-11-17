@@ -68,6 +68,7 @@ function playwrightArgs() {
       config = value
       continue
     }
+    if (arg === '--') continue
     if (arg.startsWith('-')) throw new Error(`启动脚本不认识这个参数：${arg}`)
     spec = arg
   }
@@ -169,6 +170,7 @@ function watchSpawn(child, label) {
 }
 
 async function main() {
+  const args = playwrightArgs()
   for (const [name, port] of [['Redis', redisPort], ['API', apiPort], ['Vite', vitePort]]) {
     if (!(await portFree(port))) throw new Error(`${name} 端口 ${port} 已被占用，本脚本不连接别人的服务`)
   }
@@ -347,7 +349,7 @@ export default async (env) => {
   const playwrightCli = join(dirname(kioskRequire.resolve('@playwright/test/package.json')), 'cli.js')
   // 必须异步起 Playwright：spawnSync 会堵住事件循环，API / Redis 的日志管道写满后请求会挂死。
   const testCode = await new Promise((resolveCode) => {
-    const test = track(spawn(process.execPath, [playwrightCli, 'test', ...playwrightArgs()], {
+    const test = track(spawn(process.execPath, [playwrightCli, 'test', ...args], {
       cwd: kioskRoot,
       env: childEnv({
         NODE_ENV: 'test',

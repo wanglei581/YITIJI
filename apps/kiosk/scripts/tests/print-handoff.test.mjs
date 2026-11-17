@@ -317,11 +317,15 @@ test('U6b 入口策略表：原件去打印台检查，派生产物直达报价�
 })
 
 test('U6d 返回状态只留在调用方内存，清场后不留带姓名的文件名', async () => {
+  const previousSession = globalThis.sessionStorage
+  const previousLocal = globalThis.localStorage
+  const previousWindowLocal = globalThis.window?.localStorage
   const h = await loadHandoff()
   globalThis.sessionStorage = h.storage
   const local = memoryStorage()
   globalThis.window.localStorage = local
   globalThis.localStorage = local
+  try {
   const filename = 'AI诊断报告_林晓舟.pdf'
   const returnState = {
     pathname: '/resume/report',
@@ -351,6 +355,16 @@ test('U6d 返回状态只留在调用方内存，清场后不留带姓名的文�
   sensitive.clearKioskSensitiveSession(null)
   const left = Object.values(h.storage.dump()).join('\n')
   assert.equal(left.includes(filename), false, '清场后不留带姓名的文件名')
+  } finally {
+    if (previousSession === undefined) delete globalThis.sessionStorage
+    else globalThis.sessionStorage = previousSession
+    if (previousLocal === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = previousLocal
+    if (globalThis.window) {
+      if (previousWindowLocal === undefined) delete globalThis.window.localStorage
+      else globalThis.window.localStorage = previousWindowLocal
+    }
+  }
 })
 
 test('U6c 政策清单直达报价并只保留公开政策编号用于返回，其他来源仍去掉查询串', async () => {
