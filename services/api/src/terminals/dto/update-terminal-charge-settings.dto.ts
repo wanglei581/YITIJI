@@ -36,4 +36,9 @@ export class UpdateTerminalChargeSettingsDto {
   @ValidateNested()
   @Type(() => TerminalChargePricesDto)
   prices!: TerminalChargePricesDto
+
+  /** 页面读取收费设置时的绑定版本。缺了或对不上当前绑定，都不许写。 */
+  @IsInt()
+  @Min(0)
+  orgBindingGeneration!: number
 }
