@@ -34,6 +34,8 @@ export interface PartnerPolicyRecord {
   externalId?: string
   externalUrlVerified?: boolean
   publishedDate?: string
+  /** 截止日期 YYYY-MM-DD。没有这个字段就不是已到期。 */
+  validThrough?: string
   sourceOrgId: string
   sourceName: string
   reviewStatus: string
@@ -78,6 +80,7 @@ export interface SavePolicyInput {
   externalUrl?: string | null
   externalId?: string | null
   publishedDate?: string | null
+  validThrough?: string | null
 }
 
 // ─── P21 申领条件（结构化，可机械比对）───────────────────────────────────────
@@ -330,6 +333,14 @@ const mockRows: PartnerPolicyRecord[] = [
     syncTime: now(), updatedAt: now(),
   },
   {
+    id: 'pp-mock-9', kind: 'notice', title: '已过截止日期的培训通知（演示）',
+    summary: '演示数据：截止日期已过', category: 'notice', publishedDate: '2020-01-01', validThrough: '2020-01-01',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: 'mock-partner-001', publishConfirmedAt: now(), publishConfirmedContentVersion: 1,
+    syncTime: now(), updatedAt: now(),
+  },
+  {
     id: 'pp-mock-2', kind: 'policy_guide', title: '高校毕业生就业补贴说明（演示）',
     summary: '演示数据', audience: 'graduate', publishedDate: '2026-06-01',
     sourceOrgId: 'mock-org', sourceName: '测试机构',
@@ -408,7 +419,7 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
       id: `pp-mock-${++seq}`,
       kind: input.kind, title: input.title, summary: input.summary ?? undefined, content: input.content ?? undefined,
       audience: input.audience, category: input.category, externalUrl: input.externalUrl ?? undefined,
-      publishedDate: input.publishedDate ?? undefined, externalId: input.externalId ?? undefined,
+      publishedDate: input.publishedDate ?? undefined, validThrough: input.validThrough ?? undefined, externalId: input.externalId ?? undefined,
       whoCanApply: input.whoCanApply ?? undefined, requiredMaterials: input.requiredMaterials ?? undefined, whereToApply: input.whereToApply ?? undefined,
       sourceOrgId: 'mock-org', sourceName: '测试机构',
       reviewStatus: 'pending', publishStatus: 'draft', rejectReason: null,

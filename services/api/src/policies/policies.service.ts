@@ -45,6 +45,7 @@ import {
   RECRUITMENT_POLICY_CATEGORY,
   type PolicyPublicScope,
 } from './policy-public-visibility'
+import { parsePolicyValidThrough } from './policy-validity'
 
 // ============================================================
 // PoliciesService — 阶段1D:政策服务(政策扶持条目 + 政策公告)
@@ -70,6 +71,8 @@ export interface PolicyPostDto {
   /** 来源方原始编号(CLAUDE.md §10 外部ID);来源未提供为 null,不得伪造 */
   externalId: string | null
   publishedDate?: string
+  /** 截止日期 YYYY-MM-DD。没填不带这个键，页面不得显示「已到期」。 */
+  validThrough?: string
   /** 办事三栏(2026-11-05):谁可以申请 / 要准备的材料 / 去哪办。纯文本、每行一项;未提供时不带该键。 */
   whoCanApply?: string
   requiredMaterials?: string
@@ -138,6 +141,7 @@ interface PrismaPolicyRow {
   externalUrl: string | null
   externalId: string | null
   publishedDate: Date | null
+  validThrough: Date | null
   whoCanApply: string | null
   requiredMaterials: string | null
   whereToApply: string | null
@@ -167,6 +171,7 @@ function mapPolicy(p: PrismaPolicyRow): PolicyPostDto {
     externalUrl: p.externalUrl ?? undefined,
     externalId: p.externalId ?? null,
     publishedDate: p.publishedDate ? p.publishedDate.toISOString().slice(0, 10) : undefined,
+    validThrough: p.validThrough ? p.validThrough.toISOString().slice(0, 10) : undefined,
     whoCanApply: p.whoCanApply ?? undefined,
     requiredMaterials: p.requiredMaterials ?? undefined,
     whereToApply: p.whereToApply ?? undefined,
@@ -345,6 +350,7 @@ export class PoliciesService {
         requiredMaterials: dto.requiredMaterials?.trim() || null,
         whereToApply: dto.whereToApply?.trim() || null,
         publishedDate: dto.publishedDate ? new Date(dto.publishedDate) : null,
+        validThrough: parsePolicyValidThrough(dto.validThrough),
       },
     })
     await this.audit.write({
@@ -386,6 +392,7 @@ export class PoliciesService {
         ...(dto.externalUrl !== undefined ? { externalUrl: normalizeOptionalHttpUrl(dto.externalUrl ?? undefined, 'externalUrl') ?? null } : {}),
         ...(dto.externalId !== undefined ? { externalId: dto.externalId?.trim() || null } : {}),
         ...(dto.publishedDate !== undefined ? { publishedDate: dto.publishedDate?.trim() ? new Date(dto.publishedDate) : null } : {}),
+        ...(dto.validThrough !== undefined ? { validThrough: parsePolicyValidThrough(dto.validThrough) } : {}),
         ...(dto.whoCanApply !== undefined ? { whoCanApply: dto.whoCanApply?.trim() || null } : {}),
         ...(dto.requiredMaterials !== undefined ? { requiredMaterials: dto.requiredMaterials?.trim() || null } : {}),
         ...(dto.whereToApply !== undefined ? { whereToApply: dto.whereToApply?.trim() || null } : {}),

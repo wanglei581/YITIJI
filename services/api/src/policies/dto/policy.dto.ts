@@ -70,6 +70,12 @@ export class CreatePolicyPostDto {
 
   @IsOptional() @IsISO8601()
   publishedDate?: string
+
+  /** 截止日期。不填一直有效。只接受今天以后的 YYYY-MM-DD，服务端再核一遍。 */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @IsISO8601()
+  validThrough?: string
 }
 
 /**
@@ -116,6 +122,12 @@ export class SaveAndPublishPolicyDto {
   @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
   @IsISO8601()
   publishedDate?: string | null
+
+  /** 截止日期。编辑时 null 或空串表示清空。只接受今天以后的 YYYY-MM-DD。 */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsISO8601()
+  validThrough?: string | null
 
   @Equals(true, { message: '发布前必须确认对本条政策内容负责' })
   responsibilityAcknowledged!: boolean
@@ -179,6 +191,12 @@ export class UpdatePolicyPostDto {
   @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
   @IsISO8601()
   publishedDate?: string | null
+
+  /** 截止日期。null 或空串表示清空。只接受今天以后的 YYYY-MM-DD。 */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsISO8601()
+  validThrough?: string | null
 }
 
 // ── P21 政策条件核对（S3-2）────────────────────────────────────────────────

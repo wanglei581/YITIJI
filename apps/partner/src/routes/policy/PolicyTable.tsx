@@ -7,6 +7,7 @@ import { RejectReason } from '../../components/RejectReason'
 import { PolicyEmergencyNote } from './PolicyEmergencyNote'
 
 import { KIND_LABELS, AUDIENCE_LABELS, CATEGORY_LABELS, RECRUITMENT_POLICY_BLOCKED_REASON } from './policyLabels'
+import { isPolicyDeadlinePast } from './policyFormModel'
 
 const REVIEW_MAP: Record<
   string,
@@ -89,7 +90,9 @@ export function PolicyTable({
         )}
         renderRow={(r) => {
           const review = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
-          const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
+          const publish = isPolicyDeadlinePast(r.validThrough)
+            ? { badge: 'default' as const, label: '已到期' }
+            : (PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft)
           const held = isPolicyEmergencyHeld(r)
           const recruitmentBlocked = recruitmentWriteBlocked && r.category === 'recruitment' && !held
           return (

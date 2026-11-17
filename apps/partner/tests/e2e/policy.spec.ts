@@ -73,7 +73,34 @@ test.describe('政策公告（mock 口径）', () => {
     await expect(page.getByRole('button', { name: '申领条件' })).toHaveCount(0)
   })
 
-  test('扶持条目三栏、标题计数、HTTPS 和公告可选字段', async ({ page }) => {
+  test('截止日期可选，过了就在列表显示已到期', async ({ page }) => {
+  await gotoPartner(page, '/policy', '政策公告')
+  await waitForMockList(page)
+
+  const expired = page.getByRole('row', { name: /已过截止日期的培训通知/ })
+  await expect(expired.getByText('已到期', { exact: true })).toBeVisible()
+  await expect(expired.getByText('已发布', { exact: true })).toHaveCount(0)
+
+  const noticeRow = page.getByRole('row', { name: /关于就业服务月活动的通知/ })
+  await expect(noticeRow.getByText('已到期')).toHaveCount(0)
+  await noticeRow.getByRole('button', { name: '编辑' }).click()
+  const form = page.getByRole('dialog', { name: '编辑政策内容' })
+  await expect(form.getByText('不填就一直有效，到期后一体机不再显示')).toBeVisible()
+  const deadline = form.getByLabel('截止日期')
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const [year, month, day] = today.split('-').map(Number)
+  const next = new Date(Date.UTC(year!, (month ?? 1) - 1, day ?? 1))
+  next.setUTCDate(next.getUTCDate() + 1)
+  const tomorrow = next.toISOString().slice(0, 10)
+  await expect(deadline).toHaveAttribute('min', tomorrow)
+  await deadline.fill(today)
+  await expect(form.getByRole('status').filter({ hasText: '截止日期只能选今天以后的日期' })).toBeVisible()
+  await deadline.fill(tomorrow)
+  await expect(deadline).toHaveValue(tomorrow)
+  await expect(form.getByRole('status').filter({ hasText: '截止日期只能选今天以后的日期' })).toHaveCount(0)
+})
+
+test('扶持条目三栏、标题计数、HTTPS 和公告可选字段', async ({ page }) => {
     await gotoPartner(page, '/policy', '政策公告')
     await waitForMockList(page)
     await page.getByRole('row', { name: /高校毕业生就业补贴/ }).getByRole('button', { name: '编辑' }).click()

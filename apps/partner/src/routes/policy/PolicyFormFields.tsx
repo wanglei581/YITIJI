@@ -3,7 +3,7 @@ import { partnerOfficialChannelsService } from '../../services/api/officialChann
 import { partnerPoliciesService } from '../../services/api/policies'
 import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 import { AUDIENCE_LABELS, CATEGORY_LABELS } from './policyLabels'
-import { CHECKLIST_OVERFLOW_HINT, HANDLING_FIELDS, type PolicyFormChecks, type PolicyFormState } from './policyFormModel'
+import { CHECKLIST_OVERFLOW_HINT, HANDLING_FIELDS, nextBeijingCalendarDate, type PolicyFormChecks, type PolicyFormState } from './policyFormModel'
 
 const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
@@ -149,6 +149,10 @@ export function PolicyFormFields({ form, setForm, recruitmentOpen, editingRecrui
           <input lang="zh-CN" type="date" className={inputCls} value={form.publishedDate} onChange={(e) => change('publishedDate', e.target.value)} />
         </Field>
       </div>
+      <Field label="截止日期">
+        <input lang="zh-CN" type="date" min={nextBeijingCalendarDate()} className={inputCls} value={form.validThrough} onChange={(e) => change('validThrough', e.target.value)} />
+        <span className="mt-1 block text-xs text-neutral-500">不填就一直有效，到期后一体机不再显示</span>
+      </Field>
     </>
   )
 }

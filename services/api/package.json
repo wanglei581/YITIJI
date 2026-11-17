@@ -239,6 +239,7 @@
     "verify:policy-publish-gates": "node -r @swc-node/register scripts/verify-policy-publish-gates.ts",
     "verify:policy-checklist": "node -r @swc-node/register scripts/verify-policy-checklist.ts",
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
+    "verify:policy-expiry": "node -r @swc-node/register scripts/verify-policy-expiry.ts",
     "verify:kiosk-session": "node -r @swc-node/register scripts/verify-kiosk-session.ts",
     "verify:policy-eligibility": "node -r @swc-node/register scripts/verify-policy-eligibility.ts",
     "verify:policy-eligibility-authoring": "node -r @swc-node/register scripts/verify-policy-eligibility-authoring.ts",

@@ -205,6 +205,7 @@ const ACTION_LABELS: Record<string, string> = {
   'policy.emergency_takedown': '紧急下架政策公告',
   'policy.partner_update': '机构更新政策公告',
   'policy.unpublish': '下架政策公告',
+  'policy.auto_expire': '政策到期自动下架',
   'price.updated': '更新打印价目',
   'print_conversion.images_to_pdf': '合并打印图片为 PDF',
   'print_job.pii_scan_bypassed': '本人确认跳过打印个人信息检查',

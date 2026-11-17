@@ -16,8 +16,8 @@
 // 并且**不引入第二套定义**:
 //   - 岗位   → 复用 job-validity.ts 的 canonical 谓词(与求职者可见性同源)
 //   - 招聘会 → 复用 jobs-shared.ts 的 buildFairStatusWhere('ended') 时间边界
-//   - 政策   → PolicyPost 模型里没有任何有效期字段(只有 publishedDate 发布日期),
-//              没有有效期概念就不假装有,返回 null,统计如实为 0。
+//   - 政策   → 截止日期 validThrough 由公开读取和每小时自动下架负责。
+//              批量发布仍不按这个字段排除（机构发布走单条确认），返回 null，统计为 0。
 //
 // 为什么批量路径拦、单条路径不拦:
 //   BULK_PUBLISHABLE_FROM 的原始意图就是「批量动作不复活过期内容」。

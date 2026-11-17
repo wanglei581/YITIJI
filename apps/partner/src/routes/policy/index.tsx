@@ -118,6 +118,7 @@ export default function PolicyPage() {
       category: (r.category as PolicyFormState['category']) ?? 'notice',
       externalUrl: r.externalUrl ?? '',
       publishedDate: r.publishedDate ?? '',
+      validThrough: r.validThrough ?? '',
       externalId: r.externalId ?? '',
       whoCanApply: r.whoCanApply ?? '',
       requiredMaterials: r.requiredMaterials ?? '',

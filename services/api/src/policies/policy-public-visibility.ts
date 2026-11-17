@@ -1,5 +1,6 @@
 import type { Prisma } from '../generated/prisma/client'
 import { CONTENT_TRUST_ACTIVE } from '../common/content-trust'
+import { policyStillValidWhere } from './policy-validity'
 import {
   isRecruitmentContentHostingEnabled,
   recruitmentHostingDisabledException,
@@ -86,13 +87,14 @@ function trustedSourceOrg(): Prisma.PolicyPostWhereInput {
  * 一体机和小程序的政策读取：托管关闭时去掉 recruitment 分类，
  * 并始终去掉已经写下架留痕的行（即使状态仍是 published）。
  * 来源机构不可信、已停用或已归档时，这条政策也不再公开。
+ * 截止日期空着一直公开；填了的，北京时间过了当天就不再公开（不等定时任务改状态）。
  */
 export function publicPolicyWhere(
   extra: Prisma.PolicyPostWhereInput,
   heldIds: string[],
   scope: PolicyPublicScope = { mode: 'all' },
 ): Prisma.PolicyPostWhereInput {
-  const parts: Prisma.PolicyPostWhereInput[] = [extra, recruitmentCategoryExclusion(), trustedSourceOrg()]
+  const parts: Prisma.PolicyPostWhereInput[] = [extra, recruitmentCategoryExclusion(), trustedSourceOrg(), policyStillValidWhere()]
   if (scope.mode === 'org') {
     parts.push(scope.orgId ? { sourceOrgId: scope.orgId } : { sourceOrgId: '__no_public_terminal__' })
   }
