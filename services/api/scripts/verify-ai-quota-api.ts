@@ -31,6 +31,7 @@ import {
 } from '../src/terminals/terminal-session.service'
 import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
 import { lazyAiRequestContext, runWithAiRequestContext } from '../src/ai/usage/ai-usage-context'
+import { AiUse } from '../src/ai-access/ai-access.decorator'
 import { AiQuotaController } from '../src/ai/quota/ai-quota.controller'
 import {
   AI_QUOTA_BUCKETS,
@@ -57,6 +58,22 @@ const KIOSK_ID = 'kiosk-shinan-01'
 
 function pass(message: string): void {
   console.log(`  PASS ${message}`)
+}
+
+/**
+ * 三个只读接口必须标成 read，否则覆盖门禁只扫 generate|voice，删掉标记仍然全绿。
+ * 元数据键取自 AiUse 返回的装饰器（SetMetadata 写在 KEY 上），不在源码里找字符串。
+ */
+function assertQuotaRoutesAreRead(): void {
+  const key = AiUse('read').KEY
+  assert.equal(typeof key, 'string', 'AiUse 必须把元数据键放在装饰器的 KEY 上')
+  const expectRead = (label: string, method: object) => {
+    assert.equal(Reflect.getMetadata(key, method), 'read', `${label} 的 AI 用途元数据必须是 read`)
+  }
+  expectRead('本人余量 mine', AiQuotaController.prototype.mine)
+  expectRead('一体机余量 kiosk', AiQuotaController.prototype.kiosk)
+  expectRead('管理员汇总 adminUsage', AiQuotaController.prototype.adminUsage)
+  pass('三个只读接口的 AI 用途元数据都是 read')
 }
 
 /** 关掉游客池时，计数行一次都不许读。桩在服务自己的 prisma 上，不改生产代码。 */
@@ -104,6 +121,7 @@ function watchDailyReads(service: AiQuotaService): { reads: () => number; restor
 
 async function main(): Promise<void> {
   console.log('\n=== AI 按人次数余量接口 ===')
+  assertQuotaRoutesAreRead()
   const apiRoot = resolve(__dirname, '..')
   const moduleSource = readFileSync(resolve(apiRoot, 'src/ai/quota/ai-quota.module.ts'), 'utf8')
   assert.match(moduleSource, /controllers:\s*\[AiQuotaController\]/, 'AiQuotaModule 必须注册控制器')
