@@ -122,7 +122,7 @@ async function main(): Promise<void> {
 
     await prisma.policyPost.update({ where: { id: openEnded.id }, data: { validThrough: policyDeadlineThreshold() } })
     assert.ok((await listed()).includes(openEnded.id), '截止日期当天仍然公开')
-    assert.equal(await expiry.expirePublishedPastDeadline(), 0, '截止日期当天不能被定时任务下架')
+    assert.equal(await expiry.expirePastDeadline(), 0, '截止日期当天不能被定时任务下架')
     assert.equal((await prisma.policyPost.findUnique({ where: { id: openEnded.id } }))?.publishStatus, 'published')
 
     await prisma.policyPost.update({ where: { id: dated.id }, data: { validThrough: new Date(`${yesterday}T00:00:00.000Z`) } })
@@ -145,13 +145,13 @@ async function main(): Promise<void> {
       data: { validThrough: new Date(`${yesterday}T00:00:00.000Z`), publishStatus: 'draft' },
     })
 
-    const marked = await expiry.expirePublishedPastDeadline()
+    const marked = await expiry.expirePastDeadline()
     assert.equal(marked, 1, '定时任务只把已发布且过期的那一条写成 expired')
     assert.equal((await prisma.policyPost.findUnique({ where: { id: dated.id } }))?.publishStatus, 'expired')
     assert.equal((await prisma.policyPost.findUnique({ where: { id: draft.id } }))?.publishStatus, 'draft', '草稿即使日期已过也不改状态')
     const audits = () => prisma.auditLog.count({ where: { action: 'policy.auto_expire', targetId: dated.id } })
     assert.equal(await audits(), 1, '定时任务要写 policy.auto_expire')
-    assert.equal(await expiry.expirePublishedPastDeadline(), 0)
+    assert.equal(await expiry.expirePastDeadline(), 0)
     assert.equal(await audits(), 1, '第二次跑不得再写审计')
     console.log('  PASS 定时任务置 expired、写审计、再次运行不重复')
 

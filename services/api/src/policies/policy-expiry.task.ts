@@ -21,14 +21,14 @@ export class PolicyExpiryTask {
   @Cron(CronExpression.EVERY_HOUR)
   async handleHourly(): Promise<void> {
     try {
-      const expired = await this.expirePublishedPastDeadline()
+      const expired = await this.expirePastDeadline()
       if (expired > 0) this.logger.log(`Hourly cron: marked ${expired} policies expired`)
     } catch (err) {
       this.logger.error(`Hourly policy expiry failed: ${(err as Error).message}`)
     }
   }
 
-  async expirePublishedPastDeadline(now: Date = new Date()): Promise<number> {
+  async expirePastDeadline(now: Date = new Date()): Promise<number> {
     const threshold = policyDeadlineThreshold(now)
     const due = await this.prisma.policyPost.findMany({
       where: { publishStatus: 'published', validThrough: { lt: threshold } },
