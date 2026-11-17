@@ -59,6 +59,8 @@ model Terminal {
   /// 谁付钱。org_pays：机构或我方承担，用户免费。user_pays：向用户收费。
   /// 公共就业点位即使写成 user_pays，生效价仍是 0。
   userChargeMode String @default("org_pays")
+  /// 批量预建的批次号。单台预建为空。列表按这个字段筛一批终端。
+  provisionBatchId String?
 
   heartbeats   TerminalHeartbeat[]
   servicePrices TerminalServicePrice[]
@@ -76,6 +78,7 @@ model Terminal {
   @@index([orgId])
   @@index([enabled])
   @@index([lifecycleStatus])
+  @@index([provisionBatchId])
 }
 
 /// 每台机器、每个服务一行价。没有行 = 0。金额是整数分。
