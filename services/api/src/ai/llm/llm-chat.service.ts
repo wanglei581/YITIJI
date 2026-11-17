@@ -280,6 +280,8 @@ export class LlmChatService {
   private readonly sessions = new Map<string, SessionEntry>()
   /** 忘掉之后加一。在途回复写回前核对，对不上就不再放进内存。 */
   private readonly epoch = new ConversationEpoch()
+  /** 还在等模型的对话。内存里可以还没有这段，清的时候也要作废。 */
+  private readonly inflight = new Map<string, { ownerKey: string; n: number }>()
 
   constructor(
     private readonly config: LlmConfigService,
@@ -366,19 +368,46 @@ export class LlmChatService {
       .map((message) => ({ role: message.role, content: message.content }))
   }
 
-  /** 归属对得上才删这一段对话。对不上、找不到，都不报错。 */
+  /** 进模型前登记。请求结束（答完或抛错）后注销。 */
+  private noteInflight(sessionId: string, ownerKey: string): void {
+    const id = sessionId.trim()
+    if (!id) return
+    const current = this.inflight.get(id)
+    if (current) current.n += 1
+    else this.inflight.set(id, { ownerKey, n: 1 })
+  }
+
+  private endInflight(sessionId: string): void {
+    const id = sessionId.trim()
+    const current = id ? this.inflight.get(id) : undefined
+    if (!current) return
+    current.n -= 1
+    if (current.n <= 0) this.inflight.delete(id)
+  }
+
+  /** 归属对得上才删这一段对话。内存里还没有、但在途请求是这个人的，同样作废。 */
   forgetSession(sessionId: string, ownerKey: string): boolean {
     const id = sessionId.trim()
     if (!id || !ownerKey) return false
     const session = this.sessions.get(id)
-    if (!session || session.ownerKey !== ownerKey) return false
-    this.dropSession(id)
-    return true
+    const flight = this.inflight.get(id)
+    if (session?.ownerKey === ownerKey) {
+      this.dropSession(id)
+      return true
+    }
+    if (flight?.ownerKey === ownerKey) {
+      this.epoch.invalidate(id)
+      return true
+    }
+    return false
   }
 
-  /** 删掉这个归属下的全部小青对话，返回删了几段。 */
+  /** 删掉这个归属下的全部小青对话，返回删了几段。在途的也作废，不计入删了几段。 */
   forgetOwner(ownerKey: string): number {
     if (!ownerKey) return 0
+    for (const [id, flight] of this.inflight) {
+      if (flight.ownerKey === ownerKey) this.epoch.invalidate(id)
+    }
     let removed = 0
     for (const [id, session] of this.sessions) {
       if (session.ownerKey !== ownerKey) continue
@@ -463,6 +492,8 @@ export class LlmChatService {
     session.deviceFaultJustAnswered = false
     session.messages.push({ role: 'user', content: input.message })
     const capturedEpoch = this.epoch.capture(sessionId)
+    this.noteInflight(sessionId, ownerKey)
+    try {
     const skill = input.skill
     const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
     const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()
@@ -523,6 +554,9 @@ export class LlmChatService {
       intent,
       actions,
       ...(fixedNotice ? { fixedNotice: true } : {}),
+    }
+    } finally {
+      this.endInflight(sessionId)
     }
   }
 

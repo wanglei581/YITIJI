@@ -45,10 +45,35 @@ export class AdvisorQaMemory {
   private readonly store = new Map<string, Entry>()
   /** 忘掉之后加一。追问写回前核对，对不上就不再放进内存。 */
   private readonly epoch = new ConversationEpoch()
+  /** 还在等模型的追问。内存里可以还没有这条，清的时候也要作废。 */
+  private readonly inflight = new Map<string, { ownerKey: string | null; n: number }>()
 
   /** 进模型前抓住代次。写回时原样交回来。 */
   capture(sessionId: string): number {
     return this.epoch.capture(sessionId.trim())
+  }
+
+  /**
+   * 进模型前登记这一次在途请求属于谁，并抓住代次。
+   * 首次追问还没写进内存，登出和按作业号清也要能找到它。
+   */
+  begin(sessionId: string, ownerKey: string | null): number {
+    const id = sessionId.trim()
+    if (id) {
+      const current = this.inflight.get(id)
+      if (current) current.n += 1
+      else this.inflight.set(id, { ownerKey, n: 1 })
+    }
+    return this.epoch.capture(id)
+  }
+
+  /** 这一次请求结束（答完、抛错、设备故障早退）后注销登记。 */
+  end(sessionId: string): void {
+    const id = sessionId.trim()
+    const current = id ? this.inflight.get(id) : undefined
+    if (!current) return
+    current.n -= 1
+    if (current.n <= 0) this.inflight.delete(id)
   }
 
   /** 读上下文。过期的当作没有 —— 不返回陈旧上下文，也不报错。 */
@@ -92,6 +117,9 @@ export class AdvisorQaMemory {
   /** 删掉这个归属下的全部作业问答。匿名条目的归属是 null，对不上就不会动。 */
   forgetOwner(ownerKey: string): number {
     if (!ownerKey) return 0
+    for (const [id, flight] of this.inflight) {
+      if (flight.ownerKey === ownerKey) this.epoch.invalidate(id)
+    }
     let removed = 0
     for (const [id, entry] of this.store) {
       if (entry.ownerKey !== ownerKey) continue

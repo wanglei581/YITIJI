@@ -340,78 +340,83 @@ export class AdvisorService {
       })
     }
     const memory = this.qaMemory.read(sessionId)
-    const capturedEpoch = this.qaMemory.capture(sessionId)
-    // 作业面请求里没有渠道。小程序只读会话和本次要点，不走 ask()，所以固定用一体机那段。
-    if (isDeviceFaultQuestion(question)) {
+    const ownerKey = row.endUserId ? `u:${row.endUserId}` : null
+    const capturedEpoch = this.qaMemory.begin(sessionId, ownerKey)
+    try {
+      // 作业面请求里没有渠道。小程序只读会话和本次要点，不走 ask()，所以固定用一体机那段。
+      if (isDeviceFaultQuestion(question)) {
+        return {
+          sessionId,
+          answer: deviceFaultReply('kiosk'),
+          evidenceLevel: 'E3' as const,
+          sourceNote: DEVICE_FAULT_SOURCE_NOTE,
+          disclaimer: ADVISOR_DISCLAIMER,
+          canPin: false,
+          persistence: 'not_saved' as const,
+          providerLabel: this.llm.providerLabel(),
+          fixedNotice: true as const,
+        }
+      }
+      const usage = new AiUsageAccumulator()
+      const startedAt = Date.now()
+      let fixedNotice = false
+      const produce = async () => {
+        try {
+          const value = await this.llm.answer(question, memory, { onLlmCall: usage.add })
+          // 模型已经答完才发现含动手指导：换成固定的话。这一轮调过模型，照常结算。
+          if (hasHandsOnMachineInstruction(value.answer) && !isAboutJobContent(question)) {
+            fixedNotice = true
+            return {
+              ...value,
+              answer: deviceFaultReply('kiosk'),
+              sourceNote: DEVICE_FAULT_SOURCE_NOTE,
+              evidenceLevel: 'E3' as const,
+            }
+          }
+          return value
+        } catch (error) {
+          this.recordAiLog(usage, startedAt, 'failed', row.endUserId, aiErrorCodeOf(error, 'ADVISOR_ANSWER_FAILED'))
+          throw error
+        }
+      }
+      const persist = async (value: Awaited<ReturnType<AdvisorService['llm']['answer']>>) => {
+        this.recordAiLog(usage, startedAt, 'success', row.endUserId)
+        // 内存不留原话。场景名与这一问发给模型时相同；模型回答只见过遮盖后的文本，照旧存。
+        this.qaMemory.append(
+          sessionId,
+          maskUserTextForLlmText(question.trim().slice(0, 600), 'advisor_qa'),
+          value.answer,
+          ownerKey,
+          capturedEpoch,
+        )
+        return sessionId
+      }
+      // 没有账本或没有登录身份时不预占。操作号只在这里签发，不读客户端传来的号。
+      // 进模型前就认出的设备故障在上面已经返回，不计次。
+      const answer = this.quota && row.endUserId
+        ? await runWithAiQuota({
+          quota: this.quota,
+          bucket: 'ai_assistant',
+          operationKey: `advisor-ask:${quotaSequence()}`,
+          endUserId: row.endUserId,
+          req,
+        }, produce, persist)
+        : await produce().then(async (value) => {
+          await persist(value)
+          return value
+        })
       return {
         sessionId,
-        answer: deviceFaultReply('kiosk'),
-        evidenceLevel: 'E3' as const,
-        sourceNote: DEVICE_FAULT_SOURCE_NOTE,
-        disclaimer: ADVISOR_DISCLAIMER,
-        canPin: false,
+        ...answer,
+        /** 前端据此决定「钉住这条」按钮是否可用；钉住才是唯一会留下的动作 */
+        canPin: !fixedNotice,
+        /** 如实告知：这一轮问答本身不会被保存 */
         persistence: 'not_saved' as const,
         providerLabel: this.llm.providerLabel(),
-        fixedNotice: true as const,
+        ...(fixedNotice ? { fixedNotice: true as const } : {}),
       }
-    }
-    const usage = new AiUsageAccumulator()
-    const startedAt = Date.now()
-    let fixedNotice = false
-    const produce = async () => {
-      try {
-        const value = await this.llm.answer(question, memory, { onLlmCall: usage.add })
-        // 模型已经答完才发现含动手指导：换成固定的话。这一轮调过模型，照常结算。
-        if (hasHandsOnMachineInstruction(value.answer) && !isAboutJobContent(question)) {
-          fixedNotice = true
-          return {
-            ...value,
-            answer: deviceFaultReply('kiosk'),
-            sourceNote: DEVICE_FAULT_SOURCE_NOTE,
-            evidenceLevel: 'E3' as const,
-          }
-        }
-        return value
-      } catch (error) {
-        this.recordAiLog(usage, startedAt, 'failed', row.endUserId, aiErrorCodeOf(error, 'ADVISOR_ANSWER_FAILED'))
-        throw error
-      }
-    }
-    const persist = async (value: Awaited<ReturnType<AdvisorService['llm']['answer']>>) => {
-      this.recordAiLog(usage, startedAt, 'success', row.endUserId)
-      // 内存不留原话。场景名与这一问发给模型时相同；模型回答只见过遮盖后的文本，照旧存。
-      this.qaMemory.append(
-        sessionId,
-        maskUserTextForLlmText(question.trim().slice(0, 600), 'advisor_qa'),
-        value.answer,
-        row.endUserId ? `u:${row.endUserId}` : null,
-        capturedEpoch,
-      )
-      return sessionId
-    }
-    // 没有账本或没有登录身份时不预占。操作号只在这里签发，不读客户端传来的号。
-    // 进模型前就认出的设备故障在上面已经返回，不计次。
-    const answer = this.quota && row.endUserId
-      ? await runWithAiQuota({
-        quota: this.quota,
-        bucket: 'ai_assistant',
-        operationKey: `advisor-ask:${quotaSequence()}`,
-        endUserId: row.endUserId,
-        req,
-      }, produce, persist)
-      : await produce().then(async (value) => {
-        await persist(value)
-        return value
-      })
-    return {
-      sessionId,
-      ...answer,
-      /** 前端据此决定「钉住这条」按钮是否可用；钉住才是唯一会留下的动作 */
-      canPin: !fixedNotice,
-      /** 如实告知：这一轮问答本身不会被保存 */
-      persistence: 'not_saved' as const,
-      providerLabel: this.llm.providerLabel(),
-      ...(fixedNotice ? { fixedNotice: true as const } : {}),
+    } finally {
+      this.qaMemory.end(sessionId)
     }
   }
 
