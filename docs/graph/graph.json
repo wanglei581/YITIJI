@@ -49166,7 +49166,7 @@
       },
       "file": "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "helper": false,
-      "inCi": false,
+      "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:terminal-charge-binding-race",

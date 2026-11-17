@@ -44,7 +44,7 @@ node scripts/project-graph-query.mjs model PrintTask
 | 门禁脚本文件 | 678 |
 | ├ 其中辅助库（被别的门禁 import） | 160 |
 | ├ 已在 package.json 里有脚本名 | 605 |
-| ├ 在 CI 执行闭包里 | 588 |
+| ├ 在 CI 执行闭包里 | 589 |
 | └ **无脚本名，从未被执行** | 0 |
 | 被至少一条门禁断言的文件 | 2212 |
 | 孤儿候选 · protected（不得删） | 4 |

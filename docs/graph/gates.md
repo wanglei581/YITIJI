@@ -26,7 +26,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 有脚本名但不在 CI 执行闭包里（17）
+## 有脚本名但不在 CI 执行闭包里（16）
 
 这一栏是**尽力而为的推断**，权威是 `verify:ci-gate-coverage` 加
 `scripts/ci-gate-exemptions.json`。已在豁免清单里登记的（需要真实凭证 / 真机 /
@@ -50,7 +50,6 @@ _（空）_
 | `services/api/scripts/verify-cos-live.ts` | `@ai-job-print/api::verify:cos:live` |
 | `services/api/scripts/verify-llm-connectivity.ts` | `@ai-job-print/api::verify:llm-connectivity` |
 | `services/api/scripts/verify-ocr-baidu-live.ts` | `@ai-job-print/api::verify:ocr-baidu-live` |
-| `services/api/scripts/verify-terminal-charge-binding-race.ts` | `@ai-job-print/api::verify:terminal-charge-binding-race`<br/>`@ai-job-print/api::verify:terminal-charge-binding-race:postgres` |
 
 ──────────────────────────────────────────────────────────────────────
 
