@@ -39,6 +39,11 @@ export interface PolicyPostView {
   externalUrlVerified?: boolean
   /** 内容版本。办事清单按版本生成，版本变了旧清单作废。 */
   contentVersion?: number
+  /**
+   * 截止日期（YYYY-MM-DD）。当天仍可看。
+   * 没有这个字段，或服务端已不再返回过期的一条时，页面不写截止日期，也不画「已过期」。
+   */
+  validThrough?: string
   sourceName: string
   syncTime: string
 }

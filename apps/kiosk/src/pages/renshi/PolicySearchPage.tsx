@@ -8,7 +8,7 @@ import { PolicySearchField } from './PolicySearchField'
 import { PolicyTouchLayout } from './PolicyTouchLayout'
 import { POLICY_ASK_HOME, POLICY_CATEGORIES, POLICY_PAGE_SIZE, policyPage, policyPagination, policyRead } from './policyModel'
 import { clearPolicyKeyword, getPolicyKeyword, setPolicyKeyword, subscribePolicyKeywordClear } from './policyKeywordSession'
-import { resolvePolicySearch, type PolicySearchOutcome } from './policySearchModel'
+import { policyDeadlineLabel, resolvePolicySearch, type PolicySearchOutcome } from './policySearchModel'
 
 type View =
   | { status: 'idle' }
@@ -111,7 +111,8 @@ export function PolicySearchPage() {
     {found && found.items.length > 0 && <>
       <div className="policy-min-list" data-testid="policy-search-list">
         {found.items.map((policy) => <PolicyGuideRow key={policy.id} policy={policy} highlight={word}
-          categoryLabel={categoryLabel(policy.audience)} onOpen={() => navigate(`/renshi?policy=${encodeURIComponent(policy.id)}`)} />)}
+          categoryLabel={categoryLabel(policy.audience)} deadlineLabel={policyDeadlineLabel(policy.validThrough)}
+          onOpen={() => navigate(`/renshi?policy=${encodeURIComponent(policy.id)}`)} />)}
       </div>
       {paging && <div className="policy-min-pagination">
         {paging.previous && <button type="button" className="policy-min-button" onClick={() => goPage(paging.page - 1)}>上一页</button>}

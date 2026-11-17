@@ -4,6 +4,7 @@ import { getPublishedPolicies, type PublishedPoliciesResult } from '../../servic
 import { PolicyGuideRow } from './PolicyGuideRow'
 import { PolicyChecklistSample, PolicyReadState, PolicyTouchLayout } from './PolicyTouchLayout'
 import { POLICY_ASK_LIST, POLICY_CATEGORIES, POLICY_PAGE_SIZE, policyPagination, policyRead, type PolicyAudience } from './policyModel'
+import { policyDeadlineLabel } from './policySearchModel'
 
 export { PolicySearchPage } from './PolicySearchPage'
 
@@ -29,6 +30,7 @@ export function PolicyCategoryList({ audience, page }: { audience: PolicyAudienc
     {!result ? <PolicyReadState failed={failed} retry={() => setAttempt((value) => value + 1)} /> : <>
       <div className="policy-min-list" data-testid="renshi-policy-list">
         {result.items.map((policy) => <PolicyGuideRow key={policy.id} policy={policy}
+          deadlineLabel={policyDeadlineLabel(policy.validThrough)}
           onOpen={() => navigate(`/renshi?policy=${encodeURIComponent(policy.id)}`)} />)}
       </div>
       {result.items.length === 0 && <p role="status">{result.total === 0 ? '这个类别还没有机构发布政策。' : '这一页没有政策，请返回上一页。'}</p>}

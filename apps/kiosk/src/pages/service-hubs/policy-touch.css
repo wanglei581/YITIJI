@@ -114,3 +114,20 @@
 .policy-search-status > div { flex: 1; min-width: 0; }
 .policy-search-status .qxt-illus { flex: none; width: 220px; height: auto; }
 .policy-kw { background: rgba(31, 158, 134, .18); color: var(--qxt-teal-ink); border-radius: 6px; padding: 0 4px; }
+.policy-deadline { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 20px; }
+.policy-excerpt-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.policy-excerpt-head h2 { margin: 0; }
+.policy-excerpt { margin: 0; font-size: 25px; line-height: 1.6; color: var(--qxt-ink-2); white-space: pre-wrap; word-break: break-all; }
+.policy-excerpt-cut { max-height: 80px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 40%, transparent); mask-image: linear-gradient(#000 40%, transparent); }
+.qxt-screen .policy-excerpt-open { margin-left: auto; min-height: 72px; padding: 0 16px 0 24px; border: 0; border-radius: 22px; background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); font-size: 24px; font-weight: 700; }
+.policy-read-layer { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: rgba(20, 24, 22, .28); padding: 250px 48px 34px; }
+.policy-read-sheet { display: flex; flex: 1; flex-direction: column; gap: 16px; min-height: 0; padding: 18px 0 0; }
+.policy-read { flex: 1; min-height: 0; overflow: hidden; padding: 24px 30px; border-radius: 24px; background: var(--qxt-card); border: 1.5px solid var(--qxt-line); font-size: 27px; line-height: 1.75; white-space: pre-wrap; word-break: break-all; }
+.policy-read-pager { display: flex; align-items: center; gap: 16px; }
+.policy-read-pager span { min-width: 190px; text-align: center; font-size: 24px; font-weight: 700; }
+.qxt-screen .policy-read-pager button,
+.qxt-screen .policy-read-sheet > .policy-min-button { flex: 1; min-height: 56px; }
+.policy-read-note { margin: 0; font-size: 22px; line-height: 1.5; color: var(--qxt-ink-3); text-align: center; }
+.qxt-screen .policy-gone-action { min-height: 116px; padding: 22px 26px; border: 1.5px solid var(--qxt-line); border-radius: 26px; background: var(--qxt-card); text-align: left; display: flex; flex-direction: column; gap: 8px; }
+.qxt-screen .policy-gone-action b { font-size: 32px; }
+.qxt-screen .policy-gone-action small { font-size: 22px; color: var(--qxt-ink-2); }

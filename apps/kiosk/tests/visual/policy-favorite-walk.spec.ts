@@ -342,7 +342,7 @@ test('浏览记录和打开来源各点一条政策，落到那一条；已下�
   await page.getByTestId('member-records-activity-b-gone').click()
   await page.waitForURL((url) => url.pathname === '/renshi' && url.searchParams.get('policy') === 'policy-gone')
   await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'missing')
-  await expect(policyHeading(page, '这条政策已经撤下或不在可查看范围')).toBeVisible()
+  await expect(policyHeading(page, '这条政策现在看不到了')).toBeVisible()
 })
 
 test('收藏的政策打开那一条，发布日期用确认发布时间 @kiosk', async ({ page }) => {
@@ -414,8 +414,8 @@ test('政策找不到时说明打不开，并能回政策首页看其他政策 @
   await routePolicies(page, state)
   await page.goto('/renshi?policy=gone')
   await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'missing')
-  await expect(policyHeading(page, '这条政策已经撤下或不在可查看范围')).toBeVisible()
-  await expect(page.getByText('这条现在不能查看', { exact: true })).toBeVisible()
+  await expect(policyHeading(page, '这条政策现在看不到了')).toBeVisible()
+  await expect(page.getByText('可能是这几种情况', { exact: true })).toBeVisible()
   await expect(page.getByText('灵活就业社保补贴说明')).toHaveCount(0)
   await expect(page.getByText('接口')).toHaveCount(0)
   await expect(page.getByTestId('policy-checklist-print')).toHaveCount(0)
@@ -475,7 +475,7 @@ test('政策被撤下后点打印办事清单：不生成、不进打印，整�
   state.withdrawn?.add('policy-fav')
   await print.click()
   await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'withdrawn')
-  await expect(page.getByText('这条政策已下架', { exact: true })).toBeVisible()
+  await expect(policyHeading(page, '这条政策现在看不到了')).toBeVisible()
   expect(state.checklistLog).toEqual(['policy-fav'])
   await expect(page).toHaveURL(/\/renshi\?policy=policy-fav$/)
   await expect(page.getByText('高校毕业生求职创业补贴', { exact: true })).toHaveCount(0)
@@ -583,9 +583,9 @@ test('政策下架自动刷新：正在看的这一条被下架，整页换成�
   await page.clock.fastForward(31_000)
 
   await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'withdrawn')
-  await expect(policyHeading(page, '这条政策已经撤下')).toBeVisible()
-  await expect(page.getByText('这条政策已下架', { exact: true })).toBeVisible()
-  await expect(page.getByText('不再显示旧正文、原文二维码和清单。可以返回政策首页查看当前发布内容。')).toBeVisible()
+  await expect(policyHeading(page, '这条政策现在看不到了')).toBeVisible()
+  await expect(page.getByText('可能是这几种情况', { exact: true })).toBeVisible()
+  await expect(page.getByText('不再显示旧正文、原文二维码和办事清单。')).toBeVisible()
   // 不留旧正文：标题、办事三栏、原文码、打印清单、问小青与收藏都没了。
   await expect(page.getByText('高校毕业生求职创业补贴', { exact: true })).toHaveCount(0)
   await expect(page.getByText('毕业年度内有就业创业意愿的高校毕业生')).toHaveCount(0)

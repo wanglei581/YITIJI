@@ -280,8 +280,10 @@ if (refreshMs >= 10_000 && refreshMs <= 60_000 && detail.includes('window.setInt
   detail.includes('getPublishedPolicy(id)') && detail.includes('POLICY_CHECK_TIMEOUT_MS')) {
   pass('L1. 详情按编号现读，30 秒复查、8 秒超时；超时不冒充撤下')
 } else fail('L1. 活详情必须限时按条复查')
+const goneCopy = read('src/pages/renshi/policySearchModel.ts') + read('src/pages/renshi/PolicyUnavailable.tsx')
 if (detail.includes("setPhase('withdrawn')") && detail.includes('setPhoneFile(null)') &&
-  detail.includes('这条政策已下架') && detail.includes('返回政策首页') &&
+  detail.includes('policyGoneCopy(') && goneCopy.includes('这条政策现在看不到了') &&
+  goneCopy.includes('这条政策已过截止日期') && goneCopy.includes('返回政策首页') &&
   !/withdrawnIds/.test(page + detail + list)) {
   pass('L2. 撤下清正文与二维码；不缓存撤下编号，再发布可按接口重读')
 } else fail('L2. 撤下详情必须关闭旧内容，不得永久过滤重发编号')
