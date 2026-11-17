@@ -163,6 +163,65 @@ async function main(): Promise<void> {
     assert.ok((await listed()).includes(dated.id), '改到以后并重新发布后必须重新出现')
     assert.equal((await policies.getPublishedPolicyById(dated.id)).data.id, dated.id)
     console.log('  PASS 改期后重新发布恢复显示')
+
+    const titleHit = await policies.createPartnerPolicy({
+      ...POLICY_PUBLISH_FIXTURE,
+      kind: 'notice',
+      category: 'training',
+      title: `培训补贴关键词_${suffix}`,
+      summary: '这条摘要不带检索词',
+    }, partner)
+    const summaryHit = await policies.createPartnerPolicy({
+      ...POLICY_PUBLISH_FIXTURE,
+      kind: 'notice',
+      category: 'subsidy',
+      title: `另一条公告_${suffix}`,
+      summary: `摘要里有见习补贴词_${suffix}`,
+    }, partner)
+    ids.push(titleHit.id, summaryHit.id)
+    await publish(titleHit.id)
+    await publish(summaryHit.id)
+
+    const idsOf = async (keyword: string, extra?: { category?: string; page?: number; pageSize?: number; scope?: { mode: 'org'; orgId: string | null; state: 'bound' | 'unbound' | 'missing' } }) => {
+      const page = await policies.getPublishedPolicies({ keyword, ...extra })
+      return { ids: page.data.map((row) => row.id), total: page.pagination.total, scope: page.scope }
+    }
+
+    const byTitle = await idsOf(`培训补贴关键词_${suffix}`)
+    assert.deepEqual(byTitle.ids, [titleHit.id], '关键词命中标题')
+    const bySummary = await idsOf(`见习补贴词_${suffix}`)
+    assert.deepEqual(bySummary.ids, [summaryHit.id], '关键词命中摘要')
+    const padded = await idsOf(`  培训补贴关键词_${suffix}  `)
+    assert.deepEqual(padded.ids, [titleHit.id], '关键词先去掉首尾空白')
+    const missed = await idsOf(`没有这条_${suffix}`)
+    assert.deepEqual(missed.ids, [], '不包含的关键词不命中')
+    assert.equal(missed.total, 0)
+    const blank = await idsOf('   ')
+    assert.ok(blank.ids.includes(titleHit.id) && blank.ids.includes(openEnded.id), '空白关键词等于不筛选')
+    await expectCode(
+      () => policies.getPublishedPolicies({ keyword: '字'.repeat(31) }),
+      'POLICY_KEYWORD_TOO_LONG',
+      '关键词超过 30 字',
+    )
+    const atLimit = await policies.getPublishedPolicies({ keyword: '字'.repeat(30) })
+    assert.equal(atLimit.pagination.total, 0, '刚好 30 字可以查，只是没有这么长的标题')
+    const withCategory = await idsOf(`_${suffix}`, { category: 'training' })
+    assert.deepEqual(withCategory.ids, [titleHit.id], '关键词和类别一起生效')
+    const pageOne = await idsOf(`_${suffix}`, { page: 1, pageSize: 1 })
+    const pageTwo = await idsOf(`_${suffix}`, { page: 2, pageSize: 1 })
+    assert.equal(pageOne.ids.length, 1)
+    assert.ok(pageOne.total >= 2, '关键词结果要分页，总数和当页分开')
+    assert.equal(pageTwo.total, pageOne.total)
+    assert.notEqual(pageTwo.ids[0], pageOne.ids[0])
+    const ownOrg = await idsOf(`培训补贴关键词_${suffix}`, { scope: { mode: 'org', orgId, state: 'bound' } })
+    assert.deepEqual(ownOrg.ids, [titleHit.id], '关键词和本机构范围一起生效')
+    assert.equal(ownOrg.scope, 'bound')
+    const otherOrg = await idsOf(`培训补贴关键词_${suffix}`, { scope: { mode: 'org', orgId: `org_other_${suffix}`, state: 'bound' } })
+    assert.deepEqual(otherOrg.ids, [], '别的机构范围里搜不到这条')
+    await prisma.policyPost.update({ where: { id: titleHit.id }, data: { validThrough: new Date(`${yesterday}T00:00:00.000Z`) } })
+    const expiredHit = await idsOf(`培训补贴关键词_${suffix}`)
+    assert.deepEqual(expiredHit.ids, [], '过了截止日期的政策按关键词也搜不到')
+    console.log('  PASS 关键词命中、不命中、超长、和类别一起、过期搜不到')
     console.log('PASS verify:policy-expiry')
   } finally {
     await prisma.auditLog.deleteMany({ where: { OR: [{ targetId: { in: ids } }, { actorId: userRow.id }] } })

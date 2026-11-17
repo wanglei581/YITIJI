@@ -46,6 +46,7 @@ import {
   type PolicyPublicScope,
 } from './policy-public-visibility'
 import { parsePolicyValidThrough } from './policy-validity'
+import { policyKeywordWhere } from './policy-keyword'
 
 // ============================================================
 // PoliciesService — 阶段1D:政策服务(政策扶持条目 + 政策公告)
@@ -206,7 +207,7 @@ export class PoliciesService {
   // ── Kiosk 公开读(approved+published；托管关闭时不含招聘分类；不含下架留痕)──
 
   async getPublishedPolicies(params?: {
-    kind?: string; audience?: string; category?: string; page?: number | string; pageSize?: number | string; scope?: PolicyPublicScope
+    kind?: string; audience?: string; category?: string; keyword?: string; page?: number | string; pageSize?: number | string; scope?: PolicyPublicScope
   }): Promise<{ data: PolicyPostDto[]; scope?: 'bound' | 'unbound' | 'missing'; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
     const parsedPage = Number.parseInt(String(params?.page ?? 1), 10)
     const page = Math.min(10_000, Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1)
@@ -218,6 +219,7 @@ export class PoliciesService {
       ...(params?.kind ? { kind: params.kind } : {}),
       ...(params?.audience ? { audience: params.audience } : {}),
       ...(params?.category ? { category: params.category } : {}),
+      ...policyKeywordWhere(params?.keyword),
     }, params?.scope)
     const [rows, total] = await Promise.all([
       this.prisma.policyPost.findMany({
