@@ -71,7 +71,7 @@ function fireForget(path: string, headers: Record<string, string>, body?: string
 }
 
 async function sendWithRetry(path: string, headers: Record<string, string>, body?: string): Promise<void> {
-  const doFetch = globalThis.fetch
+  const doFetch = fetch
   const kind = path.startsWith('/assistant/') ? 'assistant' : 'advisor'
   let status = 0
   for (let attempt = 0; attempt < FORGET_RETRY_DELAYS_MS.length; attempt += 1) {
