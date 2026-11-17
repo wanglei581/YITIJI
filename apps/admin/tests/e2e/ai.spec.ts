@@ -29,6 +29,8 @@ test.describe('AI 服务 / 配置（mock 口径）', () => {
     const panel = page.getByRole('region', { name: 'AI 用量与额度' })
     await expect(panel).toBeVisible()
     await expect(panel.getByText('演示模式不连接真实用量数据')).toBeVisible()
+    await expect(panel.getByRole('heading', { name: '按人次数（今天）' })).toBeVisible()
+    await expect(panel.getByText('演示模式不连接按人次数，请连接真实后端后再看。')).toBeVisible()
     // 运营看钱的面板：mock 不造假数，面板里不能出现「x.xx 元」这类金额
     await expect(panel.getByText(/\d+\.\d{2} 元/)).toHaveCount(0)
   })
