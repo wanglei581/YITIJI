@@ -27225,6 +27225,7 @@
       "services/api/scripts/verify-ai-user-text-retention.ts"
     ],
     "services/api/src/advisor/advisor-skills.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-voice.ts"
@@ -28412,6 +28413,7 @@
       "services/api/scripts/verify-admin-session-revocation.ts"
     ],
     "services/api/src/common/auth/optional-end-user.ts": [
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-auth.ts"
     ],
@@ -28754,6 +28756,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-branding.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
@@ -40211,6 +40214,7 @@
           "services/api/src/advisor/advisor-artifact.service.ts",
           "services/api/src/advisor/advisor-pdf.service.ts",
           "services/api/src/advisor/advisor-qa-memory.ts",
+          "services/api/src/advisor/advisor-skills.ts",
           "services/api/src/advisor/advisor.service.ts",
           "services/api/src/advisor/llm-advisor.service.ts",
           "services/api/src/ai/ai-log.service.ts",
@@ -42132,10 +42136,12 @@
           "services/api/src/ai/llm/llm-chat.service.ts",
           "services/api/src/ai/llm/llm-config.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/auth/optional-end-user.ts",
           "services/api/src/common/conversation-memory-bridge.ts",
           "services/api/src/common/conversation-memory.module.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/common/pii/llm-input-mask.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/member-assets/member-assets.module.ts",
           "services/api/src/member-assets/member-assets.service.ts",
