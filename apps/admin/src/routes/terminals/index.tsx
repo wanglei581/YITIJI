@@ -290,6 +290,16 @@ export default function TerminalsPage() {
   }, [batchIdFilter, filter, search, terminals])
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
   const counts = { 全部: terminals.length, 在线: terminals.filter((terminal) => terminal.online).length, 离线: terminals.filter((terminal) => !terminal.online).length }
+  const trimmedBatchId = batchIdFilter.trim()
+  const visibleSelectedIds = filtered.filter((terminal) => selectedIds.includes(terminal.id)).map((terminal) => terminal.id)
+  const currentBatchCount = trimmedBatchId
+    ? terminals.filter((terminal) => terminal.provisionBatchId === trimmedBatchId).length
+    : 0
+  const batchScopeLabel = visibleSelectedIds.length > 0
+    ? `已选 ${visibleSelectedIds.length} 台`
+    : trimmedBatchId
+      ? `本批 ${currentBatchCount} 台`
+      : ''
 
   function closeDetail() {
     setOrgLicenseError(null)
@@ -302,9 +312,12 @@ export default function TerminalsPage() {
   }
 
   function batchSelection(): TerminalBatchSelectionInput | null {
-    if (selectedIds.length > 0) return { terminalIds: selectedIds }
-    const batchId = batchIdFilter.trim()
-    return batchId ? { batchId } : null
+    if (visibleSelectedIds.length > 0) return { terminalIds: visibleSelectedIds }
+    return trimmedBatchId ? { batchId: trimmedBatchId } : null
+  }
+
+  function batchActionTitle(action: string): string {
+    return batchScopeLabel ? `${action}（${batchScopeLabel}）` : action
   }
 
   function toggleSelected(id: string) {
@@ -362,10 +375,10 @@ export default function TerminalsPage() {
   return (
     <>
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-        <div className="flex h-[34px] min-w-[280px] items-center gap-2 rounded-[9px] border border-neutral-900/10 bg-surface px-3"><SearchIcon className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索编号、设备名、MAC、位置、IP..." className="min-w-0 flex-1 bg-transparent text-[13px] text-neutral-900 outline-none placeholder:text-neutral-500" /></div>
-        {FILTERS.map((item) => <FilterChip key={item} active={filter === item} label={item} count={counts[item]} onClick={() => { setFilter(item); setPage(1) }} />)}
-        <input aria-label="按批次号筛选" value={batchIdFilter} onChange={(event) => { setBatchIdFilter(event.target.value.trim()); setPage(1) }} placeholder="批次号" className="h-[34px] w-40 rounded-[9px] border border-neutral-900/10 bg-surface px-3 font-mono text-[13px] text-neutral-900 outline-none" />
-        <div className="ml-auto flex flex-wrap items-center gap-2"><span className="text-[12.5px] text-neutral-500">共 {filtered.length} 台终端</span><button type="button" onClick={() => { setCreatingBatch(true); setNotice(null) }} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50">批量预建</button><button type="button" disabled={batchBusy} onClick={() => void runBatchCodes('issue')} className="inline-flex h-[30px] items-center rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">批量生成绑定码</button><button type="button" disabled={batchBusy} onClick={() => void runBatchRevoke()} className="inline-flex h-[30px] items-center rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">作废绑定码</button><button type="button" disabled={batchBusy} onClick={() => void runBatchCodes('reissue')} className="inline-flex h-[30px] items-center rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">重新生成绑定码</button><button type="button" onClick={() => { setCreatingPlannedTerminal(true); setNotice(null) }} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] bg-primary-600 px-3 text-xs font-bold text-white hover:bg-primary-700"><PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />预创建设备</button><button type="button" onClick={() => void refresh()} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50"><RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />刷新</button></div>
+        <div className="flex h-[34px] min-w-[280px] items-center gap-2 rounded-[9px] border border-neutral-900/10 bg-surface px-3"><SearchIcon className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" /><input value={search} onChange={(event) => { setSearch(event.target.value); setSelectedIds([]) }} placeholder="搜索编号、设备名、MAC、位置、IP..." className="min-w-0 flex-1 bg-transparent text-[13px] text-neutral-900 outline-none placeholder:text-neutral-500" /></div>
+        {FILTERS.map((item) => <FilterChip key={item} active={filter === item} label={item} count={counts[item]} onClick={() => { setFilter(item); setPage(1); setSelectedIds([]) }} />)}
+        <input aria-label="按批次号筛选" value={batchIdFilter} onChange={(event) => { setBatchIdFilter(event.target.value.trim()); setPage(1); setSelectedIds([]) }} placeholder="批次号" className="h-[34px] w-40 rounded-[9px] border border-neutral-900/10 bg-surface px-3 font-mono text-[13px] text-neutral-900 outline-none" />
+        <div className="ml-auto flex flex-wrap items-center gap-2"><span className="text-[12.5px] text-neutral-500">共 {filtered.length} 台终端</span><span className="text-[12.5px] text-neutral-500" data-testid="terminal-batch-selected-count">已勾选 {visibleSelectedIds.length} 台</span><button type="button" onClick={() => { setCreatingBatch(true); setNotice(null) }} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50">批量预建</button><button type="button" disabled={batchBusy} onClick={() => void runBatchCodes('issue')} className="inline-flex h-[30px] items-center rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">{batchActionTitle('批量生成绑定码')}</button><button type="button" disabled={batchBusy} onClick={() => void runBatchRevoke()} className="inline-flex h-[30px] items-center rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">{batchActionTitle('作废绑定码')}</button><button type="button" disabled={batchBusy} onClick={() => void runBatchCodes('reissue')} className="inline-flex h-[30px] items-center rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">{batchActionTitle('重新生成绑定码')}</button><button type="button" onClick={() => { setCreatingPlannedTerminal(true); setNotice(null) }} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] bg-primary-600 px-3 text-xs font-bold text-white hover:bg-primary-700"><PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />预创建设备</button><button type="button" onClick={() => void refresh()} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50"><RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />刷新</button></div>
       </div>
       {notice && <div className={`mb-3 rounded-[9px] border px-4 py-3 text-sm ${notice.type === 'success' ? 'border-success/20 bg-success-bg text-success-fg' : 'border-error/20 bg-error-bg text-error-fg'}`}>{notice.text}</div>}
       <Card className="overflow-hidden p-0">
@@ -378,7 +391,7 @@ export default function TerminalsPage() {
       <TerminalDetailDrawer terminal={selected} organizations={orgOptions} orgLoadError={orgLoadError} orgLicenseError={orgLicenseError} notice={notice} editingOrg={selected ? editingId === selected.id : false} editOrgValue={editValue} savingOrg={saving} profileEditing={selected ? profileEditingId === selected.id : false} profileDraft={profileDraft} profileSaving={profileSaving} statusSaving={selected ? statusSavingId === selected.id : false} lifecycleSaving={selected ? lifecycleSavingId === selected.id : false} onClose={closeDetail} onOpenBindCode={openBindCodeModal} onStartProfileEdit={startProfileEdit} onCancelProfileEdit={cancelProfileEdit} onSaveProfile={(terminal) => void saveProfile(terminal)} onProfileDraftChange={(patch) => setProfileDraft((current) => ({ ...current, ...patch }))} onStartOrgEdit={startOrgEdit} onCancelOrgEdit={cancelOrgEdit} onSaveOrg={(terminal) => void saveOrg(terminal)} onOrgChange={(value) => { setEditValue(value); setOrgLicenseError(null) }} onToggleStatus={(terminal) => void toggleStatus(terminal)} onLifecycleBusy={(busy) => setLifecycleSavingId(busy && selected ? selected.id : null)} onLifecycleUpdated={(result) => { if (selected) handleLifecycleUpdated(selected, result) }} onLifecycleConflict={() => { void refresh().catch(() => undefined) }} onNotice={setNotice} serverListIssuedAt={terminalData?.listIssuedAt ?? 0} onHomeFreeBadgeSaved={handleHomeFreeBadgeSaved} onChargeSaved={handleChargeSaved} chargeResetNotice={chargeResetNotice} />
       {bindCodeTerminal && <TerminalBindCodeDialog terminal={bindCodeTerminal} onClose={() => setBindCodeTerminal(null)} onNotice={setNotice} />}
       {creatingPlannedTerminal && <CreatePlannedTerminalDialog organizations={orgOptions} onClose={() => setCreatingPlannedTerminal(false)} onCreated={(code) => { setCreatingPlannedTerminal(false); setNotice({ type: 'success', text: `已预创建设备 ${code}；请在设备列表中生成一次性绑定码完成安装。` }); void refresh() }} onError={(message) => setNotice({ type: 'error', text: message })} />}
-      {creatingBatch && <TerminalBatchCreateDialog organizations={orgOptions} onClose={() => setCreatingBatch(false)} onCreated={(batchId, count) => { setCreatingBatch(false); setBatchIdFilter(batchId); setPage(1); setNotice({ type: 'success', text: `已预建 ${count} 台，批次号 ${batchId}` }); void refresh() }} onError={(message) => setNotice({ type: 'error', text: message })} />}
+      {creatingBatch && <TerminalBatchCreateDialog organizations={orgOptions} onClose={() => setCreatingBatch(false)} onCreated={(batchId, count) => { setCreatingBatch(false); setBatchIdFilter(batchId); setPage(1); setSelectedIds([]); setNotice({ type: 'success', text: `已预建 ${count} 台，批次号 ${batchId}` }); void refresh() }} onError={(message) => setNotice({ type: 'error', text: message })} />}
       {batchCodes && <TerminalBatchCodeDialog title="绑定码只显示这一次" result={batchCodes} onClose={() => setBatchCodes(null)} />}
     </>
   )
