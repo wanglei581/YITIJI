@@ -11,6 +11,7 @@
 import { createHash, randomBytes } from 'crypto'
 import { Inject, Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { ConversationEpoch } from '../../common/conversation-epoch'
 import { ConversationMemoryBridge } from '../../common/conversation-memory-bridge'
 import { AssistantPolicyContextService, appendAssistantPolicyContext, policyUnavailableResult } from './assistant-policy-context'
 import type {
@@ -277,6 +278,8 @@ function classifyIntent(message: string): AssistantIntent {
 export class LlmChatService {
   private readonly logger = new Logger(LlmChatService.name)
   private readonly sessions = new Map<string, SessionEntry>()
+  /** 忘掉之后加一。在途回复写回前核对，对不上就不再放进内存。 */
+  private readonly epoch = new ConversationEpoch()
 
   constructor(
     private readonly config: LlmConfigService,
@@ -292,8 +295,26 @@ export class LlmChatService {
 
   private pruneSessions(now: number): void {
     for (const [id, s] of this.sessions) {
-      if (now - s.updatedAt > SESSION_TTL_MS) this.sessions.delete(id)
+      if (now - s.updatedAt > SESSION_TTL_MS) this.dropSession(id)
     }
+  }
+
+  /** 从内存拿掉，并让还在路上的回复不能再写回这一段。 */
+  private dropSession(id: string): void {
+    this.sessions.delete(id)
+    this.epoch.invalidate(id)
+  }
+
+  /**
+   * 模型回来了才落内存。代次已经变过（清场、登出、删记录、空闲清扫）就整段丢掉。
+   * 调用方仍拿到这一轮回复：人还在等，失败会看起来像模型坏了。
+   */
+  private writeBack(sessionId: string, session: SessionEntry, captured: number): void {
+    if (!this.epoch.matches(sessionId, captured)) {
+      if (this.sessions.get(sessionId) === session) this.sessions.delete(sessionId)
+      return
+    }
+    this.sessions.set(sessionId, session)
   }
 
   private evictOldest(ownerKey?: string): void {
@@ -351,7 +372,7 @@ export class LlmChatService {
     if (!id || !ownerKey) return false
     const session = this.sessions.get(id)
     if (!session || session.ownerKey !== ownerKey) return false
-    this.sessions.delete(id)
+    this.dropSession(id)
     return true
   }
 
@@ -361,7 +382,7 @@ export class LlmChatService {
     let removed = 0
     for (const [id, session] of this.sessions) {
       if (session.ownerKey !== ownerKey) continue
-      this.sessions.delete(id)
+      this.dropSession(id)
       removed += 1
     }
     return removed
@@ -441,6 +462,7 @@ export class LlmChatService {
     }
     session.deviceFaultJustAnswered = false
     session.messages.push({ role: 'user', content: input.message })
+    const capturedEpoch = this.epoch.capture(sessionId)
     const skill = input.skill
     const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
     const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()
@@ -461,7 +483,7 @@ export class LlmChatService {
         if (error.direction === 'input') session.messages.pop()
         else session.messages.push({ role: 'assistant', content: reply })
         session.updatedAt = Date.now()
-        this.sessions.set(sessionId, session)
+        this.writeBack(sessionId, session, capturedEpoch)
         return { sessionId, reply, intent: classifyIntent(input.message), actions: [] }
       }
       throw error
@@ -493,7 +515,7 @@ export class LlmChatService {
     if (session.messages.length > MAX_HISTORY) {
       session.messages = session.messages.slice(-MAX_HISTORY)
     }
-    this.sessions.set(sessionId, session)
+    this.writeBack(sessionId, session, capturedEpoch)
 
     return {
       sessionId,

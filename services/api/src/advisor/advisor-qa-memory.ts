@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { ConversationEpoch } from '../common/conversation-epoch'
 
 // ============================================================
 // S3-3 · P26 问答型的多轮上下文。
@@ -42,22 +43,33 @@ interface Entry {
 export class AdvisorQaMemory {
   private readonly logger = new Logger(AdvisorQaMemory.name)
   private readonly store = new Map<string, Entry>()
+  /** 忘掉之后加一。追问写回前核对，对不上就不再放进内存。 */
+  private readonly epoch = new ConversationEpoch()
+
+  /** 进模型前抓住代次。写回时原样交回来。 */
+  capture(sessionId: string): number {
+    return this.epoch.capture(sessionId.trim())
+  }
 
   /** 读上下文。过期的当作没有 —— 不返回陈旧上下文，也不报错。 */
   read(sessionId: string): QaTurn[] {
     const entry = this.store.get(sessionId)
     if (!entry) return []
     if (Date.now() - entry.updatedAt > TTL_MS) {
-      this.store.delete(sessionId)
+      this.drop(sessionId)
       return []
     }
     return entry.turns
   }
 
-  /** 追加一轮问答，并顺带回收过期会话。ownerKey 只在调用方给了会员归属时写入。 */
-  append(sessionId: string, question: string, answer: string, ownerKey: string | null = null): void {
+  /**
+   * 追加一轮问答，并顺带回收过期会话。ownerKey 只在调用方给了会员归属时写入。
+   * captured 是进模型前抓住的代次。这段作业已经忘掉就不写。不传则照旧写（测试直接灌内存）。
+   */
+  append(sessionId: string, question: string, answer: string, ownerKey: string | null = null, captured?: number): void {
     const now = Date.now()
     this.sweep(now)
+    if (captured !== undefined && !this.epoch.matches(sessionId, captured)) return
     const existing = this.store.get(sessionId)
     const entry = existing ?? { turns: [], updatedAt: now, ownerKey }
     entry.turns.push({ role: 'user', content: question }, { role: 'assistant', content: answer })
@@ -68,12 +80,13 @@ export class AdvisorQaMemory {
     this.evictIfNeeded()
   }
 
-  /** 删掉这一次作业的问答内存。没有这条就当已经删过。 */
+  /** 删掉这一次作业的问答内存。没有这条就当已经删过。在途写回同样作废。 */
   forget(sessionId: string): boolean {
     const id = sessionId.trim()
-    if (!id || !this.store.has(id)) return false
-    this.store.delete(id)
-    return true
+    if (!id) return false
+    const had = this.store.has(id)
+    this.drop(id)
+    return had
   }
 
   /** 删掉这个归属下的全部作业问答。匿名条目的归属是 null，对不上就不会动。 */
@@ -82,10 +95,15 @@ export class AdvisorQaMemory {
     let removed = 0
     for (const [id, entry] of this.store) {
       if (entry.ownerKey !== ownerKey) continue
-      this.store.delete(id)
+      this.drop(id)
       removed += 1
     }
     return removed
+  }
+
+  private drop(id: string): void {
+    this.store.delete(id)
+    this.epoch.invalidate(id)
   }
 
   /** 空闲超过 TTL 的作业问答立刻丢掉。每分钟扫，不等下一次追问。 */
@@ -93,7 +111,7 @@ export class AdvisorQaMemory {
   sweep(now = Date.now()): number {
     const before = this.store.size
     for (const [id, entry] of this.store) {
-      if (now - entry.updatedAt > TTL_MS) this.store.delete(id)
+      if (now - entry.updatedAt > TTL_MS) this.drop(id)
     }
     const removed = before - this.store.size
     if (removed > 0) this.logger.log(`advisor.qa_memory_swept removed=${removed}`)

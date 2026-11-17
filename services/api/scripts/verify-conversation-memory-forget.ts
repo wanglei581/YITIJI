@@ -158,6 +158,11 @@ async function main(): Promise<void> {
       get: async (key: string) => sessions.get(key) ?? null,
       unregisterMemberSession: async () => undefined,
     }
+    const llmGate: { pending: Promise<void> | null } = { pending: null }
+    const modelGate: { wait: () => Promise<void>; entered: () => void } = {
+      wait: async () => undefined,
+      entered: () => undefined,
+    }
     const jwt = new JwtService({ secret: 'verify-conversation-memory-forget-secret' })
     const configStub = { getApiKey: () => 'verify-key', getConfig: () => llmConfig, isReady: () => true }
     const { LlmConfigService } = await import('../src/ai/llm/llm-config.service')
@@ -174,7 +179,11 @@ async function main(): Promise<void> {
         { provide: LlmAdvisorService, useValue: {
           isAvailable: () => true,
           providerLabel: () => 'verify',
-          answer: async (question: string) => ({ answer: `答：${question}`, evidenceLevel: 'E3', sourceNote: '参考' }),
+          answer: async (question: string) => {
+            modelGate.entered()
+            await modelGate.wait()
+            return { answer: `答：${question}`, evidenceLevel: 'E3', sourceNote: '参考' }
+          },
         } },
         { provide: AdvisorArtifactService, useValue: { save: async () => { throw new Error('不应走到保存要点') } } },
         { provide: AuditService, useValue: { write: async () => undefined } },
@@ -200,6 +209,8 @@ async function main(): Promise<void> {
 
     ;(globalThis as { fetch: typeof fetch }).fetch = (async (_url: string, init?: RequestInit) => {
       sent.push(JSON.parse(String(init?.body ?? '{}')) as SentBody)
+      const pending = llmGate.pending
+      if (pending) await pending
       return { ok: true, status: 200, statusText: 'OK', json: async () => ({ choices: [{ message: { content: '模型的回答' } }] }) } as Response
     }) as typeof fetch
 
@@ -472,6 +483,72 @@ async function main(): Promise<void> {
       dbStatus = 200
     } catch { dbStatus = 500 } finally { delete (prisma as { advisorSession?: unknown }).advisorSession }
     check(dbStatus === 500 && memory.read(workOther).some((turn) => turn.content.includes(qOther)), '场景 7：数据库不可用时不回 forgotten:0，错误照常抛出，另一个作业还在')
+
+    // ── 场景 8：在途回复不得把已忘掉的会话写回 ─────────────────
+    async function waitUntil(ready: () => boolean, label: string): Promise<void> {
+      const started = Date.now()
+      while (!ready()) {
+        if (Date.now() - started > 3_000) throw new Error(`超时：${label}`)
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+    }
+    const userHang = `verify-hang-${randomUUID()}`
+    await createUser(userHang)
+    const ownerHang = `u:${userHang}`
+    const markHang = textMark('在途聊天原话')
+    const seededChat = await chatTurn(ownerHang, undefined, textMark('在途聊天上一轮'))
+    let releaseChat!: () => void
+    llmGate.pending = new Promise((resolve) => { releaseChat = resolve })
+    const chatBefore = sent.length
+    const chatPending = chat.chat({ message: markHang, channel: 'kiosk', sessionId: seededChat.result.sessionId } as never, undefined, ownerHang)
+    try {
+      await waitUntil(() => sent.length > chatBefore, '小青假模型挂起')
+      const removedChat = chat.forgetSession(seededChat.result.sessionId, ownerHang)
+      const goneNow = chat.getOwnedTranscript(seededChat.result.sessionId, ownerHang)
+      check(removedChat === true && goneNow === null, '场景 8 阳性：挂起期间忘掉小青会话，当场读是空的')
+      releaseChat()
+      llmGate.pending = null
+      const chatResult = await chatPending
+      const afterChat = chat.getOwnedTranscript(seededChat.result.sessionId, ownerHang)
+      const restored = JSON.stringify(afterChat ?? '')
+      check(
+        typeof chatResult.reply === 'string' && chatResult.reply.length > 0
+          && afterChat === null
+          && !restored.includes(markHang),
+        '场景 8：放行后回复仍返回，内存里没有这段小青对话',
+      )
+    } finally {
+      releaseChat()
+      llmGate.pending = null
+    }
+
+    const workHang = `verify-work-hang-${randomUUID()}`
+    await createQa(userHang, workHang, `verify-art-hang-${randomUUID()}`)
+    const markQa = textMark('在途作业原话')
+    await advisor.ask(workHang, textMark('在途作业上一轮'), { endUserId: userHang, accessToken: null })
+    let releaseQa!: () => void
+    let qaEntered!: () => void
+    const qaEnteredPromise = new Promise<void>((resolve) => { qaEntered = resolve })
+    modelGate.entered = qaEntered
+    modelGate.wait = () => new Promise((resolve) => { releaseQa = resolve })
+    const qaPending = advisor.ask(workHang, markQa, { endUserId: userHang, accessToken: null })
+    try {
+      await qaEnteredPromise
+      const removedQa = await advisor.forgetSession(workHang, { endUserId: userHang, accessToken: null })
+      check(removedQa.forgotten === 1 && memory.read(workHang).length === 0, '场景 8 阳性：挂起期间忘掉作业，当场读是空的')
+      releaseQa()
+      const qaResult = await qaPending
+      const left = memory.read(workHang).map((turn) => turn.content).join('\n')
+      check(
+        typeof qaResult.answer === 'string' && qaResult.answer.length > 0
+          && !left.includes(markQa),
+        '场景 8：放行后作业回答仍返回，内存里没有这段作业对话',
+      )
+    } finally {
+      releaseQa?.()
+      modelGate.wait = async () => undefined
+      modelGate.entered = () => undefined
+    }
 
     console.log(`\nverify:conversation-memory-forget ${failCount === 0 ? '通过' : '未通过'}：PASS ${passCount} / FAIL ${failCount}`)
     if (failCount > 0) process.exitCode = 1

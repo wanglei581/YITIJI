@@ -338,6 +338,7 @@ export class AdvisorService {
       })
     }
     const memory = this.qaMemory.read(sessionId)
+    const capturedEpoch = this.qaMemory.capture(sessionId)
     // 作业面请求里没有渠道。小程序只读会话和本次要点，不走 ask()，所以固定用一体机那段。
     if (isDeviceFaultQuestion(question)) {
       return {
@@ -382,6 +383,7 @@ export class AdvisorService {
         maskUserTextForLlmText(question.trim().slice(0, 600), 'advisor_qa'),
         value.answer,
         row.endUserId ? `u:${row.endUserId}` : null,
+        capturedEpoch,
       )
       return sessionId
     }
