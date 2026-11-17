@@ -9,21 +9,19 @@ test.describe('文件管理（mock 口径）', () => {
     await expect(page.getByRole('heading', { name: '文件管理' })).toBeVisible()
 
     const deleteButton = page.getByRole('button', { name: /删除/ }).first()
-    if (await deleteButton.isVisible()) {
-      await expectDialogAndDismiss(page, () => deleteButton.click(), /确认删除文件[\s\S]*正在打印的文件会拒绝删除/)
-    }
+    await expect(deleteButton).toBeVisible()
+    await expectDialogAndDismiss(page, () => deleteButton.click(), /确认删除文件[\s\S]*正在打印的文件会拒绝删除/)
 
     const cleanup = page.getByRole('button', { name: /清理过期/ })
-    if (await cleanup.isVisible()) {
-      const message = await expectDialogAndDismiss(
-        page,
-        () => cleanup.click(),
-        /立即清理已过期、且当前没有在打印的文件/,
-      )
-      expect(message).not.toMatch(/所有已过期/)
-      expect(message).toMatch(/会员数据导出不在这次清理里/)
-      expect(message).toMatch(/物理删除清理到的文件并写入审计/)
-    }
+    await expect(cleanup).toBeVisible()
+    const message = await expectDialogAndDismiss(
+      page,
+      () => cleanup.click(),
+      /立即清理已过期、且当前没有在打印的文件/,
+    )
+    expect(message).not.toMatch(/所有已过期/)
+    expect(message).toMatch(/会员数据导出不在这次清理里/)
+    expect(message).toMatch(/物理删除清理到的文件并写入审计/)
 
     await expect(page.getByRole('heading', { name: '文件管理' })).toBeVisible()
   })

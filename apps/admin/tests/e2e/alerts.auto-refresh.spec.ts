@@ -95,6 +95,63 @@ test('自动刷新失败时保留上一份列表，并写明不是现状', async
   await expect(page.getByRole('button', { name: '重新获取' })).toHaveCount(1)
 })
 
+test('请求在途时切后台再切回，页面不重复刷新也不报错', async ({ page }) => {
+  let gets = 0
+  let releaseSecond: () => void = () => {}
+  let markSecondStarted: () => void = () => {}
+  const secondStarted = new Promise<void>((resolve) => {
+    markSecondStarted = resolve
+  })
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url())
+    const json = (body: unknown, status = 200) => route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    })
+    if (url.pathname.endsWith('/auth/me')) {
+      return json({ data: { userId: MOCK_ADMIN_AUTH.user.id, role: 'admin', orgId: null } })
+    }
+    if (url.pathname.endsWith('/admin/alerts')) {
+      gets += 1
+      if (gets === 2) {
+        markSecondStarted()
+        await new Promise<void>((resolve) => {
+          releaseSecond = resolve
+        })
+      }
+      return json(alertsBody())
+    }
+    return json({ items: [], total: 0, data: [] })
+  })
+  await page.clock.install()
+  await openAlerts(page)
+  await expect(page.getByText(PROBE_TITLE)).toBeVisible()
+  await expect(page.getByText(/最后刷新 \d{2}:\d{2}:\d{2}/)).toHaveCount(1)
+  await page.clock.fastForward(60_000)
+  await secondStarted
+  await page.evaluate(() => {
+    const setVisibility = (state: DocumentVisibilityState) => {
+      Object.defineProperty(Document.prototype, 'visibilityState', {
+        configurable: true,
+        get: () => state,
+      })
+      document.dispatchEvent(new Event('visibilitychange'))
+    }
+    setVisibility('hidden')
+    setVisibility('visible')
+  })
+  await expect(page.getByText(PROBE_TITLE)).toHaveCount(1)
+  await expect(page.getByText('出现了一些问题')).toHaveCount(0)
+  await expect(page.getByText(/最后刷新 \d{2}:\d{2}:\d{2}/)).toHaveCount(1)
+  await expect(page.getByRole('button', { name: '重新获取' })).toHaveCount(1)
+  releaseSecond()
+  await expect.poll(() => gets).toBe(2)
+  await expect(page.getByText(PROBE_TITLE)).toHaveCount(1)
+  await expect(page.getByText('出现了一些问题')).toHaveCount(0)
+  await expect(page.getByText(/最后刷新 \d{2}:\d{2}:\d{2}/)).toHaveCount(1)
+})
+
 test('离开告警页后不再请求告警列表', async ({ page }) => {
   const alerts = await installAlerts(page, 'ok')
   await openAlerts(page)
