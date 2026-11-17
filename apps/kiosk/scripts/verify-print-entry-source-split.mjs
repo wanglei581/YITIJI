@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import ts from 'typescript'
 
 const root = resolve(import.meta.dirname, '..')
 
@@ -10,6 +11,111 @@ function read(path) {
 function assert(condition, message) {
   if (!condition) throw new Error(message)
   console.log(`PASS ${message}`)
+}
+
+/** 照 verify-fusion-w6.mjs：标识符或字符串字面量才算属性名，计算属性读不出名字。 */
+function propertyName(node) {
+  return ts.isIdentifier(node) || ts.isStringLiteralLike(node) ? node.text : null
+}
+
+function unwrapExpression(node) {
+  let current = node
+  while (
+    current &&
+    (ts.isAsExpression(current) ||
+      ts.isSatisfiesExpression(current) ||
+      ts.isParenthesizedExpression(current) ||
+      ts.isNonNullExpression(current))
+  ) {
+    current = current.expression
+  }
+  return current
+}
+
+/** 对象字面量的直接属性名。展开、方法、简写、计算属性一律不当成允许键。 */
+function objectLiteralKeys(node) {
+  const expr = unwrapExpression(node)
+  if (!expr || !ts.isObjectLiteralExpression(expr)) {
+    return { ok: false, reason: '去确认页的 state 不是对象字面量' }
+  }
+  const keys = []
+  for (const prop of expr.properties) {
+    if (!ts.isPropertyAssignment(prop) || ts.isComputedPropertyName(prop.name)) {
+      return { ok: false, reason: '去确认页的 state 含有展开、简写或计算属性' }
+    }
+    const name = propertyName(prop.name)
+    if (!name) return { ok: false, reason: '去确认页的 state 读不出属性名' }
+    keys.push(name)
+  }
+  return { ok: true, keys }
+}
+
+/** 三元的两个分支都收成对象字面量；嵌套三元继续往下收。 */
+function stateBranches(node) {
+  const expr = unwrapExpression(node)
+  if (!expr) return { ok: false, reason: '去确认页没有 state' }
+  if (ts.isConditionalExpression(expr)) {
+    const whenTrue = stateBranches(expr.whenTrue)
+    const whenFalse = stateBranches(expr.whenFalse)
+    if (!whenTrue.ok) return whenTrue
+    if (!whenFalse.ok) return whenFalse
+    return { ok: true, branches: [...whenTrue.branches, ...whenFalse.branches] }
+  }
+  const literal = objectLiteralKeys(expr)
+  if (!literal.ok) return literal
+  return { ok: true, branches: [literal.keys] }
+}
+
+const CONFIRM_ROUTE_STATE_KEYS = new Set(['printContextId', 'printReturnState'])
+
+/**
+ * 预览页去确认页的路由状态允许名单：只许交接编号和那一个回执字段。
+ * 按名字读 `navigate('/print/confirm')` 第二参里 state 的对象字面量键。
+ */
+function confirmRouteStateAllowed(sourceText) {
+  const source = ts.createSourceFile('PrintPreviewPage.tsx', sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const calls = []
+  const visit = (node) => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'navigate' &&
+      node.arguments[0] &&
+      ts.isStringLiteralLike(node.arguments[0]) &&
+      node.arguments[0].text === '/print/confirm'
+    ) {
+      calls.push(node)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  if (calls.length !== 1) {
+    return { ok: false, reason: `预览页去确认页的 navigate 应只有一处，实际 ${calls.length} 处` }
+  }
+  const options = unwrapExpression(calls[0].arguments[1])
+  if (!options || !ts.isObjectLiteralExpression(options)) {
+    return { ok: false, reason: 'navigate 的第二参不是对象字面量' }
+  }
+  let stateInit = null
+  for (const prop of options.properties) {
+    if (!ts.isPropertyAssignment(prop) || ts.isComputedPropertyName(prop.name)) {
+      return { ok: false, reason: 'navigate 的选项含有展开、简写或计算属性' }
+    }
+    if (propertyName(prop.name) === 'state') stateInit = prop.initializer
+  }
+  if (!stateInit) return { ok: false, reason: 'navigate 没有 state' }
+  const collected = stateBranches(stateInit)
+  if (!collected.ok) return collected
+  for (const keys of collected.branches) {
+    if (!keys.includes('printContextId')) {
+      return { ok: false, reason: '每个分支都要带交接编号 printContextId' }
+    }
+    const extra = keys.filter((key) => !CONFIRM_ROUTE_STATE_KEYS.has(key))
+    if (extra.length > 0) {
+      return { ok: false, reason: `路由状态出现允许名单之外的键：${extra.join(',')}` }
+    }
+  }
+  return { ok: true, reason: '' }
 }
 
 const homeServiceGroups = read('src/pages/home/serviceGroups.ts')
@@ -105,11 +211,16 @@ for (const [handler, marker] of [
   )
 }
 
-// 打印链只从打印交接上下文读 source。去确认页带交接编号；报告导出回执可以
-// 作为已经校验过的 printReturnState 原样带回。文件、参数、检查结论、来源不进路由状态。
+// 打印链只从打印交接上下文读 source。去确认页的路由状态是允许名单：
+// 只许交接编号 printContextId 和已经校验过的回执 printReturnState。
 const carryAt = previewPage.indexOf('const carriedReturn = readPrintReturnCarry(')
 const carryEnd = previewPage.indexOf('\n  }\n', carryAt)
 const carrySlice = carryAt >= 0 ? previewPage.slice(carryAt, carryEnd) : ''
+const routeState = confirmRouteStateAllowed(previewPage)
+assert(
+  routeState.ok,
+  `去确认页的路由状态只许交接编号和回执：${routeState.reason || '通过'}`,
+)
 assert(
   materialCheckPage.includes('const source = session?.source ?? handoff?.source') &&
     !materialCheckPage.includes('location.state') &&
@@ -117,7 +228,6 @@ assert(
     carrySlice.includes("navigate('/print/confirm'") &&
     carrySlice.includes('printContextId: saved.contextId') &&
     carrySlice.includes('printReturnState: carriedReturn') &&
-    !/\b(file|params|materialCheck|source)\s*:/.test(carrySlice) &&
     confirmPage.includes('const source = handoff?.source') &&
     !/state\?\.(file|params|source|materialCheck)\b/.test(confirmPage),
   '打印流程只从打印交接上下文读 source 与文件身份；去确认页只多带校验过的回执返回状态',
