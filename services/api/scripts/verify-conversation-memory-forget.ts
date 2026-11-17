@@ -10,7 +10,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { BadRequestException, Module, NotFoundException, ValidationPipe } from '@nestjs/common'
+import { BadRequestException, HttpException, Module, NotFoundException, ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import { AssistantSessionForgetController } from '../src/ai/assistant-session-forget.controller'
@@ -27,8 +27,10 @@ import { LlmAdvisorService } from '../src/advisor/llm-advisor.service'
 import { AuditService } from '../src/audit/audit.service'
 import { ConversationMemoryBridge } from '../src/common/conversation-memory-bridge'
 import { ConversationMemoryModule } from '../src/common/conversation-memory.module'
+import { resolveOptionalEndUser } from '../src/common/auth/optional-end-user'
 import { memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { RedisService } from '../src/common/redis/redis.service'
+import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { MemberAuthService } from '../src/member-auth/member-auth.service'
 import { SMS_SENDER } from '../src/member-auth/sms/sms-sender'
@@ -549,6 +551,77 @@ async function main(): Promise<void> {
       modelGate.wait = async () => undefined
       modelGate.entered = () => undefined
     }
+
+    // ── 场景 9：身份查询出错不得装作已清 0 ─────────────────────
+    async function callForget(run: () => Promise<{ forgotten: number }>): Promise<{ status: number; forgotten: number | null }> {
+      try {
+        const body = await run()
+        return { status: 200, forgotten: body.forgotten }
+      } catch (error) {
+        return { status: error instanceof HttpException ? error.getStatus() : -1, forgotten: null }
+      }
+    }
+    function notPretendCleared(result: { status: number; forgotten: number | null }): boolean {
+      return !(result.status === 200 && result.forgotten === 0)
+    }
+    const userId9 = `verify-id-${randomUUID()}`
+    await createUser(userId9)
+    const markChat9 = textMark('身份故障聊天原话')
+    const chat9 = await chatTurn(`u:${userId9}`, undefined, markChat9)
+    const work9 = `verify-work-id-${randomUUID()}`
+    await createQa(userId9, work9, `verify-art-id-${randomUUID()}`)
+    const markQa9 = textMark('身份故障作业原话')
+    await advisor.ask(work9, markQa9, { endUserId: userId9, accessToken: null })
+    const memberToken9 = bearer(userId9)
+    const memberReq9 = { headers: { authorization: `Bearer ${memberToken9}` }, ip: '10.9.9.9' }
+    function memoriesRemain(): boolean {
+      const transcript = chat.getOwnedTranscript(chat9.result.sessionId, `u:${userId9}`)
+      return !!transcript?.some((turn) => turn.content.includes(markChat9))
+        && memory.read(work9).some((turn) => turn.content.includes(markQa9))
+    }
+    const originalRedisGet = redis.get
+    redis.get = async () => {
+      throw new Error('redis down')
+    }
+    try {
+      const loose = await resolveOptionalEndUser(`Bearer ${memberToken9}`, jwt, redis as never, prisma)
+      check(loose === null, '场景 9 阳性：不带严格模式时，Redis 故障仍当游客，其它接口口径不变')
+      resetRedisCooldownForTests()
+      const assistantRedis = await callForget(async () => controller.forget(
+        await pipe.transform({ sessionIds: [chat9.result.sessionId] }, { type: 'body', metatype: AssistantSessionsForgetDto }) as AssistantSessionsForgetDto,
+        memberReq9,
+      ))
+      check(notPretendCleared(assistantRedis), `场景 9：小青清场在 Redis 故障时不回 200/0（实际 ${assistantRedis.status}/${String(assistantRedis.forgotten)}）`)
+      resetRedisCooldownForTests()
+      const advisorRedis = await callForget(() => advisorController.forget(work9, memberReq9))
+      check(notPretendCleared(advisorRedis), `场景 9：作业清场在 Redis 故障时不回 200/0（实际 ${advisorRedis.status}/${String(advisorRedis.forgotten)}）`)
+    } finally {
+      redis.get = originalRedisGet
+      resetRedisCooldownForTests()
+    }
+    const realEndUser = prisma.endUser
+    Object.defineProperty(prisma, 'endUser', {
+      configurable: true,
+      get: () => new Proxy(realEndUser, {
+        get(target, prop, receiver) {
+          if (prop === 'findUnique') return () => Promise.reject(new Error('database unavailable'))
+          const value = Reflect.get(target, prop, receiver)
+          return typeof value === 'function' ? value.bind(target) : value
+        },
+      }),
+    })
+    try {
+      const assistantDb = await callForget(async () => controller.forget(
+        await pipe.transform({ sessionIds: [chat9.result.sessionId] }, { type: 'body', metatype: AssistantSessionsForgetDto }) as AssistantSessionsForgetDto,
+        memberReq9,
+      ))
+      check(notPretendCleared(assistantDb), `场景 9：小青清场在会员库故障时不回 200/0（实际 ${assistantDb.status}/${String(assistantDb.forgotten)}）`)
+      const advisorDb = await callForget(() => advisorController.forget(work9, memberReq9))
+      check(notPretendCleared(advisorDb), `场景 9：作业清场在会员库故障时不回 200/0（实际 ${advisorDb.status}/${String(advisorDb.forgotten)}）`)
+    } finally {
+      delete (prisma as { endUser?: unknown }).endUser
+    }
+    check(memoriesRemain(), '场景 9 阳性：身份查询失败之后，两段原话都还在')
 
     console.log(`\nverify:conversation-memory-forget ${failCount === 0 ? '通过' : '未通过'}：PASS ${passCount} / FAIL ${failCount}`)
     if (failCount > 0) process.exitCode = 1

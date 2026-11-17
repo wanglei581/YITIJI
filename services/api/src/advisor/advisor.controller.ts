@@ -79,8 +79,14 @@ export class AdvisorController {
     private readonly prisma: PrismaService,
   ) {}
 
-  private async requesterOf(req: ReqLike) {
-    const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
+  private async requesterOf(req: ReqLike, strict = false) {
+    const member = await resolveOptionalEndUser(
+      headerOf(req, 'authorization') ?? undefined,
+      this.jwt,
+      this.redis,
+      this.prisma,
+      strict ? { strict: true } : undefined,
+    )
     if (member) return { endUserId: member.endUserId, accessToken: null }
     return { endUserId: null, accessToken: headerOf(req, 'x-advisor-access-token') }
   }
@@ -194,6 +200,6 @@ export class AdvisorController {
   @AiUseExempt('清场时丢掉这一次作业的问答内存，不调模型；AI 暂停期间也必须能删')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async forget(@Param('sessionId') sessionId: string, @Req() req: ReqLike) {
-    return this.service.forgetSession(sessionId, await this.requesterOf(req))
+    return this.service.forgetSession(sessionId, await this.requesterOf(req, true))
   }
 }

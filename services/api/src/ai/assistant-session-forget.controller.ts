@@ -42,7 +42,7 @@ export class AssistantSessionForgetController {
     @Body() dto: AssistantSessionsForgetDto,
     @Req() req: ReqLike,
   ): Promise<{ forgotten: number }> {
-    const member = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    const member = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma, { strict: true })
     const ownerKey = assistantOwnerKey(member?.endUserId ?? null, resolveClientIp(req))
     let forgotten = 0
     for (const sessionId of dto.sessionIds) {
