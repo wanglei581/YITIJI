@@ -10,7 +10,6 @@ import {
   getFileSignedUrl,
   listFiles,
   type AdminFileLifecycleSummary,
-  type AdminFilePurpose,
   type AdminFileRecord,
 } from '../../services/api'
 import {
@@ -23,7 +22,7 @@ import { RETENTION_FILTERS } from './retentionMeta'
 import { RetentionSummary } from './RetentionSummary'
 import { FileTable } from './FileTable'
 
-const TYPE_TO_PURPOSE: Partial<Record<string, AdminFilePurpose>> = {
+const TYPE_TO_PURPOSE: Partial<Record<string, string>> = {
   简历上传: 'resume_upload',
   简历扫描: 'resume_scan',
   身份证: 'id_scan',
