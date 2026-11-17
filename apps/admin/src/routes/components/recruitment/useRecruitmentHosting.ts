@@ -14,14 +14,26 @@ import { recruitmentEmergencyService } from '../../../services/api/recruitmentEm
  *
  * 开关是部署级环境变量，运行期不会变，所以一次页面生命周期里只请求一次；失败后下次挂载重试。
  */
+export type RecruitmentOperatorSelfReportView = {
+  name: string
+  licenseNumber: string
+  credentialType: 'hr_service_license' | 'public_employment_registration'
+}
+
 export type RecruitmentHostingView =
   | { status: 'loading'; writable: false; retry: () => void }
-  | { status: 'ready'; enabled: boolean; writable: boolean; retry: () => void }
+  | {
+      status: 'ready'
+      enabled: boolean
+      writable: boolean
+      operatorSelfReport: RecruitmentOperatorSelfReportView | null
+      retry: () => void
+    }
   | { status: 'error'; writable: false; retry: () => void }
 
-let pending: Promise<boolean> | null = null
+let pending: Promise<{ enabled: boolean; operatorSelfReport: RecruitmentOperatorSelfReportView | null }> | null = null
 
-function loadHostingEnabled(): Promise<boolean> {
+function loadHostingEnabled(): Promise<{ enabled: boolean; operatorSelfReport: RecruitmentOperatorSelfReportView | null }> {
   if (!pending) {
     pending = recruitmentEmergencyService.getHostingEnabled().catch((error: unknown) => {
       pending = null
@@ -31,7 +43,10 @@ function loadHostingEnabled(): Promise<boolean> {
   return pending
 }
 
-type Snapshot = { status: 'loading' } | { status: 'ready'; enabled: boolean } | { status: 'error' }
+type Snapshot =
+  | { status: 'loading' }
+  | { status: 'ready'; enabled: boolean; operatorSelfReport: RecruitmentOperatorSelfReportView | null }
+  | { status: 'error' }
 
 export function useRecruitmentHosting(): RecruitmentHostingView {
   const [snapshot, setSnapshot] = useState<Snapshot>({ status: 'loading' })
@@ -40,7 +55,9 @@ export function useRecruitmentHosting(): RecruitmentHostingView {
   useEffect(() => {
     let alive = true
     loadHostingEnabled()
-      .then((enabled) => { if (alive) setSnapshot({ status: 'ready', enabled }) })
+      .then((flag) => {
+        if (alive) setSnapshot({ status: 'ready', enabled: flag.enabled, operatorSelfReport: flag.operatorSelfReport })
+      })
       .catch(() => { if (alive) setSnapshot({ status: 'error' }) })
     return () => { alive = false }
   }, [attempt])
@@ -51,7 +68,13 @@ export function useRecruitmentHosting(): RecruitmentHostingView {
   }, [])
 
   if (snapshot.status === 'ready') {
-    return { status: 'ready', enabled: snapshot.enabled, writable: snapshot.enabled, retry }
+    return {
+      status: 'ready',
+      enabled: snapshot.enabled,
+      writable: snapshot.enabled,
+      operatorSelfReport: snapshot.operatorSelfReport,
+      retry,
+    }
   }
   return { status: snapshot.status, writable: false, retry }
 }
