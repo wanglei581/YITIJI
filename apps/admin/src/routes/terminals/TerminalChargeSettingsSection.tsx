@@ -65,7 +65,7 @@ export function TerminalChargeSettingsSection({
 }: {
   terminalId: string
   orgId: string | null
-  /** 本次改绑接口返回已复位时，由抽屉外层留下这一句。重新打开抽屉时外层清掉。 */
+  /** 本次改绑接口返回已复位时，由抽屉外层留下这一句。保存成功后外层清掉；保存失败时保留。关掉抽屉时外层也清掉。 */
   resetNotice: string | null
   /** 改绑机构的请求还没回来。这段时间不能保存，否则会把旧价写进新机构。 */
   savingOrg: boolean
