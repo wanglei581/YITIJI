@@ -45,6 +45,7 @@ const exemptions: Record<string, string> = {
   "scripts/verify-terminal-credentials.ts": "验证设备令牌签发、迁移和撤销，不调用招聘内容配置路径。",
   "scripts/verify-terminal-device-config.ts": "只断言终端凭证、停用后的学校与工具箱配置及敏感字段，不断言 recruitmentHosting 返回值。",
   "scripts/verify-terminal-provisioning.ts": "验证设备预配、激活与生命周期守卫，不调用招聘托管内容路径。",
+  "scripts/verify-terminal-batch-activation.ts": "验证批量预建、绑定码与列表上的激活状态、心跳和程序版本；终端管理服务只用来读列表，不调用招聘托管内容。",
   "scripts/verify-terminal-test-print-seed-guard.ts": "只验证测试打印种子创建守卫，不读取招聘配置。",
   "src/ai/resume/__tests__/self-assessment-consent-reconfirm.test.ts": "验证自我探索授权撤回后职业规划重新确认；夹具无系统岗位匹配上下文。",
 }
