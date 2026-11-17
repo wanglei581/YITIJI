@@ -155,8 +155,8 @@ export class AdvisorQaMemory {
       if (entry.updatedAt < oldestAt) { oldestAt = entry.updatedAt; oldestId = id }
     }
     if (!oldestId) return
-    this.store.delete(oldestId)
-    // 只报容量，不报 sessionId / 内容。被淘汰的会话下一轮追问会失去上文（仍能作答）。
+    this.drop(oldestId)
+    // 只报容量，不报 sessionId / 内容。被淘汰的在途回复不再写回；下一轮追问会失去上文，仍能作答。
     this.logger.warn(`advisor.qa_memory_evicted size=${this.store.size}`)
   }
 }

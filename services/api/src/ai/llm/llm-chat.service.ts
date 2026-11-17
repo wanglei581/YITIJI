@@ -329,7 +329,7 @@ export class LlmChatService {
         oldestId = id
       }
     }
-    if (oldestId) this.sessions.delete(oldestId)
+    if (oldestId) this.dropSession(oldestId)
   }
 
   private ownerSessionCount(ownerKey: string): number {
