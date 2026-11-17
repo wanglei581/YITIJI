@@ -2780,7 +2780,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/companies/companies.types.ts` | `verify-companies.ts` |
 | `services/api/src/config/ai-platform-config.ts` | `verify-ai-platform-degradation.ts` |
 | `services/api/src/config/body-parsers.ts` | `verify-payment-real-channels.ts`<br/>`verify-resume-export-draft-source.ts` |
-| `services/api/src/config/production-runtime-gates.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-cjk-font.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-payment-flow.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-production-real-services.ts`<br/>`verify-production-runtime-gates.ts` |
+| `services/api/src/config/production-runtime-gates.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-cjk-font.ts`<br/>`verify-operator-credential-type.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-payment-flow.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-production-real-services.ts`<br/>`verify-production-runtime-gates.ts` |
 | `services/api/src/config/trust-proxy.ts` | `verify-trust-proxy.ts` |
 | `services/api/src/console-screen/console-screen.fleet.ts` | `verify-queue-dispatch-printer-status.ts` |
 | `services/api/src/content/content-signing.ts` | `verify-ad-asset-range.ts`<br/>`verify-screensaver-content.ts` |
@@ -3145,7 +3145,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/recruitment-content/recruitment-wave2-proposed-governance-rules.ts` | `verify-recruitment-wave2-proposed-governance.ts` |
 | `services/api/src/recruitment-content/recruitment-wave2-proposed-governance.types.ts` | `verify-recruitment-wave2-proposed-governance.ts` |
 | `services/api/src/recruitment-content/recruitment-wave2-target.ts` | `verify-recruitment-wave2-full-inventory.ts`<br/>`verify-recruitment-wave2-readonly.ts` |
-| `services/api/src/recruitment-hosting/deployment-ownership.ts` | `verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-production-runtime-gates.ts` |
+| `services/api/src/recruitment-hosting/deployment-ownership.ts` | `verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-operator-credential-type.ts`<br/>`verify-production-runtime-gates.ts` |
 | `services/api/src/recruitment-hosting/recruitment-emergency.controller.ts` | `verify-official-channels.ts`<br/>`verify-recruitment-emergency-scope.ts` |
 | `services/api/src/recruitment-hosting/recruitment-emergency.service.ts` | `verify-compliance-copy.mjs`<br/>`verify-companies.ts`<br/>`verify-job-review.ts`<br/>`verify-official-channels.ts`<br/>`verify-recruitment-emergency-scope.ts` |
 | `services/api/src/recruitment-hosting/recruitment-hosting.ts` | `verify-recruitment-hosting-default-off.ts` |

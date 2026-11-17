@@ -28784,6 +28784,7 @@
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
       "services/api/scripts/verify-cjk-font.ts",
+      "services/api/scripts/verify-operator-credential-type.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
@@ -31084,6 +31085,7 @@
     "services/api/src/recruitment-hosting/deployment-ownership.ts": [
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
+      "services/api/scripts/verify-operator-credential-type.ts",
       "services/api/scripts/verify-production-runtime-gates.ts"
     ],
     "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts": [
@@ -45518,6 +45520,25 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:offline-agencies-page"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-operator-credential-type.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:production-runtime-gates"
       ],
       "wired": true
     },
