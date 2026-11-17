@@ -197,6 +197,13 @@ export interface AdminTerminalRecord {
   homeFreeBadge?: boolean
   /** 本机谁付钱和五个生效价。缺省时收费设置节自己再读一次。 */
   charge?: EffectiveUserPrices
+  /** 批量预建批次号。单台预建或旧数据为空。 */
+  provisionBatchId?: string | null
+  /** 未生成码 / 码未用 / 码已过期 / 已激活。缺省时页面写未上报。 */
+  activationStatus?: 'no_code' | 'code_unused' | 'code_expired' | 'activated' | null
+  activationStatusLabel?: string | null
+  /** 最早一次绑定码兑换时间。没有则页面写未上报。 */
+  firstActivatedAt?: string | null
 }
 
 export interface CreatePlannedTerminalInput {
