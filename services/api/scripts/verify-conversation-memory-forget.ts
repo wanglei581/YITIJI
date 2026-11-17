@@ -623,6 +623,55 @@ async function main(): Promise<void> {
     }
     check(memoriesRemain(), '场景 9 阳性：身份查询失败之后，两段原话都还在')
 
+    // ── 场景 10：两种凭据都在时，游客作业也清，但不能清别人的 ──
+    const userBoth = `verify-both-${randomUUID()}`
+    await createUser(userBoth)
+    const tokenMine = `tok-${randomUUID()}`
+    const tokenOther = `tok-${randomUUID()}`
+    const workGuest = `verify-work-both-${randomUUID()}`
+    const workStranger = `verify-work-stranger-${randomUUID()}`
+    const workMemberBoth = `verify-work-both-member-${randomUUID()}`
+    await createAnon(workGuest, tokenMine)
+    await createAnon(workStranger, tokenOther)
+    await createQa(userBoth, workMemberBoth, `verify-art-both-${randomUUID()}`)
+    const markGuest = textMark('双头游客原话')
+    const markStranger = textMark('别人游客原话')
+    const markMemberBoth = textMark('双头会员原话')
+    await advisor.ask(workGuest, markGuest, { endUserId: null, accessToken: tokenMine })
+    await advisor.ask(workStranger, markStranger, { endUserId: null, accessToken: tokenOther })
+    await advisor.ask(workMemberBoth, markMemberBoth, { endUserId: userBoth, accessToken: null })
+    const memberBearer = bearer(userBoth)
+    const dual = (guestToken: string) => ({
+      headers: {
+        authorization: `Bearer ${memberBearer}`,
+        'x-advisor-access-token': guestToken,
+      },
+    })
+    const swapped = await advisorController.forget(workGuest, dual(tokenOther))
+    check(
+      swapped.forgotten === 0 && memory.read(workGuest).some((turn) => turn.content.includes(markGuest)),
+      `场景 10：双头里的游客令牌对不上这个作业 → forgotten:0（实际 ${swapped.forgotten}）`,
+    )
+    const notStranger = await advisorController.forget(workStranger, dual(tokenMine))
+    check(
+      notStranger.forgotten === 0 && memory.read(workStranger).some((turn) => turn.content.includes(markStranger)),
+      '场景 10：双头里游客令牌换成别人的，别人的作业不被清',
+    )
+    const clearedGuest = await advisorController.forget(workGuest, dual(tokenMine))
+    check(
+      clearedGuest.forgotten === 1 && memory.read(workGuest).length === 0,
+      `场景 10：会员和游客令牌一起带上时，这个游客作业被清掉（实际 ${clearedGuest.forgotten}）`,
+    )
+    const clearedMember = await advisorController.forget(workMemberBoth, dual(tokenOther))
+    check(
+      clearedMember.forgotten === 1 && memory.read(workMemberBoth).length === 0,
+      `场景 10：两种凭据都在时，会员自己的作业也清掉（实际 ${clearedMember.forgotten}）`,
+    )
+    check(
+      memory.read(workStranger).some((turn) => turn.content.includes(markStranger)),
+      '场景 10 阳性：清完自己的之后，别人的游客作业还在',
+    )
+
     console.log(`\nverify:conversation-memory-forget ${failCount === 0 ? '通过' : '未通过'}：PASS ${passCount} / FAIL ${failCount}`)
     if (failCount > 0) process.exitCode = 1
   } finally {

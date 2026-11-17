@@ -87,8 +87,13 @@ export class AdvisorController {
       this.prisma,
       strict ? { strict: true } : undefined,
     )
-    if (member) return { endUserId: member.endUserId, accessToken: null }
-    return { endUserId: null, accessToken: headerOf(req, 'x-advisor-access-token') }
+    // 其它接口认出会员后不再看游客令牌。清场（strict）两种都留下：
+    // 会员作业看会员，游客作业看这个令牌，各自核归属。
+    if (member && !strict) return { endUserId: member.endUserId, accessToken: null }
+    return {
+      endUserId: member?.endUserId ?? null,
+      accessToken: headerOf(req, 'x-advisor-access-token'),
+    }
   }
 
   /**
