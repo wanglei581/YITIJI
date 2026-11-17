@@ -13,6 +13,7 @@ import { ApiHttpError } from './client'
 export interface DemoChargeSettings extends EffectiveUserPrices {
   terminalCode: string
   orgBound: boolean
+  orgBindingGeneration: number
 }
 
 interface DemoRow {
@@ -24,6 +25,7 @@ interface DemoRow {
   configured: Record<TerminalChargeServiceKey, number>
   isPublicSite: boolean
   orgBound: boolean
+  orgBindingGeneration: number
 }
 
 /** 示例，不是真实价格。1 元 = 100 分。 */
@@ -76,6 +78,7 @@ function toView(row: DemoRow): DemoChargeSettings {
     personalChargeEnabled,
     isPublicSite: row.isPublicSite,
     orgBound: row.orgBound,
+    orgBindingGeneration: row.orgBindingGeneration,
     prices,
   }
 }
@@ -89,6 +92,7 @@ export function rememberDemoTerminal(input: {
   isPublicSite?: boolean
   userChargeMode?: TerminalUserChargeMode
   configured?: Record<TerminalChargeServiceKey, number>
+  orgBindingGeneration?: number
 }): void {
   if (rows.has(input.id)) {
     const row = rows.get(input.id)!
@@ -106,6 +110,7 @@ export function rememberDemoTerminal(input: {
     configured: input.configured ?? zeros(),
     isPublicSite: input.isPublicSite === true,
     orgBound: input.orgBound,
+    orgBindingGeneration: input.orgBindingGeneration ?? 0,
   })
 }
 
@@ -121,6 +126,7 @@ export function demoChargeSummary(id: string): EffectiveUserPrices {
       configured: zeros(),
       isPublicSite: false,
       orgBound: false,
+      orgBindingGeneration: 0,
     })
   }
   const view = toView(row)
@@ -221,6 +227,7 @@ export function resetDemoChargeOnOrgChange(terminalKey: string, orgBound: boolea
   row.userChargeMode = 'org_pays'
   row.configured = zeros()
   row.orgBound = orgBound
+  row.orgBindingGeneration += 1
 }
 
 export async function demoGetChargeSettings(terminalId: string): Promise<DemoChargeSettings> {
@@ -229,9 +236,15 @@ export async function demoGetChargeSettings(terminalId: string): Promise<DemoCha
 
 export async function demoSaveChargeSettings(
   terminalId: string,
-  body: { userChargeMode: TerminalUserChargeMode; prices: Record<TerminalChargeServiceKey, number> },
+  body: { userChargeMode: TerminalUserChargeMode; prices: Record<TerminalChargeServiceKey, number>; orgBindingGeneration: number },
 ): Promise<DemoChargeSettings> {
   const row = requireRow(terminalId)
+  if (typeof body.orgBindingGeneration !== 'number' || !Number.isInteger(body.orgBindingGeneration) || body.orgBindingGeneration < 0) {
+    throw new ApiHttpError('VALIDATION_FAILED', '必须带上读取收费设置时的绑定版本', 400)
+  }
+  if (body.orgBindingGeneration !== row.orgBindingGeneration) {
+    throw new ApiHttpError('TERMINAL_CHARGE_SETTINGS_STALE', '机构刚改过，收费设置已复位，请重新读取后再改', 409)
+  }
   const charging = body.userChargeMode === 'user_pays' || TERMINAL_CHARGE_SERVICE_KEYS.some((key) => body.prices[key] > 0)
   if (row.isPublicSite && charging) {
     throw new ApiHttpError('PUBLIC_SITE_ALWAYS_FREE', '公共就业点位永远不向求职者收费', 409)

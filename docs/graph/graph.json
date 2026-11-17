@@ -15064,7 +15064,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 827,
+      "reachableFileCount": 831,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18145,11 +18145,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1016
+      "sourceFileCount": 1020
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 101,
+      "reachableFileCount": 102,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -18673,7 +18673,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 104
+      "sourceFileCount": 105
     }
   },
   "dataModel": {
@@ -20257,7 +20257,7 @@
         ]
       },
       {
-        "fieldCount": 35,
+        "fieldCount": 36,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -21735,6 +21735,9 @@
     "apps/kiosk/src/favorites/localFavorites.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs"
+    ],
+    "apps/kiosk/src/hooks/kioskHomeFreeBadgeReader.ts": [
+      "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
     "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
@@ -24867,8 +24870,15 @@
     "apps/partner/src/routes/login/LegalDocsModal.tsx": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/partner/src/routes/login/UnregisteredPhoneNotice.tsx": [
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
+    ],
     "apps/partner/src/routes/login/index.tsx": [
-      "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+      "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
+    ],
+    "apps/partner/src/routes/login/login.css": [
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
     ],
     "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
@@ -25003,7 +25013,8 @@
       "services/api/scripts/verify-jobfair-checkin.ts"
     ],
     "apps/partner/src/services/auth/index.ts": [
-      "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+      "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
     ],
     "apps/terminal-agent/config/agent-config.example.json": [
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
@@ -26288,6 +26299,7 @@
       "services/api/scripts/verify-release-observation-contract.mjs",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
       "services/api/scripts/verify-terminal-printer-queue.ts",
@@ -26648,6 +26660,7 @@
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
@@ -26718,6 +26731,9 @@
     "services/api/scripts/support/recruitment-wave2-public-snapshot.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
     ],
+    "services/api/scripts/support/resume-optimize-after-match-r1h.ts": [
+      "services/api/scripts/verify-resume-optimize.ts"
+    ],
     "services/api/scripts/support/resume-optimize-after-match.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
     ],
@@ -26728,6 +26744,9 @@
       "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/scripts/support/resume-optimize-original-content.ts": [
+      "services/api/scripts/verify-resume-optimize.ts"
+    ],
+    "services/api/scripts/support/resume-optimize-regression-corpus.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/scripts/support/scan-panel-wording.ts": [
@@ -27720,6 +27739,7 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
+      "services/api/scripts/verify-resume-optimize-live-gate.ts",
       "services/api/scripts/verify-resume-optimize.ts",
       "services/api/scripts/verify-resume-radical-fold.ts",
       "services/api/scripts/verify-resume-radical-font-fold.ts"
@@ -30533,6 +30553,7 @@
     ],
     "services/api/src/payment/terminal-charge-settings.ts": [
       "services/api/scripts/verify-service-orders-concurrency.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/payment/terminal-charge.contract.ts": [
@@ -30543,6 +30564,7 @@
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-service-orders.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
@@ -31038,6 +31060,7 @@
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -31494,7 +31517,8 @@
       "services/api/scripts/verify-license-runtime.ts",
       "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
-      "services/api/scripts/verify-service-orders-concurrency.ts"
+      "services/api/scripts/verify-service-orders-concurrency.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts"
     ],
     "services/api/src/terminals/terminal-session.service.ts": [
       "services/api/scripts/verify-ai-safety-lexicon.ts",
@@ -33395,6 +33419,7 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/components/qingxu/touch/QxTouchTask.tsx",
+          "apps/kiosk/src/hooks/kioskHomeFreeBadgeReader.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
           "apps/kiosk/src/pages/home/components/HomeTouchView.tsx",
@@ -37070,6 +37095,27 @@
       "package": "@ai-job-print/partner",
       "scriptNames": [
         "@ai-job-print/partner::verify:job-quality-dashboard-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/partner/src/routes/login/UnregisteredPhoneNotice.tsx",
+          "apps/partner/src/routes/login/index.tsx",
+          "apps/partner/src/routes/login/login.css",
+          "apps/partner/src/services/auth/index.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/partner/scripts/verify-partner-phone-verify-guide.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/partner",
+      "scriptNames": [
+        "@ai-job-print/partner::verify:partner-phone-verify-guide"
       ],
       "wired": true
     },
@@ -48154,7 +48200,8 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "services/api/scripts/check-resume-optimize-live.ts"
+          "services/api/scripts/check-resume-optimize-live.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts"
         ],
         "missing": []
       },
@@ -48172,10 +48219,12 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/resume-optimize-after-match-r1h.ts",
           "services/api/scripts/support/resume-optimize-after-match.ts",
           "services/api/scripts/support/resume-optimize-export-contract.ts",
           "services/api/scripts/support/resume-optimize-fetch-stub.ts",
           "services/api/scripts/support/resume-optimize-original-content.ts",
+          "services/api/scripts/support/resume-optimize-regression-corpus.ts",
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/providers/llm.provider.ts",
           "services/api/src/ai/redis-inflight-lock.ts",
@@ -49141,6 +49190,30 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:terminal-bind-code"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/payment/terminal-charge-settings.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-terminal-charge-binding-race.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:terminal-charge-binding-race",
+        "@ai-job-print/api::verify:terminal-charge-binding-race:postgres"
       ],
       "wired": true
     },

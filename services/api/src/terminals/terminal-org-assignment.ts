@@ -58,7 +58,12 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
     const latest = await tx.serviceDeployment.findFirst({ where: { terminalId: terminal.id, endedAt: { not: null } }, orderBy: { endedAt: 'desc' }, select: { endedAt: true } })
     const effectiveAt = new Date(Math.max((now ?? new Date()).getTime(), active?.startedAt.getTime() ?? 0,
       current.orgBoundAt?.getTime() ?? 0, latest?.endedAt?.getTime() ?? 0))
-    await tx.terminal.update({ where: { id: terminal.id }, data: terminalOrgBindingWrite(oldOrgId, orgId, effectiveAt) })
+    const binding = terminalOrgBindingWrite(oldOrgId, orgId, effectiveAt)
+    await tx.terminal.update({
+      where: { id: terminal.id },
+      // 版本和 orgId 同一次写入。机构没变时不复位价目，版本也不加。
+      data: oldOrgId === orgId ? binding : { ...binding, orgBindingGeneration: { increment: 1 } },
+    })
     if (oldOrgId !== orgId) {
       await revokeTerminalCopyAuthorization(tx, terminal.id)
       await tx.serviceDeployment.updateMany({
