@@ -97,10 +97,11 @@ test('自动刷新失败时保留上一份列表，并写明不是现状', async
 
 test('请求在途时切后台再切回，页面不重复刷新也不报错', async ({ page }) => {
   let gets = 0
-  let releaseSecond: () => void = () => {}
-  let markSecondStarted: () => void = () => {}
-  const secondStarted = new Promise<void>((resolve) => {
-    markSecondStarted = resolve
+  let holdNext = false
+  let releaseHeld: () => void = () => {}
+  let markHeldStarted: () => void = () => {}
+  const heldStarted = new Promise<void>((resolve) => {
+    markHeldStarted = resolve
   })
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
@@ -114,10 +115,12 @@ test('请求在途时切后台再切回，页面不重复刷新也不报错', as
     }
     if (url.pathname.endsWith('/admin/alerts')) {
       gets += 1
-      if (gets === 2) {
-        markSecondStarted()
+      // 侧栏角标和本页各打一次列表。挂起的是首屏出来之后的下一次，不是这两次里的第二次。
+      if (holdNext) {
+        holdNext = false
+        markHeldStarted()
         await new Promise<void>((resolve) => {
-          releaseSecond = resolve
+          releaseHeld = resolve
         })
       }
       return json(alertsBody())
@@ -128,8 +131,10 @@ test('请求在途时切后台再切回，页面不重复刷新也不报错', as
   await openAlerts(page)
   await expect(page.getByText(PROBE_TITLE)).toBeVisible()
   await expect(page.getByText(/最后刷新 \d{2}:\d{2}:\d{2}/)).toHaveCount(1)
+  const shown = gets
+  holdNext = true
   await page.clock.fastForward(60_000)
-  await secondStarted
+  await heldStarted
   await page.evaluate(() => {
     const setVisibility = (state: DocumentVisibilityState) => {
       Object.defineProperty(Document.prototype, 'visibilityState', {
@@ -145,8 +150,9 @@ test('请求在途时切后台再切回，页面不重复刷新也不报错', as
   await expect(page.getByText('出现了一些问题')).toHaveCount(0)
   await expect(page.getByText(/最后刷新 \d{2}:\d{2}:\d{2}/)).toHaveCount(1)
   await expect(page.getByRole('button', { name: '重新获取' })).toHaveCount(1)
-  releaseSecond()
-  await expect.poll(() => gets).toBe(2)
+  expect(gets).toBe(shown + 1)
+  releaseHeld()
+  await expect.poll(() => gets).toBe(shown + 1)
   await expect(page.getByText(PROBE_TITLE)).toHaveCount(1)
   await expect(page.getByText('出现了一些问题')).toHaveCount(0)
   await expect(page.getByText(/最后刷新 \d{2}:\d{2}:\d{2}/)).toHaveCount(1)
