@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2212 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2213 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -188,7 +188,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 186 个文件</summary>
+<summary><code>apps/admin/src/</code> — 187 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -290,6 +290,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/permissions/presentation.ts` | `verify-admin-internal-accounts-ui.mjs` |
 | `apps/admin/src/routes/policy-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/print-scan/CapabilityCenter.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-scan-device-sessions.ts` |
+| `apps/admin/src/routes/print-scan/CapabilityRows.tsx` | `verify-admin-print-scan-ui.mjs` |
 | `apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx` | `verify-admin-print-scan-ui.mjs` |
 | `apps/admin/src/routes/print-scan/FreePrintQuotaCard.tsx` | `verify-free-print-quota.ts` |
 | `apps/admin/src/routes/print-scan/PrintRetryButton.tsx` | `verify-admin-print-scan-ui.mjs` |
