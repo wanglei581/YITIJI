@@ -431,6 +431,7 @@ function mountTerminalPage(options) {
       './TerminalDetailDrawer': 'src/routes/terminals/TerminalDetailDrawer.tsx',
       './TerminalHomeFreeBadgeSection': 'src/routes/terminals/TerminalHomeFreeBadgeSection.tsx',
       './TerminalChargeSettingsSection': 'src/routes/terminals/TerminalChargeSettingsSection.tsx',
+      '../../lib/kioskPayScreenNote': 'src/lib/kioskPayScreenNote.ts',
       './terminalStatusViews': 'src/routes/terminals/terminalStatusViews.ts',
       './printCompletionEvidence': 'src/routes/terminals/printCompletionEvidence.ts',
     }
