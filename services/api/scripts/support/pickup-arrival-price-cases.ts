@@ -30,6 +30,7 @@ import {
   PRINT_JOB_UNCONFIRMED_ERROR_CODE,
   PRINTING_REPORT_LOST_ERROR_CODE,
 } from '../../src/print-jobs/paid-anomaly-disposition'
+import { runArrivalMoneyCases } from './pickup-arrival-money-cases'
 import { runNoPaperAllowlistCases } from './pickup-arrival-no-paper-allowlist-cases'
 import {
   restoreTerminalChargeFixture,
@@ -458,6 +459,13 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     assert.equal(detail.refundStatus, 'failed')
     assert.equal(detail.refundFailureReason, channelFailedReason)
     assert.equal(detail.printRefundReason, channelFailedReason)
+
+    await runArrivalMoneyCases(db, {
+      tag,
+      terminalId: pricedTerminalId,
+      orderIds,
+      taskIds,
+    })
 
     await db.platformSetting.upsert({
       where: { key: PERSONAL_CHARGE_SETTING_KEY },

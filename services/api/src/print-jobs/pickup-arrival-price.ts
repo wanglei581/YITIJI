@@ -260,7 +260,14 @@ async function settlePickupArrivalOnce(
     })
 
     // 已按大于 0 的金额付过：照旧放行，不补收、不退差。
+    // 退款中、已退款不能放行。抢到「已付款」之后把任务标成认领中，退款的状态门进不来，
+    // 避免退款成功回调和核码各走各的，既退了钱又出纸。
     if (current.payStatus === 'paid' && current.amountCents > 0) {
+      const held = await tx.order.updateMany({
+        where: { id: current.id, payStatus: 'paid', taskStatus: { notIn: ['claimed', 'printing'] } },
+        data: { taskStatus: 'claimed' },
+      })
+      if (held.count !== 1) return lost()
       return { kind: 'release', arrivalCents: current.amountCents, repriced: false, notice: false }
     }
 
