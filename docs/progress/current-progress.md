@@ -13,6 +13,17 @@
 - 单测补上「3千五十万」拆开、「2亿两百万」拆开、「一万2千5千」在第二个千处拆开，以及上面 138 组和 36 组。没改现有用例的期望。
 - 没改岗位、招聘会、打印、收费、数据库和密钥。
 
+## 2026-11-17：#1640 自报改成许可证编号或公共就业服务机构登记信息二选一（未推送）
+
+- 新增 `RECRUITMENT_OPERATOR_CREDENTIAL_TYPE`。没设或空值仍是人力资源服务许可证编号那句。`public_employment_registration` 用「公共就业服务机构登记信息」那句。别的值在生产预检报 `PRODUCTION_RECRUITMENT_OPERATOR_CREDENTIAL_TYPE_INVALID`，不回显该值。内容仍填 `RECRUITMENT_OPERATOR_LICENSE_NO`。
+- 只改这条自报。托管开关、部署归属、发布流程 0a/3c/3b 没动。没有推送，没有改生产配置。
+
+## 2026-11-17：#1640 并入主线 9b50f8e0f（未推送）
+
+- 分支 `claude/move-1468-1113` 从 `c2127a815` 合并 `origin/main` `9b50f8e0f`（#1643 收费第 2 期 a，其上是 #1641 收费第 1 期、#1642 简历事实确认）。没有推送，没有改生产配置。
+- 冲突五处。`docs/graph/README.md`、`gates.md`、`graph.json`、`orphans.md` 不手改，用 `node scripts/generate-project-graph.mjs` 整套重生。`services/api/src/orgs/partner-stats.service.ts` 只在导入处冲突：本分支要招聘托管开关，主线要按机器收费的价目类型与生效价，两套导入都留，后文两边的调用已自动合上。
+- 自动合并且两边都改过：`.github/workflows/ci.yml`（本分支招聘托管门禁，主线免费角标、收费设置、服务单门禁）、`apps/kiosk/package.json`（本分支 `verify:recruitment-hosting-open`，主线 `verify:resume-fact-additions`）、`packages/shared/src/types/device.ts`（本分支改 `recruitmentHosting` 注释，主线加 `homeFreeBadge` 与 `pricing`）。
+
 ## 2026-11-15：收费设置保存核对绑定版本，改绑在途不能把旧价写进新机构（分支 `claude/pricing-p1d-1115`，未推送）
 
 - 来由：补全线第十七任 P1d。管理员在终端抽屉里改绑机构的请求已经在服务端提交、响应还没回到页面时点「保存收费设置」，旧的向用户收费价会写进新机构，顶上却写「改绑机构，收费设置已复位」。

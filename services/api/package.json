@@ -190,7 +190,7 @@
     "verify:fair-list-integrity": "node -r @swc-node/register scripts/verify-fair-list-integrity.ts",
     "verify:public-fair-demo-guard": "node -r @swc-node/register scripts/verify-public-fair-demo-guard.ts",
     "verify:production-db-guard": "node -r @swc-node/register scripts/verify-production-db-guard.ts",
-    "verify:production-runtime-gates": "node -r @swc-node/register scripts/verify-production-runtime-gates.ts",
+    "verify:production-runtime-gates": "node -r @swc-node/register scripts/verify-production-runtime-gates.ts && node -r @swc-node/register scripts/verify-operator-credential-type.ts",
     "verify:cjk-font": "node -r @swc-node/register scripts/verify-cjk-font.ts",
     "verify:boot-resilience": "node -r @swc-node/register scripts/verify-boot-resilience.ts",
     "verify:redis-degradation-truth": "node -r @swc-node/register scripts/verify-redis-degradation-truth.ts",
