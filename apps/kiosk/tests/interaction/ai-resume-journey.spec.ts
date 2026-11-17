@@ -9,6 +9,7 @@
  *
  * 不塞进 visual/，不走默认 playwright.config.ts（那会起 4177 preview 并 mock API）。
  */
+import { randomBytes } from 'node:crypto'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QRCodeSVG } from 'qrcode.react'
@@ -160,11 +161,71 @@ async function readEditorValues(page: Page): Promise<string[]> {
 }
 
 /**
+ * 走查库里的终端和会话票。
+ * 终端走真实注册接口（`POST /auth/terminal/register`，走查 API 开着遗留注册）。
+ * 会话票走真实签发：`POST /terminals/boot-ticket` 再 `POST /terminals/session-token`。
+ * 不写库伪造票据，也不放宽后端验票。票只放进页面本来就读的 sessionStorage。
+ */
+const TERMINAL_SESSION_STORAGE_KEY = 'terminal_session_token_v1'
+let walkthroughTerminal: { terminalId: string } | null = null
+
+function stringField(body: Record<string, unknown>, key: string, label: string): string {
+  const value = body[key]
+  if (typeof value !== 'string' || value === '') throw new Error(`${label}缺少 ${key}`)
+  return value
+}
+
+async function issueWalkthroughTerminalSession(): Promise<{ terminalId: string; terminalCode: string; sessionToken: string }> {
+  const adminSecret = process.env.INTERACTION_TERMINAL_ADMIN_SECRET
+  if (!adminSecret) throw new Error('走查没有终端注册密钥 INTERACTION_TERMINAL_ADMIN_SECRET')
+  const terminalCode = `KSK-WALK-${randomBytes(4).toString('hex')}`
+  const registeredResponse = await fetch(`${API_ORIGIN}/api/v1/auth/terminal/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      terminalCode,
+      deviceFingerprint: `fp-${terminalCode}`,
+      displayName: '走查终端',
+      adminSecret,
+    }),
+  })
+  const registered = await registeredResponse.json() as Record<string, unknown>
+  if (!registeredResponse.ok) throw new Error(`注册走查终端失败 ${registeredResponse.status} ${JSON.stringify(registered)}`)
+  const terminalId = stringField(registered, 'terminalId', '注册响应')
+  const terminalToken = stringField(registered, 'terminalToken', '注册响应')
+  const bootResponse = await fetch(`${API_ORIGIN}/api/v1/terminals/boot-ticket`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${terminalToken}`,
+      'x-terminal-id': terminalId,
+    },
+  })
+  const boot = await bootResponse.json() as Record<string, unknown>
+  if (!bootResponse.ok) throw new Error(`签发引导票失败 ${bootResponse.status} ${JSON.stringify(boot)}`)
+  const bootTicket = stringField(boot, 'bootTicket', '引导票响应')
+  const sessionResponse = await fetch(`${API_ORIGIN}/api/v1/terminals/session-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ bootTicket }),
+  })
+  const session = await sessionResponse.json() as Record<string, unknown>
+  if (!sessionResponse.ok) throw new Error(`换会话票失败 ${sessionResponse.status} ${JSON.stringify(session)}`)
+  return { terminalId, terminalCode, sessionToken: stringField(session, 'sessionToken', '会话票响应') }
+}
+
+/**
  * 走查默认没有本机终端身份，预览主按钮会停在「打印机不可用」。
  * 简历已经上传之后才装上身份和在线打印机，再等按钮自己变成可点。
  * 身份装得太早会把本机文件选择藏掉，诊断那一步就传不了简历。
+ * 会话票在身份被本机轮询读到之前写入，页面随后走真实续期，不清打印交接。
  */
 async function armPreviewPrinter(page: Page): Promise<void> {
+  const issued = await issueWalkthroughTerminalSession()
+  walkthroughTerminal = { terminalId: issued.terminalId }
+  await page.evaluate(({ key, token }) => {
+    window.sessionStorage.setItem(key, token)
+  }, { key: TERMINAL_SESSION_STORAGE_KEY, token: issued.sessionToken })
   const cors = { 'Access-Control-Allow-Origin': '*' }
   await page.route('http://127.0.0.1:9527/local/terminal-identity', async (route) => {
     if (route.request().method() !== 'GET') {
@@ -175,7 +236,10 @@ async function armPreviewPrinter(page: Page): Promise<void> {
       status: 200,
       contentType: 'application/json',
       headers: cors,
-      body: JSON.stringify({ success: true, data: { terminalId: 'KSK-001', terminalCode: 'KSK-001' } }),
+      body: JSON.stringify({
+        success: true,
+        data: { terminalId: issued.terminalId, terminalCode: issued.terminalCode },
+      }),
     })
   })
   await page.route('**/api/v1/terminals/*/printer-status', async (route) => {
@@ -211,18 +275,6 @@ async function walkPreviewConfirmRoundTrip(page: Page): Promise<void> {
   await page.getByRole('button', { name: '上一步', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/resume/report', { timeout: 15_000 })
   await waitReady(page)
-  // 预览按钮靠本机终端身份才可点。身份会留在这一页上，后面的优化请求就带上
-  // 走查库里没有的终端，服务端回 401。打印来回已经走完，之后不再把终端头送出去。
-  await page.route('**/api/v1/**', async (route) => {
-    if (route.request().url().includes('/printer-status')) {
-      await route.fallback()
-      return
-    }
-    const headers = { ...route.request().headers() }
-    delete headers['x-terminal-id']
-    delete headers['x-terminal-session-token']
-    await route.continue({ headers })
-  })
 }
 
 async function returnFromPrintToReport(page: Page): Promise<void> {
@@ -470,7 +522,15 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
     await expect(page.getByRole('link', { name: '简历对照', exact: true })).toHaveCount(0)
     await expect(page.getByRole('link', { name: '自我探索', exact: true })).toHaveCount(0)
 
+    const optimizeRequest = page.waitForRequest((request) => {
+      if (request.method() !== 'GET') return false
+      const url = new URL(request.url())
+      return /\/resume\/records\/[^/]+\/optimize$/.test(url.pathname) && url.searchParams.get('existingOnly') !== '1'
+    })
     await openOptimize(page, journey, collectors, 'report-optimize')
+    const sentOptimize = await optimizeRequest
+    expect(sentOptimize.headers()['x-terminal-id'], '打印来回之后的优化请求应带这台走查终端').toBe(walkthroughTerminal?.terminalId)
+    expect(sentOptimize.headers()['x-terminal-session-token'] ?? '', '打印来回之后的优化请求应带会话票').not.toBe('')
     await shot(page, journey, 'after-optimize-cta')
     await assertNotProduction(collectors)
   } finally {

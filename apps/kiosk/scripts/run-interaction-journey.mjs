@@ -35,6 +35,7 @@ const redisPort = portFrom('INTERACTION_REDIS_PORT', 6495)
 const apiPort = portFrom('INTERACTION_API_PORT', 3112)
 const vitePort = portFrom('INTERACTION_VITE_PORT', 5375)
 const pepper = 'dev-secret-encryption-key-replace-in-prod-min-32-chars'
+const terminalAdminSecret = 'ci-only-terminal-admin-secret'
 
 const children = []
 let runDir = ''
@@ -236,7 +237,7 @@ async function main() {
     SECRET_ENCRYPTION_KEY: pepper,
     PAYMENT_SESSION_SECRET: 'dev-payment-session-secret-replace-in-prod-min-32-chars',
     SANDBOX_PAYMENT_SECRET: 'dev-sandbox-payment-secret-replace-me',
-    TERMINAL_ADMIN_SECRET: 'ci-only-terminal-admin-secret',
+    TERMINAL_ADMIN_SECRET: terminalAdminSecret,
     TERMINAL_ACTION_TOKEN_SECRET: 'ci-only-terminal-action-secret',
     TERMINAL_LEGACY_REGISTER_ENABLED: 'true',
     RECRUITMENT_CONTENT_HOSTING_ENABLED: 'false',
@@ -358,6 +359,7 @@ export default async (env) => {
         INTERACTION_EVIDENCE_DIR: evidenceDir,
         INTERACTION_REDIS_URL: `redis://127.0.0.1:${redisPort}`,
         INTERACTION_SMS_PEPPER: pepper,
+        INTERACTION_TERMINAL_ADMIN_SECRET: terminalAdminSecret,
         SWEEP_API_LOG: apiLog,
         SWEEP_PDF: join(runDir, 'valid-2p.pdf'),
       }),
