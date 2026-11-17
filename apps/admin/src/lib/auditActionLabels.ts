@@ -347,6 +347,11 @@ const ACTION_LABELS: Record<string, string> = {
   'self_note_tab.update': '修改一体机求职进度页签开关',
   'print_free_quota.update': '修改免费打印额度',
   'terminal.daily_free_print_sides.update': '修改终端每日免费打印上限',
+  'terminal.home_free_badge.update': '修改终端首页「免费使用」显示',
+  'terminal.charge_settings.update': '修改终端收费设置',
+  'terminal.charge_settings.reset_on_rebind': '改绑机构，收费设置已复位',
+  'billing.personal_charge.enable': '打开向个人收费',
+  'billing.personal_charge.disable': '关闭向个人收费',
   'copy.cancel': '取消复印任务',
   'copy.confirm': '确认复印任务',
   'copy.create': '创建复印任务',
@@ -356,6 +361,12 @@ const ACTION_LABELS: Record<string, string> = {
   'policy.publish': '政策发布',
   'policy.review': '政策审核',
   'screensaver_config.update': '待机宣传屏配置更新',
+  'service_order.channel_close_failed': '服务单关码失败，稍后重试',
+  'service_order.layout_only': '排版失败，这一单不退款',
+  'service_order.paid': '服务单已付款',
+  'service_order.refund_retry': '再试一次服务单退款',
+  'service_order.refunded': '服务单已原路退款',
+  'service_order.admin_refund': '管理员发起服务单原路退款',
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -380,6 +391,7 @@ const TARGET_LABELS: Record<string, string> = {
   EndUser: '用户',
   AiQuotaReservation: 'AI 额度预占记录',
   order: '订单',
+  service_order: '服务单',
   ai_resume_result: 'AI 简历结果',
   job_ai_session: '岗位 AI 会话',
   file: '文件',

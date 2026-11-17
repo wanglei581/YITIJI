@@ -5,9 +5,12 @@ import { isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-park
 import { terminalOrgBindingWrite } from './terminal-org-binding'
 import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 import { assertCanBindTerminal } from '../licenses/license-gate'
+import { retirePendingServiceOrders } from '../payment/service-order.retire'
 
 export type TerminalOrgAssignmentAudit = (tx: PrismaTransactionClient, result: AssignTerminalOrgResult & {
-  deploymentIds: string[]; effectiveAt: string
+  deploymentIds: string[]
+  effectiveAt: string
+  chargeSettingsReset: boolean
 }) => Promise<unknown>
 
 /** Rebinding, ownership interval closure and required audit commit or roll back together. */
@@ -38,6 +41,7 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
 
   const oldOrgId = terminal.orgId
   const result = { terminalId: terminal.terminalCode, terminalCode: terminal.terminalCode, oldOrgId, newOrgId: orgId, orgName }
+  let chargeSettingsReset = false
   await prisma.$transaction(async (tx) => {
     const changed = await tx.terminal.updateMany({
       where: { id: terminal.id, orgId: oldOrgId },
@@ -61,9 +65,20 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
         where: { terminalId: terminal.id, endedAt: null },
         data: { endedAt: effectiveAt, activeTerminalId: null },
       })
+      await tx.terminal.update({ where: { id: terminal.id }, data: { userChargeMode: 'org_pays' } })
+      await tx.terminalServicePrice.deleteMany({ where: { terminalId: terminal.id } })
+      chargeSettingsReset = true
     }
-    await writeAudit(tx, { ...result, deploymentIds: oldOrgId !== orgId && active ? [active.id] : [], effectiveAt: effectiveAt.toISOString() })
+    await writeAudit(tx, {
+      ...result,
+      deploymentIds: oldOrgId !== orgId && active ? [active.id] : [],
+      effectiveAt: effectiveAt.toISOString(),
+      chargeSettingsReset,
+    })
   })
+  if (oldOrgId !== orgId) {
+    await retirePendingServiceOrders(prisma, { terminalId: terminal.id, closeReason: 'org_rebound' })
+  }
 
-  return result
+  return { ...result, chargeSettingsReset }
 }

@@ -21,6 +21,8 @@ export interface QrPaymentCreateInput {
   amountCents: number
   /** 服务端持久化的二维码失效时刻；真实渠道必须同步为其可支付截止时间。 */
   expiresAt: Date
+  /** 账单上的服务名。空、过长或带价格时由渠道侧改成「打印」，不写金额。 */
+  description?: string
 }
 
 export interface QrPaymentCreateResult {
@@ -47,6 +49,8 @@ export interface CodePaymentCreateInput {
   amountCents: number
   /** 用户微信/支付宝付款码；业务层和 Provider 都必须做格式校验。 */
   authCode: string
+  /** 账单上的服务名。空、过长或带价格时由渠道侧改成「打印」，不写金额。 */
+  description?: string
 }
 
 export interface CodePaymentCreateResult {
@@ -125,6 +129,15 @@ export interface RefundExecuteResult {
    * 订单 refunding，经 queryRefund 收敛，**绝不把受理中假报为已退款**。
    */
   status: 'success' | 'failed' | 'processing'
+  /** 渠道确认的本次退款额（分）。有值且不等于整单实付时不得完成退款。 */
+  refundAmountCents?: number | null
+}
+
+/** 账单描述：不写价格。空的、超过 32 字的、或带数字和货币符号的，都改成「打印」。 */
+export function channelChargeDescription(description: string | null | undefined): string {
+  const text = description?.trim() ?? ''
+  if (!text || text.length > 32 || /[0-9０-９元￥¥]/.test(text)) return '打印'
+  return text
 }
 
 /** 退款查证归一化结果（processing 收敛用）。 */

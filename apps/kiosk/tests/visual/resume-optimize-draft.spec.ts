@@ -76,6 +76,30 @@ function registerOptimizeShell(api: Parameters<typeof registerW6Api>[0]): void {
   })
 }
 
+/** 生成页六步填到核对。工作经历填两条，第二条描述里没有「周更」。 */
+async function fillGenerateFormToReview(page: Page): Promise<void> {
+  await page.goto('/resume/generate')
+  await page.getByRole('textbox', { name: /^姓名/ }).fill('林岚')
+  await page.getByRole('button', { name: /^下一步：求职意向/ }).click()
+  await page.getByRole('textbox', { name: /^目标岗位/ }).fill('门店运营')
+  await page.getByRole('button', { name: /^下一步：教育经历/ }).click()
+  await page.getByRole('textbox', { name: /^学校/ }).fill('烟台职业学院')
+  await page.getByRole('button', { name: /^下一步：工作经历/ }).click()
+  const company = page.getByRole('textbox', { name: /^公司/ })
+  const role = page.getByRole('textbox', { name: /^职位/ })
+  const did = page.getByRole('textbox', { name: /^做了什么/ })
+  await company.nth(0).fill('海岸超市')
+  await role.nth(0).fill('店员')
+  await did.nth(0).fill('整理仓库货架，按保质期先进先出调整摆放顺序。')
+  await page.getByRole('button', { name: '添加一段实习 / 工作经历' }).click()
+  await company.nth(1).fill('灯塔书店')
+  await role.nth(1).fill('店员')
+  await did.nth(1).fill('维护门店公众号，撰写新书推荐与活动预告。')
+  await page.getByRole('button', { name: /^下一步：项目经历/ }).click()
+  await page.getByRole('button', { name: /^下一步：技能证书/ }).click()
+  await page.getByRole('button', { name: '去核对' }).click()
+}
+
 function registerEmptyOptimize(api: Parameters<typeof registerW6Api>[0]): void {
   api.respond('GET', `/api/v1/resume/records/${EMPTY_TASK_ID}/optimize`, {
     status: 200,
@@ -534,4 +558,410 @@ test('删掉一条经历后没删的那条仍在导出里 @kiosk', async ({ page
   const companies = body.experience?.map((item) => item.company) ?? []
   expect(companies).toContain(SHORT_COMPANY)
   expect(companies).not.toContain(LONG_COMPANY)
+})
+
+test.describe('新增事实也要逐项勾选才能导出', () => {
+  test('优化页核对弹层里「周更 2 篇」是一条勾选项，没勾完不能确认导出 @kiosk', async ({ page, api }) => {
+    const taskId = 'r2-fact-additions-2099'
+    registerOptimizeShell(api)
+    api.respond('GET', `/api/v1/resume/records/${taskId}/optimize`, {
+      status: 200,
+      json: {
+        taskId,
+        status: 'completed',
+        providerName: 'llm',
+        modules: [],
+        optimizedResume: {
+          basic: { name: '周晴', phone: '13800001111', city: '青岛' },
+          intention: { position: '新媒体运营', city: '青岛' },
+          summary: '学院公众号的选题和排版都是我在学生会做的。',
+          education: [{ school: '青岛大学', major: '新闻学', degree: '本科', period: '2021-2025' }],
+          experience: [{
+            company: '青岛大学学生会',
+            role: '宣传部干事',
+            period: '2023-2025',
+            description: '负责学院公众号的选题、撰写和排版，周更 2 篇。',
+          }],
+          projects: [],
+          skills: ['公众号排版'],
+          certificates: [],
+        },
+      },
+    })
+    await page.goto(`/resume/optimize?taskId=${encodeURIComponent(taskId)}`)
+    await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue('青岛大学学生会')
+    await page.getByRole('button', { name: '去导出', exact: true }).click()
+
+    const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText('这份稿里没有可勾选的学校 / 公司 / 时间段 / 证书 / 电话。')).toHaveCount(0)
+    const addition = dialog.locator('label.qxt-factrow', { hasText: '周更 2 篇' })
+    await expect(addition).toBeVisible()
+    await expect(addition.locator('b')).toHaveCount(0)
+    await expect(addition.locator('em')).toHaveText('已核对')
+    const confirm = dialog.getByRole('button', { name: '确认导出' })
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+
+    const boxes = dialog.getByRole('checkbox')
+    const count = await boxes.count()
+    expect(count).toBeGreaterThan(1)
+    for (let i = 0; i < count; i += 1) {
+      const name = await boxes.nth(i).evaluate((node) => (node.closest('label')?.textContent ?? ''))
+      if (!name.includes('周更 2 篇')) await boxes.nth(i).click()
+    }
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    await dialog.getByRole('checkbox', { name: /周更 2 篇/ }).click()
+    await expect(confirm).not.toHaveAttribute('aria-disabled', 'true')
+    await confirm.click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '导出', exact: true })).toBeVisible()
+  })
+})
+
+const FACT_MARKS = ['甲', '乙', '丙', '丁', '戊', '己'] as const
+
+/** 6 所学校、6 段经历、3 张证书、1 个电话，再加上摘要里两句新增事实，核对框正好 30 行。 */
+function thirtyFactResume() {
+  return {
+    basic: { name: '标题样本', phone: '13800001111', city: '青岛' },
+    intention: { position: '门店运营', city: '青岛' },
+    summary: '甲组 21 项。乙组 22 项。',
+    education: FACT_MARKS.map((mark, index) => ({
+      school: `青岛学校${mark}`,
+      major: '工商管理',
+      degree: '本科',
+      period: `${2010 + index}-${2014 + index}`,
+    })),
+    experience: FACT_MARKS.map((mark, index) => ({
+      company: `青序门店${mark}`,
+      role: '店员',
+      period: `${2016 + index}-${2017 + index}`,
+      description: '按班次完成交接。',
+    })),
+    projects: [{ name: '门店陈列项目', role: '执行', period: '2023', description: '按店里的陈列标准摆货。' }],
+    skills: ['沟通'],
+    certificates: ['英语四级', '计算机一级', '驾驶证'],
+  }
+}
+
+async function stageScaleOf(page: Page): Promise<number> {
+  const transform = await page.locator('.kiosk-stage').evaluate((element) => getComputedStyle(element).transform)
+  return transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+}
+
+/** 确认导出的外框必须整颗落在视口里。1080 舞台换算后不超过 1920；手机再用真实视口高度卡住。 */
+async function expectConfirmStaysInView(page: Page, dialog: Locator): Promise<void> {
+  const scale = await stageScaleOf(page)
+  const box = await dialog.getByRole('button', { name: '确认导出' }).boundingBox()
+  expect(box).not.toBeNull()
+  const top = box!.y / scale
+  const bottom = (box!.y + box!.height) / scale
+  const viewport = page.viewportSize()
+  expect(viewport).not.toBeNull()
+  const viewBottom = viewport!.height / scale
+  expect(top).toBeGreaterThanOrEqual(0)
+  expect(bottom).toBeLessThanOrEqual(1920)
+  expect(bottom).toBeLessThanOrEqual(viewBottom)
+}
+
+async function checkEveryFactRow(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+  await expect(dialog).toBeVisible()
+  const boxes = dialog.getByRole('checkbox')
+  await expect(boxes).toHaveCount(30)
+  const confirm = dialog.getByRole('button', { name: '确认导出' })
+  const scale = await stageScaleOf(page)
+  for (let i = 0; i < 30; i += 1) {
+    const box = boxes.nth(i)
+    await box.scrollIntoViewIfNeeded()
+    const row = await box.locator('xpath=ancestor::label[1]').boundingBox()
+    expect(row).not.toBeNull()
+    expect(row!.height / scale).toBeGreaterThanOrEqual(56)
+    await expectConfirmStaysInView(page, dialog)
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    await box.click()
+  }
+  await expectConfirmStaysInView(page, dialog)
+  await expect(confirm).not.toHaveAttribute('aria-disabled', 'true')
+  await confirm.click()
+  await expect(dialog).toHaveCount(0)
+}
+
+async function openThirtyFactOptimize(page: Page, api: Parameters<typeof registerW6Api>[0], taskId: string): Promise<void> {
+  registerOptimizeShell(api)
+  api.respond('GET', `/api/v1/resume/records/${taskId}/optimize`, {
+    status: 200,
+    json: { taskId, status: 'completed', providerName: 'llm', modules: [], optimizedResume: thirtyFactResume() },
+  })
+  await page.goto(`/resume/optimize?taskId=${encodeURIComponent(taskId)}`)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  await page.getByRole('button', { name: '去导出', exact: true }).click()
+}
+
+for (const projectTag of ['@kiosk', '@mobile'] as const) {
+  test(`优化页 30 行核对事实都能点到，确认导出始终在视口内 ${projectTag}`, async ({ page, api }) => {
+    await openThirtyFactOptimize(page, api, `r2b-opt-30-${projectTag.slice(1)}`)
+    await checkEveryFactRow(page)
+  })
+}
+
+/**
+ * 30 句各不相同的职责句，句号切开，每句一个数字，所以是 30 条而不是 1 条。
+ * 说明若回到标题和按钮之间，清单被压没或按钮掉出屏外。
+ */
+const LONG_FACT_SENTENCES = [
+  '负责 3 个门店的月度盘点并把差错记在当日台账',
+  '负责 4 条配送线路的准时率并在晚班前收齐回单',
+  '负责 6 名新人的首周带教并记下每天的操作问题',
+  '负责 7 家供应商的到货抽检并分开登记破损件数',
+  '负责 8 组货架的周度陈列并按价签核对售价',
+  '负责 9 个自提点的下午补货并回收空周转箱',
+  '负责 11 台冷柜的温度巡查并在超标时立刻移货',
+  '负责 12 班收银的长短款复核并让当班人签字',
+  '负责 13 份入职材料的扫描归档并核对姓名页码',
+  '负责 14 箱季节商品的上架并在系统里改可售数量',
+  '负责 15 条会员回访的记录并标出需要店长跟进的',
+  '负责 16 块展板的周末更换并收起过期促销海报',
+  '负责 17 辆配送三轮的早晚交接并登记剩余电量',
+  '负责 18 笔团购订单的分拣并按楼栋装进对应周转箱',
+  '负责 19 种鲜食的保质期检查并在当天撤下临期品',
+  '负责 21 份日报的汇总并在次日开店前交给店长',
+  '负责 22 个库位的月度复盘并把差异写成调整单',
+  '负责 23 家写字楼的下午配送并让前台签收',
+  '负责 24 套工服的清洗收发并记下缺失的尺码',
+  '负责 25 张价签的抽查并换掉褪色或错价的那几张',
+  '负责 26 桶食用油的入库过磅并与送货单逐项比对',
+  '负责 27 个小区团长的答疑并整理当晚缺货清单',
+  '负责 28 台计价秤的清晨校准并贴上当日合格标签',
+  '负责 29 份退货的验视并按原因放进不同回收筐',
+  '负责 31 箱饮料的夜间补货并保持通道可以过人',
+  '负责 32 条客户投诉的回访并在当天写下处理结果',
+  '负责 33 个试吃台的备货并在结束后清点剩余样品',
+  '负责 34 本交接簿的周检查并补上漏签的班次',
+  '负责 36 袋大米的码放高度并留出消防栓前面的空位',
+  '负责 41 份电子小票的抽查并标出未写清品名的',
+] as const
+
+function longFactResume() {
+  return {
+    basic: { name: '周晴', phone: '', city: '青岛' },
+    intention: { position: '门店运营', city: '青岛' },
+    summary: '在青岛几家门店做过早班理货。',
+    education: [],
+    experience: [{
+      company: '',
+      role: '',
+      period: '',
+      description: LONG_FACT_SENTENCES.join('。'),
+    }],
+    projects: [],
+    skills: [],
+    certificates: [],
+  }
+}
+
+function registerLongFactExport(api: Parameters<typeof registerW6Api>[0], fileId: string): void {
+  api.respond('POST', '/api/v1/resume/generate/export', {
+    status: 200,
+    json: {
+      fileId,
+      filename: '周晴的简历.pdf',
+      sizeBytes: 4096,
+      pageCount: 1,
+      signedUrl: `/e2e-fixtures/${fileId}.pdf`,
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      printFileUrl: `/api/v1/files/${fileId}/content?expires=1&sig=test`,
+    },
+  })
+}
+
+async function expectHeadingStaysInView(page: Page, dialog: Locator): Promise<void> {
+  const scale = await stageScaleOf(page)
+  const box = await dialog.getByRole('heading', { name: '导出前核对事实' }).boundingBox()
+  expect(box).not.toBeNull()
+  const top = box!.y / scale
+  const bottom = (box!.y + box!.height) / scale
+  const viewport = page.viewportSize()
+  expect(viewport).not.toBeNull()
+  expect(top).toBeGreaterThanOrEqual(0)
+  expect(bottom).toBeLessThanOrEqual(1920)
+  expect(bottom).toBeLessThanOrEqual(viewport!.height / scale)
+}
+
+/** 说明和 30 条长片段在同一个滚动区。标题、确认导出钉在 1920 屏内，逐条滚到再勾。 */
+async function checkLongFactDialog(page: Page, dialog: Locator): Promise<void> {
+  await expect(dialog).toBeVisible()
+  const scroll = dialog.locator('.qxt-factscroll, .qx-rd-fact-scroll')
+  await expect(scroll).toHaveCount(1)
+  const metrics = await scroll.evaluate((element) => ({
+    noteInside: Boolean(element.querySelector('.qxt-pending, .qx-rd-pending')),
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+  }))
+  expect(metrics.noteInside).toBe(true)
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight)
+  const boxes = dialog.getByRole('checkbox')
+  await expect(boxes).toHaveCount(30)
+  const confirm = dialog.getByRole('button', { name: '确认导出' })
+  const scale = await stageScaleOf(page)
+  for (let i = 0; i < 30; i += 1) {
+    const box = boxes.nth(i)
+    await box.scrollIntoViewIfNeeded()
+    const row = await box.locator('xpath=ancestor::label[1]').boundingBox()
+    expect(row).not.toBeNull()
+    expect(row!.height / scale).toBeGreaterThanOrEqual(56)
+    await expectHeadingStaysInView(page, dialog)
+    await expectConfirmStaysInView(page, dialog)
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    await box.click()
+  }
+  await expectHeadingStaysInView(page, dialog)
+  await expectConfirmStaysInView(page, dialog)
+  await expect(confirm).not.toHaveAttribute('aria-disabled', 'true')
+}
+
+test('优化页 30 条长片段说明不挤掉清单，逐条确认后能导出 @kiosk', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  const taskId = 'r2c-opt-long-30'
+  registerOptimizeShell(api)
+  registerLongFactExport(api, 'r2c-opt-long-file')
+  api.respond('GET', `/api/v1/resume/records/${taskId}/optimize`, {
+    status: 200,
+    json: { taskId, status: 'completed', providerName: 'llm', modules: [], optimizedResume: longFactResume() },
+  })
+  await page.route('**/api/v1/files/r2c-opt-long-file/content**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: VISIBLE_PDF,
+  }))
+  await page.goto(`/resume/optimize?taskId=${encodeURIComponent(taskId)}`)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  await page.getByRole('button', { name: '去导出', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+  await checkLongFactDialog(page, dialog)
+  await dialog.getByRole('button', { name: '确认导出' }).click()
+  await expect(dialog).toHaveCount(0)
+  const pending = page.waitForRequest((request) => (
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
+  ))
+  await page.getByRole('button', { name: '导出', exact: true }).click()
+  expect((await pending).postDataJSON()).toBeTruthy()
+})
+
+test('生成预览页默认核对框 30 条长片段说明不挤掉清单，逐条确认后能导出 @kiosk', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  const taskId = 'r2c-gen-long-30'
+  registerOptimizeShell(api)
+  registerLongFactExport(api, 'r2c-gen-long-file')
+  api.respond('GET', `/api/v1/resume/generate/${taskId}`, {
+    status: 200,
+    json: {
+      taskId,
+      status: 'completed',
+      providerName: 'deepseek',
+      resume: longFactResume(),
+      missingHints: [],
+    },
+  })
+  await page.route('**/api/v1/files/r2c-gen-long-file/content**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: VISIBLE_PDF,
+  }))
+  await page.goto(`/resume/generate/preview?taskId=${encodeURIComponent(taskId)}`)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  await page.getByTestId('resume-generate-preview-cta-export').click()
+  await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
+  const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+  await checkLongFactDialog(page, dialog)
+  const pending = page.waitForRequest((request) => (
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
+  ))
+  await dialog.getByRole('button', { name: '确认导出' }).click()
+  expect((await pending).postDataJSON()).toBeTruthy()
+  await expect(dialog).toHaveCount(0)
+})
+
+test('预览页互换两条公司名后，AI 加的数仍待确认，本人写的数不列 @kiosk', async ({ page, api }) => {
+  const taskId = 'r2h-preview-swap'
+  const shelf = '整理仓库货架，按保质期先进先出调整摆放顺序。'
+  const aiLine = '维护门店公众号，撰写新书推荐与活动预告，周更 2 篇。'
+  const row = (company: string, description: string) => ({ company, role: '店员', period: '2019-2021', description })
+  registerOptimizeShell(api)
+  api.respond('GET', `/api/v1/resume/generate/${taskId}`, {
+    status: 200,
+    json: {
+      taskId,
+      status: 'completed',
+      providerName: 'llm',
+      resume: {
+        basic: { name: '林岚', phone: '', city: '烟台' },
+        intention: { position: '门店运营', city: '烟台' },
+        summary: '在烟台做过门店理货和书店运营。',
+        education: [],
+        experience: [row('海岸超市', shelf), row('灯塔书店', aiLine)],
+        projects: [],
+        skills: [],
+        certificates: [],
+      },
+      missingHints: [],
+    },
+  })
+  await page.goto(`/resume/generate/preview?taskId=${encodeURIComponent(taskId)}`)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  const pending = page.locator('p.qx-rd-pending')
+  await expect(pending).toContainText('周更 2 篇')
+  await page.getByRole('textbox', { name: '第 1 条经历的公司' }).fill('灯塔书店')
+  await page.getByRole('textbox', { name: '第 2 条经历的公司' }).fill('海岸超市')
+  // 整段换成和两条生成稿都不像的句子。只在句尾加几个字时，相似度仍能配回原行，丢掉下标也不会红。
+  await page.getByRole('textbox', { name: '工作经历描述 1' }).fill('另记 3 项。')
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue('灯塔书店')
+  await expect(page.getByRole('textbox', { name: '第 2 条经历的公司' })).toHaveValue('海岸超市')
+  await expect(pending).toContainText('周更 2 篇')
+  await expect(pending).not.toContainText('另记')
+  await expect(pending).not.toContainText('3 项')
+})
+
+test('生成页进入预览后互换公司名并改写描述，AI 加的数仍待确认 @kiosk', async ({ page, api }) => {
+  const shelf = '整理仓库货架，按保质期先进先出调整摆放顺序。'
+  const posts = '维护门店公众号，撰写新书推荐与活动预告，周更 2 篇。'
+  const row = (company: string, description: string) => ({ company, role: '店员', period: '2019-2021', description })
+  registerOptimizeShell(api)
+  api.respond('POST', '/api/v1/resume/generate', {
+    status: 200,
+    json: {
+      taskId: 'r2i-generate-main',
+      status: 'completed',
+      providerName: 'llm',
+      resume: {
+        basic: { name: '林岚', phone: '', city: '烟台' },
+        intention: { position: '门店运营', city: '烟台' },
+        summary: '在烟台做过门店理货和书店运营。',
+        education: [{ school: '烟台职业学院', major: '', period: '' }],
+        experience: [row('海岸超市', shelf), row('灯塔书店', posts)],
+        projects: [],
+        skills: [],
+        certificates: [],
+      },
+      missingHints: [],
+    },
+  })
+  await fillGenerateFormToReview(page)
+  await page.getByRole('button', { name: /让 AI 整理成新简历/ }).click()
+  await expect(page).toHaveURL(/\/resume\/generate\/preview$/)
+  expect(new URL(page.url()).searchParams.get('taskId')).toBeNull()
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+  const pending = page.locator('p.qx-rd-pending')
+  await expect(pending).toContainText('周更 2 篇')
+  await page.getByRole('textbox', { name: '第 1 条经历的公司' }).fill('灯塔书店')
+  await page.getByRole('textbox', { name: '第 2 条经历的公司' }).fill('海岸超市')
+  await page.getByRole('textbox', { name: '工作经历描述 1' }).fill('另记 3 项。')
+  await expect(pending).toContainText('周更 2 篇')
+  await expect(pending).not.toContainText('另记')
+  const pendingText = (await pending.innerText()).replace(/\s+/g, '')
+  const role = page.getByRole('textbox', { name: '第 2 条经历的职务' })
+  await expect(role).toHaveAttribute('data-gen-index', '1')
+  await role.fill('运营')
+  await expect.poll(async () => (await pending.innerText()).replace(/\s+/g, '')).toBe(pendingText)
+  await expect(role).toHaveAttribute('data-gen-index', '1')
 })

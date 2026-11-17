@@ -71,8 +71,11 @@ async function main(): Promise<void> {
         credentials: [{ id: 'credential-1' }],
         heartbeats: latestHeartbeat ? [latestHeartbeat] : [],
         releaseTargets: [],
+        servicePrices: [],
       }],
     },
+    // 列表会读总开关。桩返回 null = 关，与默认未配置一致。
+    platformSetting: { findUnique: async () => null },
     terminalHeartbeat: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
         latestHeartbeat = { ...data, createdAt: new Date('2026-09-13T10:20:31.000Z') }

@@ -462,12 +462,14 @@ export class PrintJobsService {
         },
       })
     }
-    // 报价：金额只由 PricingService 依 PriceConfig 计算（**不信任前端 amount**）；无 active 价目 / 异常 → fail-closed。
+    // 报价：金额只由本机生效价计算（**不信任前端 amount**）。全站 PriceConfig 不再决定用户付多少钱。
     const copies = dto.params?.copies ?? DEFAULT_PARAMS.copies
     const colorMode: 'black_white' | 'color' = dto.params?.colorMode ?? 'black_white'
     // 一体机直接建单不经过 OrderQuoteService，必须在这里单独拦。双面不把面数折半。
     assertPrintOrderSides(billablePages * copies)
-    const quote = await this.pricing.quotePrint({ billablePages, billingPageSource, copies, colorMode })
+    const quote = await this.pricing.quotePrint({
+      billablePages, billingPageSource, copies, colorMode, terminalId: targetTerminalId,
+    })
     // 动态价格二次确认：quotedAmountCents 只断言「用户确认的就是现在要收的」，金额仍取上面的 quote。
     // 必须在建 Order / PrintTask / 支付会话之前拒绝；字段缺省（旧客户端）照旧按服务端计价建单。
     if (dto.quotedAmountCents !== undefined && dto.quotedAmountCents !== quote.amountCents) {
@@ -528,7 +530,7 @@ export class PrintJobsService {
           printTaskId: task.id,
           endUserId:   ctx.endUserId ?? null,
           terminalId:  targetTerminalId,
-          // 金额由 PricingService 依 PriceConfig 计算(不信任前端)；页数为后端识别。
+          // 金额由本机生效价计算（不信任前端，不读全站 PriceConfig 单价）；页数为后端识别。
           amountCents:       quote.amountCents,
           billablePages:     quote.billablePages,
           billingPageSource: quote.billingPageSource,

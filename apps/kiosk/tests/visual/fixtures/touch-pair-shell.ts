@@ -1,5 +1,6 @@
 import { expect, type BrowserContext, type Page } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
+import { machinePricing } from '../../fixtures/machine-pricing'
 import {
   loginThroughVisibleUi,
   registerAuthenticatedMemberApis,
@@ -28,8 +29,9 @@ export function registerTouchShell(
     printerStatus: 'ready',
     paperLevel: 'sufficient',
   },
+  pricing?: Record<string, unknown>,
 ): void {
-  registerEvidenceShell(api)
+  registerEvidenceShell(api, pricing)
   // policy-favorite-walk.spec.ts 的正式构建会话应答。
   for (const action of ['start', 'heartbeat', 'end']) {
     api.respond('POST', `/api/v1/kiosk/session/${action}`, { status: 200, json: { success: true } })
@@ -109,9 +111,13 @@ export async function routeVisiblePdf(page: Page): Promise<void> {
 export async function openConfirm(page: Page, api: ApiRouter, billing: 'free' | 'fee'): Promise<void> {
   // 核对页要等终端会话 ready、打印机状态回来，按钮才会变成「确认并打印 / 去付款」。
   // 不注册这两条，正式构建会停在「安全校验没通过」和「状态未知」。
-  registerTouchShell(api)
-  await routeVisiblePdf(page)
   const free = billing === 'free'
+  registerTouchShell(
+    api,
+    { isOnline: true, printerStatus: 'ready', paperLevel: 'sufficient' },
+    free ? machinePricing(0, 0) : machinePricing(100, 100),
+  )
+  await routeVisiblePdf(page)
   api.respond('GET', '/api/v1/print/price-config', {
     status: 200,
     json: {

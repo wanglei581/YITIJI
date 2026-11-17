@@ -3,6 +3,7 @@
 import fs from 'node:fs'
 import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
+import { attachMachinePricing } from '../../fixtures/machine-pricing'
 import {
   loginThroughVisibleUi,
   registerMemberLogin,
@@ -359,6 +360,7 @@ async function openConfirm(page: Page, api: ApiRouter, state: string): Promise<v
       items: [{ serviceKey: 'print_bw_page', unitCents: 20, unit: 'page', description: '黑白打印每页' }],
     },
   })
+  attachMachinePricing(api, 20, 50)
   api.respondWith('POST', '/api/v1/orders/quote', () => hang())
   await seedPrintFlow(page, '/print/confirm')
   await page.goto('/print/confirm', { waitUntil: 'domcontentloaded' })

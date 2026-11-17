@@ -1,6 +1,14 @@
 // 终端数据页的文案与格式化。所有数字都来自服务端，这里只决定怎么说。
 
-import { formatCount, formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
+import {
+  TERMINAL_CHARGE_SERVICE_KEYS,
+  TERMINAL_CHARGE_SERVICE_LABELS,
+  formatCount,
+  formatDate,
+  formatDateTime,
+  formatRelativeTime,
+  type PartnerTerminalChargeView,
+} from '@ai-job-print/shared'
 import { buildCsv } from '../../lib/csv'
 import { printerStatusSummary, printerStatusText } from '../../lib/printerStatusLabel'
 import type {
@@ -69,6 +77,28 @@ export function relativeTime(iso: string | null, nowMs: number = Date.now()): st
 
 export function terminalName(row: TerminalOpsRow): string {
   return row.displayName?.trim() || row.terminalCode
+}
+
+function yuan(cents: number): string {
+  return `¥${(cents / 100).toFixed(2)}`
+}
+
+/** 只读。公共点位固定免费；有生效价才列五个价。 */
+export function userChargeLine(row: { charge?: PartnerTerminalChargeView | null }): string {
+  const charge = row.charge
+  if (charge?.isPublicSite) return '公共就业点位，用户免费'
+  const effective = charge?.effective
+  if (!effective) return '用户收费：免费（机构承担）'
+  const charging = TERMINAL_CHARGE_SERVICE_KEYS.some((key) => {
+    const cents = effective[key]
+    return typeof cents === 'number' && cents > 0
+  })
+  if (!charging) return '用户收费：免费（机构承担）'
+  const parts = TERMINAL_CHARGE_SERVICE_KEYS.map((key) => {
+    const cents = effective[key]
+    return `${TERMINAL_CHARGE_SERVICE_LABELS[key]} ${yuan(typeof cents === 'number' ? cents : 0)}`
+  })
+  return `向用户收费：${parts.join('，')}`
 }
 
 export type TerminalRunState = 'online' | 'offline' | 'silent'

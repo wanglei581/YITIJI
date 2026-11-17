@@ -69,6 +69,7 @@ export class GovernedJobFitService {
     requester: JobFitRequester,
     quotaContext: JobAiQuotaContext,
     req?: QuotaAbortRequest,
+    options?: { skipDailyQuota?: boolean },
   ): Promise<JobFitAnalyzeWithUsageResult['response']> {
     const parse = await this.authorizeForAnalysis(input.taskId, requester)
     const targetKey = jobFitQuotaTarget(input)
@@ -80,7 +81,7 @@ export class GovernedJobFitService {
       const run = await this.run({ input, requester, parse, job, terminalId: quotaContext.terminal, quotaContext })
       return run.response
     }
-    if (!this.memberQuota || !parse.endUserId) return work()
+    if (options?.skipDailyQuota || !this.memberQuota || !parse.endUserId) return work()
     return runWithAiQuota({
       quota: this.memberQuota,
       bucket: 'ai_resume',

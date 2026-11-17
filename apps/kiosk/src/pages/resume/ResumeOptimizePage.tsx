@@ -250,6 +250,7 @@ export function ResumeOptimizePage() {
   })
   const handleContinueDraft = () => {
     const payload = draft.remoteDraft
+    // 草稿没有生成稿下标。优化页按各字段全文和原文比，不读下标，也不按名称、相似度或同名序号配对，所以续上时不盖下标。
     if (payload?.resume) {
       const nextDecisions = parseDecisionMap(payload.decisions)
       setDecisions(nextDecisions)

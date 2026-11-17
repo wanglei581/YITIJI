@@ -35,6 +35,7 @@ import { OrderStatusService } from '../src/payment/order-status.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import {
   AlipayProvider,
@@ -75,7 +76,7 @@ function pass(message: string): void {
 }
 function fail(message: string): never {
   console.error(`  FAIL ${message}`)
-  process.exit(1)
+  throw new Error(message)
 }
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
   try {
@@ -471,6 +472,7 @@ async function main(): Promise<void> {
       `Bearer ${agentToken}`,
     )
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
     pass('test fixtures created (terminal online + price config)')
 
     // ── (1) 多通道注册表 & 出码 ────────────────────────────────────────────
@@ -1155,6 +1157,7 @@ async function main(): Promise<void> {
 
     console.log(`\n  ✅ verify:payment-real-channels 全部通过（${passCount} checks）\n`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }

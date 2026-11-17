@@ -9,6 +9,7 @@
 // 价目含 resume_export（简历导出，对应一体机 / 小程序简历优化页的导出按钮）。
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
+import { demoGetPersonalCharge, demoSetPersonalCharge } from './terminalChargeDemo'
 
 export interface AdminPriceConfigItem {
   serviceKey: string
@@ -51,10 +52,24 @@ export interface ReconciliationReport {
   attention: { latePaid: ReconciliationDiscrepancy[]; reconciled: ReconciliationDiscrepancy[] }
 }
 
+export interface PersonalChargeTerminalRow {
+  terminalCode: string
+  displayName: string | null
+  locationLabel: string | null
+  prices: Record<string, number>
+}
+
+export interface PersonalChargeOverview {
+  enabled: boolean
+  terminals: PersonalChargeTerminalRow[]
+}
+
 interface AdminBillingService {
   listPriceConfig(): Promise<{ items: AdminPriceConfigItem[] }>
   updatePriceConfig(serviceKey: string, patch: UpdatePriceConfigInput): Promise<AdminPriceConfigItem>
   reconciliation(params?: { from?: string; to?: string }): Promise<ReconciliationReport>
+  getPersonalCharge(): Promise<PersonalChargeOverview>
+  setPersonalCharge(enabled: boolean, confirm?: boolean): Promise<PersonalChargeOverview & { previous: boolean }>
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -93,12 +108,16 @@ const httpAdapter: AdminBillingService = {
     ).toString()
     return request(`/admin/billing/reconciliation${q ? `?${q}` : ''}`)
   },
+  getPersonalCharge: () => request('/admin/billing/personal-charge'),
+  setPersonalCharge: (enabled, confirm) =>
+    request('/admin/billing/personal-charge', { method: 'PUT', body: JSON.stringify({ enabled, confirm }) }),
 }
 
 // ── Mock（本地演示，无后端）────────────────────────────────────────────────
 const MOCK_PRICES: AdminPriceConfigItem[] = [
   { serviceKey: 'print_bw_page', unitCents: 20, unit: 'page', active: true, description: '黑白打印每页（演示价）', effectiveFrom: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { serviceKey: 'print_color_page', unitCents: 50, unit: 'page', active: true, description: '彩色打印每页（演示价）', effectiveFrom: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { serviceKey: 'resume_export', unitCents: 0, unit: 'each', active: true, description: '简历导出每次（演示）', effectiveFrom: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 const mockAdapter: AdminBillingService = {
   listPriceConfig: async () => ({ items: MOCK_PRICES.map((p) => ({ ...p })) }),
@@ -122,6 +141,8 @@ const mockAdapter: AdminBillingService = {
     discrepancies: [],
     attention: { latePaid: [], reconciled: [] },
   }),
+  getPersonalCharge: () => demoGetPersonalCharge(),
+  setPersonalCharge: (enabled, confirm) => demoSetPersonalCharge(enabled, confirm),
 }
 
 export const adminBillingService: AdminBillingService = API_MODE === 'http' ? httpAdapter : mockAdapter

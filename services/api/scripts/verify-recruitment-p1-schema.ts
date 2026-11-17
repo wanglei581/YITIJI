@@ -168,7 +168,10 @@ function assertNoSqliteDrift(db: string, label: string): void {
 //   License   —— 软件使用授权（只按期限与终端台数，不与岗位 / 招聘会 / 浏览 / 投递挂钩）；
 //   CopyJob   —— 屏上复印履约元数据，关联既有 Order，不保存扫描内容或文件。
 //   122 = 117 + AiServiceFact + AiSafetyTerm + BrandLogo + License + CopyJob。
-const EXPECTED_MODEL_COUNT = 122
+// 123（收费 P1，+1）：TerminalServicePrice —— 每台终端五个服务的配置价。
+// 124（收费 P2a，+1）：ServiceOrder —— 简历优化、模拟面试、扫描的按次付款。只加列不改这个数。
+//   同一常量同时守 SQLite 与 PostgreSQL，两条作业都会用到。
+const EXPECTED_MODEL_COUNT = 124
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)

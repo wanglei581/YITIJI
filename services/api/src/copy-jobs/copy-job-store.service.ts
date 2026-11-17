@@ -9,7 +9,7 @@ import { COPY_ENDED, copyError } from './copy-job.policy'
 import type { CopyJobView, CopyPriceInput, CopyPriceQuote } from './copy-job.types'
 
 export type CopyRow = NonNullable<Awaited<ReturnType<PrismaService['copyJob']['findUnique']>>>
-export type CopyDb = Pick<PrismaTransactionClient, 'copyJob' | 'terminal' | 'terminalCapability' | 'priceConfig' | 'order'>
+export type CopyDb = Pick<PrismaTransactionClient, 'copyJob' | 'terminal' | 'terminalCapability' | 'priceConfig' | 'order' | 'platformSetting'>
 export const copyDigest = (value: string) => createHash('sha256').update(value).digest('hex')
 
 /** 复印审计动作逐个写成字面量；管理端日志按 auditActionLabels 显示中文名。 */

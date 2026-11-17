@@ -93,6 +93,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminal
   }
 
+  get terminalServicePrice() {
+    return this.client.terminalServicePrice
+  }
+
   get printTask() {
     return this.client.printTask
   }
@@ -177,6 +181,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get paymentAttempt() {
     return this.client.paymentAttempt
+  }
+
+  get serviceOrder() {
+    return this.client.serviceOrder
   }
 
   // ── C5-4 退款域 ─────────────────────────────────────────────────────────────

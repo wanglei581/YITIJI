@@ -40,6 +40,7 @@ import {
   setPrintScanCapabilityModeForTest,
 } from '../src/terminals/terminal-capabilities.service'
 import { PricingService } from '../src/payment/pricing.service'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PRINT_UNIT_PRICE_CENTS } from '../src/print-jobs/print-pricing'
 import * as apiContract from '../src/terminals/terminal-capabilities.types'
@@ -57,7 +58,7 @@ function pass(m: string): void {
 }
 function fail(m: string): never {
   console.error(`  FAIL ${m}`)
-  process.exit(1)
+  throw new Error(m)
 }
 
 function errorCode(error: unknown): string | undefined {
@@ -265,18 +266,21 @@ async function main(): Promise<void> {
 
     console.log('\n-- F/G. 计价：彩色按彩色价，双面不改价 --')
     await seedDevDefaultPriceConfig(prisma)
+    await adoptDevPrintSeedPrices(prisma, terminalId)
 
     const bwQuote = await pricing.quotePrint({
       billablePages: 4,
       billingPageSource: 'pdf_lightweight_scan',
       copies: 1,
       colorMode: 'black_white',
+      terminalId,
     })
     const colorQuote = await pricing.quotePrint({
       billablePages: 4,
       billingPageSource: 'pdf_lightweight_scan',
       copies: 1,
       colorMode: 'color',
+      terminalId,
     })
 
     const expectedBw = PRINT_UNIT_PRICE_CENTS.black_white * 4
@@ -327,6 +331,7 @@ async function main(): Promise<void> {
     }
     pass('计费页与收银页均无双面附加计价标签')
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     setPrintScanCapabilityModeForTest(null)
     await prisma.terminalCapability.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { AiModule } from '../ai/ai.module'
+import { TripCoverService } from '../payment/trip-cover.service'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
 import { JobFitController } from '../ai/job-fit.controller'
@@ -34,6 +35,6 @@ import { TerminalsModule } from '../terminals/terminals.module'
     }),
   ],
   controllers: [JobAiController, MemberJobAiSessionsController, JobFitController],
-  providers: [JobAiService, JobAiLlmService, JobContextService, JobAiQuotaService, GovernedJobFitService, EndUserAuthGuard],
+  providers: [JobAiService, JobAiLlmService, JobContextService, JobAiQuotaService, GovernedJobFitService, EndUserAuthGuard, TripCoverService],
 })
 export class JobAiModule {}
