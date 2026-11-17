@@ -507,8 +507,8 @@ function assertGatePlacement(): void {
   }
   walk(join(API_ROOT, 'src'))
   const outside = gateUsers.filter((f) => !f.startsWith('licenses/') && !f.startsWith('branding/'))
-  c.equal('license-gate 只被这三处调用（会话签发、改绑终端、预创建终端）', outside.sort(), [
-    'terminals/terminal-org-assignment.ts', 'terminals/terminal-session.service.ts', 'terminals/terminals-admin.service.ts',
+  c.equal('license-gate 只被这四处调用（会话签发、改绑终端、单台预创建、批量预建）', outside.sort(), [
+    'terminals/terminal-batch.service.ts', 'terminals/terminal-org-assignment.ts', 'terminals/terminal-session.service.ts', 'terminals/terminals-admin.service.ts',
   ])
   for (const file of ['terminals/terminals.service.ts', 'terminals/terminals-agent.service.ts', 'terminals/terminal-identity.guard.ts']) {
     c.check(`${file} 不碰授权（心跳、上报、身份校验不拦）`, existsSync(join(API_ROOT, 'src', file)) && !/license/i.test(read(join(API_ROOT, 'src', file))))
