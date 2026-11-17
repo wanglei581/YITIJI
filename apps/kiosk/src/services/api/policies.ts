@@ -55,6 +55,12 @@ export interface PublishedPoliciesResult {
   page: number
   pageSize: number
   totalPages: number
+  /**
+   * POLICY_SCOPE=org 时服务端给出的终端范围。
+   * unbound / missing 且没有政策时，空态标题换成「本机还没有运营机构发布的政策」。
+   * 缺省（all）时不带这个字段，空态照旧。
+   */
+  scope?: 'bound' | 'unbound' | 'missing'
 }
 
 export interface PolicyQueryParams {
@@ -81,6 +87,7 @@ async function fetchPolicies(params?: PolicyQueryParams): Promise<PublishedPolic
   if (!res.ok) throw new Error(`请求失败（${res.status}）`)
   const body = (await res.json()) as {
     data: PolicyPostView[]
+    scope?: string
     pagination?: { total?: number; page?: number; pageSize?: number; totalPages?: number }
   }
   const items = body.data
@@ -88,7 +95,8 @@ async function fetchPolicies(params?: PolicyQueryParams): Promise<PublishedPolic
   const page = typeof body.pagination?.page === 'number' ? body.pagination.page : (params?.page ?? 1)
   const pageSize = typeof body.pagination?.pageSize === 'number' ? body.pagination.pageSize : (params?.pageSize ?? Math.max(1, items.length))
   const totalPages = typeof body.pagination?.totalPages === 'number' ? body.pagination.totalPages : Math.max(1, Math.ceil(total / Math.max(1, pageSize)))
-  return { items, total, page, pageSize, totalPages }
+  const scope = body.scope === 'bound' || body.scope === 'unbound' || body.scope === 'missing' ? body.scope : undefined
+  return { items, total, page, pageSize, totalPages, ...(scope ? { scope } : {}) }
 }
 
 const now = () => new Date().toISOString()
