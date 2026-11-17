@@ -3,7 +3,7 @@
  *
  * 锁住：只收 32 位小写十六进制、去重、只留最近 10 个；取走即清空；
  * 非 http 不发；小青有令牌发两次、没令牌发一次；作业凭据三种；
- * fetch 抛错不往外抛；每次都带 keepalive。
+ * fetch 抛错不往外抛；503 会退避重试，最终失败不抛错、不卡住离场；每次都带 keepalive。
  * 接线：读作业成功才登记、读失败不登记（编译 advisor.ts 真跑）；小青总结回了作业号也登记。
  */
 import assert from 'node:assert/strict'
@@ -223,6 +223,39 @@ test('没有登记时不发；fetch 同步抛错或拒绝都不往外抛', async
     globalThis.fetch = () => Promise.reject(new Error('async boom'))
     await assert.doesNotReject(async () => mod.forgetAiSessions(null))
   } finally {
+    restore()
+  }
+})
+
+test('503 时退避重试，最终失败不抛错、不卡住离场', async () => {
+  const { mod, restore } = await loadForget()
+  const warnings = []
+  const originalWarn = console.warn
+  console.warn = (...args) => { warnings.push(args.map(String).join(' ')) }
+  const secret = '这段原话不许进诊断'
+  const sessionId = HEX(21)
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    return { ok: false, status: 503, json: async () => ({ message: secret }) }
+  }
+  try {
+    mod.rememberAssistantSession(sessionId)
+    const started = Date.now()
+    assert.doesNotThrow(() => mod.forgetAiSessions(null))
+    assert.ok(Date.now() - started < 100, '清场调用本身不能等回执')
+    const deadline = Date.now() + 3_000
+    while (calls < 3 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 40))
+    }
+    assert.equal(calls, 3)
+    const mine = warnings.filter((line) => line.includes('status=503'))
+    assert.equal(mine.length, 1)
+    assert.match(mine[0], /\[kiosk-clear\] forget_failed kind=assistant status=503 attempts=3/)
+    assert.equal(mine[0].includes(secret), false)
+    assert.equal(mine[0].includes(sessionId), false)
+  } finally {
+    console.warn = originalWarn
     restore()
   }
 })

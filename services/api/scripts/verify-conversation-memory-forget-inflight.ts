@@ -1,0 +1,470 @@
+/**
+ * 在途请求的清场补洞。挂在 verify-conversation-memory-forget 末尾。
+ *
+ * A 首次追问还没进内存时登出（Redis 成功 / 失败）；首次小青在途、内存里还没有这条时清场。
+ * B 容量淘汰本身作废在途回复；淘汰之后再登出 / forgetOwner 也不写回。
+ * C 代次表挤满后，挤掉之前抓住的代次不能再对上；三个方法同样去掉会话号两端空白。
+ * D 两个清场接口在身份查询 503 时，内存已清、在途作废，作业行仍在库里。
+ */
+import { randomUUID } from 'node:crypto'
+import { HttpException, ValidationPipe } from '@nestjs/common'
+import type { JwtService } from '@nestjs/jwt'
+import { AssistantSessionForgetController } from '../src/ai/assistant-session-forget.controller'
+import { AssistantSessionsForgetDto } from '../src/ai/dto/assistant-sessions-forget.dto'
+import { LlmChatService, MAX_ASSISTANT_SESSIONS_PER_OWNER } from '../src/ai/llm/llm-chat.service'
+import { AdvisorController } from '../src/advisor/advisor.controller'
+import { AdvisorQaMemory } from '../src/advisor/advisor-qa-memory'
+import { AdvisorService } from '../src/advisor/advisor.service'
+import { ConversationEpoch } from '../src/common/conversation-epoch'
+import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
+import { MemberAuthService } from '../src/member-auth/member-auth.service'
+import type { PrismaService } from '../src/prisma/prisma.service'
+
+interface ModelGate {
+  wait: () => Promise<void>
+  entered: () => void
+}
+
+interface RedisStub {
+  get: (key: string) => Promise<string | null> | string | null
+  unregisterMemberSession: (endUserId: string, sessionId: string) => Promise<void>
+}
+
+interface ChatSession {
+  ownerKey: string
+  messages: Array<{ role: string; content: string }>
+}
+
+export interface InflightForgetContext {
+  check: (ok: boolean, msg: string) => void
+  textMark: (label: string) => string
+  chat: LlmChatService
+  memory: AdvisorQaMemory
+  advisor: AdvisorService
+  auth: MemberAuthService
+  controller: AssistantSessionForgetController
+  advisorController: AdvisorController
+  redis: RedisStub
+  prisma: PrismaService
+  jwt: JwtService
+  createUser: (id: string) => Promise<void>
+  createQa: (userId: string, sessionId: string, artifactId: string) => Promise<void>
+  bearer: (userId: string) => string
+  modelGate: ModelGate
+}
+
+interface ForgetResult { status: number; code: string; forgotten: number | null }
+interface HungChat {
+  pending: Promise<{ reply: string; sessionId: string }>
+  entered: Promise<void>
+  release: () => void
+}
+interface HungAsk {
+  pending: Promise<{ answer: string }>
+  entered: Promise<void>
+  release: () => void
+}
+
+const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })
+
+function sessionsOf(chat: LlmChatService): Map<string, ChatSession> {
+  return (chat as unknown as { sessions: Map<string, ChatSession> }).sessions
+}
+
+function transcriptOf(chat: LlmChatService, sessionId: string, owner: string): string {
+  return (chat.getOwnedTranscript(sessionId, owner) ?? []).map((turn) => turn.content).join('\n')
+}
+
+function qaText(memory: AdvisorQaMemory, sessionId: string): string {
+  return memory.read(sessionId).map((turn) => turn.content).join('\n')
+}
+
+function findChat(chat: LlmChatService, owner: string, mark: string): string | undefined {
+  for (const [id, session] of sessionsOf(chat)) {
+    if (session.ownerKey === owner && session.messages.some((message) => message.content.includes(mark))) return id
+  }
+  return undefined
+}
+
+async function waitFor(ready: Promise<void>, label: string): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`超时：${label}`)), 3_000)
+  })
+  try {
+    await Promise.race([ready, timeout])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+async function forgetBody(sessionIds: string[]): Promise<AssistantSessionsForgetDto> {
+  return await pipe.transform(
+    { sessionIds },
+    { type: 'body', metatype: AssistantSessionsForgetDto },
+  ) as AssistantSessionsForgetDto
+}
+
+async function callForget(run: () => Promise<{ forgotten: number }>): Promise<ForgetResult> {
+  try {
+    const body = await run()
+    return { status: 200, code: '', forgotten: body.forgotten }
+  } catch (error) {
+    let code = ''
+    if (error instanceof HttpException) {
+      const body = error.getResponse() as { error?: { code?: string } }
+      code = typeof body.error?.code === 'string' ? body.error.code : ''
+    }
+    return { status: error instanceof HttpException ? error.getStatus() : -1, code, forgotten: null }
+  }
+}
+
+/** 只挂住含 mark 的那一次模型请求。其它对话走同一个替身，立刻返回。 */
+function hangChat(chat: LlmChatService, owner: string, mark: string, sessionId?: string): HungChat {
+  const previous = globalThis.fetch
+  let releaseGate: () => void = () => undefined
+  const gate = new Promise<void>((resolve) => { releaseGate = resolve })
+  let markEntered: () => void = () => undefined
+  const entered = new Promise<void>((resolve) => { markEntered = resolve })
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body ?? '{}')) as { messages?: Array<{ role: string; content: string }> }
+    const text = (body.messages ?? []).filter((message) => message.role === 'user').map((message) => message.content).join('\n')
+    if (text.includes(mark)) {
+      markEntered()
+      await gate
+    }
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({ choices: [{ message: { content: '模型的回答' } }] }),
+    } as Response
+  }) as typeof fetch
+  const pending = chat.chat(
+    { message: mark, channel: 'kiosk', sessionId } as never,
+    undefined,
+    owner,
+  ) as Promise<{ reply: string; sessionId: string }>
+  return {
+    pending,
+    entered,
+    release() {
+      releaseGate()
+      globalThis.fetch = previous
+    },
+  }
+}
+
+function hangAsk(
+  gate: ModelGate,
+  advisor: AdvisorService,
+  sessionId: string,
+  question: string,
+  requester: { endUserId: string | null; accessToken: string | null },
+): HungAsk {
+  const previousWait = gate.wait
+  const previousEntered = gate.entered
+  let releaseGate: () => void = () => undefined
+  let markEntered: () => void = () => undefined
+  const entered = new Promise<void>((resolve) => { markEntered = resolve })
+  gate.entered = () => markEntered()
+  gate.wait = () => new Promise<void>((resolve) => { releaseGate = resolve })
+  const pending = advisor.ask(sessionId, question, requester) as Promise<{ answer: string }>
+  return {
+    pending,
+    entered,
+    release() {
+      releaseGate()
+      gate.wait = previousWait
+      gate.entered = previousEntered
+    },
+  }
+}
+
+async function fillUntilEvicted(chat: LlmChatService, sessionId: string, owner: string): Promise<void> {
+  for (let n = 0; n < MAX_ASSISTANT_SESSIONS_PER_OWNER + 2 && chat.getOwnedTranscript(sessionId, owner); n += 1) {
+    await chat.chat({ message: `填满归属${n}`, channel: 'kiosk' } as never, undefined, owner)
+  }
+}
+
+function runEpochCases(check: InflightForgetContext['check']): void {
+  const epoch = new ConversationEpoch(2)
+  const captured = epoch.capture('target-job')
+  epoch.invalidate('target-job')
+  epoch.invalidate('filler-a')
+  epoch.invalidate('filler-b')
+  check(!epoch.matches('target-job', captured), '场景 C：代次表挤掉这条之后，挤掉之前抓住的代次不能再写回')
+  const fresh = epoch.capture('fresh-job')
+  check(epoch.matches('fresh-job', fresh), '场景 C 阳性：挤掉之后新抓住的代次仍能写回')
+
+  const spaced = new ConversationEpoch()
+  spaced.invalidate('job-1')
+  const fromPadded = spaced.capture('  job-1  ')
+  check(
+    spaced.matches('job-1', fromPadded) && fromPadded !== 0,
+    '场景 C：抓代次先去掉会话号两端空白，和作废用的是同一个号',
+  )
+  const plain = new ConversationEpoch()
+  const before = plain.capture('job-2')
+  plain.invalidate('  job-2  ')
+  check(!plain.matches('job-2', before), '场景 C：作废时去掉两端空白，原先抓住的代次对不上')
+  const again = plain.capture('job-2')
+  check(!plain.matches('  job-2  ', before) && plain.matches('  job-2  ', again), '场景 C：核对代次时同样去掉两端空白')
+}
+
+export async function runInflightForgetScenarios(ctx: InflightForgetContext): Promise<void> {
+  const {
+    check, textMark, chat, memory, advisor, auth, controller, advisorController,
+    redis, prisma, createUser, createQa, bearer, modelGate,
+  } = ctx
+  runEpochCases(check)
+
+  const userA = `verify-a-first-${randomUUID()}`
+  await createUser(userA)
+  const workA = `verify-work-a-first-${randomUUID()}`
+  await createQa(userA, workA, `verify-art-a-first-${randomUUID()}`)
+  const markA = textMark('首次追问原话')
+  const hungA = hangAsk(modelGate, advisor, workA, markA, { endUserId: userA, accessToken: null })
+  try {
+    await waitFor(hungA.entered, '首次作业追问挂起')
+    check(memory.read(workA).length === 0, '场景 A 阳性：首次追问还在路上，内存里还没有这条')
+    await auth.logout(userA, randomUUID())
+    hungA.release()
+    const answered = await hungA.pending
+    check(
+      answered.answer.length > 0 && !qaText(memory, workA).includes(markA),
+      '场景 A：首次追问在途时登出成功，放行后内存不写回原话，回答仍返回',
+    )
+  } finally {
+    hungA.release()
+  }
+
+  const userA2 = `verify-a-fail-${randomUUID()}`
+  await createUser(userA2)
+  const workA2 = `verify-work-a-fail-${randomUUID()}`
+  await createQa(userA2, workA2, `verify-art-a-fail-${randomUUID()}`)
+  const markA2 = textMark('注销失败首次原话')
+  const hungA2 = hangAsk(modelGate, advisor, workA2, markA2, { endUserId: userA2, accessToken: null })
+  const originalUnregister = redis.unregisterMemberSession
+  let logoutError: unknown = null
+  try {
+    await waitFor(hungA2.entered, '注销失败时的首次追问挂起')
+    redis.unregisterMemberSession = async () => { throw new Error('redis revoke failed') }
+    try {
+      await auth.logout(userA2, randomUUID())
+    } catch (error) {
+      logoutError = error
+    }
+    hungA2.release()
+    const answered = await hungA2.pending
+    check(
+      logoutError instanceof Error && answered.answer.length > 0 && !qaText(memory, workA2).includes(markA2),
+      '场景 A：首次追问在途时 Redis 注销失败，登出仍失败，放行后内存不写回原话',
+    )
+  } finally {
+    redis.unregisterMemberSession = originalUnregister
+    hungA2.release()
+  }
+
+  const userKeep = `verify-a-keep-${randomUUID()}`
+  await createUser(userKeep)
+  const workKeep = `verify-work-a-keep-${randomUUID()}`
+  await createQa(userKeep, workKeep, `verify-art-a-keep-${randomUUID()}`)
+  const markKeep = textMark('旁路会员原话')
+  await advisor.ask(workKeep, markKeep, { endUserId: userKeep, accessToken: null })
+  check(qaText(memory, workKeep).includes(markKeep), '场景 A 阳性：旁路会员的作业原话还在')
+
+  const userChat = `verify-a-chat-${randomUUID()}`
+  await createUser(userChat)
+  const ownerChat = `u:${userChat}`
+  const markChat = textMark('首次小青原话')
+  const hungChat = hangChat(chat, ownerChat, markChat)
+  try {
+    await waitFor(hungChat.entered, '首次小青挂起')
+    const sessionId = findChat(chat, ownerChat, markChat)
+    check(typeof sessionId === 'string' && sessionId.length === 32, '场景 A 阳性：首次小青已经在途，会话号已经铸出来')
+    // 产品会先把空壳放进内存。拿掉之后，剩下的就是「还没写入，或刚被删掉但代次没升」的在途请求。
+    if (sessionId) sessionsOf(chat).delete(sessionId)
+    const forgotten = await controller.forget(
+      await forgetBody(sessionId ? [sessionId] : ['0'.repeat(32)]),
+      { headers: { authorization: `Bearer ${bearer(userChat)}` }, ip: '10.20.1.1' },
+    )
+    hungChat.release()
+    const answered = await hungChat.pending
+    const left = sessionId ? transcriptOf(chat, sessionId, ownerChat) : markChat
+    check(
+      forgotten.forgotten === 1 && answered.reply.length > 0 && !left.includes(markChat),
+      `场景 A：首次小青在途且内存里还没有这条时清场，放行后不写回（forgotten ${forgotten.forgotten}）`,
+    )
+  } finally {
+    hungChat.release()
+  }
+
+  const userB = `verify-b-chat-${randomUUID()}`
+  await createUser(userB)
+  const ownerB = `u:${userB}`
+  const markB = textMark('淘汰小青原话')
+  const hungB = hangChat(chat, ownerB, markB)
+  try {
+    await waitFor(hungB.entered, '待淘汰的小青挂起')
+    const sessionId = findChat(chat, ownerB, markB) ?? ''
+    check(sessionId.length === 32, '场景 B 阳性：挂起的小青会话在内存里')
+    await fillUntilEvicted(chat, sessionId, ownerB)
+    check(chat.getOwnedTranscript(sessionId, ownerB) === null, '场景 B 阳性：同会员再开满之后，挂起的那段被淘汰')
+    hungB.release()
+    const answered = await hungB.pending
+    check(
+      answered.reply.length > 0 && !transcriptOf(chat, sessionId, ownerB).includes(markB),
+      '场景 B：小青被容量淘汰后直接放行，原会话号读不到原话，回答仍返回',
+    )
+  } finally {
+    hungB.release()
+  }
+
+  const userB2 = `verify-b-logout-${randomUUID()}`
+  await createUser(userB2)
+  const ownerB2 = `u:${userB2}`
+  const markB2 = textMark('淘汰后登出原话')
+  const hungB2 = hangChat(chat, ownerB2, markB2)
+  try {
+    await waitFor(hungB2.entered, '淘汰后登出的小青挂起')
+    const sessionId = findChat(chat, ownerB2, markB2) ?? ''
+    await fillUntilEvicted(chat, sessionId, ownerB2)
+    check(chat.getOwnedTranscript(sessionId, ownerB2) === null, '场景 B 阳性：登出前这段小青已经被淘汰')
+    await auth.logout(userB2, randomUUID())
+    hungB2.release()
+    const answered = await hungB2.pending
+    check(
+      answered.reply.length > 0 && !transcriptOf(chat, sessionId, ownerB2).includes(markB2),
+      '场景 B：小青淘汰后再登出，放行仍不写回原话',
+    )
+  } finally {
+    hungB2.release()
+  }
+
+  const userQa = `verify-b-qa-${randomUUID()}`
+  await createUser(userQa)
+  const ownerQa = `u:${userQa}`
+  const workB = `verify-work-b-${randomUUID()}`
+  await createQa(userQa, workB, `verify-art-b-${randomUUID()}`)
+  await advisor.ask(workB, textMark('作业上一轮'), { endUserId: userQa, accessToken: null })
+  const markQa = textMark('淘汰作业原话')
+  const hungQa = hangAsk(modelGate, advisor, workB, markQa, { endUserId: userQa, accessToken: null })
+  try {
+    await waitFor(hungQa.entered, '待淘汰的作业追问挂起')
+    let flooded = 0
+    while (memory.read(workB).length > 0 && flooded < 800) {
+      memory.append(`${workB}-flood-${flooded}`, '问', '答', ownerQa)
+      flooded += 1
+    }
+    check(memory.read(workB).length === 0 && flooded > 0, `场景 B 阳性：写满之后目标作业被淘汰（写了 ${flooded} 条）`)
+    hungQa.release()
+    const answered = await hungQa.pending
+    check(
+      answered.answer.length > 0 && !qaText(memory, workB).includes(markQa),
+      '场景 B：作业被容量淘汰后直接放行，内存里没有这一问，回答仍返回',
+    )
+  } finally {
+    hungQa.release()
+  }
+
+  const userQa2 = `verify-b-own-${randomUUID()}`
+  await createUser(userQa2)
+  const ownerQa2 = `u:${userQa2}`
+  const workB2 = `verify-work-b2-${randomUUID()}`
+  await createQa(userQa2, workB2, `verify-art-b2-${randomUUID()}`)
+  await advisor.ask(workB2, textMark('作业再上一轮'), { endUserId: userQa2, accessToken: null })
+  const markQa2 = textMark('淘汰后清归属原话')
+  const hungQa2 = hangAsk(modelGate, advisor, workB2, markQa2, { endUserId: userQa2, accessToken: null })
+  try {
+    await waitFor(hungQa2.entered, '淘汰后清归属的作业挂起')
+    let flooded = 0
+    while (memory.read(workB2).length > 0 && flooded < 800) {
+      memory.append(`${workB2}-flood-${flooded}`, '问', '答', ownerQa2)
+      flooded += 1
+    }
+    check(memory.read(workB2).length === 0, '场景 B 阳性：forgetOwner 之前目标作业已经被淘汰')
+    memory.forgetOwner(ownerQa2)
+    hungQa2.release()
+    const answered = await hungQa2.pending
+    check(
+      answered.answer.length > 0 && !qaText(memory, workB2).includes(markQa2),
+      '场景 B：作业淘汰后再 forgetOwner，放行仍不写回原话',
+    )
+  } finally {
+    hungQa2.release()
+  }
+
+  const userD = `verify-d-${randomUUID()}`
+  await createUser(userD)
+  const ownerD = `u:${userD}`
+  const seeded = await chat.chat(
+    { message: textMark('身份故障已有小青'), channel: 'kiosk' } as never,
+    undefined,
+    ownerD,
+  ) as { sessionId: string }
+  const markD = textMark('身份故障在途小青')
+  const hungD = hangChat(chat, ownerD, markD, seeded.sessionId)
+  const originalGet = redis.get
+  try {
+    await waitFor(hungD.entered, '身份故障时的小青挂起')
+    check(transcriptOf(chat, seeded.sessionId, ownerD).length > 0, '场景 D 阳性：清场前小青原话在内存里')
+    redis.get = async () => { throw new Error('redis down') }
+    resetRedisCooldownForTests()
+    const assistantFailed = await callForget(async () => controller.forget(
+      await forgetBody([seeded.sessionId]),
+      { headers: { authorization: `Bearer ${bearer(userD)}` }, ip: '10.20.2.2' },
+    ))
+    const clearedNow = transcriptOf(chat, seeded.sessionId, ownerD)
+    hungD.release()
+    const answered = await hungD.pending
+    const left = transcriptOf(chat, seeded.sessionId, ownerD)
+    check(
+      assistantFailed.status === 503
+        && assistantFailed.code === 'MEMBER_SESSION_STORE_UNAVAILABLE'
+        && assistantFailed.forgotten === null
+        && clearedNow.length === 0
+        && answered.reply.length > 0
+        && !left.includes(markD),
+      `场景 D：小青清场身份查询失败时先清内存并作废在途，再回 503（实际 ${assistantFailed.status}/${assistantFailed.code}）`,
+    )
+  } finally {
+    redis.get = originalGet
+    resetRedisCooldownForTests()
+    hungD.release()
+  }
+
+  const workD = `verify-work-d-${randomUUID()}`
+  await createQa(userD, workD, `verify-art-d-${randomUUID()}`)
+  await advisor.ask(workD, textMark('身份故障已有作业'), { endUserId: userD, accessToken: null })
+  const markWork = textMark('身份故障在途作业')
+  const hungWork = hangAsk(modelGate, advisor, workD, markWork, { endUserId: userD, accessToken: null })
+  try {
+    await waitFor(hungWork.entered, '身份故障时的作业追问挂起')
+    check(qaText(memory, workD).length > 0, '场景 D 阳性：清场前作业原话在内存里')
+    redis.get = async () => { throw new Error('redis down') }
+    resetRedisCooldownForTests()
+    const advisorFailed = await callForget(() => advisorController.forget(
+      workD,
+      { headers: { authorization: `Bearer ${bearer(userD)}` } },
+    ))
+    const clearedNow = qaText(memory, workD)
+    const row = await prisma.advisorSession.findUnique({ where: { id: workD } })
+    hungWork.release()
+    const answered = await hungWork.pending
+    check(
+      advisorFailed.status === 503
+        && advisorFailed.code === 'MEMBER_SESSION_STORE_UNAVAILABLE'
+        && advisorFailed.forgotten === null
+        && clearedNow.length === 0
+        && !!row
+        && answered.answer.length > 0
+        && !qaText(memory, workD).includes(markWork),
+      `场景 D：作业清场身份查询失败时只清内存并作废在途，不删库，再回 503（实际 ${advisorFailed.status}/${advisorFailed.code}）`,
+    )
+  } finally {
+    redis.get = originalGet
+    resetRedisCooldownForTests()
+    hungWork.release()
+  }
+}
