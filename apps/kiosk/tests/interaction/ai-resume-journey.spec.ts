@@ -155,14 +155,20 @@ async function readEditorValues(page: Page): Promise<string[]> {
   return locator.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value))
 }
 
-/** 走查环境常常没有终端心跳，主按钮会停用。停用只挡点击，不挡 handleNext。 */
+/**
+ * 走查环境没有终端心跳，主按钮是原生 disabled。
+ * React 按 props.disabled 丢掉 onClick，只改 DOM 再 click() 到不了 handleNext。
+ * 直接调用按钮上现有的处理函数；handleNext 自己不看打印机是否可用。
+ */
 async function clickPreviewNext(page: Page): Promise<void> {
   const next = page.locator('footer.qxt-dock button.qxt-btn-pri')
   await expect(next, '预览页应有去确认页的主按钮').toBeVisible({ timeout: 15_000 })
   await next.evaluate((el) => {
-    const button = el as HTMLButtonElement
-    button.disabled = false
-    button.click()
+    const button = el as HTMLButtonElement & Record<string, { onClick?: () => void }>
+    const key = Object.keys(button).find((name) => name.startsWith('__reactProps$'))
+    const onClick = key ? button[key]?.onClick : undefined
+    if (typeof onClick !== 'function') throw new Error('预览主按钮没有可调用的处理函数')
+    onClick()
   })
 }
 
