@@ -363,6 +363,65 @@ async function main(): Promise<void> {
     assert.equal(afterDeadline.data.some((row) => row.id === pageIds[0]), false)
     console.log('  PASS 关键词按字面匹配，通配符、撇号、分页和截止日期一起生效')
 
+    const stillPrintable = await seedPublished(`清单仍有效_${suffix}`, '可以打印')
+    const expiredPrintable = await seedPublished(`清单已过期_${suffix}`, '不能打印', {
+      validThrough: new Date(`${yesterday}T00:00:00.000Z`),
+    })
+    const makeChecklistFile = async (policyId: string) => {
+      const fileId = `file_pl1_${randomUUID().replace(/-/g, '').slice(0, 16)}`
+      await prisma.fileObject.create({
+        data: {
+          id: fileId,
+          storageKey: `verify-pl1/${fileId}.pdf`,
+          filename: '办事清单.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 128,
+          sha256: 'a'.repeat(64),
+          purpose: 'policy_checklist',
+          createdBy: checklistMetadata(policyId, 1),
+          status: 'active',
+        },
+      })
+      fileIds.push(fileId)
+      return fileId
+    }
+    const printableFile = await makeChecklistFile(stillPrintable)
+    const expiredFile = await makeChecklistFile(expiredPrintable)
+    await assertPiiScanned({
+      prisma,
+      fileId: printableFile,
+      requireCompleted: true,
+      missingMessage: '缺少隐私检查',
+      pendingMessage: '隐私检查未完成',
+    })
+    await expectCode(
+      () => assertPiiScanned({
+        prisma,
+        fileId: expiredFile,
+        requireCompleted: true,
+        missingMessage: '缺少隐私检查',
+        pendingMessage: '隐私检查未完成',
+      }),
+      'POLICY_CHECKLIST_WITHDRAWN',
+      '过期政策的办事清单在打印建单前被拒',
+    )
+    console.log('  PASS 打印建单前拒绝已过截止日期的办事清单')
+
+    const boundary = await seedPublished(`跨日截止_${suffix}`, '北京时间跨零点', {
+      validThrough: new Date('2026-11-17T00:00:00.000Z'),
+    })
+    await withFrozenNow(new Date('2026-11-17T15:59:59.999Z'), async () => {
+      assert.equal(policyDeadlineThreshold().toISOString(), '2026-11-17T00:00:00.000Z')
+      const page = await policies.getPublishedPolicies({ keyword: `跨日截止_${suffix}`, scope: own })
+      assert.deepEqual(page.data.map((row) => row.id), [boundary], '北京时间 11 月 17 日 23:59:59.999 仍有效')
+    })
+    await withFrozenNow(new Date('2026-11-17T16:00:00.000Z'), async () => {
+      assert.equal(policyDeadlineThreshold().toISOString(), '2026-11-18T00:00:00.000Z')
+      const page = await policies.getPublishedPolicies({ keyword: `跨日截止_${suffix}`, scope: own })
+      assert.deepEqual(page.data.map((row) => row.id), [], '北京时间 11 月 18 日 00:00 已过期')
+    })
+    console.log('  PASS 北京时间跨零点后截止日当天的政策变为过期')
+
     const redisUrl = process.env['REDIS_URL']?.trim()
     if (!redisUrl) throw new Error('REDIS_URL is required for the community cache deadline check')
     redis = new Redis(redisUrl, { maxRetriesPerRequest: 1, connectTimeout: 2_000 })
@@ -458,3 +517,35 @@ async function main(): Promise<void> {
     assert.equal(await auditCount(raceRow), 1, '并发下只写一条审计')
     console.log('  PASS 到期下架与审计同成同败，并发只写一条')
 
+    console.log('PASS verify:policy-expiry')
+  } finally {
+    try {
+      if (ddl) {
+        if (prisma.dbKind === 'sqlite') {
+          await ddl.$executeRawUnsafe('DROP TRIGGER IF EXISTS verify_policy_auto_expire_fail')
+        } else {
+          await ddl.$executeRawUnsafe('DROP TRIGGER IF EXISTS verify_policy_auto_expire_fail ON "AuditLog"')
+          await ddl.$executeRawUnsafe('DROP FUNCTION IF EXISTS verify_policy_auto_expire_fail()')
+        }
+      }
+    } catch (error) {
+      console.error('drop audit injection failed', error)
+    }
+    if (redis) {
+      if (redisKeys.length > 0) await redis.del(...redisKeys).catch(() => undefined)
+      await redis.quit().catch(() => redis?.disconnect())
+    }
+    await ddl?.$disconnect().catch(() => undefined)
+    if (fileIds.length > 0) await prisma.fileObject.deleteMany({ where: { id: { in: fileIds } } })
+    await prisma.auditLog.deleteMany({ where: { OR: [{ targetId: { in: ids } }, { actorId: userRow.id }] } })
+    await prisma.policyPost.deleteMany({ where: { sourceOrgId: orgId } })
+    await prisma.user.deleteMany({ where: { id: userRow.id } })
+    await prisma.organization.deleteMany({ where: { id: orgId } })
+    await prisma.onModuleDestroy()
+  }
+}
+
+main().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})

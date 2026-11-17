@@ -18,11 +18,15 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import ts from 'typescript'
+import { MODULE_METADATA } from '@nestjs/common/constants'
+import { CronExpression } from '@nestjs/schedule'
 import {
   describeBackgroundError,
   installUnhandledRejectionGuard,
   scheduleBackground,
 } from '../src/common/process/background-task'
+import { PoliciesModule } from '../src/policies/policies.module'
+import { PolicyExpiryTask } from '../src/policies/policy-expiry.task'
 import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 
 const SRC = join(__dirname, '..', 'src')
@@ -180,6 +184,29 @@ async function main() {
     }
     assert.equal(process.listenerCount('unhandledRejection'), 0, '卸载后不应残留监听')
     pass('未处理拒绝被记下并告警，原文不外泄，卸载干净')
+  }
+
+  console.log('\n[5] PolicyExpiryTask：模块里登记、@Cron 是每小时、出错不抛出调度')
+  {
+    const providers = (Reflect.getMetadata(MODULE_METADATA.PROVIDERS, PoliciesModule) ?? []) as unknown[]
+    assert.ok(providers.includes(PolicyExpiryTask), 'PoliciesModule 必须登记 PolicyExpiryTask')
+    const cron = Reflect.getMetadata('SCHEDULE_CRON_OPTIONS', PolicyExpiryTask.prototype.handleHourly) as { cronTime?: string } | undefined
+    assert.ok(cron, '读不到 PolicyExpiryTask.handleHourly 的 @Cron 元数据')
+    assert.equal(cron.cronTime, CronExpression.EVERY_HOUR, `应为每小时，实际 ${String(cron.cronTime)}`)
+    const errors: string[] = []
+    const task = new PolicyExpiryTask(
+      { policyPost: { findMany: async () => { throw new Error('expiry-boom') } } } as never,
+      {} as never,
+    )
+    ;(task as unknown as { logger: { error: (line: string) => void; log: () => void } }).logger = {
+      error: (line) => errors.push(line),
+      log: () => undefined,
+    }
+    await task.handleHourly()
+    assert.equal(errors.length, 1, '失败应记一行日志，而不是抛出去')
+    assert.match(errors[0] ?? '', /Hourly policy expiry failed/)
+    assert.match(errors[0] ?? '', /expiry-boom/)
+    pass('PolicyExpiryTask 已登记、每小时执行、失败只记日志')
   }
 
   console.log(`\n=== ALL PASS (${passed}) ===`)
