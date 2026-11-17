@@ -55,7 +55,7 @@ if (!controllerSrc.includes("publicQuota.consume('assistant_chat'")) fail('1f. v
 if (!controllerSrc.includes('runWithPublicQuota')) fail('1g. 配额失败必须回滚')
 pass('1. voice / summary 端点、限流、配额、WAV 上限存在')
 
-const voiceMatch = controllerSrc.match(/async transcribeAssistantVoice[\s\S]*?\n  async summarizeAssistantSession/)
+const voiceMatch = controllerSrc.match(/async transcribeAssistantVoice[\s\S]*?\n {2}async summarizeAssistantSession/)
 if (!voiceMatch) fail('2a. 未找到 transcribeAssistantVoice 方法体')
 const voiceBody = voiceMatch[0]
 if (!voiceBody.includes('isWavBuffer(audio.buffer)')) fail('2b. 必须 WAV 魔数校验')
