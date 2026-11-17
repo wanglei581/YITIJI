@@ -370,7 +370,10 @@ async function main() {
   async function cleanup() {
     if (createdTaskIds.length) {
       const orders = await prisma.order.findMany({ where: { printTaskId: { in: createdTaskIds } }, select: { id: true } })
-      await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: orders.map((o: { id: string }) => o.id) } } })
+      const orderIds = orders.map((o: { id: string }) => o.id)
+      await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: orderIds } } })
+      // 个人收费打开后，明确没出纸会自动原路退，Refund 行挡住删订单。
+      await prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } })
       await prisma.order.deleteMany({ where: { printTaskId: { in: createdTaskIds } } })
       await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: createdTaskIds } } })
       await prisma.auditLog.deleteMany({ where: { targetType: 'print_task', targetId: { in: createdTaskIds } } })

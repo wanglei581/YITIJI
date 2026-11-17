@@ -36,7 +36,7 @@ export class MemberOrderClaimHereService {
     if (!order) {
       throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
     }
-    if (order.terminalId !== terminal.id) {
+    if (order.terminalId && order.terminalId !== terminal.id) {
       // 本人已证明身份：直接告诉他该去哪台机器，不计入锁机、不需要防枚举的同文案。
       const target = order.terminalId
         ? await this.prisma.terminal.findUnique({

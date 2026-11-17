@@ -106,6 +106,8 @@
     "verify:terminal-charge-settings": "node -r @swc-node/register scripts/verify-terminal-charge-settings.ts",
     "verify:service-orders": "node -r @swc-node/register scripts/verify-service-orders.ts",
     "verify:service-orders-concurrency": "node -r @swc-node/register scripts/verify-service-orders-concurrency.ts",
+    "verify:pickup-arrival-price": "node -r @swc-node/register scripts/verify-pickup-arrival-price.ts",
+    "verify:pickup-arrival-price:postgres": "node -r @swc-node/register scripts/verify-pickup-arrival-price-postgres.ts",
     "verify:service-order-open-ref:postgres": "node -r @swc-node/register scripts/verify-service-order-open-ref-postgres.ts",
     "verify:print-queue-timeout": "node -r @swc-node/register scripts/verify-print-queue-timeout.ts",
     "verify:print-completion-evidence": "node -r @swc-node/register scripts/verify-print-completion-evidence.ts",

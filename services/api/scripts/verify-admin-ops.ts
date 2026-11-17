@@ -111,6 +111,11 @@ function mockOpsPrisma(
       findMany: async () => [],
       findFirst: async () => null,
     },
+    // 打印没出纸的自动退失败会查 Refund。这组夹具没有这种单。
+    refund: {
+      findMany: async () => [],
+      findFirst: async () => null,
+    },
     feedbackTicket: {
       count: async (args?: FeedbackQuery) => matchFeedback(feedbackRows, args).length,
       findFirst: async (args?: FeedbackQuery) => {

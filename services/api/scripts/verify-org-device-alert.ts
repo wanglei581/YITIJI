@@ -218,6 +218,7 @@ async function assertIncidents(): Promise<void> {
     feedbackTicket: { count: async () => 0, findFirst: async () => null },
     aiUsageRecord: { findMany: async () => [], groupBy: async () => [], count: async () => 0 },
     serviceOrder: { findMany: async () => [], findFirst: async () => null },
+    refund: { findMany: async () => [], findFirst: async () => null },
     serviceIncident: prisma.serviceIncident,
     serviceIncidentEvent: prisma.serviceIncidentEvent,
     organization: prisma.organization,

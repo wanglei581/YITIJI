@@ -18,6 +18,7 @@ import {
   markPaidUnfulfilledRefundRequired,
   PAID_UNFULFILLED_PENDING_REFUND_REASON,
 } from '../payment/pending-refund-signal'
+import { settleExplicitNoPaperFromReportedFailure } from '../payment/print-no-paper-refund'
 import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 
 export const PRINT_QUEUE_TIMEOUT = 'PRINT_QUEUE_TIMEOUT'
@@ -239,7 +240,11 @@ export async function expireQueuedPrintTasks(prisma: PrismaService, now = new Da
       })
       return true
     })
-    if (didFail) expired += 1
+    if (didFail) {
+      expired += 1
+      // 事务已经提交。开关关时只保留上面的待退款信号，不调渠道。
+      await settleExplicitNoPaperFromReportedFailure(prisma, task.id).catch(() => undefined)
+    }
   }
   return expired
 }

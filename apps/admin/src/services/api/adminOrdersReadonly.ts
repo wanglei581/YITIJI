@@ -81,6 +81,9 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
     errorCode: string | null
     createdAt: string
   }>
+  autoRefund: boolean
+  refundStatus: string | null
+  refundFailureReason: string | null
 }
 
 export interface AdminOrderReadonlyPage {
@@ -287,6 +290,9 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
     { fromStatus: 'pending', toStatus: 'claimed', errorCode: null, createdAt: now() },
     { fromStatus: 'claimed', toStatus: 'completed', errorCode: null, createdAt: now() },
   ],
+  autoRefund: false,
+  refundStatus: null,
+  refundFailureReason: null,
 }
 
 /** 存量订单未记录计费页数，供列表和详情验证空值展示。 */
@@ -360,6 +366,9 @@ function demoServiceOrders(): AdminOrderReadonlyDetail[] {
     printTaskId: null,
     print: null,
     statusLogs: [],
+    autoRefund: false,
+    refundStatus: null,
+    refundFailureReason: null,
     recordKind: 'service' as const,
     createdAt: '2026-11-13T09:10:00+08:00',
     updatedAt: paidAt,

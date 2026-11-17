@@ -95,6 +95,7 @@ export const PICKUP_SAME_CODE_RESUME_NOTE =
  */
 export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   PRINT_TERMINAL_QUEUE_HALTED: `这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
+  ARRIVAL_PRICE_UNAVAILABLE: `这台机器的打印价格暂时算不出来，你的到机码没有作废，请稍后再来这台机器输码。${helpNeededLine()}`,
   PRINTER_UNAVAILABLE: `这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
   PICKUP_CODE_INVALID: PICKUP_CODE_REJECTED_COPY,
   PICKUP_CODE_EXPIRED: PICKUP_CODE_REJECTED_COPY,
@@ -228,6 +229,21 @@ const FINISHED_PRINT_STATUSES = new Set(['completed', 'failed', 'cancelled', 'ab
  * released=true 且已经打完 —— 如实说完成，给出路；
  * 其余已放行 —— 还在队列或正在出纸，请留在出纸口旁。
  */
+/** 金额用「2.00 元」，不带货币符号。设计句见青序流光触屏稿 pay-1113。 */
+export function arrivalChargeYuan(amountCents: number): string {
+  const yuan = Math.abs(amountCents) / 100
+  const text = yuan.toFixed(2)
+  return amountCents < 0 ? `-${text}` : text
+}
+
+export function arrivalChargeNoticeCopy(amountCents: number): { headline: string; next: string; ifUnpaid: string } {
+  return {
+    headline: `这台机器打印收费，本单 ${arrivalChargeYuan(amountCents)} 元，付完就出纸`,
+    next: '下一步进收银台。付好了才开始打印。核查确认没出纸后，钱自动退回原付款账户，到账时间以支付渠道为准。',
+    ifUnpaid: '付不成可以返回，订单还在，可以再来付款。',
+  }
+}
+
 export function claimSuccessCopy(released: boolean, printTaskStatus?: string | null): ClaimSuccessCopy {
   if (!released) {
     return {

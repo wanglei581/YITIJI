@@ -29,6 +29,7 @@ import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../payment/pending-refund-signal'
+import { settleExplicitNoPaperFromReportedFailure } from '../payment/print-no-paper-refund'
 import {
   claimableFreshnessFilter,
   expireQueuedPrintTasks,
@@ -830,6 +831,15 @@ export class TerminalAgentService implements OnModuleInit {
 
     const isTerminal = TERMINAL_STATES.includes(dto.status as TaskStatus)
     if (isTerminal) await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
+
+    // 幂等重放在写库前就返回了，不会走到这里。退款失败不让状态回执失败。
+    if (dto.status === 'failed') {
+      await settleExplicitNoPaperFromReportedFailure(this.prisma, taskId).catch((error: unknown) => {
+        this.logger.warn(
+          `PRINT_NO_PAPER_REFUND_FAILED task=${taskId} error=${error instanceof Error ? error.message : String(error)}`,
+        )
+      })
+    }
 
     return { acknowledged: true }
   }

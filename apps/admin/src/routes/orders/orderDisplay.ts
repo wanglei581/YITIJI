@@ -69,6 +69,14 @@ export const OWNER_LABELS: Record<string, string> = { member: '会员', anonymou
 export const REFUND_REASON_LABELS: Record<string, string> = {
   PAID_UNFULFILLED_PENDING_REFUND: '已付款未出纸',
   ONLINE_PAID_PENDING_REFUND: '渠道已收款，但取件窗口已关、订单未转已支付',
+  paid_no_paper_auto: '已付款没出纸，自动原路退',
+}
+
+export function autoRefundStatusText(status: string | null): string {
+  if (status === 'success') return '已原路退回'
+  if (status === 'failed') return '没有成功'
+  if (status === 'pending') return '处理中'
+  return status ?? '—'
 }
 
 // 收款入账来源：后端 AdminMarkPaidDto 只放行这两个（free 由 0 元建单自动产生，

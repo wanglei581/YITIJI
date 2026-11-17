@@ -35,6 +35,8 @@ function scanFixture() {
     feedbackTicket: { count: async () => 0, findFirst: async () => null },
     aiUsageRecord: { findMany: async () => [], groupBy: async () => [], count: async () => 0 },
     serviceOrder: { findMany: async () => [], findFirst: async () => null },
+    // 打印没出纸的自动退失败会查 Refund。这组夹具没有这种单。
+    refund: { findMany: async () => [], findFirst: async () => null },
   }
   const calls = []
   const service = make('https://example.invalid', {}, calls)

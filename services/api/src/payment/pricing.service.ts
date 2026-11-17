@@ -13,7 +13,7 @@ export interface PrintPriceInput {
   colorMode: 'black_white' | 'color'
   /**
    * 有终端时按该机 print_bw_page / print_color_page 的生效价。
-   * 不传（手机先下单、到机取件）本包一律 0 元。到机补价由 P2 做。
+   * 不传（手机先下单、到机取件）本包一律 0 元。到机补价在 print-jobs/pickup-arrival-price.ts。
    */
   terminalId?: string | null
 }
@@ -46,7 +46,7 @@ export async function readPrintUnitPrice(
  *
  * 硬约束：
  * - **绝不信任前端金额**。
- * - 没传终端：一律 0 元（到机补价由 P2 做），不查终端表。
+ * - 没传终端：一律 0 元（到机补价在 print-jobs/pickup-arrival-price.ts），不查终端表。
  * - 向用户收费且配置价不是 0 到上限的整数 → PRICE_CONFIG_INVALID，不按 0 放行。
  * - 非法页数或份数仍拒绝。缺 PriceConfig 不再让报价失败。
  * - 本批按内容页计价，duplex / pagesPerSheet 不影响单价。
@@ -136,7 +136,7 @@ export class PricingService {
   }
 
   /**
-   * 没传终端时不查终端表，直接 0。到机补价由 P2 做。
+   * 没传终端时不查终端表，直接 0。到机补价在 print-jobs/pickup-arrival-price.ts。
    * 有终端时只认生效价；向用户收费且配置价非法则拒绝。
    */
   private async resolveEffectivePrintUnit(

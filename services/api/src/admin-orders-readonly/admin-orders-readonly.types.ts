@@ -86,6 +86,12 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
     errorCode: string | null
   }) | null
   statusLogs: AdminOrderStatusLogItem[]
+  /** 这一单有「已付款没出纸」的自动原路退记录。 */
+  autoRefund: boolean
+  /** 自动退款那一行的状态：pending / success / failed。没有记录时为 null。 */
+  refundStatus: string | null
+  /** 自动退款失败时给管理员看的原因。成功或还没有记录时为 null。 */
+  refundFailureReason: string | null
 }
 
 export interface AdminOrderReadonlyPage {

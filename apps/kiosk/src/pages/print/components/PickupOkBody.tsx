@@ -4,7 +4,7 @@ import { PrintArt } from '../art/PrintArt'
 import { PrintIcon } from '../art/PrintIcon'
 import { formatCents } from '../cashierStatus'
 import { PICKUP_HERE_RESUME_NOTE } from '../pickupHereOrders'
-import { PICKUP_SAME_CODE_RESUME_NOTE, type ClaimSuccessCopy } from '../pickupClaimModel'
+import { arrivalChargeNoticeCopy, PICKUP_SAME_CODE_RESUME_NOTE, type ClaimSuccessCopy } from '../pickupClaimModel'
 
 // 到机码核对订单页的正文（稿 pickup-ok）：订单摘要 → 续打说明 → 三步。
 // 只转述回执：订单号、文件名、金额缺哪项就不画哪一行，不补演示值；纸张缩略只是装饰，不当订单预览。
@@ -27,6 +27,7 @@ export function PickupOkBody({
   amountCents,
   privacyNote,
   claimVia = 'code',
+  arrivalChargeNotice = false,
 }: {
   copy: ClaimSuccessCopy
   orderNo: string
@@ -35,8 +36,13 @@ export function PickupOkBody({
   privacyNote: ReactNode
   /** 点单来的不提到机码。输码来的保持原说明。 */
   claimVia?: 'code' | 'order'
+  /** 本机价大于已付金额时，写出应付和原因。只在后端明确带回时为 true。 */
+  arrivalChargeNotice?: boolean
 }) {
   const icons = stepIcons(copy.cta)
+  const charge = arrivalChargeNotice && typeof amountCents === 'number' && amountCents > 0
+    ? arrivalChargeNoticeCopy(amountCents)
+    : null
   return (
     <>
       <section className="pok-grid" aria-label="认领结果">
@@ -76,6 +82,14 @@ export function PickupOkBody({
           )}
         </span>
       </aside>
+
+      {charge ? (
+        <aside className="pok-charge" data-testid="pickup-arrival-charge">
+          <p>{charge.headline}</p>
+          <p>{charge.next}</p>
+          <p>{charge.ifUnpaid}</p>
+        </aside>
+      ) : null}
 
       <ol className="pok-steps" aria-label="接下来的三步">
         {copy.steps.map((step, index) => (

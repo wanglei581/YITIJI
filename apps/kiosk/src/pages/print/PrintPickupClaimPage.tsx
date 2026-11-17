@@ -104,6 +104,8 @@ interface ClaimPickupResult {
   /** 续打成功时后端才带。只在严格为 true 时提醒看出纸口。 */
   mayHavePrinted?: boolean
   partialOutput?: boolean
+  /** 本机价大于已付金额。只在严格为 true 时写出补价说明。 */
+  arrivalChargeNotice?: boolean
 }
 
 type ClaimState = 'idle' | 'loading' | 'success' | 'error'
@@ -133,6 +135,7 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
     printTaskStatus?: string
     mayHavePrinted?: unknown
     partialOutput?: unknown
+    arrivalChargeNotice?: unknown
     error?: { code?: string; message?: string; details?: unknown }
     message?: string | string[]
   }
@@ -166,6 +169,7 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
     ...claimed,
     mayHavePrinted: body.mayHavePrinted === true,
     partialOutput: body.partialOutput === true,
+    arrivalChargeNotice: body.arrivalChargeNotice === true,
   }
 }
 
@@ -402,7 +406,10 @@ export function PrintPickupClaimPage() {
       railNow={screen === 'success' ? 1 : 0}
       railLabels={claimedByOrder ? PICKUP_HERE_RAIL : PICKUP_RAIL}
       back={screen === 'success'
-        ? { label: claimedByOrder ? '返回取件' : '重新输入', onBack: handleReset }
+        ? {
+            label: result?.arrivalChargeNotice ? '返回' : (claimedByOrder ? '返回取件' : '重新输入'),
+            onBack: handleReset,
+          }
         : { label: '返回', onBack: () => navigate('/print-scan') }}
       title={successCopy?.title ?? (screen === 'legacy' ? '输入历史码' : '输入你的到机码')}
       subtitle={subtitle}
@@ -448,6 +455,7 @@ export function PrintPickupClaimPage() {
           amountCents={result.amountCents}
           privacyNote={<>办完离开或闲置超时后，会<b>清除本机登录态和临时信息</b>，下一个人无法查看。订单与文件按系统留存期限管理。</>}
           claimVia={claimedByOrder ? 'order' : 'code'}
+          arrivalChargeNotice={result.arrivalChargeNotice === true}
         />
       </div>,
       <button

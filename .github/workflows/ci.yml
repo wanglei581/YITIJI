@@ -669,6 +669,8 @@ jobs:
           # 一体机按次付款：收费机器建单、开始前占用、没做成退款；不收费的机器不建单。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-orders
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-orders-concurrency
+          # 手机单到机按本机价补价；已付款且明确没出纸时，个人收费总开关打开才自动原路退。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pickup-arrival-price
           # 排队打印单的时效（超时判失败、过期单领不走）与心跳里的打印完成判据。
           # 前两条直接调服务方法、各自建临时库；第三条起真服务走 HTTP（入参校验、鉴权、
           # 真实的重新提交路径）——心跳多一个服务端不认识的字段会被整条拒收，只有这样测得出。
@@ -1294,6 +1296,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-retry-lock:postgres
           # 同一任务两张没结案的服务单同时挂上：部分唯一索引只许一条成功。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-open-ref:postgres
+          # 到机补价与明确没出纸自动退，在 PostgreSQL 上再跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pickup-arrival-price:postgres
           # 排队超时的清扫与领单时间上限在 PostgreSQL 上同样成立（线上每 30 秒清扫一次）。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-reliability-http
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
