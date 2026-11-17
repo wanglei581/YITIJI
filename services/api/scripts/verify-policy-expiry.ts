@@ -8,10 +8,12 @@ import 'dotenv/config'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { NotFoundException } from '@nestjs/common'
+import { Redis } from 'ioredis'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { POLICY_PUBLISH_FIXTURE, POLICY_VERIFIED_DOMAINS_FIXTURE } from './support/policy-publish-fixture'
 import { formatBeijingDate } from '../src/common/beijing-display-time'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { createPrismaClient } from '../src/prisma/create-client'
 import { AuditService } from '../src/audit/audit.service'
 import { PoliciesService } from '../src/policies/policies.service'
 import { PolicyExpiryTask } from '../src/policies/policy-expiry.task'
@@ -19,7 +21,15 @@ import { PolicyChecklistService } from '../src/policies/policy-checklist.service
 import { AssistantPolicyContextService } from '../src/ai/llm/assistant-policy-context'
 import { publicPolicyWhere } from '../src/policies/policy-public-visibility'
 import { policyDeadlineThreshold } from '../src/policies/policy-validity'
+import { checklistMetadata } from '../src/policies/policy-checklist-metadata'
+import { assertPiiScanned } from '../src/print-jobs/pii-scan-gate'
+import { CommunityService, communityFeedCacheKey } from '../src/community/community.service'
+import { RedisService } from '../src/common/redis/redis.service'
+import { isRecruitmentContentHostingEnabled } from '../src/recruitment-hosting/recruitment-hosting'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+
+// 这道门禁只测普通政策的截止日期，显式关掉招聘托管，不跟着外部环境漂。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 
 assertIsolatedVerificationDatabase()
 
@@ -30,6 +40,11 @@ function shiftCalendar(ymd: string, days: number): string {
   return date.toISOString().slice(0, 10)
 }
 
+function errorText(error: unknown): string {
+  const record = error as { message?: string; meta?: unknown; cause?: unknown }
+  return [record?.message, record?.meta ? JSON.stringify(record.meta) : '', record?.cause ? errorText(record.cause) : ''].join('\n')
+}
+
 function errCode(error: unknown): string | undefined {
   const ex = error as { getResponse?: () => unknown }
   const body = typeof ex.getResponse === 'function' ? ex.getResponse() : undefined
@@ -37,6 +52,26 @@ function errCode(error: unknown): string | undefined {
     ? (body as { error?: { code?: string } }).error
     : undefined
   return record?.code
+}
+
+async function withFrozenNow<T>(instant: Date, run: () => Promise<T>): Promise<T> {
+  const RealDate = Date
+  class FrozenDate extends RealDate {
+    constructor(...args: ConstructorParameters<typeof RealDate>) {
+      if (args.length === 0) super(instant.getTime())
+      else super(...args)
+    }
+
+    static override now(): number {
+      return instant.getTime()
+    }
+  }
+  globalThis.Date = FrozenDate as DateConstructor
+  try {
+    return await run()
+  } finally {
+    globalThis.Date = RealDate
+  }
 }
 
 async function expectCode(fn: () => Promise<unknown>, code: string, label: string): Promise<void> {
@@ -81,6 +116,10 @@ async function main(): Promise<void> {
   })
   const partner: AuthedUser = { userId: userRow.id, role: 'partner', orgId: org.id }
   const ids: string[] = []
+  const fileIds: string[] = []
+  const redisKeys: string[] = []
+  let redis: Redis | null = null
+  let ddl: { $executeRawUnsafe: (query: string) => Promise<unknown>; $disconnect: () => Promise<void> } | null = null
 
   const publish = async (id: string) => {
     await policies.reviewPolicy(id, 'approve', undefined, partner)
@@ -222,8 +261,128 @@ async function main(): Promise<void> {
     const expiredHit = await idsOf(`培训补贴关键词_${suffix}`)
     assert.deepEqual(expiredHit.ids, [], '过了截止日期的政策按关键词也搜不到')
     console.log('  PASS 关键词命中、不命中、超长、和类别一起、过期搜不到')
+
+    const own = { mode: 'org' as const, orgId, state: 'bound' as const }
+    const seedPublished = async (
+      title: string,
+      summary: string | null,
+      extra?: { category?: string; validThrough?: Date | null; createdAt?: Date },
+    ) => {
+      const row = await prisma.policyPost.create({
+        data: {
+          sourceOrgId: orgId,
+          sourceName: org.name,
+          kind: 'notice',
+          category: extra?.category ?? 'announcement',
+          title,
+          summary,
+          reviewStatus: 'approved',
+          publishStatus: 'published',
+          externalUrl: POLICY_PUBLISH_FIXTURE.externalUrl,
+          whoCanApply: POLICY_PUBLISH_FIXTURE.whoCanApply,
+          requiredMaterials: POLICY_PUBLISH_FIXTURE.requiredMaterials,
+          whereToApply: POLICY_PUBLISH_FIXTURE.whereToApply,
+          ...(extra?.validThrough !== undefined ? { validThrough: extra.validThrough } : {}),
+          ...(extra?.createdAt ? { createdAt: extra.createdAt } : {}),
+        },
+      })
+      ids.push(row.id)
+      return row.id
+    }
+    const literalPage = (keyword: string, extra?: { category?: string; page?: number; pageSize?: number }) =>
+      policies.getPublishedPolicies({ keyword, scope: own, pageSize: extra?.pageSize ?? 50, page: extra?.page, category: extra?.category })
+    const assertLiteralSet = async (keyword: string, expected: string[], extra?: { category?: string }) => {
+      const page = await literalPage(keyword, extra)
+      const needle = keyword.trim()
+      const got = page.data.map((row) => row.id).sort()
+      assert.deepEqual(got, [...expected].sort(), `关键词 ${JSON.stringify(keyword)} 命中集合不对`)
+      assert.equal(page.pagination.total, expected.length, `关键词 ${JSON.stringify(keyword)} 总数不对`)
+      for (const row of page.data) {
+        assert.ok(
+          row.title.includes(needle) || (row.summary ?? '').includes(needle),
+          `${row.id} 的标题和摘要都不含字面 ${JSON.stringify(needle)}`,
+        )
+      }
+    }
+
+    const percentTitle = await seedPublished(`百分号%字面${suffix}`, '这条摘要没有百分号')
+    const hundred = await seedPublished(`报价100%整${suffix}`, '没有通配', { category: 'notice' })
+    const hundredX = await seedPublished(`报价100X整${suffix}`, '不该被百分号命中')
+    const underscoreTitle = await seedPublished(`下划_线${suffix}`, '摘要没有下划线')
+    const backslashTitle = await seedPublished(`反斜\\杠${suffix}`, '摘要没有反斜杠')
+    const ab = await seedPublished(`标记A_B${suffix}`, '下划线夹在字母中间')
+    const axb = await seedPublished(`标记AXB${suffix}`, '中间是字母不是下划线')
+    const aSlashB = await seedPublished(`标记A\\B${suffix}`, '中间是反斜杠')
+    const oreilly = await seedPublished(`书名O'Reilly${suffix}`, '撇号按字面')
+    const summaryPercent = await seedPublished(`摘要侧${suffix}`, `只有%在摘要${suffix}`)
+    const pageIds: string[] = []
+    for (let index = 1; index <= 12; index += 1) {
+      pageIds.push(await seedPublished(`页%${suffix}#${String(index).padStart(2, '0')}`, '分页夹具'))
+    }
+    const pageDecoy = await seedPublished(`页X${suffix}#00`, '分页对照，不含百分号')
+    const percentIds = [percentTitle, hundred, summaryPercent, ...pageIds]
+    const underscoreIds = [underscoreTitle, ab, openEnded.id, dated.id, summaryHit.id]
+
+    await assertLiteralSet('%', percentIds)
+    assert.equal((await literalPage('%')).data.some((row) => row.id === hundredX), false)
+    await assertLiteralSet('_', underscoreIds)
+    await assertLiteralSet('\\', [backslashTitle, aSlashB])
+    await assertLiteralSet('100%', [hundred])
+    assert.equal((await literalPage('100%')).data.some((row) => row.id === hundredX), false, '100% 不得命中 100X')
+    await assertLiteralSet('A_B', [ab])
+    const abPage = await literalPage('A_B')
+    assert.equal(abPage.data.some((row) => row.id === axb || row.id === aSlashB), false, 'A_B 不得命中 AXB 或 A\\B')
+    await assertLiteralSet("O'Reilly", [oreilly])
+    const paddedPercent = await literalPage('  100%  ')
+    const plainPercent = await literalPage('100%')
+    assert.deepEqual(
+      paddedPercent.data.map((row) => row.id),
+      plainPercent.data.map((row) => row.id),
+      '首尾空白去掉后与 100% 同一命中集合',
+    )
+    assert.equal(paddedPercent.pagination.total, plainPercent.pagination.total)
+    const withNotice = await literalPage('%', { category: 'notice' })
+    assert.deepEqual(withNotice.data.map((row) => row.id), [hundred], '字面关键词仍和类别一起生效')
+
+    const seen = new Set<string>()
+    for (let page = 1; page <= 3; page += 1) {
+      const result = await literalPage(`页%${suffix}`, { page, pageSize: 5 })
+      assert.equal(result.pagination.total, 12, '命中 12 条时总数保持 12')
+      assert.equal(result.data.length, page === 3 ? 2 : 5, `第 ${page} 页条数不对`)
+      for (const row of result.data) {
+        assert.equal(seen.has(row.id), false, '三页不得重复')
+        seen.add(row.id)
+        assert.ok(row.title.includes(`页%${suffix}`))
+      }
+    }
+    assert.equal(seen.size, 12)
+    assert.equal(seen.has(pageDecoy), false, '页X 不得进入页%的分页')
+    await prisma.policyPost.update({ where: { id: pageIds[0] }, data: { validThrough: new Date(`${yesterday}T00:00:00.000Z`) } })
+    const afterDeadline = await literalPage(`页%${suffix}`, { pageSize: 20 })
+    assert.equal(afterDeadline.pagination.total, 11, '过了截止日期的一条要退出字面关键词结果')
+    assert.equal(afterDeadline.data.some((row) => row.id === pageIds[0]), false)
+    console.log('  PASS 关键词按字面匹配，通配符、撇号、分页和截止日期一起生效')
+
     console.log('PASS verify:policy-expiry')
   } finally {
+    try {
+      if (ddl) {
+        if (prisma.dbKind === 'sqlite') {
+          await ddl.$executeRawUnsafe('DROP TRIGGER IF EXISTS verify_policy_auto_expire_fail')
+        } else {
+          await ddl.$executeRawUnsafe('DROP TRIGGER IF EXISTS verify_policy_auto_expire_fail ON "AuditLog"')
+          await ddl.$executeRawUnsafe('DROP FUNCTION IF EXISTS verify_policy_auto_expire_fail()')
+        }
+      }
+    } catch (error) {
+      console.error('drop audit injection failed', error)
+    }
+    if (redis) {
+      if (redisKeys.length > 0) await redis.del(...redisKeys).catch(() => undefined)
+      await redis.quit().catch(() => redis?.disconnect())
+    }
+    await ddl?.$disconnect().catch(() => undefined)
+    if (fileIds.length > 0) await prisma.fileObject.deleteMany({ where: { id: { in: fileIds } } })
     await prisma.auditLog.deleteMany({ where: { OR: [{ targetId: { in: ids } }, { actorId: userRow.id }] } })
     await prisma.policyPost.deleteMany({ where: { sourceOrgId: orgId } })
     await prisma.user.deleteMany({ where: { id: userRow.id } })

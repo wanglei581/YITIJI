@@ -46,7 +46,8 @@ import {
   type PolicyPublicScope,
 } from './policy-public-visibility'
 import { parsePolicyValidThrough } from './policy-validity'
-import { policyKeywordWhere } from './policy-keyword'
+import { policyKeywordPlan } from './policy-keyword'
+import { pagePoliciesMatchingLiteral } from './policy-keyword-page'
 
 // ============================================================
 // PoliciesService — 阶段1D:政策服务(政策扶持条目 + 政策公告)
@@ -213,24 +214,18 @@ export class PoliciesService {
     const page = Math.min(10_000, Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1)
     const parsedPageSize = Number.parseInt(String(params?.pageSize ?? 200), 10)
     const pageSize = Math.min(200, Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : 200)
+    const keywordPlan = policyKeywordPlan(params?.keyword)
     const where = await publicPolicyLookupWhere(this.prisma, {
       reviewStatus: 'approved',
       publishStatus: 'published',
       ...(params?.kind ? { kind: params.kind } : {}),
       ...(params?.audience ? { audience: params.audience } : {}),
       ...(params?.category ? { category: params.category } : {}),
-      ...policyKeywordWhere(params?.keyword),
+      ...keywordPlan.where,
     }, params?.scope)
-    const [rows, total] = await Promise.all([
-      this.prisma.policyPost.findMany({
-        where,
-        include: { org: { select: { verifiedOfficialDomainsJson: true } } },
-        orderBy: [{ publishedDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-      this.prisma.policyPost.count({ where }),
-    ])
+    const { rows, total } = keywordPlan.literal
+      ? await pagePoliciesMatchingLiteral(this.prisma, where, keywordPlan.literal, page, pageSize)
+      : await this.readPublicPolicyPage(where, page, pageSize)
     return {
       data: rows.map(mapPolicy),
       ...(params?.scope?.mode === 'org' ? { scope: params.scope.state } : {}),
@@ -251,6 +246,24 @@ export class PoliciesService {
       throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
     }
     return { data: mapPolicy(row), success: true, ...(scope.mode === 'org' ? { scope: scope.state } : {}) }
+  }
+
+  private async readPublicPolicyPage(
+    where: Prisma.PolicyPostWhereInput,
+    page: number,
+    pageSize: number,
+  ) {
+    const [rows, total] = await Promise.all([
+      this.prisma.policyPost.findMany({
+        where,
+        include: { org: { select: { verifiedOfficialDomainsJson: true } } },
+        orderBy: [{ publishedDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.policyPost.count({ where }),
+    ])
+    return { rows, total }
   }
 
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────
