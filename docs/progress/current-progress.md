@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-17：#1640 自报改成许可证编号或公共就业服务机构登记信息二选一（未推送）
+
+- 新增 `RECRUITMENT_OPERATOR_CREDENTIAL_TYPE`。没设或空值仍是人力资源服务许可证编号那句。`public_employment_registration` 用「公共就业服务机构登记信息」那句。别的值在生产预检报 `PRODUCTION_RECRUITMENT_OPERATOR_CREDENTIAL_TYPE_INVALID`，不回显该值。内容仍填 `RECRUITMENT_OPERATOR_LICENSE_NO`。
+- 只改这条自报。托管开关、部署归属、发布流程 0a/3c/3b 没动。没有推送，没有改生产配置。
+
 ## 2026-11-17：#1640 并入主线 9b50f8e0f（未推送）
 
 - 分支 `claude/move-1468-1113` 从 `c2127a815` 合并 `origin/main` `9b50f8e0f`（#1643 收费第 2 期 a，其上是 #1641 收费第 1 期、#1642 简历事实确认）。没有推送，没有改生产配置。

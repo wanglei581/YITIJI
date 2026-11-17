@@ -3,13 +3,16 @@ import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { RecruitmentHostingNotice } from './RecruitmentHostingNotice'
-import type { RecruitmentHostingView } from './useRecruitmentHosting'
+import type { RecruitmentHostingView, RecruitmentOperatorSelfReportView } from './useRecruitmentHosting'
 
 const NAME = '示例职业介绍所'
 const LICENSE = '鲁人社证字〔2026〕第001号'
 const EXACT = `运营单位自报：${NAME}，人力资源服务许可证编号 ${LICENSE}。本软件未核验。`
+const REG_NAME = '青岛市公共就业服务中心'
+const REG_CONTENT = '青人社登记〔2026〕042'
+const REG_EXACT = `运营单位自报：${REG_NAME}，公共就业服务机构登记信息 ${REG_CONTENT}。本软件未核验。`
 
-function ready(operatorSelfReport: { name: string; licenseNumber: string } | null): RecruitmentHostingView {
+function ready(operatorSelfReport: RecruitmentOperatorSelfReportView | null): RecruitmentHostingView {
   return {
     status: 'ready',
     enabled: true,
@@ -36,14 +39,28 @@ function visibleText(html: string): string {
 }
 
 test('有自报内容时提示条整句等于源码全文，且不出现已认证、已核验', () => {
-  const html = markup(ready({ name: NAME, licenseNumber: LICENSE }))
+  const html = markup(ready({ name: NAME, licenseNumber: LICENSE, credentialType: 'hr_service_license' }))
   assert.equal(noticeSentence(html), EXACT, html)
   assert.ok(html.includes(EXACT), html)
   assert.ok(html.includes('运营单位自报：'), html)
   assert.ok(html.includes('本软件未核验。'), html)
+  assert.equal(html.includes('公共就业服务机构登记信息'), false, html)
   assert.equal(html.includes('已认证'), false, html)
   assert.equal(html.includes('已核验'), false, html)
   assert.equal(visibleText(html), EXACT, html)
+})
+
+test('登记信息类型时提示条整句等于登记信息句', () => {
+  const html = markup(ready({
+    name: REG_NAME,
+    licenseNumber: REG_CONTENT,
+    credentialType: 'public_employment_registration',
+  }))
+  assert.equal(noticeSentence(html), REG_EXACT, html)
+  assert.equal(visibleText(html), REG_EXACT, html)
+  assert.equal(html.includes('人力资源服务许可证编号'), false, html)
+  assert.equal(html.includes('已认证'), false, html)
+  assert.equal(html.includes('已核验'), false, html)
 })
 
 test('自报为空时提示条不出现', () => {

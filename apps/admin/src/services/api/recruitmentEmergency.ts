@@ -20,6 +20,7 @@ import {
   type RecruitmentCircuitBreakResult,
   type RecruitmentEmergencyTakedownInput,
   type RecruitmentEmergencyTakedownResult,
+  type RecruitmentOperatorCredentialType,
 } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
@@ -34,11 +35,12 @@ export const MOCK_RECRUITMENT_EMERGENCY_KEY = 'mock:recruitment-emergency'
 export interface RecruitmentOperatorSelfReportView {
   name: string
   licenseNumber: string
+  credentialType: RecruitmentOperatorCredentialType
 }
 
 export interface RecruitmentHostingFlag {
   enabled: boolean
-  /** 仅私有化且托管开、两项都填了时有值。我方云为 null。 */
+  /** 仅私有化且托管开、类型认得出、名称和证照内容都填了时有值。我方云为 null。 */
   operatorSelfReport: RecruitmentOperatorSelfReportView | null
 }
 
@@ -90,14 +92,22 @@ function unwrap<T extends object>(body: unknown, requiredKey: keyof T): T {
   throw new ApiHttpError('UNEXPECTED_RESPONSE', '服务端返回的内容无法识别，请刷新列表核对处置是否生效', 200)
 }
 
+function readCredentialType(value: string | undefined): RecruitmentOperatorCredentialType | null {
+  const raw = value?.trim() ?? ''
+  if (raw === '' || raw === 'hr_service_license') return 'hr_service_license'
+  if (raw === 'public_employment_registration') return 'public_employment_registration'
+  return null
+}
+
 function readOperatorSelfReport(
   value: AdminRecruitmentHostingStatus['recruitmentHosting']['operatorSelfReport'] | undefined,
 ): RecruitmentOperatorSelfReportView | null {
   if (!value) return null
   const name = value.name.trim()
   const licenseNumber = value.licenseNumber.trim()
-  if (!name || !licenseNumber) return null
-  return { name, licenseNumber }
+  const credentialType = readCredentialType(value.credentialType)
+  if (!name || !licenseNumber || !credentialType) return null
+  return { name, licenseNumber, credentialType }
 }
 
 const httpAdapter: RecruitmentEmergencyServiceInterface = {

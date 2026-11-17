@@ -136,7 +136,7 @@ async function bootstrap(): Promise<void> {
   const port = process.env['PORT'] ?? 3010
   await app.listen(port)
   console.log(`AI Job Print API running on http://localhost:${port}/api/v1`)
-  // 所有环境都打。自报句带运营单位名称和许可证编号全文；其它环境变量值不打印。
+  // 所有环境都打。自报句带运营单位名称和证照内容全文；其它环境变量值不打印。
   console.log(recruitmentLockStartupLine(evaluateRecruitmentLock()))
 
   // 启动期降级如实上屏：运维在部署日只看控制台也能知道「起来了但不完整」。

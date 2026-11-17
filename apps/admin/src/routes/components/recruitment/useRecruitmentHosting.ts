@@ -14,7 +14,11 @@ import { recruitmentEmergencyService } from '../../../services/api/recruitmentEm
  *
  * 开关是部署级环境变量，运行期不会变，所以一次页面生命周期里只请求一次；失败后下次挂载重试。
  */
-export type RecruitmentOperatorSelfReportView = { name: string; licenseNumber: string }
+export type RecruitmentOperatorSelfReportView = {
+  name: string
+  licenseNumber: string
+  credentialType: 'hr_service_license' | 'public_employment_registration'
+}
 
 export type RecruitmentHostingView =
   | { status: 'loading'; writable: false; retry: () => void }
