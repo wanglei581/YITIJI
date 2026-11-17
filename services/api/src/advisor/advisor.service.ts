@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
@@ -64,6 +64,13 @@ function tokenMatches(token: string | null, expectedHash: string | null): boolea
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
+/** 只认作业归属失败这一个码。别的错误（例如库不可用）必须原样抛出去。 */
+function isAdvisorSessionMissing(error: unknown): boolean {
+  if (!(error instanceof NotFoundException)) return false
+  const body = error.getResponse() as { error?: { code?: string } }
+  return body.error?.code === 'ADVISOR_SESSION_NOT_FOUND'
+}
+
 export interface AdvisorRequester {
   endUserId: string | null
   accessToken: string | null
@@ -72,7 +79,7 @@ export interface AdvisorRequester {
 @Injectable()
 export class AdvisorService {
   /** 进程内存，不落库。重启即失 —— 这是刻意的，不是缺陷，理由见 advisor-qa-memory.ts。 */
-  private readonly qaMemory = new AdvisorQaMemory()
+  private readonly qaMemory: AdvisorQaMemory
 
   constructor(
     private readonly prisma: PrismaService,
@@ -81,7 +88,10 @@ export class AdvisorService {
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
     @Optional() private readonly quota?: AiQuotaService,
-  ) {}
+    @Optional() @Inject(AdvisorQaMemory) qaMemory?: AdvisorQaMemory,
+  ) {
+    this.qaMemory = qaMemory ?? new AdvisorQaMemory()
+  }
 
   /**
    * 可用性探针。
@@ -365,7 +375,12 @@ export class AdvisorService {
     }
     const persist = async (value: Awaited<ReturnType<AdvisorService['llm']['answer']>>) => {
       this.recordAiLog(usage, startedAt, 'success', row.endUserId)
-      this.qaMemory.append(sessionId, question.trim().slice(0, 600), value.answer)
+      this.qaMemory.append(
+        sessionId,
+        question.trim().slice(0, 600),
+        value.answer,
+        row.endUserId ? `u:${row.endUserId}` : null,
+      )
       return sessionId
     }
     // 没有账本或没有登录身份时不预占。操作号只在这里签发，不读客户端传来的号。
@@ -444,6 +459,20 @@ export class AdvisorService {
   async printArtifact(sessionId: string, artifactId: string, requester: AdvisorRequester) {
     const row = await this.loadOwned(sessionId, requester)
     return this.artifacts.print(artifactId, row.id, { endUserId: row.endUserId })
+  }
+
+  /**
+   * 一体机清场：归属对得上才丢掉这一次作业的问答内存。
+   * 找不到、过期、不是本人都当已经清掉。不删库里的作业。
+   */
+  async forgetSession(sessionId: string, requester: AdvisorRequester): Promise<{ forgotten: number }> {
+    try {
+      await this.loadOwned(sessionId, requester)
+    } catch (error: unknown) {
+      if (isAdvisorSessionMissing(error)) return { forgotten: 0 }
+      throw error
+    }
+    return { forgotten: this.qaMemory.forget(sessionId) ? 1 : 0 }
   }
 
   // ── 内部 ──────────────────────────────────────────────────

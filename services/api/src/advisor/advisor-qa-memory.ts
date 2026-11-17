@@ -1,4 +1,5 @@
-import { Logger } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
+import { Cron, CronExpression } from '@nestjs/schedule'
 
 // ============================================================
 // S3-3 · P26 问答型的多轮上下文。
@@ -14,6 +15,8 @@ import { Logger } from '@nestjs/common'
 //   - 服务重启 / 多实例部署时上下文会丢，用户的追问会被当成新问题作答。
 //     这是**诚实的降级**（答得更泛，但不会答错），远好于违背对用户的保存承诺。
 //   - 一体机是公共设备，所以必须有 TTL 与容量上限，见下面两个常量。
+//   - 用户删记录、登出或清场时当场丢掉；空闲超过 TTL 的由每分钟清扫丢掉，
+//     不再等下一次追问才顺手清。
 // ============================================================
 
 /** 保留的最近轮数（user + assistant 各算一条），与 LlmChatService 同量级。 */
@@ -31,8 +34,11 @@ export interface QaTurn {
 interface Entry {
   turns: QaTurn[]
   updatedAt: number
+  /** 登录会员是 `u:<会员号>`；匿名作业没有归属，登出时不动它。 */
+  ownerKey: string | null
 }
 
+@Injectable()
 export class AdvisorQaMemory {
   private readonly logger = new Logger(AdvisorQaMemory.name)
   private readonly store = new Map<string, Entry>()
@@ -48,18 +54,50 @@ export class AdvisorQaMemory {
     return entry.turns
   }
 
-  /** 追加一轮问答，并顺带回收过期会话。 */
-  append(sessionId: string, question: string, answer: string): void {
+  /** 追加一轮问答，并顺带回收过期会话。ownerKey 只在调用方给了会员归属时写入。 */
+  append(sessionId: string, question: string, answer: string, ownerKey: string | null = null): void {
     const now = Date.now()
-    for (const [id, entry] of this.store) {
-      if (now - entry.updatedAt > TTL_MS) this.store.delete(id)
-    }
-    const entry = this.store.get(sessionId) ?? { turns: [], updatedAt: now }
+    this.sweep(now)
+    const existing = this.store.get(sessionId)
+    const entry = existing ?? { turns: [], updatedAt: now, ownerKey }
     entry.turns.push({ role: 'user', content: question }, { role: 'assistant', content: answer })
     if (entry.turns.length > MAX_TURNS) entry.turns = entry.turns.slice(-MAX_TURNS)
     entry.updatedAt = now
+    if (ownerKey) entry.ownerKey = ownerKey
     this.store.set(sessionId, entry)
     this.evictIfNeeded()
+  }
+
+  /** 删掉这一次作业的问答内存。没有这条就当已经删过。 */
+  forget(sessionId: string): boolean {
+    const id = sessionId.trim()
+    if (!id || !this.store.has(id)) return false
+    this.store.delete(id)
+    return true
+  }
+
+  /** 删掉这个归属下的全部作业问答。匿名条目的归属是 null，对不上就不会动。 */
+  forgetOwner(ownerKey: string): number {
+    if (!ownerKey) return 0
+    let removed = 0
+    for (const [id, entry] of this.store) {
+      if (entry.ownerKey !== ownerKey) continue
+      this.store.delete(id)
+      removed += 1
+    }
+    return removed
+  }
+
+  /** 空闲超过 TTL 的作业问答立刻丢掉。每分钟扫，不等下一次追问。 */
+  @Cron(CronExpression.EVERY_MINUTE)
+  sweep(now = Date.now()): number {
+    const before = this.store.size
+    for (const [id, entry] of this.store) {
+      if (now - entry.updatedAt > TTL_MS) this.store.delete(id)
+    }
+    const removed = before - this.store.size
+    if (removed > 0) this.logger.log(`advisor.qa_memory_swept removed=${removed}`)
+    return removed
   }
 
   /** 容量兜底：淘汰最久未活动的一条。 */
