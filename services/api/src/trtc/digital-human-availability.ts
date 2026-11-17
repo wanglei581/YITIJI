@@ -65,7 +65,10 @@ export async function digitalHumanVerdict(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<DigitalHumanVerdict> {
   const platform = aiPlatformBlockFor('voice')
-  if (platform) return { refusal: platform, capabilityReason: platform.message }
+  if (platform) {
+    // 能力表和其他模型位同一句短原因。通话接口仍回平台闸门原来的拒绝体。
+    return { refusal: platform, capabilityReason: 'AI 服务暂未开通' }
+  }
   if (llm && llm.getConfig('digital_human').enabled === false) {
     return { refusal: DIGITAL_HUMAN_PAUSED, capabilityReason: DIGITAL_HUMAN_PAUSED.message }
   }

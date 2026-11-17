@@ -3,7 +3,7 @@
 ## 2026-11-17：小青、数字人、模拟面试「能不能用」与真实调用对齐（分支 `claude/ai-availability-1117`，未推送）
 
 - 小青文字对话新增只读 `GET /api/v1/assistant/availability`，与 `POST /assistant/chat` 共用 `assistant_chat` 判断。顾问探针仍看 `advisor_work`。一体机 `/assistant` 只有探针明确不能用才锁输入。
-- 数字人能力表 `digital_human` 与 `POST /trtc/session` 共用 `digitalHumanVerdict`（凭证、功能位、全站暂停、当天预算）。缺凭证回 503 `AI_NOT_CONFIGURED`。后台说明改为这个开关管语音通话，开着还要凭证齐且没被暂停或额度拦住。
+- 数字人能力表 `digital_human` 与 `POST /trtc/session` 共用 `digitalHumanVerdict`（凭证、功能位、全站暂停、当天预算）。缺凭证回 503 `AI_NOT_CONFIGURED`。平台没开通时能力表原因仍是「AI 服务暂未开通」，通话接口仍回平台闸门原来的拒绝体。后台说明改为这个开关管语音通话，开着还要凭证齐且没被暂停或额度拦住。
 - 模拟面试新增只读 `GET /api/v1/mock-interviews/availability`，与开场共用 `mock_interview` 判断。设置页不能用时不亮「创建并开始练习」，主按钮改为「打印通用题目单」（建配置后出纸，不 start），「先看面试技巧」仍在。探针读失败不说成能用，也不说成不能用。
 - 没推送，没上线。
 
