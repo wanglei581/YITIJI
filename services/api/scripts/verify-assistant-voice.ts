@@ -20,9 +20,18 @@ import { AiController } from '../src/ai/ai.controller'
 import { AssistantSummaryService } from '../src/advisor/assistant-summary.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
+import { AuditService } from '../src/audit/audit.service'
+import { AiLogService } from '../src/ai/ai-log.service'
+import { AdvisorService } from '../src/advisor/advisor.service'
+import { AdvisorArtifactService } from '../src/advisor/advisor-artifact.service'
+import { AdvisorPdfService } from '../src/advisor/advisor-pdf.service'
+import { LlmAdvisorService } from '../src/advisor/llm-advisor.service'
+import { ASSISTANT_SUMMARY_TOPIC } from '../src/advisor/advisor-skills'
 
-function pass(m: string) { console.log(`  PASS ${m}`) }
+let passCount = 0
+function pass(m: string) { passCount += 1; console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exitCode = 1; throw new Error(m) }
+function check(ok: boolean, message: string) { if (!ok) fail(message); pass(message) }
 
 const root = join(__dirname, '..')
 const controllerSrc = readFileSync(join(root, 'src/ai/ai.controller.ts'), 'utf-8')
@@ -207,6 +216,8 @@ async function verifyQaRecordsPersist() {
   const assets = new MemberAssetsService(prisma)
   const userId = `vfy-qa-${randomUUID()}`
   const sessionId = `vfy-sess-${randomUUID()}`
+  const s = randomUUID().slice(0, 10)
+  const legacyOpening = `存量列表开场_${s} 手机13800138000`
   try {
     await prisma.endUser.create({
       data: {
@@ -222,7 +233,7 @@ async function verifyQaRecordsPersist() {
         endUserId: userId,
         skill: 'qa',
         status: 'completed',
-        topic: '怎么打印简历',
+        topic: legacyOpening,
         skillReason: '由小青助手本次对话浓缩',
         skillSource: 'llm',
         slotsJson: JSON.stringify({ source: { value: 'assistant', filledAt: new Date().toISOString() } }),
@@ -245,9 +256,17 @@ async function verifyQaRecordsPersist() {
     if (!hit) fail('9b. qaRecords 必须包含刚落库的 qa_pins')
     if (hit.title !== '小青本次要点') fail('9c. qaRecords.title 应来自产物 title')
     if ('payloadJson' in (hit as object)) fail('9d. qaRecords 不得回传 payloadJson')
-    if (JSON.stringify(page).includes('怎么打印简历') === false) {
-      // topic 仅作 title 兜底；本条有 title，不应把整段对话正文泄露
-    }
+    // 无产物 title 的存量行不能再把会话原话当标题。
+    const untitled = await prisma.advisorArtifact.create({ data: {
+      sessionId, kind: 'qa_pins', status: 'completed', provider: 'llm:unit',
+      payloadJson: JSON.stringify({ kind: 'qa_pins', pins: [{ content: '存量要点' }] }),
+      expiresAt: new Date(Date.now() + 3600_000),
+    } })
+    const legacyPage = await assets.listAiRecords(userId, { cursor: null, pageSize: 20 })
+    check(legacyPage.qaRecords.find((row) => row.artifactId === untitled.id)?.title === '问答要点'
+      && !JSON.stringify(legacyPage).includes(legacyOpening), '9g. 无 title 的存量记录用固定兜底，整页不含开场原话')
+    check(legacyPage.qaRecords.find((row) => row.artifactId === artifact.id)?.title === '小青本次要点',
+      '9h. 阳性对照：有 title 的记录仍显示产物标题（保留 9c）')
     const other = await assets.listAiRecords('someone-else', { cursor: null, pageSize: 20 })
     if (other.qaRecords.some((row) => row.artifactId === artifact.id)) {
       fail('9e. qaRecords 必须按 endUserId 隔离')
@@ -276,8 +295,94 @@ async function verifyQaRecordsPersist() {
   }
 }
 
+async function verifySummaryRuntime() {
+  const prisma = new PrismaService()
+  await prisma.onModuleInit()
+  const s = randomUUID().replace(/-/g, '').slice(0, 10)
+  const userId = `vfy-summary-${s}`
+  const markers = [`小青用户一_${s}`, `小青用户二_${s}`, `小青用户三_${s}`]
+  const userTurns = markers.map((marker, index) => ({ role: 'user' as const,
+    content: `${marker}，${index === 1 ? '手机13800138000，' : ''}我拿不准简历怎么写` }))
+  const highlights = ['先整理本人做过的工作', '保留可以核实的具体经历']
+  const todos = ['补充一项真实成果']
+  const realFetch = global.fetch
+  const audit = new AuditService(prisma)
+  const aiLog = new AiLogService(prisma)
+  const config = {
+    isReady: () => true, getApiKey: () => 'verify-only-fake-key',
+    getConfig: () => ({ vendor: 'fakevendor', model: 'fake-model-v1', baseURL: 'https://llm.invalid/v1',
+      systemPrompt: '', roleScope: '', forbiddenWords: [], temperature: 0.6, enabled: true }),
+  } as unknown as ConstructorParameters<typeof LlmAdvisorService>[0]
+  process.env['AI_ENDPOINT_ALLOWLIST_EXTRA'] = [process.env['AI_ENDPOINT_ALLOWLIST_EXTRA'], 'llm.invalid'].filter(Boolean).join(',')
+  const artifacts = new AdvisorArtifactService(prisma, new AdvisorPdfService(), {} as never, audit)
+  // save 使用真实服务；只替换打印出口，PDF 已由 verify:advisor-work 的 G 区验证。
+  artifacts.print = async () => { throw new Error('verify-only print unavailable') }
+  const advisor = new AdvisorService(prisma, new LlmAdvisorService(config), artifacts, audit, aiLog)
+  const summary = new AssistantSummaryService(prisma, {
+    getOwnedTranscript: () => [
+      userTurns[0], { role: 'assistant', content: '可以先整理经历' },
+      userTurns[1], { role: 'assistant', content: '补充真实成果' }, userTurns[2],
+    ],
+  } as never, config, artifacts, audit, aiLog)
+  let sessionId: string | undefined
+  let sentBody = ''
+  try {
+    await prisma.endUser.create({ data: { id: userId, phoneHash: userId, phoneEnc: 'verify-only', enabled: true, status: 'active' } })
+    global.fetch = (async (_url: string, init?: { body?: string }) => {
+      sentBody = init?.body ?? ''
+      return { ok: true, status: 200, json: async () => ({
+      choices: [{ message: { content: JSON.stringify({ highlights, todos }) } }],
+      usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+    }) } }) as unknown as typeof fetch
+    const saved = await summary.summarize(`assistant-${s}`, userId, null)
+    sessionId = saved.advisorSessionId
+    check(markers.every((marker) => sentBody.includes(marker)) && !sentBody.includes('13800138000'),
+      '10i. 阳性对照：每条用户原话标记确实进入浓缩调用，手机号送前已遮盖')
+    const row = await prisma.advisorSession.findUniqueOrThrow({ where: { id: sessionId } })
+    const slots = JSON.parse(row.slotsJson)
+    check(row.topic === ASSISTANT_SUMMARY_TOPIC && Object.keys(slots).join(',') === 'source'
+      && slots.source.value === 'assistant' && !('question' in slots), '10a. 真 summarize：固定主题，只存 source，不存 question')
+    check(markers.every((marker) => !JSON.stringify(row).includes(marker)) && !JSON.stringify(row).includes('13800138000'),
+      '10b. 真读会话整行：每条用户原话的标记与手机号均未落库')
+    const artifactRows = await prisma.advisorArtifact.findMany({ where: { sessionId } })
+    // AI 整理的要点按设计照旧保存，本用例不声称能拦模型复述。
+    check(artifactRows.length === 1 && JSON.stringify(JSON.parse(artifactRows[0]!.payloadJson).pins.map((pin: { content: string }) => pin.content))
+      === JSON.stringify([...highlights, ...todos.map((todo) => `待办：${todo}`)]),
+      '10c. 真 AdvisorArtifact.save：产物内容逐条等于假模型给的要点和待办')
+    const view = await advisor.getSession(sessionId, { endUserId: userId, accessToken: null })
+    check(view.topic === ASSISTANT_SUMMARY_TOPIC && view.status === 'completed' && view.canRun && view.missingSlotKeys.length === 0 && view.nextSlotKey === null,
+      '10d. 真 getSession：摘要回读仍 completed/canRun，不被算回 collecting')
+    const page = await new MemberAssetsService(prisma).listAiRecords(userId, { cursor: null, pageSize: 20 })
+    check(page.qaRecords.find((item) => item.artifactId === saved.artifactId)?.title === '小青本次要点',
+      '10e. 真 listAiRecords：保存的摘要标题是小青本次要点')
+    const payload = JSON.parse(artifactRows[0]!.payloadJson) as { pins: Array<{ content: string }> }
+    check(JSON.stringify(saved.highlights) === JSON.stringify(highlights)
+      && JSON.stringify(saved.todos) === JSON.stringify(todos)
+      && JSON.stringify(payload.pins.map((pin) => pin.content)) === JSON.stringify([...highlights, ...todos.map((todo) => `待办：${todo}`)]),
+      '10f. 阳性对照：模型要点/待办逐字留在产物，返回 highlights/todos 与之一致')
+    const audits = await prisma.auditLog.findMany({ where: { targetId: sessionId, action: 'assistant.session_summary' } })
+    check(audits.length === 1 && markers.every((marker) => !JSON.stringify(audits).includes(marker))
+      && !JSON.stringify(audits).includes('13800138000'),
+      '10g. 真读 assistant.session_summary 审计存在且无任何用户原话标记或手机号')
+    await aiLog.flush()
+    const logs = await prisma.aiServiceLog.findMany({ where: { endUserId: userId } })
+    check(logs.length > 0 && markers.every((marker) => !JSON.stringify(logs).includes(marker)) && !JSON.stringify(logs).includes('13800138000'),
+      '10h. 阳性对照：AI 日志真落库，只含元数据，无任何用户原话标记或手机号')
+  } finally {
+    global.fetch = realFetch
+    await aiLog.flush()
+    const sessions = await prisma.advisorSession.findMany({ where: { endUserId: userId }, select: { id: true } })
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: sessions.map((item) => item.id) } } })
+    await prisma.advisorSession.deleteMany({ where: { endUserId: userId } })
+    await prisma.aiServiceLog.deleteMany({ where: { endUserId: userId } })
+    await prisma.endUser.deleteMany({ where: { id: userId } })
+    await prisma.onModuleDestroy()
+  }
+}
+
 void verifyVoiceRuntime()
   .then(verifySummaryAnonymous)
   .then(verifyQaRecordsPersist)
-  .then(() => console.log('\n=== ALL PASS: 小青语音 / 本次要点门禁 ==='))
+  .then(verifySummaryRuntime)
+  .then(() => console.log(`\n=== ALL PASS: 小青语音 / 本次要点门禁 (${passCount} PASS) ===`))
   .catch((err) => fail(err instanceof Error ? err.message : '运行时断言失败'))
