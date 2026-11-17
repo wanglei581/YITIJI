@@ -77,6 +77,7 @@ export function PolicyTouchHub() {
         <QxTouchTile icon="home" title="回首页办别的事" desc="打印、扫描、改简历、练面试照常" onClick={() => navigate('/')} />
       </div>
       {channelsRow}
+      <p className="policy-min-fine">政策由发布机构自行审核发布，以官方原文为准</p>
     </> : <>
       <PolicySearchField disabled={winding} onSearch={(word) => { setPolicyKeyword(word); navigate('/renshi?search=1') }} />
       <div className="policy-min-grid policy-min-categories" data-testid="policy-categories">
