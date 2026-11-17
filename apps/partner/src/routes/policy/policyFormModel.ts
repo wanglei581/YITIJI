@@ -36,9 +36,8 @@ export function beijingCalendarDate(now: Date = new Date()): string {
 
 export function nextBeijingCalendarDate(now: Date = new Date()): string {
   const [year, month, day] = beijingCalendarDate(now).split('-').map(Number)
-  const next = new Date(Date.UTC(year!, (month ?? 1) - 1, day ?? 1))
-  next.setUTCDate(next.getUTCDate() + 1)
-  return next.toISOString().slice(0, 10)
+  const next = new Date(Date.UTC(year!, (month ?? 1) - 1, (day ?? 1) + 1))
+  return beijingCalendarDate(next)
 }
 
 /** 没填截止日期不算到期。只认 YYYY-MM-DD，并且早于北京时间的今天。 */
