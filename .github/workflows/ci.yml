@@ -737,6 +737,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:cjk-font-fallback
           pnpm --filter @ai-job-print/api verify:file-list-purpose
           pnpm --filter @ai-job-print/api verify:file-cleanup-schedule
+          # 管理员手动删除与手动清理：审计写不进则不删。自建临时 SQLite。
+          pnpm --filter @ai-job-print/api verify:file-admin-delete-audit
           # 告警自动刷新计时器：假时钟跑真实 hook，不打开浏览器。
           pnpm --filter @ai-job-print/admin verify:admin-alert-auto-refresh
           # 包 D：服务端文档转换（Word → PDF）契约 / 超时 / 并发 / 归属 / 能力为假时 fail-closed（fake 引擎，不需要 LibreOffice）
