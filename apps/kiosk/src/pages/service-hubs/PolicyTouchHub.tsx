@@ -9,6 +9,8 @@ import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { useInterviewAiCapabilities } from '../interview/useInterviewAiCapabilities'
+import { PolicySearchField } from '../renshi/PolicySearchField'
+import { setPolicyKeyword } from '../renshi/policyKeywordSession'
 import { PolicyChecklistSample, PolicyReadState, PolicyTouchLayout } from '../renshi/PolicyTouchLayout'
 import { POLICY_CATEGORIES, POLICY_GENERAL_QUESTION, policyCategorySummaries, policyRead } from '../renshi/policyModel'
 import { policyPublishedOn } from '../renshi/policyFacts'
@@ -76,6 +78,7 @@ export function PolicyTouchHub() {
       </div>
       {channelsRow}
     </> : <>
+      <PolicySearchField disabled={winding} onSearch={(word) => { setPolicyKeyword(word); navigate('/renshi?search=1') }} />
       <div className="policy-min-grid policy-min-categories" data-testid="policy-categories">
         {policyCategorySummaries(data.categories).map((category, index) => <QxTouchTile key={category.key} icon={category.icon}
           title={category.label} desc={category.disabled ? '还没有机构发布' : `${category.total} 条 · 最近：${category.latest?.title ?? '标题未提供'}`}
@@ -90,7 +93,7 @@ export function PolicyTouchHub() {
       </button>}
       {channelsRow}
       {isLoggedIn && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate('/me/favorites?tab=policy')}>政策收藏</button>}
-      <p className="policy-min-fine">条数从发布数据读；政策由发布机构自行审核发布，以官方原文为准</p>
+      <p className="policy-min-fine">政策由发布机构自行审核发布，以官方原文为准</p>
     </>}
   </PolicyTouchLayout>
 }
