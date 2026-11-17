@@ -30,8 +30,11 @@ export function TerminalBatchCreateDialog({ organizations, onClose, onCreated, o
   const [paste, setPaste] = useState('')
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const pasteParsed = mode === 'paste' ? parseTerminalBatchPaste(paste, organizations) : null
+  const pasteBlocked = (pasteParsed?.errors.length ?? 0) > 0
 
   async function submit() {
+    if (pasteBlocked) return
     setErrorMessage(null)
     setSaving(true)
     try {
@@ -127,10 +130,11 @@ export function TerminalBatchCreateDialog({ organizations, onClose, onCreated, o
             <textarea aria-label="粘贴终端表格" value={paste} onChange={(event) => setPaste(event.target.value)} rows={8} className="rounded-lg border border-neutral-200 px-3 py-2 font-mono text-sm outline-none focus:border-primary-600" placeholder={'大厅 1 号,一楼东侧,,\n大厅 2 号,一楼西侧,,'} />
           </label>
         )}
-        {errorMessage && <p role="alert" className="mt-3 text-sm text-error-fg">{errorMessage}</p>}
+        {pasteBlocked && pasteParsed && <p role="alert" className="mt-3 text-sm text-error-fg">{pasteParsed.errors.join('；')}</p>}
+        {errorMessage && !pasteBlocked && <p role="alert" className="mt-3 text-sm text-error-fg">{errorMessage}</p>}
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onClose} disabled={saving} className="h-10 rounded-lg border border-neutral-200 px-4 text-sm font-semibold text-neutral-700">取消</button>
-          <button type="button" onClick={() => void submit()} disabled={saving} className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? '正在预建' : '开始预建'}</button>
+          <button type="button" onClick={() => void submit()} disabled={saving || pasteBlocked} className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? '正在预建' : '开始预建'}</button>
         </div>
       </div>
     </div>

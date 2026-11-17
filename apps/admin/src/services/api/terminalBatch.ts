@@ -61,6 +61,8 @@ export interface TerminalBatchRevokeResult {
 }
 
 const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+const NAME_LIMIT = 120
+const LOCATION_LIMIT = 200
 
 export function parseTerminalBatchPaste(
   text: string,
@@ -75,25 +77,26 @@ export function parseTerminalBatchPaste(
     const name = columns[0] ?? ''
     const location = columns[1] ?? ''
     const orgText = columns[2] ?? ''
-    if (!name) {
-      errors.push(`第 ${lineNo} 行：终端名称不能为空`)
-      return
-    }
+    const lineErrors: string[] = []
+    if (!name) lineErrors.push(`第 ${lineNo} 行：终端名称不能为空`)
+    else if (name.length > NAME_LIMIT) lineErrors.push(`第 ${lineNo} 行：名称超过上限 ${NAME_LIMIT} 个字`)
+    if (location.length > LOCATION_LIMIT) lineErrors.push(`第 ${lineNo} 行：点位超过上限 ${LOCATION_LIMIT} 个字`)
     let orgId: string | undefined
     if (orgText) {
       const org = organizations.find((item) => item.id === orgText || item.name === orgText)
-      if (!org) {
-        errors.push(`第 ${lineNo} 行：找不到机构`)
-        return
-      }
-      orgId = org.id
+      if (!org) lineErrors.push(`第 ${lineNo} 行：找不到机构`)
+      else orgId = org.id
+    }
+    if (lineErrors.length > 0) {
+      errors.push(...lineErrors)
+      return
     }
     const usableAsCode = name.length <= 64 && CODE_RE.test(name)
     const terminalCode = usableAsCode ? name : `P${cryptoRandom()}`
     rows.push({
       terminalCode,
-      displayName: name.slice(0, 120),
-      ...(location ? { locationLabel: location.slice(0, 200) } : {}),
+      displayName: name,
+      ...(location ? { locationLabel: location } : {}),
       ...(orgId ? { orgId } : {}),
     })
   })

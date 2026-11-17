@@ -51,6 +51,22 @@ test('批量预建、下载绑定码，并按批次号筛选', async ({ page }) 
   await assertNoTechLeak(page)
 })
 
+test('粘贴 121 字名称会标出第 1 行超长，开始预建不可用', async ({ page }) => {
+  const guards = await openAuthed(page, '/devices')
+  await settleAdminPage(page, guards)
+  await page.getByRole('button', { name: '终端', exact: true }).click()
+  await page.getByRole('button', { name: '批量预建', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '批量预建' })
+  await dialog.getByRole('button', { name: '粘贴表格', exact: true }).click()
+  await dialog.getByLabel('粘贴终端表格').fill('名'.repeat(121))
+  const alert = dialog.getByRole('alert')
+  await expect(alert).toContainText('第 1 行')
+  await expect(alert).toContainText('名称')
+  await expect(alert).toContainText('120')
+  await expect(dialog.getByRole('button', { name: '开始预建', exact: true })).toBeDisabled()
+  await assertNoTechLeak(page)
+})
+
 test('导出的绑定码表格中和公式开头', async ({ page }) => {
   const guards = await openAuthed(page, '/devices')
   await settleAdminPage(page, guards)

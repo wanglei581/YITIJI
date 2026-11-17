@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { formatBindCodeCsv, type TerminalBatchIssuedCode } from './terminalBatch.ts'
+import { formatBindCodeCsv, parseTerminalBatchPaste, type TerminalBatchIssuedCode } from './terminalBatch.ts'
 
 function row(patch: Partial<TerminalBatchIssuedCode>): TerminalBatchIssuedCode {
   return {
@@ -41,6 +41,27 @@ test('以 = + - @ 开头的单元格加单引号，普通值不变', () => {
     'AB12CD34EF56GH78JK90',
     '2026-11-17T00:00:00.000Z',
   ])
+})
+
+test('121 字名称报第 1 行超上限，201 字点位报第 2 行，普通行原样保留', () => {
+  const tooLongName = '名'.repeat(121)
+  const nameParsed = parseTerminalBatchPaste(tooLongName, [])
+  assert.deepEqual(nameParsed.rows, [])
+  assert.equal(nameParsed.errors.length, 1)
+  assert.match(nameParsed.errors[0] ?? '', /第 1 行/)
+  assert.match(nameParsed.errors[0] ?? '', /名称/)
+  assert.match(nameParsed.errors[0] ?? '', /120/)
+  assert.equal((nameParsed.errors[0] ?? '').includes(tooLongName), false)
+
+  const tooLongLocation = '点'.repeat(201)
+  const mixed = parseTerminalBatchPaste(`大厅甲,一楼东\n大厅乙,${tooLongLocation}`, [])
+  assert.equal(mixed.rows.length, 1)
+  assert.equal(mixed.rows[0]?.displayName, '大厅甲')
+  assert.equal(mixed.rows[0]?.locationLabel, '一楼东')
+  assert.equal(mixed.errors.length, 1)
+  assert.match(mixed.errors[0] ?? '', /第 2 行/)
+  assert.match(mixed.errors[0] ?? '', /点位/)
+  assert.match(mixed.errors[0] ?? '', /200/)
 })
 
 test('制表符和回车开头同样加单引号，含逗号的公式先加引号再按 CSV 转义', () => {
