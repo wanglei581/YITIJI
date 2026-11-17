@@ -2064,7 +2064,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/license.ts` | `verify-license-state.ts` |
 | `packages/shared/src/types/member-privacy.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-member-data-request-contract.ts`<br/>`verify-member-step-up.helpers.ts`<br/>`verify-member-step-up.ts`<br/>`verify-wave2-account-rebind.ts` |
 | `packages/shared/src/types/memberAssets.ts` | `verify-jobfair-checkin.ts` |
-| `packages/shared/src/types/memberBenefits.ts` | `verify-ai-quota.ts` |
+| `packages/shared/src/types/memberBenefits.ts` | `verify-ai-contract-mirror.mjs`<br/>`verify-ai-quota.ts` |
 | `packages/shared/src/types/memberPrintOrders.ts` | `verify-member-print-orders-ui.mjs`<br/>`verify-member-order-timeline.ts` |
 | `packages/shared/src/types/memberPrivacy.ts` | `verify-user-closure-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-ai-usage-retention.ts`<br/>`verify-member-data-request-contract.ts` |
 | `packages/shared/src/types/mockInterview.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
@@ -2574,7 +2574,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/advisor/assistant-summary.service.ts` | `verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-assistant-device-fault-intercept.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-resume-parse-intent-http.ts` |
 | `services/api/src/advisor/llm-advisor.service.ts` | `verify-advisor-work.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assistant-device-fault-intercept.ts`<br/>`verify-assistant-device-fault.ts`<br/>`verify-llm-account-unavailable.ts` |
 | `services/api/src/ai-access/admin-ai-access.controller.ts` | `verify-admin-ai-access-ui.mjs`<br/>`verify-ai-access.ts` |
-| `services/api/src/ai-access/ai-access.decorator.ts` | `verify-ai-access.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-scan-device-settings.ts`<br/>`verify-self-assessment-ai-gate.ts` |
+| `services/api/src/ai-access/ai-access.decorator.ts` | `verify-ai-access.ts`<br/>`verify-ai-quota-api.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-scan-device-settings.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai-access/ai-access.guard.ts` | `verify-ai-access.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai-access/ai-access.module.ts` | `verify-ai-access.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai-access/ai-access.service.ts` | `verify-admin-ai-access-ui.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-self-assessment-ai-gate.ts`<br/>`verify-self-assessment-append-file-scope.ts` |
@@ -2621,7 +2621,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/quota/ai-quota.module.ts` | `verify-ai-quota-api.ts` |
 | `services/api/src/ai/quota/ai-quota.policy.ts` | `verify-ai-quota-api.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-quota.ts`<br/>`verify-free-print-quota.ts` |
 | `services/api/src/ai/quota/ai-quota.service.ts` | `verify-ai-quota-api.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-quota.ts` |
-| `services/api/src/ai/quota/ai-quota.types.ts` | `verify-ai-quota-api.ts` |
+| `services/api/src/ai/quota/ai-quota.types.ts` | `verify-ai-contract-mirror.mjs`<br/>`verify-ai-quota-api.ts` |
 | `services/api/src/ai/quota/ai-resume-charge-steps.ts` | `verify-service-orders.ts` |
 | `services/api/src/ai/quota/ai-resume-charge.ts` | `verify-service-orders.ts` |
 | `services/api/src/ai/redis-inflight-lock.ts` | `verify-resume-optimize.ts`<br/>`verify-service-orders.ts` |
@@ -2971,7 +2971,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/member-benefits/admin-member-benefits.service.ts` | `verify-ai-quota.ts`<br/>`verify-member-benefits-admin.ts` |
 | `services/api/src/member-benefits/dto/admin-member-benefits.dto.ts` | `verify-ai-quota.ts` |
 | `services/api/src/member-benefits/member-benefits.service.ts` | `verify-benefit-activities.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-favorites-benefits.ts`<br/>`verify-wave3-print-aftercare.ts` |
-| `services/api/src/member-benefits/member-benefits.types.ts` | `verify-ai-quota.ts` |
+| `services/api/src/member-benefits/member-benefits.types.ts` | `verify-ai-contract-mirror.mjs`<br/>`verify-ai-quota.ts` |
 | `services/api/src/member-favorites/member-favorites.controller.ts` | `verify-kiosk-job-board-switch.ts`<br/>`verify-policy-scope.ts` |
 | `services/api/src/member-favorites/member-favorites.service.ts` | `verify-kiosk-job-board-switch.ts`<br/>`verify-member-favorites-benefits.ts`<br/>`verify-policies.ts` |
 | `services/api/src/member-feedback/admin-member-feedback.controller.ts` | `verify-feedback-notifications.ts` |

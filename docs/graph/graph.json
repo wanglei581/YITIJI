@@ -25956,6 +25956,7 @@
       "services/api/scripts/verify-jobfair-checkin.ts"
     ],
     "packages/shared/src/types/memberBenefits.ts": [
+      "services/api/scripts/verify-ai-contract-mirror.mjs",
       "services/api/scripts/verify-ai-quota.ts"
     ],
     "packages/shared/src/types/memberPrintOrders.ts": [
@@ -27277,6 +27278,7 @@
     ],
     "services/api/src/ai-access/ai-access.decorator.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
@@ -27615,6 +27617,7 @@
       "services/api/scripts/verify-ai-quota.ts"
     ],
     "services/api/src/ai/quota/ai-quota.types.ts": [
+      "services/api/scripts/verify-ai-contract-mirror.mjs",
       "services/api/scripts/verify-ai-quota-api.ts"
     ],
     "services/api/src/ai/quota/ai-resume-charge-steps.ts": [
@@ -29925,6 +29928,7 @@
       "services/api/scripts/verify-wave3-print-aftercare.ts"
     ],
     "services/api/src/member-benefits/member-benefits.types.ts": [
+      "services/api/scripts/verify-ai-contract-mirror.mjs",
       "services/api/scripts/verify-ai-quota.ts"
     ],
     "services/api/src/member-favorites/member-favorites.controller.ts": [
@@ -40347,8 +40351,11 @@
         "dirs": [],
         "files": [
           "packages/shared/src/types/ai.ts",
+          "packages/shared/src/types/memberBenefits.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
-          "services/api/src/ai/llm/ai-config-audit.ts"
+          "services/api/src/ai/llm/ai-config-audit.ts",
+          "services/api/src/ai/quota/ai-quota.types.ts",
+          "services/api/src/member-benefits/member-benefits.types.ts"
         ],
         "missing": []
       },
@@ -40573,6 +40580,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai-access/ai-access.decorator.ts",
           "services/api/src/ai/quota/ai-quota.controller.ts",
           "services/api/src/ai/quota/ai-quota.module.ts",
           "services/api/src/ai/quota/ai-quota.policy.ts",
