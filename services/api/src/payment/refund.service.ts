@@ -30,11 +30,13 @@
  *   渠道通知或查证金额不等于整单实付时，Refund 进入 manual_review，订单停在
  *   refunding 并记 refund.notify_amount_mismatch，不自动再打一笔，也不无限抛错重试。
  */
-import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
+import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
+import { settleServiceRefundNotify } from './service-order.payment'
 import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput, type RefundExecuteResult } from './payment-provider.types'
 import {
   holdMismatchedChannelRefund,
@@ -134,6 +136,7 @@ export class RefundService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(PAYMENT_PROVIDER_TOKEN) private readonly registry: PaymentProviderRegistry,
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   /**
@@ -174,6 +177,10 @@ export class RefundService {
       throw new UnauthorizedException('CALLBACK_REPLAY')
     }
 
+    if (event.refundNo.startsWith('svc-rfd-')) {
+      await settleServiceRefundNotify(this.prisma, this.audit, this.redis ?? null, event)
+      return { ok: true }
+    }
     const refund = await this.prisma.refund.findUnique({ where: { refundNo: event.refundNo } })
     if (!refund) throw new BadRequestException('REFUND_NOTIFY_UNKNOWN_REFUND') // 不误改任何订单
     if (refund.channel !== 'wechat') throw new BadRequestException('REFUND_NOTIFY_CHANNEL_MISMATCH')

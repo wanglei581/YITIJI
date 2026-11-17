@@ -9,6 +9,8 @@ import type { AiQuotaService } from './ai-quota.service'
 /** 诊断 / 优化 / 生成 / 排版共用的一次简历计次。从 AiService 拆出，避免服务文件继续加长。 */
 export interface ResumeChargeRunInput<T> {
   endUserId?: string | null
+  /** 这一趟已经付过。为真时不再扣每人每日次数。 */
+  skipDailyQuota?: boolean
   operationKey: string
   loadStored?: () => Promise<T | null>
   failureOf?: (value: T) => ReleaseReason | null
@@ -86,7 +88,7 @@ export function executeResumeCharge<T>(
   input: ResumeChargeRunInput<T>,
   gate: { bucket: 'ai_resume'; runWithAiQuota: RunWithAiQuota },
 ): Promise<T> {
-  if (!quota || !input.endUserId) {
+  if (input.skipDailyQuota || !quota || !input.endUserId) {
     return input.work().then(async (value) => {
       await input.saveResult(value)
       return value

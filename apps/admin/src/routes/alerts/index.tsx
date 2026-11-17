@@ -67,6 +67,12 @@ const TYPE_META: Record<
     icon: Building2Icon,
     guidance: '机构在后台提交的报障还没关闭。请在机构详情里查看这台终端的报障，处理完后这条告警会消失。',
   },
+  service_return_manual: {
+    label: '退款待人工处理',
+    icon: AlertTriangleIcon,
+    guidance: '有一笔服务已经付过款，钱还没回到用户手里。自动处理已到上限，或到账通知和这一单对不上。请到订单里按原路再试一次。确认 / 静默只记录处理。',
+    link: { label: '去订单', to: '/orders' },
+  },
 }
 
 const SEVERITY_MAP: Record<string, { badge: 'error' | 'warning'; label: string }> = {
@@ -92,6 +98,7 @@ const TYPE_FILTERS = [
   { label: 'AI 费用上限已用完', value: 'ai_budget_exhausted' },
   { label: '扫描仪异常', value: 'scan_device_issue' },
   { label: '机构报障', value: 'partner_incident' },
+  { label: '退款待人工处理', value: 'service_return_manual' },
 ] as const
 
 const VIEW_TABS: Array<{ label: string; value: AlertListView }> = [

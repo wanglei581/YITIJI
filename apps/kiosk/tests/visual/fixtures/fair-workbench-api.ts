@@ -8,6 +8,7 @@
 // 企业 / 校园 / 政策一起注册），而这里要逐屏切换 loading / empty / error / 结束 / 下架
 // 这些互斥形态，需要按屏定制。共用一份会让每个用例都得先拆掉一堆别的登记。
 import type { ApiRouter } from '../../fixtures/api-router'
+import { attachMachinePricing } from '../../fixtures/machine-pricing'
 
 export const FAIR_ID = 'fair-001'
 /** 参会准备单是 fairId + taskId 两级路径；taskId 由调用方带进来（location.state）。 */
@@ -170,6 +171,7 @@ export function registerPrintConfirm(api: ApiRouter): void {
     status: 200,
     json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] },
   })
+  attachMachinePricing(api, 100, 100)
 }
 
 /** 壳层（KioskRoot）自己会拉的三条，与业务无关但必须登记，否则 fail-closed 会红。 */

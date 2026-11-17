@@ -84,6 +84,46 @@ function pickMismatchTerminal(value: unknown): MismatchTerminal | null {
   return { id: t['id'], displayName: text(t['displayName']), locationLabel: text(t['locationLabel']) }
 }
 
+const SERVICE_PAYMENT_KEYS = ['resume_optimize', 'mock_interview', 'scan'] as const
+const SERVICE_PAYMENT_NAMES = ['AI 简历优化', 'AI 模拟面试', '扫描'] as const
+
+/** 只放行这一次要付的整数分和三项目录里的服务名，其它字段继续丢掉。 */
+function pickServicePaymentRequired(err: Record<string, unknown>): {
+  amountCents: number
+  serviceKey: (typeof SERVICE_PAYMENT_KEYS)[number]
+  serviceName: (typeof SERVICE_PAYMENT_NAMES)[number]
+} | undefined {
+  const amountCents = err['amountCents']
+  const serviceKey = err['serviceKey']
+  const serviceName = err['serviceName']
+  if (typeof amountCents !== 'number' || !Number.isInteger(amountCents) || amountCents < 1 || amountCents > 100_000) return undefined
+  if (typeof serviceKey !== 'string' || !(SERVICE_PAYMENT_KEYS as readonly string[]).includes(serviceKey)) return undefined
+  if (typeof serviceName !== 'string' || !(SERVICE_PAYMENT_NAMES as readonly string[]).includes(serviceName)) return undefined
+  return {
+    amountCents,
+    serviceKey: serviceKey as (typeof SERVICE_PAYMENT_KEYS)[number],
+    serviceName: serviceName as (typeof SERVICE_PAYMENT_NAMES)[number],
+  }
+}
+
+/** 只在「这一趟已经有旧单」时带出旧单号。格式与本库单号一致，不透传任意字符串。 */
+function pickExistingOrderId(err: Record<string, unknown>): string | undefined {
+  const value = err['existingOrderId']
+  if (typeof value !== 'string') return undefined
+  const text = value.trim()
+  if (!text || text.length > 128 || !/^[A-Za-z0-9_-]+$/.test(text)) return undefined
+  return text
+}
+
+/** 只在「这一次已经在进行」时带出占用引用，便于一体机接着查，而不是再带去付款。 */
+function pickConsumedRef(err: Record<string, unknown>): string | undefined {
+  const value = err['consumedRef']
+  if (typeof value !== 'string') return undefined
+  const text = value.trim()
+  if (!text || text.length > 128 || /[\r\n]/.test(text)) return undefined
+  return text
+}
+
 /**
  * 全局异常过滤器。除了把异常整形成统一错误响应，还负责**唯一一条**
  * 服务端异常日志 —— 此前这里一行日志都不写，所有 500 在服务端零痕迹。
@@ -110,6 +150,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let mismatchTerminal: MismatchTerminal | null | undefined
     let closureOrders: Array<{ orderNo: string; status: string }> | undefined
     let nextAction: string | undefined
+    let servicePayment: { amountCents: number; serviceKey: 'resume_optimize' | 'mock_interview' | 'scan'; serviceName: string } | undefined
+    let consumedRef: string | undefined
+    let existingOrderId: string | undefined
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -147,6 +190,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
               .map((row) => ({ orderNo: row.orderNo, status: row.status }))
           }
           if (isNextActionId(err['nextAction'])) nextAction = err['nextAction']
+          if (err['code'] === 'SERVICE_PAYMENT_REQUIRED') servicePayment = pickServicePaymentRequired(err)
+          if (err['code'] === 'SERVICE_ORDER_IN_USE') consumedRef = pickConsumedRef(err)
+          if (err['code'] === 'SERVICE_ORDER_REF_OCCUPIED') existingOrderId = pickExistingOrderId(err)
         } else if (typeof errField === 'string') {
           const bodyMessage = b['message']
           if (typeof bodyMessage === 'string' && isMachineErrorCode(bodyMessage)) {
@@ -241,6 +287,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ...(mismatchTerminal !== undefined ? { terminal: mismatchTerminal } : {}),
         ...(closureOrders ? { orders: closureOrders } : {}),
         ...(nextAction ? { nextAction } : {}),
+        ...(servicePayment ?? {}),
+        ...(consumedRef ? { consumedRef } : {}),
+        ...(existingOrderId ? { existingOrderId } : {}),
       },
       requestId: request.requestId,
     }

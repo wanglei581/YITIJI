@@ -21,6 +21,21 @@ let cachedConfig: KioskTerminalConfig | null = null
 let cachedAt = 0
 let inflightTerminalId: string | null = null
 let inflight: Promise<KioskTerminalConfig> | null = null
+/** 强制刷新递增。更早发出的请求回来后，世代对不上就不能盖掉后发的结果。 */
+let cacheGeneration = 0
+
+function storeCachedConfig(
+  terminalId: string,
+  config: KioskTerminalConfig,
+  generation: number,
+): KioskTerminalConfig {
+  if (generation === cacheGeneration) {
+    cachedTerminalId = terminalId
+    cachedConfig = config
+    cachedAt = Date.now()
+  }
+  return config
+}
 
 export async function getKioskTerminalConfig(terminalId: string): Promise<KioskTerminalConfig> {
   if (API_MODE !== 'http') return { ...OFF_CONFIG, serverTime: new Date().toISOString() }
@@ -71,19 +86,31 @@ export async function getCachedKioskTerminalConfig(
   }
   if (inflight && inflightTerminalId === terminalId) return inflight
 
+  const generation = cacheGeneration
   inflightTerminalId = terminalId
   inflight = getKioskTerminalConfig(terminalId)
-    .then((config) => {
-      cachedTerminalId = terminalId
-      cachedConfig = config
-      cachedAt = Date.now()
-      return config
-    })
+    .then((config) => storeCachedConfig(terminalId, config, generation))
     .finally(() => {
       inflight = null
       inflightTerminalId = null
     })
   return inflight
+}
+
+/** 绕过 30 秒缓存和在途请求，重新读终端配置。价格刚变过时用这个。读失败就丢掉旧缓存。 */
+export async function refreshKioskTerminalConfig(terminalId: string): Promise<KioskTerminalConfig> {
+  const generation = ++cacheGeneration
+  try {
+    const config = await getKioskTerminalConfig(terminalId)
+    return storeCachedConfig(terminalId, config, generation)
+  } catch (error) {
+    if (generation === cacheGeneration) {
+      cachedTerminalId = null
+      cachedConfig = null
+      cachedAt = 0
+    }
+    throw error
+  }
 }
 
 export { getTerminalCode, getTerminalId }

@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`649` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`659` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -84,7 +84,7 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/users` | AdminUsersController.list | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | GET | `/api/v1/admin/users/:endUserId` | AdminUsersController.getDetail | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
-| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>CopyJob<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
+| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>CopyJob<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>ServiceOrder<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
 | POST | `/api/v1/admin/users/:endUserId/disable` | AdminUsersController.disable | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | POST | `/api/v1/admin/users/:endUserId/restore` | AdminUsersController.restore | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 
@@ -403,9 +403,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/terminals/:terminalId/copy/jobs/:id/permit` | CopyAgentController.permit | — | CopyAgentService<br/>TerminalsService | AuditLog<br/>CopyJob<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| POST | `/api/v1/terminals/:terminalId/copy/jobs/:id/result` | CopyAgentController.result | — | CopyAgentService<br/>TerminalsService | AuditLog<br/>CopyJob<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| POST | `/api/v1/terminals/:terminalId/copy/jobs/:id/scan-result` | CopyAgentController.scanResult | — | CopyAgentService<br/>TerminalsService | AuditLog<br/>CopyJob<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| GET | `/api/v1/terminals/:terminalId/copy/jobs/:id/permit` | CopyAgentController.permit | — | CopyAgentService<br/>TerminalsService | AuditLog<br/>CopyJob<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/copy/jobs/:id/result` | CopyAgentController.result | — | CopyAgentService<br/>TerminalsService | AuditLog<br/>CopyJob<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/copy/jobs/:id/scan-result` | CopyAgentController.scanResult | — | CopyAgentService<br/>TerminalsService | AuditLog<br/>CopyJob<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 
 ## `services/api/src/copy-jobs/copy-jobs.controller.ts`
 
@@ -637,9 +637,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/session/end` | KioskSessionController.end | — | KioskSessionService | KioskSession<br/>Terminal |
-| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | KioskSessionService | KioskSession<br/>Terminal |
-| POST | `/api/v1/kiosk/session/start` | KioskSessionController.start | — | KioskSessionService | KioskSession<br/>Terminal |
+| POST | `/api/v1/kiosk/session/end` | KioskSessionController.end | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/session/start` | KioskSessionController.start | — | KioskSessionService | KioskSession<br/>MockInterviewTurn<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/legal/admin-legal-docs.controller.ts`
 
@@ -954,15 +954,17 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/partner/stats` | PartnerStatsQueryDto.getStats | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| GET | `/api/v1/partner/terminal-operations` | PartnerStatsQueryDto.getTerminalOperations | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/partner/stats` | PartnerStatsQueryDto.getStats | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PlatformSetting<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat<br/>TerminalServicePrice |
+| GET | `/api/v1/partner/terminal-operations` | PartnerStatsQueryDto.getTerminalOperations | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PlatformSetting<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat<br/>TerminalServicePrice |
 
 ## `services/api/src/payment/admin-billing.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/billing/price-config` | AdminBillingController.list | admin | AdminBillingService | AuditLog<br/>PriceConfig |
-| PUT | `/api/v1/admin/billing/price-config/:serviceKey` | AdminBillingController.update | admin | AdminBillingService | AuditLog<br/>PriceConfig |
+| GET | `/api/v1/admin/billing/personal-charge` | AdminBillingController.getPersonalCharge | admin | AdminBillingService | AuditLog<br/>PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
+| PUT | `/api/v1/admin/billing/personal-charge` | AdminBillingController.setPersonalCharge | admin | AdminBillingService | AuditLog<br/>PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
+| GET | `/api/v1/admin/billing/price-config` | AdminBillingController.list | admin | AdminBillingService | AuditLog<br/>PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
+| PUT | `/api/v1/admin/billing/price-config/:serviceKey` | AdminBillingController.update | admin | AdminBillingService | AuditLog<br/>PlatformSetting<br/>PriceConfig<br/>Terminal<br/>TerminalServicePrice |
 | GET | `/api/v1/admin/billing/reconciliation` | AdminBillingController.reconcile | admin | ReconciliationService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund |
 
 ## `services/api/src/payment/admin-order-actions.controller.ts`
@@ -970,7 +972,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/admin/orders/:id/mark-paid` | AdminOrderActionsController.markPaid | admin | OrderStatusService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem |
-| POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund |
+| POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder |
 
 ## `services/api/src/payment/order-quote.controller.ts`
 
@@ -982,15 +984,30 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/orders/:id/code-pay` | PaymentController.createCodePayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| POST | `/api/v1/orders/:id/pay` | PaymentController.createPayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| GET | `/api/v1/orders/:id/pay-status` | PaymentController.getPayStatus | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| POST | `/api/v1/orders/:id/pay/reconcile` | PaymentController.reconcile | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
+| POST | `/api/v1/orders/:id/code-pay` | PaymentController.createCodePayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/pay` | PaymentController.createPayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| GET | `/api/v1/orders/:id/pay-status` | PaymentController.getPayStatus | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/pay/reconcile` | PaymentController.reconcile | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
 | POST | `/api/v1/payment/callback/:channel` | PaymentController.callback | — | — | — |
-| GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund |
-| GET | `/api/v1/print/price-config` | PaymentController.getPrintPriceConfig | — | PricingService | PriceConfig |
+| GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder |
+| GET | `/api/v1/print/price-config` | PaymentController.getPrintPriceConfig | — | PricingService | PlatformSetting<br/>PriceConfig<br/>Terminal |
+
+## `services/api/src/payment/service-order-admin.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/admin/orders/:id/refund-service` | ServiceOrderAdminController.refund | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/admin/orders/:id/retry-service-refund` | ServiceOrderAdminController.retry | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+
+## `services/api/src/payment/service-order.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/kiosk/service-orders` | ServiceOrderController.create | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| GET | `/api/v1/kiosk/service-orders/:id` | ServiceOrderController.get | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/service-orders/:id/close` | ServiceOrderController.close | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/policies/policies.controller.ts`
 
@@ -1103,7 +1120,7 @@
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/scan/sessions/:id/device-settings` | ScanDeviceController.deviceSettings | — | ScanDeviceSessionsService | FileObject<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/scan/sessions/:id/switch-to-panel` | ScanDeviceController.switchToPanel | — | ScanDeviceSessionsService | FileObject<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
-| POST | `/api/v1/terminals/:terminalId/scan-tasks/:taskId/device-report` | ScanDeviceController.deviceReport | — | ScanDeviceSessionsService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/scan-tasks/:taskId/device-report` | ScanDeviceController.deviceReport | — | ScanDeviceSessionsService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 
 ## `services/api/src/scan-tasks/scan-tasks.controller.ts`
 
@@ -1113,8 +1130,8 @@
 | DELETE | `/api/v1/scan/sessions/:id` | ScanTasksController.cancel | — | ScanTasksService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/scan/sessions/:id` | ScanTasksController.status | — | ScanTasksService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/scan/sessions/:id/ack` | ScanTasksController.ack | — | ScanTasksService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
-| POST | `/api/v1/terminals/:terminalId/scan-sessions/deliver` | ScanTasksController.deliver | — | ScanTasksService<br/>TerminalsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| GET | `/api/v1/terminals/:terminalId/scan-tasks/current-lease` | ScanTasksController.getLease | — | ScanTasksService<br/>TerminalsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/scan-sessions/deliver` | ScanTasksController.deliver | — | ScanTasksService<br/>TerminalsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| GET | `/api/v1/terminals/:terminalId/scan-tasks/current-lease` | ScanTasksController.getLease | — | ScanTasksService<br/>TerminalsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 
 ## `services/api/src/screensaver/screensaver.controller.ts`
 
@@ -1165,7 +1182,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/printers` | AdminPrintersController.list | admin | AdminPrinterOutputService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| GET | `/api/v1/admin/printers` | AdminPrintersController.list | admin | AdminPrinterOutputService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 
 ## `services/api/src/terminals/admin-release-observation.controller.ts`
 
@@ -1180,16 +1197,19 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/terminals` | AdminTerminalsController.list | admin | — | — |
-| POST | `/api/v1/admin/terminals` | AdminTerminalsController.createPlannedTerminal | admin | AuditService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| POST | `/api/v1/admin/terminals/:terminalId/bind-code` | AdminTerminalsController.createBindCode | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/admin/terminals` | AdminTerminalsController.createPlannedTerminal | admin | AuditService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/admin/terminals/:terminalId/bind-code` | AdminTerminalsController.createBindCode | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/admin/terminals/:terminalId/capabilities` | AdminTerminalsController.listCapabilities | admin | — | — |
 | DELETE | `/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey` | AdminTerminalsController.clearCapability | admin | — | — |
 | PUT | `/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey` | AdminTerminalsController.updateCapability | admin | — | — |
+| GET | `/api/v1/admin/terminals/:terminalId/charge-settings` | AdminTerminalsController.getChargeSettings | admin | TerminalCapabilitiesService | Terminal<br/>TerminalCapability |
+| PUT | `/api/v1/admin/terminals/:terminalId/charge-settings` | AdminTerminalsController.updateChargeSettings | admin | AuditService<br/>TerminalCapabilitiesService | AuditLog<br/>Terminal<br/>TerminalCapability |
 | PUT | `/api/v1/admin/terminals/:terminalId/daily-free-print-sides` | AdminTerminalsController.updateDailyFreePrintSides | admin | — | — |
-| POST | `/api/v1/admin/terminals/:terminalId/emergency-revoke` | AdminTerminalsController.emergencyRevoke | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PATCH | `/api/v1/admin/terminals/:terminalId/lifecycle` | AdminTerminalsController.updateLifecycle | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PATCH | `/api/v1/admin/terminals/:terminalId/org` | AdminTerminalsController.assignOrg | admin | AuditService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PATCH | `/api/v1/admin/terminals/:terminalId/profile` | AdminTerminalsController.updateProfile | admin | AuditService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/admin/terminals/:terminalId/emergency-revoke` | AdminTerminalsController.emergencyRevoke | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| PUT | `/api/v1/admin/terminals/:terminalId/home-free-badge` | AdminTerminalsController.updateHomeFreeBadge | admin | — | — |
+| PATCH | `/api/v1/admin/terminals/:terminalId/lifecycle` | AdminTerminalsController.updateLifecycle | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| PATCH | `/api/v1/admin/terminals/:terminalId/org` | AdminTerminalsController.assignOrg | admin | AuditService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| PATCH | `/api/v1/admin/terminals/:terminalId/profile` | AdminTerminalsController.updateProfile | admin | AuditService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/admin/terminals/org-options` | AdminTerminalsController.orgOptions | admin | — | — |
 
 ## `services/api/src/terminals/admin-toolbox.controller.ts`
@@ -1217,20 +1237,20 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/auth/terminal/exchange-bind-code` | TerminalsController.exchangeBindCode | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| POST | `/api/v1/auth/terminal/register` | TerminalsController.register | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PATCH | `/api/v1/print-tasks/:taskId/status` | TerminalsController.patchTaskStatus | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/auth/terminal/exchange-bind-code` | TerminalsController.exchangeBindCode | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/auth/terminal/register` | TerminalsController.register | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| PATCH | `/api/v1/print-tasks/:taskId/status` | TerminalsController.patchTaskStatus | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/terminals/:terminalId/capabilities` | TerminalsController.getTerminalCapabilities | — | TerminalCapabilitiesService | Terminal<br/>TerminalCapability |
-| GET | `/api/v1/terminals/:terminalId/config` | TerminalsController.getTerminalConfig | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PUT | `/api/v1/terminals/:terminalId/heartbeat` | TerminalsController.heartbeat | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| GET | `/api/v1/terminals/:terminalId/printer-status` | TerminalsController.getTerminalPrinterStatus | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| GET | `/api/v1/terminals/:terminalId/config` | TerminalsController.getTerminalConfig | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| PUT | `/api/v1/terminals/:terminalId/heartbeat` | TerminalsController.heartbeat | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| GET | `/api/v1/terminals/:terminalId/printer-status` | TerminalsController.getTerminalPrinterStatus | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 | PUT | `/api/v1/terminals/:terminalId/release-observation` | TerminalsController.reportReleaseObservation | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
 | GET | `/api/v1/terminals/:terminalId/release-observation-plan` | TerminalsController.getReleaseObservationPlan | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
-| POST | `/api/v1/terminals/:terminalId/scan-deletion-audits` | TerminalsController.reportScanDeletionAudit | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| POST | `/api/v1/terminals/:terminalId/tasks/claim` | TerminalsController.claimTasks | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/scan-deletion-audits` | TerminalsController.reportScanDeletionAudit | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/tasks/claim` | TerminalsController.claimTasks | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 | POST | `/api/v1/terminals/:terminalId/toolbox-events` | TerminalsController.recordToolboxLaunchEvent | — | TerminalToolboxService | Terminal<br/>TerminalHeartbeat<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
 | POST | `/api/v1/terminals/boot-ticket` | TerminalsController.createBootTicket | — | TerminalSessionService | Terminal |
-| GET | `/api/v1/terminals/public` | TerminalsController.listPublicTerminals | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| GET | `/api/v1/terminals/public` | TerminalsController.listPublicTerminals | — | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 | POST | `/api/v1/terminals/session-token` | TerminalsController.exchangeSessionToken | — | TerminalSessionService | Terminal |
 | POST | `/api/v1/terminals/session-token/refresh` | TerminalsController.refreshSessionToken | — | TerminalSessionService | Terminal |
 | GET | `/api/v1/test/sample-visible.pdf` | TerminalsController.getSampleVisiblePdf | — | — | — |

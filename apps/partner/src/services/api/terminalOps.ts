@@ -9,6 +9,7 @@
 //   - 出纸成功率分母不足 5 时 successRate=null；
 //   - 服务人次、AI 可用率当前恒为 available:false，照实写「暂不能统计」。
 
+import type { PartnerTerminalChargeView } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
@@ -58,6 +59,8 @@ export interface TerminalOpsRow {
   printerStatus: string | null
   /** 当前未恢复的设备告警条数。 */
   openAlertCount: number
+  /** 本机向用户收不收费。缺省按免费（机构承担）。 */
+  charge?: PartnerTerminalChargeView
 }
 
 export interface TerminalOpsUnavailable {
@@ -125,6 +128,15 @@ function buildDemoTerminalOps(period: TerminalOpsPeriod): PartnerTerminalOpsView
     recoveredCount: 0, avgRecoveryMinutes: null, longestMinutes: null,
     unrecovered: false, reportedInWindow: true, ...over,
   })
+  // 示例，不是真实价格。1 元 = 100 分。
+  const exampleCents = 100
+  const priced = (cents: number): PartnerTerminalChargeView['effective'] => ({
+    resume_optimize: cents,
+    mock_interview: cents,
+    print_bw_page: cents,
+    print_color_page: cents,
+    scan: cents,
+  })
   const terminals: TerminalOpsRow[] = [
     {
       terminalCode: 'DEMO-001', displayName: '演示终端 · 图书馆一层', locationLabel: '演示位置 A',
@@ -132,6 +144,7 @@ function buildDemoTerminalOps(period: TerminalOpsPeriod): PartnerTerminalOpsView
       output: { printed: null, settled: 63, successRate: null, unconfirmed: null },
       faults: faults({ offlineCount: 1, offlineMinutes: 12, recoveredCount: 1, avgRecoveryMinutes: 12, longestMinutes: 12 }),
       printerStatus: 'low_paper', openAlertCount: 1,
+      charge: { userChargeMode: 'user_pays', isPublicSite: false, effective: priced(exampleCents) },
     },
     {
       terminalCode: 'DEMO-002', displayName: '演示终端 · 就业服务大厅', locationLabel: '演示位置 B',
@@ -139,6 +152,7 @@ function buildDemoTerminalOps(period: TerminalOpsPeriod): PartnerTerminalOpsView
       output: { printed: null, settled: null, successRate: null, unconfirmed: null },
       faults: faults({ offlineCount: 2, offlineMinutes: 175, printerFaultCount: 1, printerFaultMinutes: 18, recoveredCount: 2, avgRecoveryMinutes: 16.5, longestMinutes: 135, unrecovered: true }),
       printerStatus: 'paper_empty', openAlertCount: 1,
+      charge: { userChargeMode: 'org_pays', isPublicSite: false, effective: priced(0) },
     },
     {
       terminalCode: 'DEMO-003', displayName: '演示终端 · 未上线', locationLabel: null,
@@ -146,6 +160,7 @@ function buildDemoTerminalOps(period: TerminalOpsPeriod): PartnerTerminalOpsView
       output: { printed: 0, settled: 0, successRate: null, unconfirmed: 0 },
       faults: faults({ reportedInWindow: false }),
       printerStatus: null, openAlertCount: 1,
+      charge: { userChargeMode: 'org_pays', isPublicSite: true, effective: priced(0) },
     },
   ]
   return {

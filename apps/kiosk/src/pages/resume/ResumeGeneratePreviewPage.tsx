@@ -31,7 +31,8 @@ import { RESUME_FILL_PAGE_HINT } from './components/resume-deliver/optimizeState
 import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { ResumeFormatChooser } from './components/resume-deliver/ResumeFormatChooser'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
-import { detectGeneratedUnconfirmedAdditions, detectUserResumeEdits, extractConfirmableFacts, UNCONFIRMED_WHY } from './components/resume-deliver/facts'
+import { detectGeneratedUnconfirmedAdditions, extractConfirmableFacts, previewUserEditTokens, UNCONFIRMED_WHY } from './components/resume-deliver/facts'
+import { loadStampedGeneratedResume } from './components/resume-deliver/generatedEntryIndex'
 import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
@@ -117,8 +118,11 @@ export function ResumeGeneratePreviewPage() {
   const summaryRef = useRef<HTMLTextAreaElement>(null)
   const pendingTitleFocus = useRef<string | null>(null)
 
-  const [resume, setResume] = useState<GeneratedResume | null>(state?.result?.resume ?? null)
-  const [result, setResult] = useState<ResumeGenerateResponse | null>(state?.result ?? null)
+  const openedResume = loadStampedGeneratedResume(state?.result?.resume)
+  const [resume, setResume] = useState<GeneratedResume | null>(openedResume)
+  const [result, setResult] = useState<ResumeGenerateResponse | null>(
+    state?.result ? (openedResume ? { ...state.result, resume: openedResume } : state.result) : null,
+  )
   const [input] = useState<ResumeGenerateInput | undefined>(state?.input)
   const [restoring, setRestoring] = useState(Boolean(restoreTaskId) && !query.capture)
   const [restoreFailed, setRestoreFailed] = useState(false)
@@ -144,8 +148,9 @@ export function ResumeGeneratePreviewPage() {
     const requested = query.requested
     const fixture = synthetic && requested && requested !== 'session-lost' && requested !== 'preview-no-result' && requested !== 'illegal'
     if (fixture && requested) {
-      setResult(SYNTHETIC_GENERATE)
-      setResume(SYNTHETIC_GENERATE.resume ?? null)
+      const stampedFixture = loadStampedGeneratedResume(SYNTHETIC_GENERATE.resume)
+      setResult(stampedFixture ? { ...SYNTHETIC_GENERATE, resume: stampedFixture } : SYNTHETIC_GENERATE)
+      setResume(stampedFixture)
       setRestoring(false)
       setRestoreFailed(requested === 'preview-failed')
       setExporting(requested === 'export-exporting')
@@ -174,8 +179,9 @@ export function ResumeGeneratePreviewPage() {
     getResumeGenerate(restoreTaskId, { token })
       .then((res) => {
         if (cancelled) return
-        setResult(res)
-        setResume(res.resume ?? null)
+        const stamped = loadStampedGeneratedResume(res.resume)
+        setResult(stamped ? { ...res, resume: stamped } : res)
+        setResume(stamped)
         setRestoreFailed(res.status === 'failed' || !res.resume)
       })
       .catch(() => { if (!cancelled) setRestoreFailed(true) })
@@ -462,7 +468,8 @@ export function ResumeGeneratePreviewPage() {
                 resume={resume}
                 summaryRef={summaryRef}
                 onChange={(next) => {
-                  setUserAdditions((words) => [...new Set([...words, ...detectUserResumeEdits(resume, next)])])
+                  const generatedResume = result.resume ?? resume
+                  setUserAdditions((words) => [...new Set([...words, ...previewUserEditTokens(generatedResume, resume, next)])])
                   setResume(next); setExported(null); setExportError(null)
                 }}
                 previewClassName={previewClassName}

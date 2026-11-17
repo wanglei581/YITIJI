@@ -664,9 +664,12 @@ async function verifyPublicTerminalNames(): Promise<void> {
     enabled: true, lifecycleStatus: 'active', registeredAt: now,
     credentials: [], releaseTargets: [],
     heartbeats: [{ createdAt: now, localTaskDatabaseAvailable: true }],
+    servicePrices: [],
   }))
   const prisma = {
     terminal: { findMany: async () => rows },
+    // 列表会读总开关。桩返回 null = 关，与默认未配置一致。servicePrices 空数组 = 配置价 0。
+    platformSetting: { findUnique: async () => null },
   } as unknown as PrismaService
   const admin = new TerminalAdminService(prisma, {} as TerminalAgentService, new TerminalToolboxService(prisma))
   const service = new TerminalsService({} as TerminalAgentService, admin)

@@ -36,7 +36,14 @@ import { CreateTerminalBindCodeDto } from './dto/create-terminal-bind-code.dto'
 import { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { UpdateTerminalCapabilityDto } from './dto/update-terminal-capability.dto'
 import { UpdateTerminalDailyFreeSidesDto } from './dto/update-terminal-daily-free-sides.dto'
-import { TerminalCapabilitiesService } from './terminal-capabilities.service'
+import { UpdateTerminalHomeFreeBadgeDto } from './dto/update-terminal-home-free-badge.dto'
+import { UpdateTerminalChargeSettingsDto } from './dto/update-terminal-charge-settings.dto'
+import { TerminalCapabilitiesService, TERMINAL_HOME_FREE_BADGE_AUDIT_ACTION } from './terminal-capabilities.service'
+import {
+  TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION,
+  TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION,
+  chargeAuditSnapshot,
+} from '../payment/terminal-charge-settings'
 import { AUDIT_TERMINAL_DAILY_FREE_SIDES } from '../print-jobs/free-print-quota.policy'
 import { UpdateTerminalLifecycleDto } from './dto/update-terminal-lifecycle.dto'
 import { EmergencyRevokeTerminalCredentialsDto } from './dto/emergency-revoke-terminal-credentials.dto'
@@ -129,23 +136,41 @@ export class AdminTerminalsController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ): Promise<ApiResponse<AssignTerminalOrgResult>> {
-    const result = await this.terminalsService.assignTerminalOrg(terminalId, dto.orgId, undefined, (tx, assignment) => this.audit.writeRequired(tx, {
-      actorId: user.userId,
-      actorRole: user.role,
-      action: 'terminal.org.update',
-      targetType: 'terminal',
-      targetId: assignment.terminalCode,
-      payload: {
-        terminalCode: assignment.terminalCode,
-        oldOrgId: assignment.oldOrgId,
-        newOrgId: assignment.newOrgId,
-        deploymentIds: assignment.deploymentIds,
-        effectiveAt: assignment.effectiveAt,
-      },
-      ipAddress: extractIp(req),
-      userAgent: extractUa(req),
-      requestId: req.requestId ?? null,
-    }))
+    const result = await this.terminalsService.assignTerminalOrg(terminalId, dto.orgId, undefined, async (tx, assignment) => {
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId,
+        actorRole: user.role,
+        action: 'terminal.org.update',
+        targetType: 'terminal',
+        targetId: assignment.terminalCode,
+        payload: {
+          terminalCode: assignment.terminalCode,
+          oldOrgId: assignment.oldOrgId,
+          newOrgId: assignment.newOrgId,
+          deploymentIds: assignment.deploymentIds,
+          effectiveAt: assignment.effectiveAt,
+        },
+        ipAddress: extractIp(req),
+        userAgent: extractUa(req),
+        requestId: req.requestId ?? null,
+      })
+      if (!assignment.chargeSettingsReset) return
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId,
+        actorRole: user.role,
+        action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION,
+        targetType: 'terminal',
+        targetId: assignment.terminalCode,
+        payload: {
+          terminalCode: assignment.terminalCode,
+          oldOrgId: assignment.oldOrgId,
+          newOrgId: assignment.newOrgId,
+        },
+        ipAddress: extractIp(req),
+        userAgent: extractUa(req),
+        requestId: req.requestId ?? null,
+      })
+    })
     return ApiResponse.ok(result)
   }
 
@@ -357,6 +382,66 @@ export class AdminTerminalsController {
       requestId: req.requestId ?? null,
     })
     return ApiResponse.ok({ terminalCode: saved.terminalCode, dailyFreePrintSides: saved.dailyFreePrintSides })
+  }
+
+  // PUT /api/v1/admin/terminals/:terminalId/home-free-badge
+  // 只改首页「免费使用」开关。不改价目，也不改每日免费面数。
+  @Put(':terminalId/home-free-badge')
+  async updateHomeFreeBadge(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: UpdateTerminalHomeFreeBadgeDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<{ terminalCode: string; enabled: boolean }>> {
+    const saved = await this.capabilities.setHomeFreeBadge(terminalId, dto.enabled)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: TERMINAL_HOME_FREE_BADGE_AUDIT_ACTION,
+      targetType: 'terminal',
+      targetId: saved.terminalCode,
+      payload: {
+        terminalCode: saved.terminalCode,
+        previous: saved.previous,
+        next: saved.next,
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok({ terminalCode: saved.terminalCode, enabled: saved.next })
+  }
+
+  @Get(':terminalId/charge-settings')
+  async getChargeSettings(
+    @Param('terminalId') terminalId: string,
+  ): Promise<ApiResponse<Awaited<ReturnType<TerminalCapabilitiesService['getChargeSettings']>>>> {
+    return ApiResponse.ok(await this.capabilities.getChargeSettings(terminalId))
+  }
+
+  @Put(':terminalId/charge-settings')
+  async updateChargeSettings(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: UpdateTerminalChargeSettingsDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<Awaited<ReturnType<TerminalCapabilitiesService['getChargeSettings']>>>> {
+    const saved = await this.capabilities.saveChargeSettings(terminalId, dto, user.userId, (tx, written) => this.audit.writeRequired(tx, {
+      actorId: user.userId,
+      actorRole: user.role,
+      action: TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION,
+      targetType: 'terminal',
+      targetId: written.next.terminalCode,
+      payload: {
+        terminalCode: written.next.terminalCode,
+        previous: chargeAuditSnapshot(written.previous),
+        next: chargeAuditSnapshot(written.next),
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    }))
+    return ApiResponse.ok(saved.next)
   }
 }
 

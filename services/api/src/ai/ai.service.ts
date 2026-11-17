@@ -466,12 +466,13 @@ export class AiService {
     requester: AiResultRequester = { endUserId: null, accessToken: null },
     existingOnly = false,
     req?: QuotaAbortRequest,
+    beforeGenerate?: () => Promise<boolean>,
   ): Promise<OptimizeResumeOutput> {
     const identity = captureFactIdentity()
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
     if (existingOnly) throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '这份优化稿已删除、已过期或不属于当前账号，无法打开' } })
-    return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester, identity, req))
+    return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester, identity, req, beforeGenerate))
   }
 
   /** PUT /resume/records/:taskId/draft — 仅登录用户；匿名 404。 */
@@ -503,6 +504,7 @@ export class AiService {
     requester: AiResultRequester,
     identity: ReturnType<typeof captureFactIdentity>,
     req?: QuotaAbortRequest,
+    beforeGenerate?: () => Promise<boolean>,
   ): Promise<OptimizeResumeOutput> {
     return chargeComputeResumeOptimize(
       this.resumeChargeBindings(),
@@ -511,6 +513,7 @@ export class AiService {
       req,
       (spec) => this.runResumeCharge(spec),
       () => recordAiServiceFact(this.prisma, this.logger, identity, 'resume_optimize', taskId),
+      beforeGenerate,
     )
   }
 
@@ -527,6 +530,7 @@ export class AiService {
     layout: ResumeLayoutSettings | undefined,
     requester: AiResultRequester = { endUserId: null, accessToken: null },
     req?: QuotaAbortRequest,
+    skipDailyQuota = false,
   ): Promise<{ resume: GeneratedResume; warnings: string[] }> {
     return chargeAdjustResumeLayout(
       this.resumeChargeBindings(),
@@ -537,6 +541,7 @@ export class AiService {
       requester,
       req,
       (spec) => this.runResumeCharge(spec),
+      skipDailyQuota,
     )
   }
 

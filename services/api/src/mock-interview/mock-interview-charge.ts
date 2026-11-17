@@ -18,6 +18,8 @@ export interface InterviewChargeRequester {
 /** 一场面试只在首题下发时计一次。从 MockInterviewService 拆出，避免服务文件变长。 */
 export interface InterviewChargeRunInput<T> {
   endUserId?: string | null
+  /** 这一场已经付过。为真时不再扣每人每日次数。 */
+  skipDailyQuota?: boolean
   operationKey: string
   loadStored?: () => Promise<T | null>
   work: () => Promise<T>
@@ -108,7 +110,7 @@ export function executeInterviewCharge<T>(
   input: InterviewChargeRunInput<T>,
   gate: { bucket: 'ai_interview'; runWithAiQuota: RunWithAiQuota },
 ): Promise<T> {
-  if (!quota || !input.endUserId) {
+  if (input.skipDailyQuota || !quota || !input.endUserId) {
     return input.work().then(async (value) => {
       await input.saveResult(value)
       return value

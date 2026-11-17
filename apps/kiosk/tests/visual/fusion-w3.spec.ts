@@ -2,6 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { KIOSK_AI_CAPABILITIES_PATH, kioskAiCapabilitiesResponse } from '../fixtures/ai-capabilities'
+import { attachMachinePricing } from '../fixtures/machine-pricing'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
 import {
@@ -2791,6 +2792,7 @@ test('advisor artifact print waits for the server receipt @w3-kiosk', async ({ p
   // 进打印链之后报价确认页会读的几条（本机能力、价目、报价）。
   api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', { status: 200, json: { terminalCode: 'KSK-001', capabilities: [] } })
   api.respond('GET', '/api/v1/print/price-config', { status: 200, json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] } })
+  attachMachinePricing(api, 100, 100)
   api.respond('POST', '/api/v1/orders/quote', { status: 200, json: { amountCents: 100, billablePages: 1, billingPageSource: 'detected', priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 1, amountCents: 100 }] } })
   page.on('request', (request) => {
     if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/artifacts/w3-art-1/print')) {

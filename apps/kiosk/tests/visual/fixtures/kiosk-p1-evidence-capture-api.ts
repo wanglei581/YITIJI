@@ -44,7 +44,7 @@ async function seedP1MaterialSession(page: Page): Promise<void> {
   )
 }
 
-export function registerEvidenceShell(api: ApiRouter): void {
+export function registerEvidenceShell(api: ApiRouter, pricing?: Record<string, unknown>): void {
   registerW6Api(api)
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
     status: 200,
@@ -75,6 +75,7 @@ export function registerEvidenceShell(api: ApiRouter): void {
       configVersion: 'p1-evidence',
       refreshIntervalMs: 300000,
       serverTime: '2026-07-26T00:00:00.000Z',
+      ...(pricing ? { pricing } : {}),
     },
   })
 }

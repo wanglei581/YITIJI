@@ -9,8 +9,8 @@ import { PRINT_UNIT_PRICE_CENTS } from '../print-jobs/print-pricing'
  * `docs/operations/price-config-production.md`）；Admin 价目 CRUD 另批（P1-3）。
  *
  * `unitCents` 取自 `PRINT_UNIT_PRICE_CENTS`（开发 seed 唯一源）。
- * 运行期价目真相源永远是数据库 `PriceConfig`；Kiosk 报价走 `POST /orders/quote`，
- * **不得**再把本常量当页面展示价。
+ * 11/13 起这张表的打印两行只是全站参考价。用户实付按每台机器的生效价，
+ * 不带终端的报价一律 0 元（到机补价由 P2 做）。不得再把本常量当页面展示价。
  *
  * 危险点：本函数的 `update` 分支会覆盖已有行的 `unitCents`。
  * 因此 **NODE_ENV=production 时一律拒绝执行**，防止 verify 误连生产库时把运营价

@@ -123,6 +123,21 @@ export async function retainClosureRecords(tx: PrismaTransactionClient, endUserI
   const refunds = await tx.refund.findMany({ where: { orderId: { in: orderIds } } })
   for (const row of refunds) await tx.refund.update({ where: { id: row.id }, data: { reason: row.reason ? scrub(row.reason) : null } })
   counts.Refund = refunds.length
+  // 服务单是收款记录：行留下，账号关联和付款码清掉。订单仍保留 endUserId，这里必须断开。
+  const serviceOrders = await tx.serviceOrder.findMany({ where: { endUserId } })
+  for (const row of serviceOrders) {
+    await tx.serviceOrder.update({
+      where: { id: row.id },
+      data: {
+        endUserId: null,
+        qrCodeContent: null,
+        refundReason: row.refundReason ? scrub(row.refundReason) : null,
+        failureReason: row.failureReason ? scrub(row.failureReason) : null,
+        closeReason: row.closeReason ? scrub(row.closeReason) : null,
+      },
+    })
+  }
+  counts.ServiceOrder = serviceOrders.length
   // UserDataRequest 的计数/执行来源由执行器保存；导出能力失效，失败原文不再留存。
   counts.UserDataRequest = await tx.userDataRequest.count({ where: { endUserId } })
   await tx.userDataRequest.updateMany({ where: { endUserId, requestType: { not: 'delete' } }, data: {

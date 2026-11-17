@@ -349,6 +349,44 @@ export class ScanTasksService {
     private readonly capabilities: TerminalCapabilitiesService
   ) {}
 
+  /**
+   * 重放前先看这一次会落到哪个任务，不新建。
+   * 普通开扫还没有任务号，返回空号；调用方据此拒绝，避免先建出没人要的任务。
+   * 重扫能找回已经提交的子任务时，返回那个子任务号。
+   */
+  async previewCreate(
+    dto: CreateScanTaskDto,
+    endUserId: string | null,
+    retryControlToken?: string,
+  ): Promise<ScanRetryCreateResult> {
+    const empty = (): ScanRetryCreateResult => ({
+      scanTaskId: '',
+      controlToken: '',
+      expiresAt: new Date(0).toISOString(),
+      instructions: [],
+    })
+    const retryOfScanTaskId = dto.retryOfScanTaskId?.trim()
+    if (!retryOfScanTaskId || !retryControlToken) return empty()
+    try {
+      const terminalRef = dto.terminalId.trim()
+      const terminal = await this.prisma.terminal.findFirst({
+        where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
+        select: { id: true },
+      })
+      if (!terminal) return empty()
+      const recovered = await this.recoverRetryChildIfPresent({
+        retryOfScanTaskId,
+        retryControlToken,
+        endUserId,
+        terminalId: terminal.id,
+        scanType: dto.scanType,
+      })
+      return recovered ?? empty()
+    } catch {
+      return empty()
+    }
+  }
+
   async create(
     dto: CreateScanTaskDto,
     endUserId: string | null,

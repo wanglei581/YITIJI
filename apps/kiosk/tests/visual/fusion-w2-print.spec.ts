@@ -5,6 +5,7 @@ import type { ApiRouter } from '../fixtures/api-router'
 import type { DocumentProcessTaskView } from '../../src/services/api/materials'
 import { test, expect } from '../fixtures/kiosk-test'
 import { MACHINE_UNUSABLE_LINE } from '../fixtures/unattended-lines'
+import { attachMachinePricing } from '../fixtures/machine-pricing'
 import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
@@ -94,6 +95,7 @@ function registerPrice(api: ApiRouter): void {
       ],
     },
   })
+  attachMachinePricing(api, 100, 200)
 }
 
 /**
@@ -2238,6 +2240,7 @@ test('benefit card reports 后台刚调价 when quote and price-config disagree 
       items: [{ serviceKey: 'print_bw_page', unitCents: 120, unit: 'page', description: '黑白打印' }],
     },
   })
+  attachMachinePricing(api, 120, 200)
   registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
   await seedMaterialSession(page)
 
@@ -2261,6 +2264,7 @@ test('zero-amount order confirms pages without benefit mechanism copy @w2', asyn
       items: [{ serviceKey: 'print_bw_page', unitCents: 0, unit: 'page', description: '免费试运营' }],
     },
   })
+  attachMachinePricing(api, 0, 0)
   registerQuote(api, { amountCents: 0, billablePages: 2, unitCents: 0 })
   await seedMaterialSession(page)
 
