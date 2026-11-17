@@ -19,10 +19,15 @@ export const PERSONAL_CHARGE_DISABLE_AUDIT_ACTION = 'billing.personal_charge.dis
 
 type ChargeReadDb = Pick<PrismaTransactionClient, 'terminal' | 'platformSetting'>
 
+export const TERMINAL_CHARGE_SETTINGS_STALE_CODE = 'TERMINAL_CHARGE_SETTINGS_STALE'
+export const TERMINAL_CHARGE_SETTINGS_STALE_MESSAGE = '机构刚改过，收费设置已复位，请重新读取后再改'
+
 export interface TerminalChargeSettingsView extends EffectiveUserPrices {
   terminalCode: string
   /** 绑了机构才为真。界面用来提示：机构买的机器不该用我方账户向用户收钱。 */
   orgBound: boolean
+  /** 读取这一刻的绑定版本。保存时原样带回，对不上就不写。 */
+  orgBindingGeneration: number
 }
 
 export interface PersonalChargeTerminalRow {
@@ -50,13 +55,18 @@ export async function getTerminalChargeSettings(
 ): Promise<TerminalChargeSettingsView> {
   const terminal = await db.terminal.findUnique({
     where: { id: terminalId },
-    select: { id: true, terminalCode: true, orgId: true },
+    select: { id: true, terminalCode: true, orgId: true, orgBindingGeneration: true },
   })
   if (!terminal) {
     throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
   }
   const prices = await getEffectiveUserPrices(db, terminal.id)
-  return { ...prices, terminalCode: terminal.terminalCode, orgBound: terminal.orgId != null }
+  return {
+    ...prices,
+    terminalCode: terminal.terminalCode,
+    orgBound: terminal.orgId != null,
+    orgBindingGeneration: terminal.orgBindingGeneration,
+  }
 }
 
 function parsePrices(raw: unknown): Record<TerminalChargeServiceKey, number> {
@@ -81,14 +91,24 @@ function parsePrices(raw: unknown): Record<TerminalChargeServiceKey, number> {
   return prices
 }
 
-export function parseChargeSettingsBody(raw: { userChargeMode?: unknown; prices?: unknown }): {
+function staleChargeSettings(): ConflictException {
+  return new ConflictException({
+    error: { code: TERMINAL_CHARGE_SETTINGS_STALE_CODE, message: TERMINAL_CHARGE_SETTINGS_STALE_MESSAGE },
+  })
+}
+
+export function parseChargeSettingsBody(raw: { userChargeMode?: unknown; prices?: unknown; orgBindingGeneration?: unknown }): {
   userChargeMode: TerminalUserChargeMode
   prices: Record<TerminalChargeServiceKey, number>
+  orgBindingGeneration: number
 } {
   if (raw.userChargeMode !== 'org_pays' && raw.userChargeMode !== 'user_pays') {
     throw new BadRequestException({ error: { code: 'VALIDATION_FAILED', message: '谁付钱只许是机构承担或向用户收费' } })
   }
-  return { userChargeMode: raw.userChargeMode, prices: parsePrices(raw.prices) }
+  if (typeof raw.orgBindingGeneration !== 'number' || !Number.isInteger(raw.orgBindingGeneration) || raw.orgBindingGeneration < 0) {
+    throw new BadRequestException({ error: { code: 'VALIDATION_FAILED', message: '必须带上读取收费设置时的绑定版本' } })
+  }
+  return { userChargeMode: raw.userChargeMode, prices: parsePrices(raw.prices), orgBindingGeneration: raw.orgBindingGeneration }
 }
 
 export type ChargeSettingsAuditWriter = (
@@ -99,7 +119,7 @@ export type ChargeSettingsAuditWriter = (
 export async function saveTerminalChargeSettings(
   db: PrismaService,
   terminalId: string,
-  raw: { userChargeMode?: unknown; prices?: unknown },
+  raw: { userChargeMode?: unknown; prices?: unknown; orgBindingGeneration?: unknown },
   adminId: string,
   writeAudit?: ChargeSettingsAuditWriter,
 ): Promise<{ previous: TerminalChargeSettingsView; next: TerminalChargeSettingsView }> {
@@ -107,11 +127,13 @@ export async function saveTerminalChargeSettings(
   const saved = await db.$transaction(async (tx) => {
     const existing = await tx.terminal.findUnique({
       where: { id: terminalId },
-      select: { id: true, org: { select: { type: true } } },
+      select: { id: true, orgBindingGeneration: true, org: { select: { type: true } } },
     })
     if (!existing) {
       throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
     }
+    // 版本核对和写价在同一个事务里。对不上就整段回滚，后面的关待付单也不会跑。
+    if (existing.orgBindingGeneration !== input.orgBindingGeneration) throw staleChargeSettings()
     const charging = input.userChargeMode === 'user_pays' || TERMINAL_CHARGE_SERVICE_KEYS.some((key) => input.prices[key] > 0)
     if (isPublicEmploymentOrgType(existing.org?.type) && charging) {
       throw new ConflictException({
@@ -119,7 +141,11 @@ export async function saveTerminalChargeSettings(
       })
     }
     const previous = await getTerminalChargeSettings(tx, terminalId)
-    await tx.terminal.update({ where: { id: terminalId }, data: { userChargeMode: input.userChargeMode } })
+    const locked = await tx.terminal.updateMany({
+      where: { id: terminalId, orgBindingGeneration: input.orgBindingGeneration },
+      data: { userChargeMode: input.userChargeMode },
+    })
+    if (locked.count !== 1) throw staleChargeSettings()
     for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
       await tx.terminalServicePrice.upsert({
         where: { terminalId_serviceKey: { terminalId, serviceKey: key } },

@@ -2,9 +2,10 @@ import type { GeneratedResume } from '@ai-job-print/shared'
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import { useState } from 'react'
 import { MaskedContactLine } from '../../../../components/MaskedContactLine'
+import { ProjectTitleFields, ResumeTagList } from './ResumeEntryFields'
 import { DeleteEntryButton, EntryDeleteDialog } from './ResumeFactConfirmDialog'
 import { editStampedEntry, readGeneratedEntryIndex } from './generatedEntryIndex'
-import { resumeTitleIssues } from './resumeEntryTitles'
+import { RESUME_EDIT_LIMITS, resumeTitleIssues } from './resumeEntryTitles'
 
 const taCls = 'qx-rg-ta'
 type EntrySection = 'experience' | 'education'
@@ -89,7 +90,7 @@ export function GenerateResumeEditor(props: {
   }
 
   return (
-    <article className="qx-rg-sheet" data-testid="resume-generate-preview-sheet" style={props.previewStyle}>
+    <article className="qx-rg-sheet" data-testid="resume-generate-preview-sheet" data-resume-editor="" style={props.previewStyle}>
       <header className="qx-rg-sheet-top">
         <b>{resume.basic.name || '未填写姓名'}</b>
         <span>{[resume.intention.position, resume.basic.city || resume.intention.city].filter(Boolean).join(' · ') || '意向还没写'}</span>
@@ -101,10 +102,12 @@ export function GenerateResumeEditor(props: {
             ref={props.summaryRef}
             className={taCls}
             aria-label="个人简介"
+            data-entry-field="summary"
+            maxLength={RESUME_EDIT_LIMITS.summary}
             value={resume.summary}
             placeholder="你没填自我评价，这里不会编一段"
             onFocus={mark}
-            onChange={(e) => onChange({ ...resume, summary: e.target.value.slice(0, 600) })}
+            onChange={(e) => onChange({ ...resume, summary: e.target.value })}
           />
         </Block>
         <Block title="求职意向" tags={<Tag kind="keep">原样保留</Tag>}>
@@ -147,12 +150,14 @@ export function GenerateResumeEditor(props: {
                   <textarea
                     className={taCls}
                     aria-label={`教育经历描述 ${i + 1}`}
+                    data-entry-field={`education-${i}-description`}
+                    maxLength={RESUME_EDIT_LIMITS.description}
                     value={item.description ?? ''}
                     placeholder="这一段没有描述"
                     onFocus={mark}
                     onChange={(ev) => onChange({
                       ...resume,
-                      education: resume.education.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value.slice(0, 1000) }) : row),
+                      education: resume.education.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value }) : row),
                     })}
                   />
                   <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条教育`} onClick={() => setPendingDelete({ section: 'education', index: i })} />
@@ -197,12 +202,14 @@ export function GenerateResumeEditor(props: {
                   <textarea
                     className={taCls}
                     aria-label={`工作经历描述 ${i + 1}`}
+                    data-entry-field={`experience-${i}-description`}
+                    maxLength={RESUME_EDIT_LIMITS.description}
                     value={item.description}
                     placeholder="这一段没有描述"
                     onFocus={mark}
                     onChange={(ev) => onChange({
                       ...resume,
-                      experience: resume.experience.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value.slice(0, 1000) }) : row),
+                      experience: resume.experience.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value }) : row),
                     })}
                   />
                   <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条经历`} onClick={() => setPendingDelete({ section: 'experience', index: i })} />
@@ -215,32 +222,48 @@ export function GenerateResumeEditor(props: {
           <Block title="项目经历" tags={<><Tag kind="keep">事实原样</Tag><Tag kind="pol">描述润色</Tag></>}>
             {resume.projects.map((item, i) => (
               <div key={i} className="qx-rg-entry">
-                <p><b>{item.role ? `${item.name} · ${item.role}` : item.name}</b></p>
+                <ProjectTitleFields
+                  index={i}
+                  name={item.name}
+                  role={item.role ?? ''}
+                  className={`${taCls} qx-rg-title`}
+                  captionClassName="qx-rg-cap"
+                  onFocus={mark}
+                />
                 <textarea
                   className={taCls}
                   aria-label={`项目经历描述 ${i + 1}`}
+                  data-entry-field={`projects-${i}-description`}
+                  maxLength={RESUME_EDIT_LIMITS.description}
                   value={item.description}
                   placeholder="这一段没有描述"
                   onFocus={mark}
                   onChange={(ev) => onChange({
                     ...resume,
-                    projects: resume.projects.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value.slice(0, 1000) }) : row),
+                    projects: resume.projects.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value }) : row),
                   })}
                 />
               </div>
             ))}
           </Block>
         )}
-        {resume.skills.length > 0 && (
-          <Block title="技能" tags={<Tag kind="pol">表达整理</Tag>}>
-            <p>{resume.skills.join(' · ')}</p>
-          </Block>
-        )}
-        {resume.certificates.length > 0 && (
-          <Block title="证书 / 资质" tags={<Tag kind="keep">原样保留</Tag>}>
-            <p>{resume.certificates.join(' · ')}</p>
-          </Block>
-        )}
+        <Block title="技能" tags={<Tag kind="pol">表达整理</Tag>}>
+          <ResumeTagList
+            items={resume.skills}
+            field="skill"
+            appearance="inline"
+            onChange={(skills) => { mark(); onChange({ ...resume, skills }) }}
+          />
+        </Block>
+        <Block title="证书 / 资质" tags={<Tag kind="keep">原样保留</Tag>}>
+          <ResumeTagList
+            items={resume.certificates}
+            field="certificate"
+            appearance="inline"
+            readOnly
+            onChange={() => undefined}
+          />
+        </Block>
       </div>
       {pendingDelete && (
         <EntryDeleteDialog

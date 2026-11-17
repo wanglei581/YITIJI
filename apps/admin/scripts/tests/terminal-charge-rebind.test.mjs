@@ -1,6 +1,7 @@
 // 改绑机构之后，收费设置必须按新机构重读。
 // 复位提示只在本次接口返回「已复位」时出现一次，关掉抽屉再打开不再显示。
 // 点保存发出的是重读后的谁付钱和五个价，不能把改绑前屏幕上的旧价写回去。
+// 改绑请求还没回来时保存键停用。保存撞上过期绑定版本时提示并重读，不留下旧价。
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -11,6 +12,7 @@ import ts from 'typescript'
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const PRICE_KEYS = ['resume_optimize', 'mock_interview', 'print_bw_page', 'print_color_page', 'scan']
 const RESET_SENTENCE = '改绑机构，收费设置已复位'
+const STALE_SENTENCE = '机构刚改过，收费设置已复位，请重新读取后再改'
 const ORG_PAYS_LABEL = '机构或我方承担（用户免费）'
 const USER_PAYS_LABEL = '向用户收费'
 
@@ -171,7 +173,7 @@ async function flush() {
   for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setImmediate(resolve))
 }
 
-function chargeView(mode, cents) {
+function chargeView(mode, cents, generation) {
   const prices = {}
   for (const key of PRICE_KEYS) {
     prices[key] = {
@@ -185,6 +187,7 @@ function chargeView(mode, cents) {
     personalChargeEnabled: true,
     isPublicSite: false,
     orgBound: true,
+    orgBindingGeneration: generation,
     prices,
   }
 }
@@ -234,7 +237,7 @@ function mountTerminalPage(options) {
   const loads = []
   const saves = []
   const assigns = []
-  const server = { mode: 'user_pays', cents: 100 }
+  const server = { mode: 'user_pays', cents: 100, generation: options.generation ?? 0 }
   const nullComponent = (name) => {
     const component = () => null
     Object.defineProperty(component, 'name', { value: name })
@@ -373,10 +376,12 @@ function mountTerminalPage(options) {
         }),
         assignTerminalOrg: async (terminalCode, orgId) => {
           assigns.push({ terminalCode, orgId })
+          if (options.holdAssign) await options.holdAssign
           const chargeSettingsReset = options.reset
           if (chargeSettingsReset) {
             server.mode = 'org_pays'
             server.cents = 0
+            server.generation += 1
           }
           return {
             terminalId: 't1',
@@ -397,11 +402,19 @@ function mountTerminalPage(options) {
       return {
         loadTerminalChargeSettings: async (terminalId) => {
           loads.push(terminalId)
-          return chargeView(server.mode, server.cents)
+          return chargeView(server.mode, server.cents, server.generation)
         },
         saveTerminalChargeSettings: async (terminalId, body) => {
           saves.push({ terminalId, body: structuredClone(body) })
-          return chargeView(body.userChargeMode, body.userChargeMode === 'user_pays' ? server.cents : 0)
+          if (options.staleSave) {
+            server.mode = 'org_pays'
+            server.cents = 0
+            server.generation += 1
+            const error = new Error(STALE_SENTENCE)
+            error.code = 'TERMINAL_CHARGE_SETTINGS_STALE'
+            throw error
+          }
+          return chargeView(body.userChargeMode, body.userChargeMode === 'user_pays' ? server.cents : 0, server.generation)
         },
         chargeSummary: (view) => ({
           userChargeMode: view.userChargeMode,
@@ -519,6 +532,59 @@ test('改绑接口没说已复位时不提示，保存仍按重读到的旧价',
   await flush()
   view.render()
   assert.equal(saves[0].body.userChargeMode, 'user_pays')
+  assert.deepEqual(saves[0].body.prices, {
+    resume_optimize: 100,
+    mock_interview: 100,
+    print_bw_page: 100,
+    print_color_page: 100,
+    scan: 100,
+  })
+  view.unmount()
+})
+
+test('改绑请求还没回来时，保存收费设置是停用的，点了也不发出', async () => {
+  let releaseHold = () => {}
+  const holdAssign = new Promise((resolve) => { releaseHold = resolve })
+  const { view, jobs, saves } = mountTerminalPage({ reset: true, holdAssign })
+  let tree = await openCharge(view, jobs)
+  clickLabeled(tree, '更改机构')
+  tree = view.render()
+  const select = nodesOf(tree).find((node) => node.type === 'select')
+  assert.ok(select, '找不到机构选择')
+  select.props.onChange({ target: { value: 'org-b' } })
+  tree = view.render()
+  clickLabeled(tree, '保存归属')
+  tree = view.render()
+  const saveButton = nodesOf(tree).find((node) => node.type === 'button' && textOf(node.children).includes('保存收费设置'))
+  assert.ok(saveButton, '找不到保存收费设置')
+  assert.equal(saveButton.props.disabled, true, '改绑还在途，保存收费设置必须停用')
+  saveButton.props.onClick()
+  await flush()
+  assert.equal(saves.length, 0, '停用期间不能把旧价发出去')
+  releaseHold()
+  await flush()
+  tree = view.render()
+  await flush()
+  tree = view.render()
+  assert.equal(checkedModeLabel(tree), ORG_PAYS_LABEL)
+  assert.deepEqual(priceValues(tree), ['0.00', '0.00', '0.00', '0.00', '0.00'])
+  view.unmount()
+})
+
+test('保存撞上过期绑定版本时提示并重读，不留下旧价', async () => {
+  const { view, jobs, loads, saves } = mountTerminalPage({ reset: false, staleSave: true, generation: 7 })
+  let tree = await openCharge(view, jobs)
+  assert.deepEqual(priceValues(tree), ['1.00', '1.00', '1.00', '1.00', '1.00'])
+  clickLabeled(tree, '保存收费设置')
+  await flush()
+  tree = view.render()
+  assert.equal(textOf(tree).includes(STALE_SENTENCE), true)
+  assert.equal(checkedModeLabel(tree), ORG_PAYS_LABEL)
+  assert.deepEqual(priceValues(tree), ['0.00', '0.00', '0.00', '0.00', '0.00'])
+  assert.deepEqual(loads, ['t1', 't1'], '409 之后必须再读一次')
+  assert.equal(saves.length, 1)
+  assert.equal(saves[0].body.userChargeMode, 'user_pays')
+  assert.equal(saves[0].body.orgBindingGeneration, 7)
   assert.deepEqual(saves[0].body.prices, {
     resume_optimize: 100,
     mock_interview: 100,

@@ -17,6 +17,7 @@ import { AiContentBlockedError, containsForbiddenWord } from '../llm/llm-guard'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { containsMaskPlaceholder, maskUserTextsForLlmReversible } from '../../common/pii/llm-input-mask'
+import { fitResumeToDocLimits } from './resume-doc-limits'
 
 // ============================================================
 // LlmResumeGenerateService — 阶段2A 真实简历生成(单轮、结构化 JSON,OpenAI 兼容)
@@ -33,11 +34,7 @@ import { containsMaskPlaceholder, maskUserTextsForLlmReversible } from '../../co
 // 安全:出错只记状态码,绝不记 prompt / 用户资料 / 请求·响应正文(简历输入含 PII)。
 // ============================================================
 
-/** 单条润色文本上限(防超长撑爆版面;超限截断)。 */
-const MAX_DESC_CHARS = 600
-const MAX_SUMMARY_CHARS = 300
-const MAX_SKILL_CHARS = 40
-/** 生成求稳。 */
+/** 生成求稳。超长不在这里截半句，返回前交给 fitResumeToDocLimits。 */
 const GENERATE_TEMPERATURE = 0.3
 
 /**
@@ -139,7 +136,7 @@ export class LlmResumeGenerateService {
         `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, onLlmCall,
       )
       const polish = this.parsePolish(raw, input)
-      if (polish) return assembleResume(input, restorePolish(polish, masked.restore), cfg.forbiddenWords)
+      if (polish) return fitResumeToDocLimits(assembleResume(input, restorePolish(polish, masked.restore), cfg.forbiddenWords))
       this.logger.warn(`resume generate: invalid output (attempt ${attempt}/2)`)
     }
 
@@ -357,22 +354,22 @@ export function assembleResume(
   forbiddenWords: readonly string[],
 ): GeneratedResume {
   const blocked = [...GENERATE_GUARD_TERMS, ...forbiddenWords]
-  const safe = (polished: string, fallback: string, maxLen: number): string => {
+  const safe = (polished: string, fallback: string): string => {
     let text = polished.trim()
     if (!text || containsForbiddenWord(text, blocked)) text = fallback.trim()
-    return text.slice(0, maxLen)
+    return text
   }
 
   return {
     basic: { ...input.basic },
     intention: { ...input.intention },
-    summary: safe(polish.summary, input.selfIntro ?? '', MAX_SUMMARY_CHARS),
+    summary: safe(polish.summary, input.selfIntro ?? ''),
     education: input.education.map((e, i) => ({
       school: e.school,
       major: e.major,
       degree: e.degree,
       period: e.period,
-      description: safe(polish.educationDesc[i] ?? '', e.description ?? '', MAX_DESC_CHARS) || undefined,
+      description: safe(polish.educationDesc[i] ?? '', e.description ?? '') || undefined,
     })),
     experience: input.experience.map((e, i) => {
       const polished = polish.experienceDesc[i] ?? ''
@@ -382,15 +379,15 @@ export function assembleResume(
         company: e.company,
         role: e.role ?? '',
         period: e.period,
-        description: safe(keepPolish ? polished : '', e.description, MAX_DESC_CHARS),
+        description: safe(keepPolish ? polished : '', e.description),
       }
     }),
     projects: input.projects.map((p, i) => ({
       name: p.name,
       role: p.role,
-      description: safe(polish.projectDesc[i] ?? '', p.description, MAX_DESC_CHARS),
+      description: safe(polish.projectDesc[i] ?? '', p.description),
     })),
-    skills: input.skills.map((s, i) => safe(polish.skillsPolished[i] ?? '', s, MAX_SKILL_CHARS)),
+    skills: input.skills.map((s, i) => safe(polish.skillsPolished[i] ?? '', s)),
     certificates: [...input.certificates],
   }
 }

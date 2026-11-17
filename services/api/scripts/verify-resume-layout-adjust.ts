@@ -361,6 +361,46 @@ async function main(): Promise<void> {
     if (PLACEHOLDER_TOKEN.test(responseText)) fail('10. 产物残留遮盖占位符，用户会看到 [手机号_1] 这类文本')
     pass('10. 回程：占位符在服务端还原为真值，产物无占位符残留')
 
+    // 2026-11-12：简介、描述、技能、证书不再先截再查。完整文字留下；单字段超过 24000 才截并写明。
+    {
+      const desc700 = '负责门店货架整理与收银交接。'.repeat(50)
+      const skill60 = '熟悉门店的收银对账。'.repeat(6)
+      const cert70 = '食品从业人员健康证明'.repeat(7)
+      if (desc700.length !== 700 || skill60.length !== 60 || cert70.length !== 70) {
+        fail(`F3 排版夹具长度不对 ${desc700.length}/${skill60.length}/${cert70.length}`)
+      }
+      const current: GeneratedResume = {
+        ...baseResume,
+        experience: [{ ...baseResume.experience[0], description: desc700 }],
+        skills: [...baseResume.skills, skill60],
+        certificates: [...baseResume.certificates, cert70],
+      }
+      const original = `${ORIGINAL_TEXT}\n${desc700}\n${skill60}\n${cert70}`
+      const keepLong: StubMutate = (resume) => {
+        resume.experience[0] = { ...resume.experience[0], description: desc700 }
+        if (!resume.skills.includes(skill60)) resume.skills.push(skill60)
+        if (!resume.certificates.includes(cert70)) resume.certificates.push(cert70)
+      }
+      setResponses([keepLong])
+      const keptLong = await svc.adjustLayoutDraft({ currentResume: current, originalText: original, action: 'reformat' })
+      assertStubHealthy()
+      if (keptLong.resume.experience[0].description !== desc700) {
+        fail(`F3. 排版描述应完整保留 700 字，实际 ${keptLong.resume.experience[0].description.length} 字`)
+      }
+      if (!keptLong.resume.skills.includes(skill60)) fail('F3. 排版技能 60 字未完整保留')
+      if (!keptLong.resume.certificates.includes(cert70)) fail('F3. 排版证书 70 字未完整保留')
+      pass('F3. 排版调整描述 700 字、技能 60 字、证书 70 字完整保留（2026-11-12 起不再先截再查）')
+
+      const note = '（内容过长，后面的部分请以原件为准）'
+      setResponses([(resume) => { resume.summary = '整'.repeat(24001) }])
+      const clipped = await svc.adjustLayoutDraft({ currentResume: baseResume, originalText: ORIGINAL_TEXT, action: 'reformat' })
+      assertStubHealthy()
+      if (clipped.resume.summary.length !== 24000 || !clipped.resume.summary.endsWith(note) || !clipped.resume.summary.startsWith('整')) {
+        fail(`F3. 排版简介超过 24000 应截到 24000 并带说明，实际 ${clipped.resume.summary.length} 字`)
+      }
+      pass('F3. 排版调整单字段超过 24000 仍按 fitResumeToDocLimits 截断并写明内容过长')
+    }
+
     const aiServiceSource = readFileSync(join(process.cwd(), 'src/ai/ai.service.ts'), 'utf-8')
     if (!aiServiceSource.includes('adjustResumeLayout')) fail('7. AiService 缺少 adjustResumeLayout')
     if (!aiServiceSource.includes('resumeExtraction.extractResumeText')) fail('7. layout-adjust 必须重新提取原文')

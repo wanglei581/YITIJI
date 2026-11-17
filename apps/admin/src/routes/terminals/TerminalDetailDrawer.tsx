@@ -185,7 +185,7 @@ export function TerminalDetailDrawer({
 
         <TerminalDailyFreeSidesSection terminalId={terminal.id} />
         <TerminalHomeFreeBadgeSection terminalId={terminal.id} enabled={homeFreeBadgeOn(terminal.homeFreeBadge)} listIssuedAt={serverListIssuedAt} onSaved={(savedTerminalId, enabled) => onHomeFreeBadgeSaved(savedTerminalId, enabled)} />
-        <TerminalChargeSettingsSection key={`${terminal.id}:${terminal.orgId ?? ''}`} terminalId={terminal.id} orgId={terminal.orgId} resetNotice={chargeResetNotice} onSaved={onChargeSaved} />
+        <TerminalChargeSettingsSection key={`${terminal.id}:${terminal.orgId ?? ''}`} terminalId={terminal.id} orgId={terminal.orgId} resetNotice={chargeResetNotice} savingOrg={savingOrg} onSaved={onChargeSaved} />
 
         <Section title="所属机构">
           {editingOrg ? (
