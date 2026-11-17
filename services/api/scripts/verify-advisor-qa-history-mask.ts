@@ -229,6 +229,24 @@ async function main(): Promise<void> {
     assert(!dumped.includes(PHONE) && !dumped.includes(legacyMark), '旧行判型理由不再把原话和手机号带回视图')
     assert(viewed.skillReason === SKILL_REASONS.qa && viewed.topic === ADVISOR_SESSION_TOPIC, '旧行判型理由换成这一型的固定说明，topic 仍是固定标签')
 
+    const idMark = textMark('证件邮箱标记')
+    const idNo = '110101199003077777'
+    const email = 'maskgate@example.com'
+    installFakeLlm(answerJson)
+    await svc.ask(sessionId, `${idMark}，身份证${idNo}，邮箱${email}`, owner)
+    assert(captured.length === 1, '阳性：证件和邮箱这一轮发出了模型请求')
+    const idBody = captured[0]!.body
+    assert(idBody.includes(idMark), '阳性：这一轮的标记在出站请求里')
+    assert(!idBody.includes(idNo), '出站请求里没有原身份证号')
+    assert(!idBody.includes(email), '出站请求里没有原邮箱')
+    assert(idBody.includes('[身份证_'), '出站请求里有身份证占位')
+    assert(idBody.includes('[邮箱_'), '出站请求里有邮箱占位')
+    const idTurns = memory.read(sessionId).filter((turn) => turn.role === 'user' && turn.content.includes(idMark))
+    assert(
+      idTurns.length === 1 && !idTurns[0]!.content.includes(idNo) && !idTurns[0]!.content.includes(email),
+      '内存里这一轮没有原身份证号和原邮箱',
+    )
+
     console.log(`\n=== 作业面追问历史遮盖通过：${passCount} PASS ===\n`)
   } finally {
     global.fetch = realFetch

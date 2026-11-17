@@ -713,6 +713,30 @@ async function main(): Promise<void> {
       '场景 11 阳性：另一个会员的两块内存不受这次注销失败影响',
     )
 
+    // ── 场景 12：清当前作业不许连带清同会员的另一个作业 ───────
+    const userScope = `verify-scope-${randomUUID()}`
+    await createUser(userScope)
+    const workScopeA = `verify-work-scope-a-${randomUUID()}`
+    const workScopeB = `verify-work-scope-b-${randomUUID()}`
+    await createQa(userScope, workScopeA, `verify-art-scope-a-${randomUUID()}`)
+    await createQa(userScope, workScopeB, `verify-art-scope-b-${randomUUID()}`)
+    const markScopeA = textMark('当前作业原话')
+    const markScopeB = textMark('同会员另一作业原话')
+    await advisor.ask(workScopeA, markScopeA, { endUserId: userScope, accessToken: null })
+    await advisor.ask(workScopeB, markScopeB, { endUserId: userScope, accessToken: null })
+    check(
+      memory.read(workScopeA).some((turn) => turn.content.includes(markScopeA))
+        && memory.read(workScopeB).some((turn) => turn.content.includes(markScopeB)),
+      '场景 12 阳性：清之前，同一会员的两个作业都有原话',
+    )
+    const scopeCleared = await advisor.forgetSession(workScopeA, { endUserId: userScope, accessToken: null })
+    check(
+      scopeCleared.forgotten === 1
+        && memory.read(workScopeA).length === 0
+        && memory.read(workScopeB).some((turn) => turn.content.includes(markScopeB)),
+      '场景 12：清当前作业不清同会员的另一个作业',
+    )
+
     console.log(`\nverify:conversation-memory-forget ${failCount === 0 ? '通过' : '未通过'}：PASS ${passCount} / FAIL ${failCount}`)
     if (failCount > 0) process.exitCode = 1
   } finally {
