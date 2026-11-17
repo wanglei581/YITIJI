@@ -15,6 +15,8 @@ const EVERY_HOUR = '0 0-23/1 * * *'
 function cronTimeOf(type: { prototype: object; name: string }, method: string): unknown {
   const handler = (type.prototype as Record<string, unknown>)[method]
   assert.equal(typeof handler, 'function', `${type.name}.${method} 不是方法`)
+  // getMetadata 的目标必须是对象。assert.equal 不收窄类型。
+  if (typeof handler !== 'function') return undefined
   const options = Reflect.getMetadata(SCHEDULE_CRON_OPTIONS, handler) as { cronTime?: unknown } | undefined
   assert.ok(options, `${type.name}.${method} 没有定时元数据`)
   return options.cronTime
