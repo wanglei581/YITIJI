@@ -228,7 +228,8 @@ export class AiQuotaService {
         bucket,
         usedTotal: memberRows.reduce((sum, row) => sum + row.used, 0),
         membersUsed: memberRows.filter((row) => row.used > 0).length,
-        membersExhausted: memberRows.filter((row) => row.used >= dailyLimitForBucket).length,
+        // 上限为 0 时，used 为 0 的行（预占后归还留下的）也满足 used >= 上限，那种行不算用完。
+        membersExhausted: memberRows.filter((row) => row.used > 0 && row.used >= dailyLimitForBucket).length,
         dailyLimit: dailyLimitForBucket,
       }
     })

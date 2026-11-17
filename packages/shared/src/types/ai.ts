@@ -902,7 +902,7 @@ export interface AdminAiQuotaBucketUsage {
   usedTotal: number
   /** used > 0 的人数。 */
   membersUsed: number
-  /** used >= 当日上限的人数。 */
+  /** used > 0 且达到当日上限的人数。used 为 0 的计数行不算用完。 */
   membersExhausted: number
   dailyLimit: number
 }

@@ -693,6 +693,48 @@ async function main(): Promise<void> {
     )
     pass('直接调用 adminUsage 与 HTTP 的简历类合计一致')
 
+    // 用不会撞上「今天」的历史日，免得这两行混进上面的管理员汇总。
+    const previousResumeLimit = process.env.AI_QUOTA_RESUME_DAILY
+    const countOnDay = async (
+      day: string,
+      limit: string,
+      rows: ReadonlyArray<{ id: string; used: number }>
+    ) => {
+      process.env.AI_QUOTA_RESUME_DAILY = limit
+      for (const row of rows) {
+        await prisma.aiQuotaDaily.create({
+          data: { endUserId: `member:${row.id}`, bucket: 'ai_resume', day, used: row.used },
+        })
+      }
+      const at = new Date(`${day}T04:00:00.000Z`)
+      assert.equal(quotaDay(at), day)
+      const summary = await quota.adminUsage(at)
+      const resume = summary.buckets.find((item) => item.bucket === 'ai_resume')
+      assert.ok(resume)
+      assert.equal(resume.dailyLimit, Number(limit))
+      return resume
+    }
+    try {
+      const zeroLimit = await countOnDay('2019-04-08', '0', [
+        { id: 'eu-sun-qiaoling', used: 0 },
+        { id: 'eu-zhao-wenbo', used: 1 },
+      ])
+      assert.equal(zeroLimit.membersUsed, 1, '上限 0：用过人数')
+      assert.equal(zeroLimit.membersExhausted, 1, '上限 0：用完人数')
+      pass('上限为 0：used=0 的计数行不算用完，used=1 算用过也算用完')
+
+      const twoLimit = await countOnDay('2019-04-09', '2', [
+        { id: 'eu-wu-haiyan', used: 0 },
+        { id: 'eu-zheng-mingyuan', used: 2 },
+      ])
+      assert.equal(twoLimit.membersUsed, 1, '上限 2：用过人数')
+      assert.equal(twoLimit.membersExhausted, 1, '上限 2：用完人数')
+      pass('上限为 2：used=0 不算用过也不算用完，used=2 算用过也算用完')
+    } finally {
+      if (previousResumeLimit === undefined) delete process.env.AI_QUOTA_RESUME_DAILY
+      else process.env.AI_QUOTA_RESUME_DAILY = previousResumeLimit
+    }
+
     process.env.AI_QUOTA_GUEST_TERMINAL_DAILY = '0'
     const again = watchDailyReads(quota)
     try {
