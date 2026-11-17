@@ -319,6 +319,8 @@ test('U6b 入口策略表：原件去打印台检查，派生产物直达报价�
 test('U6d 返回状态只留在调用方内存，清场后不留带姓名的文件名', async () => {
   const previousSession = globalThis.sessionStorage
   const previousLocal = globalThis.localStorage
+  const previousWindow = globalThis.window
+  const previousWindowSession = globalThis.window?.sessionStorage
   const previousWindowLocal = globalThis.window?.localStorage
   const h = await loadHandoff()
   globalThis.sessionStorage = h.storage
@@ -360,10 +362,18 @@ test('U6d 返回状态只留在调用方内存，清场后不留带姓名的文�
     else globalThis.sessionStorage = previousSession
     if (previousLocal === undefined) delete globalThis.localStorage
     else globalThis.localStorage = previousLocal
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
     if (globalThis.window) {
+      if (previousWindowSession === undefined) delete globalThis.window.sessionStorage
+      else globalThis.window.sessionStorage = previousWindowSession
       if (previousWindowLocal === undefined) delete globalThis.window.localStorage
       else globalThis.window.localStorage = previousWindowLocal
     }
+    assert.ok(
+      globalThis.window === previousWindow && globalThis.window?.sessionStorage === previousWindowSession,
+      'U6d 结束后 globalThis.window 与其 sessionStorage 应还原成进来之前的对象',
+    )
   }
 })
 
