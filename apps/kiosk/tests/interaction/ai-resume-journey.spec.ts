@@ -211,6 +211,18 @@ async function walkPreviewConfirmRoundTrip(page: Page): Promise<void> {
   await page.getByRole('button', { name: '上一步', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/resume/report', { timeout: 15_000 })
   await waitReady(page)
+  // 预览按钮靠本机终端身份才可点。身份会留在这一页上，后面的优化请求就带上
+  // 走查库里没有的终端，服务端回 401。打印来回已经走完，之后不再把终端头送出去。
+  await page.route('**/api/v1/**', async (route) => {
+    if (route.request().url().includes('/printer-status')) {
+      await route.fallback()
+      return
+    }
+    const headers = { ...route.request().headers() }
+    delete headers['x-terminal-id']
+    delete headers['x-terminal-session-token']
+    await route.continue({ headers })
+  })
 }
 
 async function returnFromPrintToReport(page: Page): Promise<void> {
