@@ -12,7 +12,7 @@ import {
   ONLINE_PAID_PENDING_REFUND_REASON,
   PAID_UNFULFILLED_PENDING_REFUND_REASON,
 } from '../payment/pending-refund-signal'
-import { PAID_NO_PAPER_AUTO_REASON, PRINT_REFUND_FAILED_DETAIL } from '../payment/print-no-paper-refund.constants'
+import { explainPrintRefund } from '../payment/print-return-disposition'
 import type {
   AdminOrderReadonlyDetail,
   AdminOrderReadonlyItem,
@@ -277,11 +277,7 @@ export class AdminOrdersReadonlyService {
 
     const labels = await this.lookupLabels([row])
     const unconfirmed = await this.unconfirmedOrderIdSet([row.id])
-    const autoRefundRow = await this.prisma.refund.findFirst({
-      where: { orderId: row.id, reason: PAID_NO_PAPER_AUTO_REASON },
-      orderBy: { createdAt: 'desc' },
-      select: { status: true },
-    })
+    const printRefund = await explainPrintRefund(this.prisma, row.id)
     const item = this.toItem(row, labels, unconfirmed.has(row.id))
     const summary = row.type !== 'copy' && row.printTask ? parseSafePrintSummary(row.printTask.paramsJson) : null
     const statusLogs = row.type !== 'copy' && row.printTask
@@ -314,9 +310,11 @@ export class AdminOrdersReadonlyService {
         errorCode: log.errorCode ?? null,
         createdAt: log.createdAt.toISOString(),
       })),
-      autoRefund: Boolean(autoRefundRow),
-      refundStatus: autoRefundRow?.status ?? null,
-      refundFailureReason: autoRefundRow?.status === 'failed' ? PRINT_REFUND_FAILED_DETAIL : null,
+      autoRefund: printRefund.disposition === 'auto_success' || printRefund.disposition === 'auto_failed',
+      refundStatus: printRefund.refundStatus,
+      refundFailureReason: printRefund.disposition === 'auto_failed' ? printRefund.reason : null,
+      printRefundDisposition: printRefund.disposition,
+      printRefundReason: printRefund.disposition === 'auto_success' ? null : printRefund.reason,
     }
   }
 

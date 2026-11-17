@@ -23,9 +23,15 @@ import {
   PAID_NO_PAPER_AUTO_REASON,
   PRINT_RETURN_MANUAL_TYPE,
 } from './print-no-paper-refund.constants'
+import {
+  PRINT_NO_PAPER_AUTO_FAILED_AUDIT,
+  PRINT_NO_PAPER_MANUAL_AUDIT,
+  manualHoldReason,
+  switchOffRefundReason,
+} from './print-return-disposition'
 import { RefundService } from './refund.service'
 
-export type NoPaperRefundOutcome = 'ignored' | 'signaled' | 'refunded' | 'idempotent' | 'failed'
+export type NoPaperRefundOutcome = 'ignored' | 'signaled' | 'manual' | 'refunded' | 'idempotent' | 'failed'
 
 export interface NoPaperRefundDeps {
   refund?: Pick<RefundService, 'refund'>
@@ -69,10 +75,22 @@ function isExplicitNoPaper(status: string, errorCode: string | null): boolean {
   return EXPLICIT_NO_PAPER_ERROR_CODES.has(errorCode)
 }
 
-async function pushPrintReturnAlert(orderId: string): Promise<void> {
+async function terminalCodeForOrder(db: PrismaService, orderId: string): Promise<string | null> {
+  const order = await db.order.findUnique({ where: { id: orderId }, select: { terminalId: true } })
+  if (!order?.terminalId) return null
+  const terminal = await db.terminal.findUnique({
+    where: { id: order.terminalId },
+    select: { terminalCode: true },
+  })
+  const code = terminal?.terminalCode?.trim()
+  return code ? code : null
+}
+
+async function pushPrintReturnAlert(db: PrismaService, orderId: string): Promise<void> {
   const webhook = process.env['ALERT_WEBHOOK_URL']?.trim() || null
   const redisUrl = process.env['REDIS_URL']?.trim()
   if (!webhook || !redisUrl) return
+  const terminalCode = await terminalCodeForOrder(db, orderId)
   try {
     const { default: Redis } = await import('ioredis')
     const client = new Redis(redisUrl, {
@@ -98,7 +116,7 @@ async function pushPrintReturnAlert(orderId: string): Promise<void> {
           type: PRINT_RETURN_MANUAL_TYPE,
           severity: 'error',
           title: '打印没出纸，待人工处理',
-          terminalCode: null,
+          terminalCode,
         },
         state: 'firing',
       })
@@ -108,6 +126,27 @@ async function pushPrintReturnAlert(orderId: string): Promise<void> {
   } catch {
     // 推送失败不改变退款结果。列表仍由收集器现算。
   }
+}
+
+async function rememberOnce(
+  db: PrismaService,
+  orderId: string,
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const existing = await db.auditLog.findFirst({
+    where: { targetId: orderId, action },
+    select: { id: true },
+  })
+  if (existing) return
+  await new AuditService(db).write({
+    actorId: null,
+    actorRole: 'system',
+    action,
+    targetType: 'order',
+    targetId: orderId,
+    payload,
+  })
 }
 
 /**
@@ -126,18 +165,32 @@ export async function settleExplicitNoPaper(
   deps?: NoPaperRefundDeps,
 ): Promise<NoPaperRefundOutcome> {
   if (input.printOutcome === 'printed') return 'ignored'
-  if (input.completedItemCount > 0) return 'ignored'
-  if (!isExplicitNoPaper(input.taskStatus, input.errorCode)) return 'ignored'
+  if (input.taskStatus !== 'failed') return 'ignored'
 
   const order = await db.order.findUnique({ where: { id: input.orderId } })
   if (!order) return 'ignored'
   if (order.taskStatus === 'claimed' || order.taskStatus === 'printing') return 'ignored'
   if (order.payStatus !== 'paid' || payableCents(order) <= 0) return 'ignored'
 
+  const partial = input.completedItemCount > 0
+  const explicit = !partial && isExplicitNoPaper(input.taskStatus, input.errorCode)
   await markPaidUnfulfilledRefundRequired(db, order)
 
+  if (!explicit) {
+    await holdForManualReview(db, order.id, input)
+    return 'manual'
+  }
+
   const enabled = await readPersonalChargeEnabled(db)
-  if (!enabled) return 'signaled'
+  if (!enabled) {
+    await rememberOnce(db, order.id, PRINT_NO_PAPER_MANUAL_AUDIT, {
+      detail: switchOffRefundReason(),
+      errorCode: input.errorCode,
+      switchOff: true,
+    })
+    await pushPrintReturnAlert(db, order.id)
+    return 'signaled'
+  }
 
   const existing = await db.refund.findFirst({
     where: { orderId: order.id, reason: PAID_NO_PAPER_AUTO_REASON },
@@ -152,19 +205,41 @@ export async function settleExplicitNoPaper(
       reason: PAID_NO_PAPER_AUTO_REASON,
     })
     if (view.refund.status === 'failed') {
-      await pushPrintReturnAlert(order.id)
+      await rememberOnce(db, order.id, PRINT_NO_PAPER_AUTO_FAILED_AUDIT, { code: 'REFUND_CHANNEL_FAILED' })
+      await pushPrintReturnAlert(db, order.id)
       return 'failed'
     }
     return view.idempotent ? 'idempotent' : 'refunded'
   } catch (error) {
     const code = exceptionCode(error)
-    if (code === 'REFUND_CHANNEL_FAILED') {
-      await pushPrintReturnAlert(order.id)
+    if (code === 'ORDER_ALREADY_REFUNDED' || code === 'ORDER_TASK_IN_PROGRESS') return 'signaled'
+    if (code) {
+      await rememberOnce(db, order.id, PRINT_NO_PAPER_AUTO_FAILED_AUDIT, { code })
+      await pushPrintReturnAlert(db, order.id)
       return 'failed'
     }
-    if (code === 'ORDER_ALREADY_REFUNDED' || code === 'ORDER_TASK_IN_PROGRESS') return 'signaled'
     throw error
   }
+}
+
+async function holdForManualReview(
+  db: PrismaService,
+  orderId: string,
+  input: { errorCode: string | null; completedItemCount: number },
+): Promise<void> {
+  const itemCount = await db.orderItem.count({ where: { orderId } })
+  await rememberOnce(db, orderId, PRINT_NO_PAPER_MANUAL_AUDIT, {
+    detail: manualHoldReason({
+      errorCode: input.errorCode,
+      completedItemCount: input.completedItemCount,
+      itemCount,
+    }),
+    errorCode: input.errorCode,
+    completedItemCount: input.completedItemCount,
+    itemCount,
+    switchOff: false,
+  })
+  await pushPrintReturnAlert(db, orderId)
 }
 
 /** 按任务号读失败原因，再决定退不退。队列超时和终端失败上报都走这里。 */

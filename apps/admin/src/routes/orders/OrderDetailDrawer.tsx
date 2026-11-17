@@ -46,11 +46,23 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               {detail.refundReason && detail.payStatus !== 'paid' ? (
                 <Info label="退款原因" value={REFUND_REASON_LABELS[detail.refundReason] ?? detail.refundReason} />
               ) : null}
-              {detail.autoRefund ? (
+              {detail.printRefundDisposition === 'auto_success' ? (
                 <>
                   <Info label="退款方式" value="自动原路退" />
                   <Info label="退款状态" value={autoRefundStatusText(detail.refundStatus)} />
-                  <Info label="失败原因" value={detail.refundFailureReason ?? '—'} />
+                </>
+              ) : null}
+              {detail.printRefundDisposition === 'auto_failed' ? (
+                <>
+                  <Info label="退款方式" value="自动原路退" />
+                  <Info label="退款状态" value={autoRefundStatusText(detail.refundStatus)} />
+                  <Info label="失败原因" value={detail.printRefundReason ?? detail.refundFailureReason ?? '—'} />
+                </>
+              ) : null}
+              {detail.printRefundDisposition === 'manual' ? (
+                <>
+                  <Info label="退款方式" value="待人工退款" />
+                  <Info label="原因" value={detail.printRefundReason ?? '—'} />
                 </>
               ) : null}
             </div>

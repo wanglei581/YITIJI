@@ -88,7 +88,7 @@ export async function runNoPaperAllowlistCases(
       },
     },
   })
-  assert.equal(unknown, 'ignored', '没见过的错误码不自动退')
+  assert.equal(unknown, 'manual', '没见过的错误码不自动退，改成待人工')
   assert.equal(unknownCalls, 0)
   assert.equal(await db.refund.count({ where: { order: { printTaskId: unknownTask } } }), 0)
 
@@ -102,6 +102,6 @@ export async function runNoPaperAllowlistCases(
       },
     },
   })
-  assert.equal(after, 'ignored', '提交打印之后改写成未确认的，不自动退')
+  assert.equal(after, 'manual', '提交打印之后改写成未确认的，不自动退，改成待人工')
   assert.equal(afterCalls, 0)
 }

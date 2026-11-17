@@ -10,7 +10,7 @@ import { AdminOrdersReadonlyService } from '../../src/admin-orders-readonly/admi
 import { collectPrintReturnAlerts } from '../../src/admin-ops/derived-print-return-alerts'
 import type { PaymentProvider } from '../../src/payment/payment-provider.types'
 import { PaymentProviderRegistry } from '../../src/payment/payment-provider.factory'
-import { PAID_NO_PAPER_AUTO_REASON, PRINT_REFUND_FAILED_DETAIL } from '../../src/payment/print-no-paper-refund.constants'
+import { PAID_NO_PAPER_AUTO_REASON } from '../../src/payment/print-no-paper-refund.constants'
 import {
   settleExplicitNoPaper,
   settleExplicitNoPaperFromReportedFailure,
@@ -55,7 +55,7 @@ function assertWiring(): void {
   )
   assert.match(source('src/print-jobs/print-queue-timeout.ts'), /settleExplicitNoPaperFromReportedFailure\(/)
   assert.match(source('src/terminals/terminals-agent.service.ts'), /settleExplicitNoPaperFromReportedFailure\(/)
-  assert.match(source('src/payment/print-no-paper-refund.ts'), /if \(!enabled\) return 'signaled'/)
+  assert.match(source('src/payment/print-no-paper-refund.ts'), /if \(!enabled\)[\s\S]{0,500}return 'signaled'/)
   assert.match(source('src/payment/print-no-paper-refund.ts'), /EXPLICIT_NO_PAPER_ERROR_CODES\.has\(errorCode\)/)
   assert.match(source('src/payment/print-no-paper-refund.ts'), /reason: PAID_NO_PAPER_AUTO_REASON/)
 }
@@ -351,6 +351,13 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     assert.equal(await settleExplicitNoPaperFromReportedFailure(db, `pt_${repeatId}`, { refund: countingRefund }), 'idempotent')
     assert.equal(refundCalls, 1, '重复回调只调用一次退款')
 
+    const manualReason: Record<string, string> = {
+      unconfirmed: '出纸结果未确认，不能自动退',
+      'lost-report': '打印过程中报告丢失，不能自动退',
+      'partial-code': '只出了一部分纸，不能自动退',
+      paper: '打印机缺纸，没有自动退',
+      'empty-code': '打印失败但没有错误码，不能确定有没有出纸，不能自动退',
+    }
     for (const [suffix, errorCode] of [
       ['unconfirmed', PRINT_JOB_UNCONFIRMED_ERROR_CODE],
       ['lost-report', PRINTING_REPORT_LOST_ERROR_CODE],
@@ -370,11 +377,18 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
       const outcome = await settleExplicitNoPaperFromReportedFailure(db, `pt_${id}`, {
         refund: { refund: async () => { calls += 1; throw new Error('不应退款') } },
       })
-      assert.equal(outcome, 'ignored', `${suffix} 不能自动退`)
+      assert.equal(outcome, 'manual', `${suffix} 不能自动退，要进待人工`)
       assert.equal(calls, 0)
       assert.equal(await db.refund.count({ where: { orderId: id } }), 0)
       const row = await db.order.findUniqueOrThrow({ where: { id } })
-      assert.equal(row.refundReason, null)
+      assert.equal(row.refundReason, PAID_UNFULFILLED_PENDING_REFUND_REASON)
+      const detail = await new AdminOrdersReadonlyService(db).getById(id)
+      assert.equal(detail.printRefundDisposition, 'manual')
+      assert.equal(detail.autoRefund, false)
+      assert.equal(detail.printRefundReason, manualReason[suffix])
+      const held = (await collectPrintReturnAlerts(db)).find((alert) => alert.subjectId === id)
+      assert.equal(held?.detail, manualReason[suffix])
+      assert.equal(held?.terminalCode, pricedTerminalId)
     }
 
     const partialId = await createdOrders({
@@ -384,13 +398,37 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
       paymentSource: 'offline',
       taskStatus: 'failed',
     })
-    await attachTask(partialId, 'PRINT_COMMAND_FAILED', { completed: true })
+    await attachTask(partialId, 'PRINT_COMMAND_FAILED')
+    for (const [seq, status] of [[0, 'completed'], [1, 'failed'], [2, 'failed']] as const) {
+      await db.orderItem.create({
+        data: {
+          orderId: partialId,
+          seq,
+          fileId: `file_${partialId}_${seq}`,
+          colorMode: 'black_white',
+          duplex: 'simplex',
+          copies: 1,
+          billablePages: 1,
+          amountCents: 100,
+          status,
+        },
+      })
+    }
     let partialCalls = 0
     const partial = await settleExplicitNoPaperFromReportedFailure(db, `pt_${partialId}`, {
       refund: { refund: async () => { partialCalls += 1; throw new Error('部分出纸不应退款') } },
     })
-    assert.equal(partial, 'ignored', '已有打完的一份不能自动退')
+    assert.equal(partial, 'manual', '三份里出了一份不能自动退')
     assert.equal(partialCalls, 0)
+    const partialReason = '材料包 3 份里出了 1 份，没有全部出纸，不能自动退'
+    const partialDetail = await new AdminOrdersReadonlyService(db).getById(partialId)
+    assert.equal(partialDetail.printRefundDisposition, 'manual')
+    assert.equal(partialDetail.autoRefund, false)
+    assert.equal(partialDetail.printRefundReason, partialReason)
+    assert.equal(
+      (await collectPrintReturnAlerts(db)).find((alert) => alert.subjectId === partialId)?.detail,
+      partialReason,
+    )
 
     const failedId = await createdOrders({
       suffix: 'fail',
@@ -411,12 +449,15 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     assert.equal(failedOrder.payStatus, 'paid', '渠道退款失败后订单回到已付款')
     const failedRow = await db.refund.findFirst({ where: { orderId: failedId, reason: PAID_NO_PAPER_AUTO_REASON } })
     assert.equal(failedRow?.status, 'failed')
+    const channelFailedReason = '退款渠道返回失败（REFUND_CHANNEL_FAILED），没有退成'
     const alerts = await collectPrintReturnAlerts(db)
-    assert.ok(alerts.some((alert) => alert.type === 'print_return_manual' && alert.subjectId === failedId && alert.detail === PRINT_REFUND_FAILED_DETAIL))
+    assert.ok(alerts.some((alert) => alert.type === 'print_return_manual' && alert.subjectId === failedId && alert.detail === channelFailedReason))
     const detail = await new AdminOrdersReadonlyService(db).getById(failedId)
     assert.equal(detail.autoRefund, true)
+    assert.equal(detail.printRefundDisposition, 'auto_failed')
     assert.equal(detail.refundStatus, 'failed')
-    assert.equal(detail.refundFailureReason, PRINT_REFUND_FAILED_DETAIL)
+    assert.equal(detail.refundFailureReason, channelFailedReason)
+    assert.equal(detail.printRefundReason, channelFailedReason)
 
     await db.platformSetting.upsert({
       where: { key: PERSONAL_CHARGE_SETTING_KEY },
@@ -447,6 +488,14 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     assert.equal(offRow.refundReason, PAID_UNFULFILLED_PENDING_REFUND_REASON)
     assert.equal(offRow.payStatus, 'paid')
     assert.equal(await db.refund.count({ where: { orderId: offId } }), 0)
+    const switchOffReason = '个人收费总开关关着，没有发起自动退款'
+    const offDetail = await new AdminOrdersReadonlyService(db).getById(offId)
+    assert.equal(offDetail.printRefundDisposition, 'manual')
+    assert.equal(offDetail.autoRefund, false)
+    assert.equal(offDetail.printRefundReason, switchOffReason)
+    const offAlert = (await collectPrintReturnAlerts(db)).find((alert) => alert.subjectId === offId)
+    assert.equal(offAlert?.detail, switchOffReason)
+    assert.equal(offAlert?.terminalCode, pricedTerminalId)
   } finally {
     await db.refund.deleteMany({ where: { orderId: { in: orderIds } } })
     await db.paymentAttempt.deleteMany({ where: { orderId: { in: orderIds } } })

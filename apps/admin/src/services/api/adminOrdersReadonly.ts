@@ -84,6 +84,8 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   autoRefund: boolean
   refundStatus: string | null
   refundFailureReason: string | null
+  printRefundDisposition: 'auto_success' | 'auto_failed' | 'manual' | null
+  printRefundReason: string | null
 }
 
 export interface AdminOrderReadonlyPage {
@@ -293,6 +295,8 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   autoRefund: false,
   refundStatus: null,
   refundFailureReason: null,
+  printRefundDisposition: null,
+  printRefundReason: null,
 }
 
 /** 存量订单未记录计费页数，供列表和详情验证空值展示。 */
@@ -369,6 +373,8 @@ function demoServiceOrders(): AdminOrderReadonlyDetail[] {
     autoRefund: false,
     refundStatus: null,
     refundFailureReason: null,
+    printRefundDisposition: null,
+    printRefundReason: null,
     recordKind: 'service' as const,
     createdAt: '2026-11-13T09:10:00+08:00',
     updatedAt: paidAt,
