@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-17：运维包 O1 文件清理定时任务防退化（分支 `claude/ops-o1-1117`，未推送）
+
+- 新增单测读取 `@nestjs/schedule` 写在方法上的 `SCHEDULE_CRON_OPTIONS`。文件清理每分钟、每小时，材料清理每小时，扫描任务三条每分钟，间隔保持原表达式。`FilesModule` 的 providers 含 `FilesCleanupTask`，`AppModule` 引入了 `ScheduleModule`。
+- 没有改生产配置、部署脚本或定时开关。
+
 ## 2026-11-17：运维包 O1 文件管理按钮核对（分支 `claude/ops-o1-1117`，未推送）
 
 - 「招聘会资料」筛选改为同时查 `fair_material` 与 `job_fair_material`。列表上这两种用途都显示成同一标签，原先只发前一种，后一种会被筛没。合同风险提示报告仍然不进这张表。
