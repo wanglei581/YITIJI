@@ -1245,6 +1245,35 @@ test('末段含十的 138 组删掉后要本人确认，规格要拆开的 36 �
   }
 })
 
+test('末段十位后面紧跟数字或单位时并进同一条，加后缀和删后缀都要本人确认', () => {
+  assertBothKeys('年营收2亿两千3十', '', ['raw:2亿两千3十'])
+  assertBothKeys('年营收2亿两千3十万', '', ['raw:2亿两千3十万'])
+  assertBothKeys('年营收2亿两千3十亿', '', ['raw:2亿两千3十亿'])
+  assertBothKeys('年营收2亿两千3十五', '', ['raw:2亿两千3十五'])
+  const added = [
+    ['年营收2亿两千3十', '年营收2亿两千3十万'],
+    ['年营收2亿两千3十', '年营收2亿两千3十亿'],
+    ['年营收2亿两千3十', '年营收2亿两千3十五'],
+  ]
+  for (const [input, ai] of added) {
+    assert.equal(findFactAdditions(ai, input).length, 1, `${input} -> ${ai}`)
+    assert.equal(apiFindFactAdditions(ai, input).length, 1, `api ${input} -> ${ai}`)
+  }
+  const removed = [
+    ['年营收2亿两千3十万', '年营收2亿两千3十'],
+    ['年营收2亿两千3十亿', '年营收2亿两千3十'],
+    ['年营收2亿两千3十五', '年营收2亿两千3十'],
+  ]
+  for (const [input, ai] of removed) {
+    assert.equal(findFactAdditions(ai, input).length >= 1, true, `${input} -> ${ai}`)
+    assert.equal(apiFindFactAdditions(ai, input).length >= 1, true, `api ${input} -> ${ai}`)
+  }
+})
+
+test('百后面只接十，一万2千5百两百拆成整串和两百', () => {
+  assertBothKeys('一万2千5百两百', '', ['raw:一万2千5百', 'num:200'])
+})
+
 test('删掉第二条后把第一条里 AI 写大的数改短，仍要本人确认', () => {
   const base = '负责生鲜区上货和每晚盘点交接'
   const input = shellResume([

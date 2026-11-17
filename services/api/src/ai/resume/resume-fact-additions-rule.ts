@@ -19,7 +19,7 @@
  * 后段看开头单位，再看段内后面有没有万：亿后面要千开头且段内还有万（三千万、三千五百万、2千5百万），
  * 万后面要千开头且段内不再有万（两千、2千5百），千后面要百开头（五百、五百万、5百），百后面要十开头（五十、5十）。
  * 阿拉伯后段把后面每一段「一个数字加更小的单位」都吃完，十也算一级，末尾还可以再补一个万。
- * 链收住之后，末段若是「一位一到九或两、再加十」，仍算同一条；中间只隔着一段本来不接的数、最后仍落到这个十位，也算同一条。
+ * 链收住之后，末段若是「一位一到九或两、再加十」，并且十后面没有紧跟数字或万、亿、千、百、十，仍算同一条；中间只隔着一段本来不接的数、最后仍落到这个十位，也算同一条。十后面紧跟这些字时并进同一条，读数和停在十的原文不同。
  * 「1000万一百」「3千五十万」低了不止一级，不是一条链。逗号、顿号、句号（全角和半角）一律断开，不把标点从整串里拿掉。
  * 字段在空格或「多、余、来、几、左右」处结束、后面没有百千万亿时，仍按数值读。单字「十」后面隔着这些字或空格再接单位，同样整串读。
  * 职责词长的先占住区间，「独立负责」不再另报里面的「负责」。
@@ -550,10 +550,28 @@ function pureChineseTensEnd(text: string, from: number): number | null {
   return run.end
 }
 
+/** 十后面紧跟的数字或单位。空字符串不是。这些字不能留在末段截断的外面。 */
+function tensTailContinues(text: string, index: number): boolean {
+  const ch = text.charAt(index)
+  if (ch === '') return false
+  if (isDigitChar(ch) || cnDigit(ch) !== null) return true
+  return '万亿千百十'.indexOf(ch) !== -1
+}
+
+/** 读数停在「十」且后面还紧着数字或单位时，把后面并进同一条。停在别的字上不动。 */
+function extendPastTensTail(text: string, cursor: number): number {
+  if (text.charAt(cursor - 1) !== '十') return cursor
+  let end = cursor
+  if (!tensTailContinues(text, end)) return end
+  while (tensTailContinues(text, end)) end += 1
+  return end
+}
+
 function pureArabicTensEnd(text: string, from: number): number | null {
   if (!isDigitChar(text.charAt(from)) || isDigitChar(text.charAt(from + 1))) return null
   if (text.charAt(from + 1) !== '十') return null
-  return from + 2
+  // 十后面紧跟数字或万、亿、千、百、十：不能在十这里截断。并进同一条，才和停在十的原文不同。
+  return extendPastTensTail(text, from + 2)
 }
 
 /** 不顾级差，只读一段。纯十位不算这段，留给末段规则。阿拉伯数字只吃「数字 + 一个单位」。 */
@@ -580,6 +598,7 @@ function looseSegmentEnd(text: string, from: number, cn: boolean): number | null
  * firstCn 表示下一段是中文数字。prevPlaces 是上一段末尾的单位。
  * 逗号、顿号、句号先断开，标点不进整串。
  * 级差对不上时，末段仍可以是「一位数字加十」；也可以先隔一段本来不接的数，再落到这个十位。
+ * 十后面紧跟数字或万、亿、千、百、十时，这一段接着读进去，不在十这里截断。
  */
 function mixedUnitChainEnd(text: string, from: number, firstCn: boolean, prevPlaces: number): number | null {
   let cursor = from
@@ -589,7 +608,7 @@ function mixedUnitChainEnd(text: string, from: number, firstCn: boolean, prevPla
   while (cursor < text.length) {
     const link = expectCn ? takeChineseLink(text, cursor, places) : takeArabicLink(text, cursor, places)
     if (link !== null) {
-      cursor = link.end
+      cursor = extendPastTensTail(text, link.end)
       places = link.trailing
       consumed = true
       expectCn = !expectCn
@@ -598,7 +617,7 @@ function mixedUnitChainEnd(text: string, from: number, firstCn: boolean, prevPla
     if (expectCn) {
       const tens = pureChineseTensEnd(text, cursor)
       if (tens !== null) {
-        cursor = tens
+        cursor = extendPastTensTail(text, tens)
         places = 1
         consumed = true
         expectCn = !expectCn
@@ -608,7 +627,7 @@ function mixedUnitChainEnd(text: string, from: number, firstCn: boolean, prevPla
     const loose = looseSegmentEnd(text, cursor, expectCn)
     const tensAt = loose === null ? null : expectCn ? pureArabicTensEnd(text, loose) : pureChineseTensEnd(text, loose)
     if (loose === null || tensAt === null) break
-    cursor = tensAt
+    cursor = extendPastTensTail(text, tensAt)
     places = 1
     consumed = true
   }
