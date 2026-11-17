@@ -14273,7 +14273,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 288,
+      "reachableFileCount": 289,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -15060,7 +15060,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 315
+      "sourceFileCount": 316
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -19905,6 +19905,7 @@
           "services/api/src/branding/branding.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/effective-user-prices.ts",
+          "services/api/src/payment/terminal-charge-reset-snapshot.ts",
           "services/api/src/payment/terminal-charge-settings.ts",
           "services/api/src/print-jobs/free-print-quota.config.ts",
           "services/api/src/print-jobs/print-queue-timeout.ts",
@@ -20308,6 +20309,8 @@
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/effective-user-prices.ts",
           "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/payment/terminal-charge-public-reset.ts",
+          "services/api/src/payment/terminal-charge-reset-snapshot.ts",
           "services/api/src/payment/terminal-charge-settings.ts",
           "services/api/src/policies/policy-scope.service.ts",
           "services/api/src/print-jobs/free-print-quota.decide.ts",
@@ -20421,6 +20424,7 @@
         ],
         "usedBy": [
           "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/payment/terminal-charge-public-reset.ts",
           "services/api/src/payment/terminal-charge-settings.ts",
           "services/api/src/terminals/terminal-org-assignment.ts"
         ]
@@ -26289,6 +26293,7 @@
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-charge-binding-race.ts",
+      "services/api/scripts/verify-terminal-charge-public-reset.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
       "services/api/scripts/verify-terminal-printer-queue.ts",
@@ -26650,6 +26655,7 @@
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
       "services/api/scripts/verify-terminal-charge-binding-race.ts",
+      "services/api/scripts/verify-terminal-charge-public-reset.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
@@ -26742,7 +26748,9 @@
       "services/api/scripts/verify-service-order-open-ref-postgres.ts"
     ],
     "services/api/scripts/support/service-order-verify-fixture.ts": [
+      "services/api/scripts/verify-service-orders-charge.ts",
       "services/api/scripts/verify-service-orders-concurrency.ts",
+      "services/api/scripts/verify-service-orders-settle.ts",
       "services/api/scripts/verify-service-orders.ts"
     ],
     "services/api/scripts/support/sqlite-cli.ts": [
@@ -26772,7 +26780,7 @@
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-service-orders-concurrency.ts",
-      "services/api/scripts/verify-service-orders.ts",
+      "services/api/scripts/verify-service-orders-settle.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -26993,6 +27001,12 @@
     ],
     "services/api/scripts/verify-scan-input-lockout-telemetry.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-service-orders-charge.ts": [
+      "services/api/scripts/verify-service-orders.ts"
+    ],
+    "services/api/scripts/verify-service-orders-settle.ts": [
+      "services/api/scripts/verify-service-orders.ts"
     ],
     "services/api/scripts/verify-terminal-credentials.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
@@ -27333,7 +27347,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
-      "services/api/scripts/verify-service-orders.ts"
+      "services/api/scripts/verify-service-orders-charge.ts"
     ],
     "services/api/src/ai/career-plan.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -27545,7 +27559,7 @@
     ],
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts",
-      "services/api/scripts/verify-service-orders.ts"
+      "services/api/scripts/verify-service-orders-charge.ts"
     ],
     "services/api/src/ai/resume-layout-adjust.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -28159,6 +28173,7 @@
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-charge-public-reset.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -28727,7 +28742,7 @@
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-service-orders-concurrency.ts",
-      "services/api/scripts/verify-service-orders.ts",
+      "services/api/scripts/verify-service-orders-settle.ts",
       "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
@@ -30197,6 +30212,7 @@
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-policy-scope.ts",
+      "services/api/scripts/verify-terminal-charge-public-reset.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/orgs/contact-phone-change.ts": [
@@ -30266,6 +30282,7 @@
       "services/api/scripts/verify-refund-idempotent.ts"
     ],
     "services/api/src/payment/effective-user-prices.ts": [
+      "services/api/scripts/verify-terminal-charge-public-reset.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/payment/online-payment.service.ts": [
@@ -30523,7 +30540,7 @@
     ],
     "services/api/src/payment/service-order.payment.ts": [
       "services/api/scripts/verify-service-orders-concurrency.ts",
-      "services/api/scripts/verify-service-orders.ts"
+      "services/api/scripts/verify-service-orders-settle.ts"
     ],
     "services/api/src/payment/service-order.policy.ts": [
       "services/api/scripts/verify-service-orders-concurrency.ts",
@@ -30531,11 +30548,15 @@
     ],
     "services/api/src/payment/service-order.ref.ts": [
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
-      "services/api/scripts/verify-service-orders.ts"
+      "services/api/scripts/verify-service-orders-settle.ts"
+    ],
+    "services/api/src/payment/terminal-charge-public-reset.ts": [
+      "services/api/scripts/verify-terminal-charge-public-reset.ts"
     ],
     "services/api/src/payment/terminal-charge-settings.ts": [
       "services/api/scripts/verify-service-orders-concurrency.ts",
       "services/api/scripts/verify-terminal-charge-binding-race.ts",
+      "services/api/scripts/verify-terminal-charge-public-reset.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/payment/terminal-charge.contract.ts": [
@@ -30545,8 +30566,9 @@
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
-      "services/api/scripts/verify-service-orders.ts",
+      "services/api/scripts/verify-service-orders-settle.ts",
       "services/api/scripts/verify-terminal-charge-binding-race.ts",
+      "services/api/scripts/verify-terminal-charge-public-reset.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
@@ -31043,6 +31065,7 @@
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-charge-binding-race.ts",
+      "services/api/scripts/verify-terminal-charge-public-reset.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -31130,7 +31153,8 @@
     "services/api/src/scan-tasks/dto/create-scan-task.dto.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "services/api/scripts/verify-scan-device-sessions.ts",
-      "services/api/scripts/verify-scan-tasks.ts"
+      "services/api/scripts/verify-scan-tasks.ts",
+      "services/api/scripts/verify-service-orders-settle.ts"
     ],
     "services/api/src/scan-tasks/dto/scan-device-report.dto.ts": [
       "services/api/scripts/verify-scan-device-sessions.ts"
@@ -31190,7 +31214,8 @@
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-scan-quiet-period.ts",
-      "services/api/scripts/verify-scan-tasks.ts"
+      "services/api/scripts/verify-scan-tasks.ts",
+      "services/api/scripts/verify-service-orders-settle.ts"
     ],
     "services/api/src/smart-campus/dto/save-smart-campus-config.dto.ts": [
       "services/api/scripts/verify-partner-smart-campus.ts"
@@ -48943,6 +48968,24 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/service-order-verify-fixture.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/redis-inflight-lock.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-service-orders-charge.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/service-order-verify-fixture.ts",
           "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/common/redis/redis.service.ts",
@@ -48973,15 +49016,33 @@
         "files": [
           "services/api/scripts/support/service-order-verify-fixture.ts",
           "services/api/scripts/support/terminal-charge-fixture.ts",
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/quota/ai-resume-charge-steps.ts",
-          "services/api/src/ai/quota/ai-resume-charge.ts",
-          "services/api/src/ai/redis-inflight-lock.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/payment/service-order.payment.ts",
-          "services/api/src/payment/service-order.policy.ts",
           "services/api/src/payment/service-order.ref.ts",
-          "services/api/src/payment/terminal-charge.contract.ts"
+          "services/api/src/payment/terminal-charge.contract.ts",
+          "services/api/src/scan-tasks/dto/create-scan-task.dto.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-service-orders-settle.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/service-order-verify-fixture.ts",
+          "services/api/scripts/verify-service-orders-charge.ts",
+          "services/api/scripts/verify-service-orders-settle.ts",
+          "services/api/src/ai/quota/ai-resume-charge-steps.ts",
+          "services/api/src/ai/quota/ai-resume-charge.ts",
+          "services/api/src/payment/service-order.policy.ts"
         ],
         "missing": []
       },
@@ -49171,6 +49232,33 @@
       "scriptNames": [
         "@ai-job-print/api::verify:terminal-charge-binding-race",
         "@ai-job-print/api::verify:terminal-charge-binding-race:postgres"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/payment/effective-user-prices.ts",
+          "services/api/src/payment/terminal-charge-public-reset.ts",
+          "services/api/src/payment/terminal-charge-settings.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-terminal-charge-public-reset.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:terminal-charge-public-reset",
+        "@ai-job-print/api::verify:terminal-charge-public-reset:postgres"
       ],
       "wired": true
     },
