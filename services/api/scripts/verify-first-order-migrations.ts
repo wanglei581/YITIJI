@@ -53,6 +53,8 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261114120000_service_order_settlement/migration.sql')])
     // 没结案的同一任务只能一张单，并补退款通知与渠道关单重试列（20261114170000）。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261114170000_service_order_open_ref/migration.sql')])
+    // 绑定版本（20261115120000）。当前客户端写 Terminal 会带上 orgBindingGeneration，必须在第一次 terminal.create 之前执行。
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261115120000_add_terminal_org_binding_generation/migration.sql')])
     // 批量预建批次号（20261117120000）。当前客户端读 Terminal.provisionBatchId，必须在第一次 terminal.create 之前执行。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261117120000_add_terminal_provision_batch/migration.sql')])
     // 屏上扫描会话字段（20261102230000，排在上一条之后）。升级前已有的扫描任务升级后要取默认值：此时库里的 ScanTask 还是旧结构，
@@ -78,9 +80,10 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
       orgId: sentinel.id, name: 'Migration project', reference: 'migration-1', serviceStartAt: new Date('2026-01-01T00:00:00Z'),
       serviceEndAt: new Date('2027-01-01T00:00:00Z'), serviceScope: 'Migration only', supportContact: 'Test support',
     } })
-    const migrationTerminal = await client.terminal.create({ data: { id: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', agentToken: 'migration-only-no-device', deviceFingerprint: 'migration', orgId: sentinel.id }, select: { id: true, homeFreeBadge: true, userChargeMode: true, provisionBatchId: true } })
+    const migrationTerminal = await client.terminal.create({ data: { id: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', agentToken: 'migration-only-no-device', deviceFingerprint: 'migration', orgId: sentinel.id }, select: { id: true, homeFreeBadge: true, userChargeMode: true, orgBindingGeneration: true, provisionBatchId: true } })
     if (migrationTerminal.homeFreeBadge !== true) throw new Error(`${kind}: homeFreeBadge 默认必须是 true`)
     if (migrationTerminal.userChargeMode !== 'org_pays') throw new Error(`${kind}: userChargeMode 默认必须是 org_pays`)
+    if (migrationTerminal.orgBindingGeneration !== 0) throw new Error(`${kind}: orgBindingGeneration 默认必须是 0`)
     if (migrationTerminal.provisionBatchId !== null) throw new Error(`${kind}: provisionBatchId 默认必须是空`)
     const queueHeartbeat = await client.terminalHeartbeat.create({ data: {
       terminalId: 'migration-terminal',
