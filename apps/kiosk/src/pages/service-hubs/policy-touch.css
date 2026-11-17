@@ -110,3 +110,7 @@
 .policy-search-hint.is-bad,
 .policy-search-hint.is-bad b { color: var(--qxt-clay-ink); font-weight: 700; }
 .policy-search-tip { margin: 0; padding: 0 8px; font-size: 22px; line-height: 1.5; color: var(--qxt-ink-2); }
+.policy-search-status { display: flex; gap: 28px; align-items: center; }
+.policy-search-status > div { flex: 1; min-width: 0; }
+.policy-search-status .qxt-illus { flex: none; width: 220px; height: auto; }
+.policy-kw { background: rgba(31, 158, 134, .18); color: var(--qxt-teal-ink); border-radius: 6px; padding: 0 4px; }

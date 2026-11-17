@@ -23,7 +23,10 @@ function KeyboardMark() {
 export type PolicySearchFieldViewProps = {
   value: string
   composition?: string
-  engaged: boolean
+  /** 正在点着框或还在组字。框变青绿，并写出字数。 */
+  active: boolean
+  /** 框里已经有字。清空和搜索留着，字数先收起。 */
+  filled: boolean
   disabled?: boolean
   showGo?: boolean
   clearLabel?: string
@@ -40,21 +43,22 @@ export type PolicySearchFieldViewProps = {
 
 /** 纯展示。字数由 policyKeywordCount 算，组字中的拼音不计入。 */
 export function PolicySearchFieldView({
-  value, composition = '', engaged, disabled = false, showGo = true, clearLabel = '清空', inputRef,
+  value, composition = '', active, filled, disabled = false, showGo = true, clearLabel = '清空', inputRef,
   onValue, onCompositionStart, onCompositionUpdate, onCompositionEnd, onFocus, onBlur, onSearch, onClear,
 }: PolicySearchFieldViewProps) {
   const count = policyKeywordCount(value, composition)
   const over = count > POLICY_KEYWORD_MAX_LENGTH
-  const idle = !engaged
+  const idle = !active && !filled
   const canSearch = !disabled && count > 0 && !over
+  const showHint = active || over
   const showClear = !idle && value.length > 0
   let hint: ReactNode = null
-  if (!idle && over) {
+  if (showHint && over) {
     hint = <div className="policy-search-hint is-bad">
       <span>最多 {POLICY_KEYWORD_MAX_LENGTH} 个字，现在 {count} 个字</span>
       <b data-testid="policy-search-count">{count} / {POLICY_KEYWORD_MAX_LENGTH}</b>
     </div>
-  } else if (!idle) {
+  } else if (showHint) {
     hint = <div className="policy-search-hint">
       <span>按政策标题和摘要找，输入一个词就行</span>
       <b data-testid="policy-search-count">{count} / {POLICY_KEYWORD_MAX_LENGTH}</b>
@@ -63,7 +67,7 @@ export function PolicySearchFieldView({
   return <div className="policy-search" data-testid="policy-search">
     <div className="policy-search-row">
       <div className="policy-search-wrap">
-        <label className={`policy-search-field${idle ? '' : ' is-on'}${over ? ' is-bad' : ''}${showClear ? ' has-clear' : ''}`}>
+        <label className={`policy-search-field${active && !over ? ' is-on' : ''}${over ? ' is-bad' : ''}${showClear ? ' has-clear' : ''}`}>
           <Magnifier />
           <input
             ref={inputRef}
@@ -134,7 +138,8 @@ export function PolicySearchField({
   return <PolicySearchFieldView
     value={value}
     composition={composition}
-    engaged={focused || value.length > 0 || composition.length > 0}
+    active={focused || composition.length > 0}
+    filled={value.length > 0}
     disabled={disabled}
     showGo={showGo}
     clearLabel={clearLabel}
