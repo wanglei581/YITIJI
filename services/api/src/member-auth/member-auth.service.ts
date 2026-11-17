@@ -333,10 +333,14 @@ export class MemberAuthService {
 
   /** 登出:删除 Redis 会话即失效(JWT 即使未过期也作废)。 */
   async logout(endUserId: string, sessionId: string): Promise<void> {
-    await this.redis.unregisterMemberSession(endUserId, sessionId)
     const ownerKey = `u:${endUserId}`
-    this.memoryBridge?.forgetChatOwner(ownerKey)
-    this.qaMemory?.forgetOwner(ownerKey)
+    try {
+      await this.redis.unregisterMemberSession(endUserId, sessionId)
+    } finally {
+      // 注销失败也要把本进程里的原话丢掉。错误照旧抛出，登出对外仍算失败。
+      this.memoryBridge?.forgetChatOwner(ownerKey)
+      this.qaMemory?.forgetOwner(ownerKey)
+    }
   }
 
   /** 当前登录用户信息(phoneMasked 由 phoneEnc 解密派生,绝不回明文)。 */

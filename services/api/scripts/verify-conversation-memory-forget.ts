@@ -672,6 +672,47 @@ async function main(): Promise<void> {
       '场景 10 阳性：清完自己的之后，别人的游客作业还在',
     )
 
+    // ── 场景 11：Redis 注销失败也要清本进程两块内存 ───────────
+    const userRevoke = `verify-revoke-${randomUUID()}`
+    const userRevokeKeep = `verify-revoke-keep-${randomUUID()}`
+    await createUser(userRevoke)
+    await createUser(userRevokeKeep)
+    const markRevokeChat = textMark('注销失败聊天原话')
+    const markKeepChat = textMark('注销失败旁路聊天')
+    const revokeChat = await chatTurn(`u:${userRevoke}`, undefined, markRevokeChat)
+    const keepChat = await chatTurn(`u:${userRevokeKeep}`, undefined, markKeepChat)
+    const workRevoke = `verify-work-revoke-${randomUUID()}`
+    const workRevokeKeep = `verify-work-revoke-keep-${randomUUID()}`
+    await createQa(userRevoke, workRevoke, `verify-art-revoke-${randomUUID()}`)
+    await createQa(userRevokeKeep, workRevokeKeep, `verify-art-revoke-keep-${randomUUID()}`)
+    const markRevokeQa = textMark('注销失败作业原话')
+    const markKeepQa = textMark('注销失败旁路作业')
+    await advisor.ask(workRevoke, markRevokeQa, { endUserId: userRevoke, accessToken: null })
+    await advisor.ask(workRevokeKeep, markKeepQa, { endUserId: userRevokeKeep, accessToken: null })
+    const originalUnregister = redis.unregisterMemberSession
+    redis.unregisterMemberSession = async () => {
+      throw new Error('redis revoke failed')
+    }
+    let revokeError: unknown = null
+    try {
+      await auth.logout(userRevoke, randomUUID())
+    } catch (error) {
+      revokeError = error
+    } finally {
+      redis.unregisterMemberSession = originalUnregister
+    }
+    check(
+      revokeError instanceof Error
+        && chat.getOwnedTranscript(revokeChat.result.sessionId, `u:${userRevoke}`) === null
+        && memory.read(workRevoke).length === 0,
+      '场景 11：注销抛错之后，他名下的小青对话和作业问答都空了，登出仍失败',
+    )
+    check(
+      !!chat.getOwnedTranscript(keepChat.result.sessionId, `u:${userRevokeKeep}`)?.some((turn) => turn.content.includes(markKeepChat))
+        && memory.read(workRevokeKeep).some((turn) => turn.content.includes(markKeepQa)),
+      '场景 11 阳性：另一个会员的两块内存不受这次注销失败影响',
+    )
+
     console.log(`\nverify:conversation-memory-forget ${failCount === 0 ? '通过' : '未通过'}：PASS ${passCount} / FAIL ${failCount}`)
     if (failCount > 0) process.exitCode = 1
   } finally {
