@@ -95,6 +95,7 @@ export const AI_USE_ROUTES: readonly AiUseRoute[] = [
   { method: 'POST', path: '/trtc/session', kind: 'voice' },
   { method: 'POST', path: '/trtc/session/stop', kind: 'exempt' },
   { method: 'GET', path: '/assistant/availability', kind: 'read' },
+  { method: 'GET', path: '/mock-interviews/availability', kind: 'read' },
 ]
 
 function segments(path: string): string[] {

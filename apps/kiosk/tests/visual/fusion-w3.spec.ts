@@ -2485,32 +2485,47 @@ async function fillInterviewSetupToStep3(page: Page): Promise<void> {
   await advanceInterviewSetupToStart(page)
 }
 
-test('interview setup: mock_interview off keeps creation shut, says why, and sends no create request @w3-kiosk', async ({ page, api }) => {
+test('interview setup: opening probe down keeps start shut, offers the practice sheet, and does not start @w3-kiosk', async ({ page, api }) => {
   armInterviewSession(api)
-  api.respond('GET', KIOSK_AI_CAPABILITIES_PATH, { status: 200, json: kioskAiCapabilitiesResponse({ mock_interview: CAPABILITY_OFF }) })
+  // 开场看 GET /mock-interviews/availability，不再看能力表的 mock_interview。
+  // 不能用时主按钮换成稿上的「打印通用题目单」（建配置、不 start），「创建并开始练习」不亮。
+  api.respond('GET', '/api/v1/mock-interviews/availability', {
+    status: 200,
+    json: { success: true, data: { available: false } },
+  })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/practice-sheet`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中，打印扫描照常' } },
+  })
   await fillInterviewSetupToStep3(page)
   const primary = page.getByTestId('interview-primary')
-  await expect(primary).toBeDisabled()
+  await expect(primary).toHaveText('打印通用题目单')
+  await expect(primary).toBeEnabled()
+  await expect(page.getByRole('button', { name: '创建并开始练习', exact: true })).toHaveCount(0)
   await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
   const note = page.locator('.qxt-iv-note', { hasText: '暂时不能开始 AI 面试' })
-  await expect(note).toContainText('AI能力当前不可用')
+  await expect(note).toContainText('题目单不经模型，不含点评、评分或通过率。')
   await expect(page.getByText('管理员已关闭')).toHaveCount(0)
-  // 出口：页内不依赖 AI 的面试技巧。问小青没关（assistant_chat 可用），照常可点。
   await expect(page.getByRole('button', { name: /先看面试技巧/ })).toBeVisible()
   await expect(page.locator('[data-qxt-ask="on"]')).toHaveText('问小青：这场练习怎么设')
-  await primary.dispatchEvent('click')
-  expect(api.requestCount('POST', '/api/v1/mock-interviews')).toBe(0)
+  await primary.click()
+  expect(api.requestCount('POST', '/api/v1/mock-interviews')).toBe(1)
+  expect(api.requestCount('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/start`)).toBe(0)
+  expect(api.requestCount('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/practice-sheet`)).toBe(1)
 })
 
 test('interview setup: the not-ready note shows from step 1, so nobody fills three steps before finding out @w3-kiosk', async ({ page, api }) => {
   armInterviewSession(api)
-  api.respond('GET', KIOSK_AI_CAPABILITIES_PATH, { status: 200, json: kioskAiCapabilitiesResponse({ mock_interview: CAPABILITY_OFF }) })
+  api.respond('GET', '/api/v1/mock-interviews/availability', {
+    status: 200,
+    json: { success: true, data: { available: false } },
+  })
   await page.goto('/interview/setup')
   const note = page.locator('.qxt-iv-note', { hasText: '暂时不能开始 AI 面试' })
   await expect(note).toBeVisible()
-  await expect(note).toContainText('AI能力当前不可用')
+  await expect(note).toContainText('题目单不经模型，不含点评、评分或通过率。')
   await expect(page.locator('.qxt-status')).toHaveText('AI 暂时不能出题')
-  // 第 1 步照常能填、能往下走（手填不依赖 AI）；只是创建在第 3 步不放行。
+  // 第 1 步照常能填、能往下走（手填不依赖 AI）；开场在第 3 步不亮。
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
   await expect(page.getByRole('button', { name: '下一步', exact: true })).toBeEnabled()
 })
@@ -2518,6 +2533,8 @@ test('interview setup: the not-ready note shows from step 1, so nobody fills thr
 test('interview setup: unreadable capabilities count as unconfirmed, not available, for creation and 小青 @w3-kiosk', async ({ page, api }) => {
   armInterviewSession(api)
   api.respond('GET', KIOSK_AI_CAPABILITIES_PATH, CAPABILITIES_UNREADABLE)
+  // 开场探针读失败同样不当成能用，也不当成不能用：开始键不亮，顶栏不写「AI 模拟面试」。
+  api.respond('GET', '/api/v1/mock-interviews/availability', CAPABILITIES_UNREADABLE)
   await fillInterviewSetupToStep3(page)
   await expect(page.getByTestId('interview-primary')).toBeDisabled()
   await expect(page.locator('.qxt-status')).toHaveText('AI 状态未确认')

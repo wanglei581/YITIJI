@@ -42,7 +42,9 @@ import { useInlineResumeAiConsent } from '../resume/useInlineResumeAiConsent'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { openedInterviewDeadline } from './session/interviewDeadline'
 import { InterviewShell } from './InterviewShell'
-import { assistantOffAsk, interviewAiPill, isAiGateDown, useInterviewAiCapabilities } from './useInterviewAiCapabilities'
+import { assistantOffAsk, interviewAiPill, isAiGateDown, useInterviewAiCapabilities, type InterviewAiState } from './useInterviewAiCapabilities'
+import { INTERVIEW_DOWN_NOTE, interviewStartControl } from './interviewStartControl'
+import { useMockInterviewAvailability } from './useMockInterviewAvailability'
 import { InterviewNote, InterviewStatus } from './interviewQxParts'
 import { scrollInterviewToTop } from './interviewScroll'
 import type { InterviewStage } from './interviewWorkbenchModel'
@@ -120,8 +122,10 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [usbBusy, setUsbBusy] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /** 各 AI 能力的配置状态（读不到按没确认处理）；入口、顶栏、底栏小青都按它判。 */
+  /** 小青底栏仍读能力表。开场能不能用读 mock_interview 探针，不把能力表当成开场开关。 */
   const capabilities = useInterviewAiCapabilities()
+  const opening = useMockInterviewAvailability()
+  const control = interviewStartControl(opening)
   /** 这次创建被服务端 AI 闸门（暂停、额度）拦下：小青这次也用不了。只管本页本次，不落存储。 */
   const [assistantDown, setAssistantDown] = useState(false)
   /**
@@ -366,14 +370,15 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
    * 口径来源：docs/design/kiosk-ai-os-v3-2026-08/20-interview-pod.html 的 ai-down 支线
    * （:497「AI 不可用 · 只能用通用题库」/ :1137「生成题目与答案单」/ :1894「本单不含点评」）。
    */
-  const handlePracticeSheet = async () => {
-    if (!pendingSession || printingSheet) return
+  const handlePracticeSheet = async (session?: { sessionId: string; accessToken?: string }) => {
+    const target = session ?? pendingSession
+    if (!target || printingSheet) return
     setPrintingSheet(true)
     setError(null)
     try {
-      const file = await printInterviewPracticeSheet(pendingSession.sessionId, {
+      const file = await printInterviewPracticeSheet(target.sessionId, {
         token: getToken(),
-        accessToken: pendingSession.accessToken,
+        accessToken: target.accessToken,
       })
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
       startPrint({
@@ -446,11 +451,15 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const goTips = () => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))
   // 小青：配置没确认可用、或这次创建被服务端 AI 闸门拦下，都换停用态（照稿 st-ai-down）。
   const assistantState = assistantDown ? 'off' : capabilities.state('assistant_chat')
-  const mockState = capabilities.state('mock_interview')
-  // 配置没确认可用就不放行创建：写明原因，出口是不依赖 AI 的「先看面试技巧」。第 1、2 步也先说，别让人白填到第 3 步。
+  const mockState: InterviewAiState = control.pill === 'available' ? 'available' : control.pill
+  // 探针没确认可用就不放行开场。不能用时写稿上的那句，并给出看技巧和题目单；探不到不说成正常，也不说成不能用。
   const capabilityNote = mockState !== 'available' && !aiOutage && !creating ? (
     <InterviewNote lead={mockState === 'checking' ? '正在确认 AI 面试能力' : '暂时不能开始 AI 面试'}>
-      <span>{capabilities.reason('mock_interview')}。{step === 3 ? '下面的「先看面试技巧」' : '「先看面试技巧」'}不依赖 AI，现在就能看。</span>
+      <span>
+        {mockState === 'off'
+          ? INTERVIEW_DOWN_NOTE
+          : `${mockState === 'checking' ? '正在确认AI能力状态' : '暂时无法确认AI能力状态'}。${step === 3 ? '下面的「先看面试技巧」' : '「先看面试技巧」'}不依赖 AI，现在就能看。`}
+      </span>
     </InterviewNote>
   ) : null
   const shownError = interviewUserLine(error, contact)
@@ -476,6 +485,35 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     if (!industry.trim()) return '请先选择本次练习的行业，不会替你预选'
     if (!experience) return '请先选择你的经验情况，不会替你预选'
     return null
+  }
+  /** 探针说开不了场：建一场配置（不调模型、不 start），再印通用题目单。 */
+  const handleOpenSheet = async () => {
+    if (pendingSession) {
+      await handlePracticeSheet()
+      return
+    }
+    const invalid = validateBasics()
+    if (invalid || !experience) {
+      setError(invalid ?? '请先选择你的经验情况，不会替你预选')
+      return
+    }
+    setError(null)
+    try {
+      const token = getToken()
+      const created = await createInterview({
+        interviewerType,
+        industry: industry.trim(),
+        position: position.trim(),
+        experience,
+        difficulty,
+        durationMin: duration,
+      }, { token })
+      const session = { sessionId: created.sessionId, accessToken: created.accessToken }
+      setPendingSession(session)
+      await handlePracticeSheet(session)
+    } catch (err) {
+      setError(aiErrorMessageOf(err, '题目单生成失败，请稍后重试'))
+    }
   }
   const goNext = () => {
     if (step === 1) {
@@ -521,13 +559,16 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 ? '正在为你准备面试官…'
                 : aiOutage && pendingSession
                   ? '打印通用题目与答案单'
-                  : '创建并开始练习',
+                  : control.mode === 'sheet'
+                    ? '打印通用题目单'
+                    : '创建并开始练习',
             testId: step === 3 ? 'interview-primary' : undefined,
-            disabled: step === 3 && (creating || uploading || printingSheet || (mockState !== 'available' && !(aiOutage && pendingSession))),
+            disabled: step === 3 && (creating || uploading || printingSheet || (control.mode === 'wait' && !(aiOutage && pendingSession))),
             onClick: () => {
               if (step < 3) goNext()
               else if (aiOutage && pendingSession) void handlePracticeSheet()
-              else void handleStart()
+              else if (control.mode === 'sheet') void handleOpenSheet()
+              else if (control.mode === 'start') void handleStart()
             },
           }}
         />

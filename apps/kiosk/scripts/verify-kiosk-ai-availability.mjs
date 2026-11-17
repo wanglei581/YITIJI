@@ -54,4 +54,46 @@ for (const [body, expect, label] of cases) {
 }
 console.log('  PASS 小青判定函数：只有明确不能用才锁，其余保持原状')
 rmSync(dir, { recursive: true, force: true })
+
+const setup = read('src/pages/interview/InterviewSetupPage.tsx')
+const interviewHook = read('src/pages/interview/useMockInterviewAvailability.ts')
+const interviewPure = read('src/pages/interview/interviewStartControl.ts')
+assert.match(setup, /useMockInterviewAvailability\(\)/, '设置页必须先读开场探针')
+assert.match(setup, /interviewStartControl\(opening\)/, '开始键必须按探针判定')
+assert.match(setup, /control\.mode === 'sheet'/, '不能用时主按钮走题目单，不亮开场')
+assert.match(setup, /打印通用题目单/, '不能用时给出打印题目单')
+assert.match(setup, /先看面试技巧/, '不能用时仍可看技巧')
+assert.match(setup, /INTERVIEW_DOWN_NOTE/, '不能用时用稿上的现成句')
+assert.match(setup, /control\.mode === 'wait'/, '还没确认时开始键不亮')
+assert.match(setup, /control\.mode === 'start'\) void handleStart\(\)/, '只有确认能用才开场')
+assert.doesNotMatch(setup, /handleOpenSheet[\s\S]{0,800}startInterview\(/, '题目单这条路不得开场')
+assert.match(interviewHook, /\/mock-interviews\/availability/, '探针打到开场只读接口')
+assert.match(interviewHook, /setProbe\('unconfirmed'\)/, '网络失败记成没确认')
+assert.doesNotMatch(interviewHook, /setProbe\('up'\)|setProbe\('down'\)/, '钩子不得把失败或成功写死')
+assert.match(interviewPure, /题目单不经模型，不含点评、评分或通过率。/, '说明用稿上的现成句')
+console.log('  PASS 面试设置页：不能用时开始键不亮，两条出路在；探不到不说正常')
+
+const interviewJs = ts.transpileModule(interviewPure, {
+  compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const interviewDir = mkdtempSync(join(tmpdir(), 'q22-kiosk-interview-'))
+const interviewFile = join(interviewDir, 'interview.mjs')
+writeFileSync(interviewFile, interviewJs)
+const { interviewProbeFromBody, interviewStartControl } = await import(pathToFileURL(interviewFile).href)
+const interviewCases = [
+  [{ success: true, data: { available: false } }, 'down', 'sheet', 'off', '包装后的 false'],
+  [{ available: false }, 'down', 'sheet', 'off', '裸 false'],
+  [{ success: true, data: { available: true } }, 'up', 'start', 'available', '可用'],
+  [{ success: true, data: {} }, 'unconfirmed', 'wait', 'unconfirmed', '没有 available'],
+  [null, 'unconfirmed', 'wait', 'unconfirmed', '空体'],
+  [{ success: false, error: { code: 'AI_NOT_CONFIGURED' } }, 'unconfirmed', 'wait', 'unconfirmed', '失败体不当成不能用'],
+  ['nope', 'unconfirmed', 'wait', 'unconfirmed', '不是对象'],
+]
+for (const [body, probe, mode, pill, label] of interviewCases) {
+  assert.equal(interviewProbeFromBody(body), probe, label)
+  assert.deepEqual(interviewStartControl(probe), { mode, pill }, label)
+}
+assert.deepEqual(interviewStartControl('checking'), { mode: 'wait', pill: 'checking' }, '确认中不说正常也不说不能用')
+console.log('  PASS 面试判定函数：只有明确不能用才改走题目单')
+rmSync(interviewDir, { recursive: true, force: true })
 console.log('\n=== ALL PASS ===')

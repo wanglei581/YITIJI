@@ -20,6 +20,8 @@ import { AssistantAvailabilityController } from '../src/ai/assistant-availabilit
 import { AssistantChatAvailability } from '../src/ai/assistant-chat-availability.service'
 import { listKioskAiCapabilities } from '../src/ai/kiosk-ai-capabilities'
 import { LlmConfigService } from '../src/ai/llm/llm-config.service'
+import { MockInterviewAvailability } from '../src/mock-interview/mock-interview-availability.service'
+import { MockInterviewController } from '../src/mock-interview/mock-interview.controller'
 import { TrtcController } from '../src/trtc/trtc.controller'
 
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'q22-avail-'))
@@ -85,6 +87,20 @@ function sourceContracts(): void {
   assert.match(read('src/ai/kiosk-ai-capabilities.ts'), /digitalHumanVerdict\(/, '能力表必须调用同一个判断')
   assert.match(read('src/trtc/trtc.service.ts'), /trtcConfigGap\(/, '建会话服务不得再把缺凭证报成 500')
   console.log('  PASS 数字人：源码共用一个判断')
+
+  const interviewLlm = read('src/mock-interview/mock-interview-llm.service.ts')
+  const callLlm = interviewLlm.slice(interviewLlm.indexOf('private async callLlm'))
+  assert.match(callLlm, /mockInterviewModelRefusal\(this\.config\)/, '出题必须调用共用的模型位判断')
+  assert.doesNotMatch(callLlm, /code: 'AI_NOT_CONFIGURED'/, '出题不得再手写一套没配错误')
+  const interviewCtrl = read('src/mock-interview/mock-interview.controller.ts')
+  const interviewStart = interviewCtrl.slice(interviewCtrl.indexOf("@Post(':id/start')"), interviewCtrl.indexOf("@Post(':id/answer')"))
+  assert.match(interviewStart, /this\.opening\.refusal\(\)/, '开场必须调用共用判断')
+  const interviewProbe = interviewCtrl.slice(interviewCtrl.indexOf("@Get('availability')"), interviewCtrl.indexOf("@Post(':id/end')"))
+  assert.match(interviewProbe, /this\.opening\.refusal\(\)/, '面试探针必须调用同一个判断')
+  assert.match(interviewProbe, /@AiUse\('read'\)/, '面试探针是只读')
+  assert.match(interviewProbe, /available: refusal === null/, '探针只回答能不能用')
+  assert.match(read('src/mock-interview/mock-interview.module.ts'), /MockInterviewAvailability/, '生产模块必须提供共用判断')
+  console.log('  PASS 模拟面试：源码共用一个判断')
 }
 
 const TRTC_FIXTURE: Record<string, string> = {
@@ -269,6 +285,67 @@ async function main(): Promise<void> {
   } finally {
     restoreTrtc()
   }
+
+  store.set('system:ai-access:paused', 'off')
+  budgetExhausted = false
+  access.clearCache()
+  let openings = 0
+  const interview = new MockInterviewController(
+    {
+      hasInterviewerTurn: async () => false,
+      start: async () => { openings += 1; throw new Error(PASSED) },
+    } as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    undefined,
+    new MockInterviewAvailability(access, llm),
+  )
+  const interviewPair = async (label: string, expectCode: string | null) => {
+    access.clearCache()
+    const before = openings
+    const body = await interview.availability()
+    const text = JSON.stringify(body)
+    assert.equal(body.success, true)
+    assert.deepEqual(Object.keys(body.data).sort(), ['available'])
+    assert.doesNotMatch(text, /apiKey|baseURL|systemPrompt|vendor|\bmodel\b|\benabled\b|sk-q22/i, `${label} 探针回显了配置`)
+    let outcome: ReturnType<typeof chatError> = 'other'
+    try {
+      await interview.start('sess-q22', {} as never, { headers: {} })
+    } catch (error) {
+      outcome = chatError(error)
+    }
+    if (expectCode === null) {
+      assert.equal(body.data.available, true, `${label} 探针应可用`)
+      assert.equal(outcome, 'passed', `${label} 开场应放行到出题之前`)
+      assert.equal(openings, before + 1, `${label} 应真正进入开场`)
+    } else {
+      assert.equal(body.data.available, false, `${label} 探针应不可用`)
+      assert.notEqual(outcome, 'passed', `${label} 开场不得放行`)
+      assert.notEqual(outcome, 'other', `${label} 开场应回 503 而不是其它错误`)
+      if (outcome !== 'passed' && outcome !== 'other') {
+        assert.equal(outcome.code, expectCode, `${label} 开场拒绝码`)
+      }
+      assert.equal(openings, before, `${label} 不得进入出题`)
+    }
+    console.log(`  PASS 模拟面试双向 ${label}`)
+  }
+  await interviewPair('mock_interview 没配', 'AI_NOT_CONFIGURED')
+  llm.update({ enabled: true, apiKey: 'sk-q22-interview-not-real' }, 'mock_interview')
+  llm.update({ enabled: false }, 'mock_interview')
+  await interviewPair('mock_interview 被关掉', 'AI_NOT_CONFIGURED')
+  llm.update({ enabled: true }, 'mock_interview')
+  store.set('system:ai-access:paused', 'on')
+  await interviewPair('全站暂停', 'AI_PAUSED')
+  store.set('system:ai-access:paused', 'off')
+  budgetExhausted = true
+  await interviewPair('当天预算到顶', 'AI_BUDGET_EXHAUSTED')
+  budgetExhausted = false
+  await interviewPair('mock_interview 配好且未暂停、未到顶', null)
 
   console.log('\n=== ALL PASS ===')
 }

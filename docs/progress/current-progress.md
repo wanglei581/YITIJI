@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-17：小青、数字人、模拟面试「能不能用」与真实调用对齐（分支 `claude/ai-availability-1117`，未推送）
+
+- 小青文字对话新增只读 `GET /api/v1/assistant/availability`，与 `POST /assistant/chat` 共用 `assistant_chat` 判断。顾问探针仍看 `advisor_work`。一体机 `/assistant` 只有探针明确不能用才锁输入。
+- 数字人能力表 `digital_human` 与 `POST /trtc/session` 共用 `digitalHumanVerdict`（凭证、功能位、全站暂停、当天预算）。缺凭证回 503 `AI_NOT_CONFIGURED`。后台说明改为这个开关管语音通话，开着还要凭证齐且没被暂停或额度拦住。
+- 模拟面试新增只读 `GET /api/v1/mock-interviews/availability`，与开场共用 `mock_interview` 判断。设置页不能用时不亮「创建并开始练习」，主按钮改为「打印通用题目单」（建配置后出纸，不 start），「先看面试技巧」仍在。探针读失败不说成能用，也不说成不能用。
+- 没推送，没上线。
+
 ## 2026-11-15：收费设置保存核对绑定版本，改绑在途不能把旧价写进新机构（分支 `claude/pricing-p1d-1115`，未推送）
 
 - 来由：补全线第十七任 P1d。管理员在终端抽屉里改绑机构的请求已经在服务端提交、响应还没回到页面时点「保存收费设置」，旧的向用户收费价会写进新机构，顶上却写「改绑机构，收费设置已复位」。

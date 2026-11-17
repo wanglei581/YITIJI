@@ -1,5 +1,5 @@
 import { wavDuration } from '../asr/wav-duration'
-import { BadRequestException, Body, Controller, Delete, Get, Optional, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Optional, Param, Post, Query, Req, ServiceUnavailableException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
@@ -18,7 +18,9 @@ import { InterviewTranscriptPrintService } from './interview-transcript-print.se
 import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
 import { TtsService } from './asr/tts.service'
 import { AiLogService } from '../ai/ai-log.service'
-import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { PaidAiThrottle, TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
+import { MOCK_INTERVIEW_NOT_CONFIGURED } from './mock-interview-availability'
+import { MockInterviewAvailability } from './mock-interview-availability.service'
 import { chargeInterviewStart } from '../payment/service-order.intercept'
 import { ServiceOrderService } from '../payment/service-order.service'
 
@@ -133,6 +135,7 @@ export class MockInterviewController {
     private readonly aiLog: AiLogService,
     private readonly transcriptPrint: InterviewTranscriptPrintService,
     @Optional() private readonly serviceOrders?: ServiceOrderService,
+    @Optional() private readonly opening?: MockInterviewAvailability,
   ) {}
 
   private async requesterOf(req: ReqLike): Promise<InterviewRequester> {
@@ -156,6 +159,10 @@ export class MockInterviewController {
   @AiUse('generate')
 
   async start(@Param('id') id: string, @Body() dto: StartInterviewDto, @Req() req: ReqLike) {
+    if (this.opening) {
+      const refusal = await this.opening.refusal()
+      if (refusal) throw new ServiceUnavailableException({ error: refusal })
+    }
     const requester = await this.requesterOf(req)
     const alreadyOpen = typeof this.service.hasInterviewerTurn === 'function'
       ? await this.service.hasInterviewerTurn(id, requester)
@@ -270,6 +277,18 @@ export class MockInterviewController {
 
   voiceCapability() {
     return ApiResponse.ok({ asrEnabled: this.asr.enabled, ttsEnabled: this.tts.enabled })
+  }
+
+  /**
+   * 开场前的只读探针。与 POST :id/start 共用同一个判断。
+   * 只回答能不能用，不回密钥、厂商、模型或提示词。静态路径必须写在 :id 之前。
+   */
+  @Get('availability')
+  @TerminalScopedThrottle(30)
+  @AiUse('read')
+  async availability(): Promise<ApiResponse<{ available: boolean }>> {
+    const refusal = this.opening ? await this.opening.refusal() : MOCK_INTERVIEW_NOT_CONFIGURED
+    return ApiResponse.ok({ available: refusal === null })
   }
 
   @Post(':id/end')
