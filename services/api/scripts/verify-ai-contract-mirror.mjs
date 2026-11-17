@@ -23,6 +23,11 @@
  *    B. 两份文件里**同名**的声明，一律必须逐字相同（覆盖根闭包之外的手抄面）。
  *    C. 每个根类型两边都必须存在（catch 单侧删除）。
  *
+ * 另比 AI 按人次数余量的手抄副本：shared 里的六个余量类型 ↔
+ * services/api/src/ai/quota/ai-quota.types.ts，以及两侧的 AiQuotaBucket。
+ * 副本把桶写成别名，shared 把同一个联合类型写开；比对前按这一侧别名的右部展开，
+ * 再走下面同一套「剥注释、去空白」的结构比对。
+ *
  * 运行：pnpm --filter @ai-job-print/api verify:ai-contract-mirror
  */
 import { readFileSync } from 'node:fs'
@@ -34,6 +39,17 @@ const repo = resolve(here, '../../..')
 
 const SHARED = 'packages/shared/src/types/ai.ts'
 const MIRROR = 'services/api/src/ai/interfaces/ai-provider.interface.ts'
+const QUOTA_MIRROR = 'services/api/src/ai/quota/ai-quota.types.ts'
+const BUCKET_SHARED = 'packages/shared/src/types/memberBenefits.ts'
+const BUCKET_MIRROR = 'services/api/src/member-benefits/member-benefits.types.ts'
+const QUOTA_TYPES = [
+  'AiQuotaRemaining',
+  'KioskAiQuota',
+  'AdminAiQuotaBucketUsage',
+  'AdminAiQuotaGuestUsage',
+  'AdminAiQuotaExtraBucket',
+  'AdminAiQuotaUsage',
+]
 
 /**
  * 引用闭包的根。选取标准：**跨进程传输的契约**（前端读得到的报告 / 结果结构）。
@@ -115,6 +131,18 @@ function normalize(text) {
   return text.replace(/\s+/g, '').replace(/=\|/g, '=')
 }
 
+/** `export type Name = …` 的右部。 */
+function aliasRhs(decl) {
+  const match = decl.match(/=\s*([\s\S]*?)\s*;?\s*$/)
+  return match ? match[1] : null
+}
+
+/** 把本侧的 AiQuotaBucket 展开成别名右部，再交给 normalize。 */
+function expandBucket(text, rhs) {
+  if (!rhs) return text
+  return text.replace(/\bAiQuotaBucket\b/g, rhs)
+}
+
 /** 声明体里引用到的、且在同一文件里有定义的名字。 */
 function referencedNames(text, known) {
   const out = new Set()
@@ -183,6 +211,42 @@ if (drifted.length > 0) {
     console.error(`\n  ── ${name} ──`)
     console.error(`  ${SHARED}\n    ${normalize(sharedDecls.get(name))}`)
     console.error(`  ${MIRROR}\n    ${normalize(mirrorDecls.get(name))}`)
+  }
+}
+
+console.log('\n=== AI 按人次数余量手抄副本（shared/types/ai.ts ↔ ai-quota.types.ts，含 AiQuotaBucket）===')
+const quotaMirrorDecls = declarations(readFileSync(resolve(repo, QUOTA_MIRROR), 'utf8'))
+const bucketSharedDecl = declarations(readFileSync(resolve(repo, BUCKET_SHARED), 'utf8')).get('AiQuotaBucket')
+const bucketMirrorDecl = declarations(readFileSync(resolve(repo, BUCKET_MIRROR), 'utf8')).get('AiQuotaBucket')
+const bucketSharedRhs = bucketSharedDecl ? aliasRhs(bucketSharedDecl) : null
+const bucketMirrorRhs = bucketMirrorDecl ? aliasRhs(bucketMirrorDecl) : null
+check(
+  Boolean(bucketSharedDecl && bucketMirrorDecl && bucketSharedRhs && bucketMirrorRhs),
+  'AiQuotaBucket 两侧都有类型别名',
+)
+check(
+  Boolean(bucketSharedDecl && bucketMirrorDecl) && normalize(bucketSharedDecl) === normalize(bucketMirrorDecl),
+  'AiQuotaBucket 结构一致',
+)
+if (bucketSharedDecl && bucketMirrorDecl && normalize(bucketSharedDecl) !== normalize(bucketMirrorDecl)) {
+  console.error(`\n  ── AiQuotaBucket ──`)
+  console.error(`  ${BUCKET_SHARED}\n    ${normalize(bucketSharedDecl)}`)
+  console.error(`  ${BUCKET_MIRROR}\n    ${normalize(bucketMirrorDecl)}`)
+}
+for (const name of QUOTA_TYPES) {
+  const sharedText = sharedDecls.get(name)
+  const mirrorText = quotaMirrorDecls.get(name)
+  if (!sharedText || !mirrorText) {
+    check(false, `${name} 两侧都存在（shared=${Boolean(sharedText)} / quota=${Boolean(mirrorText)}）`)
+    continue
+  }
+  const sharedNorm = normalize(expandBucket(sharedText, bucketSharedRhs))
+  const mirrorNorm = normalize(expandBucket(mirrorText, bucketMirrorRhs))
+  check(sharedNorm === mirrorNorm, `${name} 与手抄副本结构一致`)
+  if (sharedNorm !== mirrorNorm) {
+    console.error(`\n  ── ${name} ──`)
+    console.error(`  ${SHARED}\n    ${sharedNorm}`)
+    console.error(`  ${QUOTA_MIRROR}\n    ${mirrorNorm}`)
   }
 }
 
