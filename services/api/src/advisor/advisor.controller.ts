@@ -5,7 +5,7 @@ import { JwtService } from '@nestjs/jwt'
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { isMemberLookupUnavailable, resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { AdvisorService } from './advisor.service'
 import { ADVISOR_SKILLS, EVIDENCE_LEVELS, type AdvisorSkill } from './advisor-skills'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -205,6 +205,13 @@ export class AdvisorController {
   @AiUseExempt('清场时丢掉这一次作业的问答内存，不调模型；AI 暂停期间也必须能删')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async forget(@Param('sessionId') sessionId: string, @Req() req: ReqLike) {
-    return this.service.forgetSession(sessionId, await this.requesterOf(req, true))
+    let requester: Awaited<ReturnType<AdvisorController['requesterOf']>>
+    try {
+      requester = await this.requesterOf(req, true)
+    } catch (error) {
+      if (isMemberLookupUnavailable(error)) this.service.discardQaMemory(sessionId)
+      throw error
+    }
+    return this.service.forgetSession(sessionId, requester)
   }
 }

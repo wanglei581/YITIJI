@@ -1,7 +1,7 @@
 import { Body, Controller, Post, Req } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { AiUseExempt } from '../ai-access/ai-access.decorator'
-import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { isMemberLookupUnavailable, resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { resolveClientIp } from '../common/client-ip'
 import { RedisService } from '../common/redis/redis.service'
 import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
@@ -42,7 +42,15 @@ export class AssistantSessionForgetController {
     @Body() dto: AssistantSessionsForgetDto,
     @Req() req: ReqLike,
   ): Promise<{ forgotten: number }> {
-    const member = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma, { strict: true })
+    let member: Awaited<ReturnType<typeof resolveOptionalEndUser>>
+    try {
+      member = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma, { strict: true })
+    } catch (error) {
+      if (isMemberLookupUnavailable(error)) {
+        for (const sessionId of dto.sessionIds) this.chat.discardById(sessionId)
+      }
+      throw error
+    }
     const ownerKey = assistantOwnerKey(member?.endUserId ?? null, resolveClientIp(req))
     let forgotten = 0
     for (const sessionId of dto.sessionIds) {

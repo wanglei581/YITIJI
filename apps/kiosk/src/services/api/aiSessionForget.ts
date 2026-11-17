@@ -1,8 +1,9 @@
 // 清场时让服务器忘掉这一人次的小青对话和作业内存。
 //
 // 会话号只留在本模块的内存里：整页重载自然清空，不写 localStorage / sessionStorage。
-// 发送用 keepalive 的裸 fetch，不等回执、不抛错。终端封装发出前会先等声明桥和在飞的续期，
-// 可能晚于清场末尾的整页重载；这两个接口本身也不要求终端会话票。
+// 发送用 keepalive 的裸 fetch。失败会退避重试，仍失败只记一条诊断，不抛错、不把原话写进日志。
+// 终端封装发出前会先等声明桥和在飞的续期，可能晚于清场末尾的整页重载；
+// 这两个接口本身也不要求终端会话票。
 
 import { parseId } from '../../pages/ai-plan/advisorArtifactModel'
 import { API_BASE_URL, API_MODE } from './client'
@@ -50,23 +51,52 @@ export function rememberAdvisorSession(id: string, access?: AdvisorSessionAccess
   )
 }
 
+const FORGET_RETRY_DELAYS_MS = [0, 200, 800]
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms)
+    if (typeof timer === 'object' && timer !== null && 'unref' in timer && typeof timer.unref === 'function') {
+      timer.unref()
+    }
+  })
+}
+
 function fireForget(path: string, headers: Record<string, string>, body?: string): void {
   try {
-    void fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      headers,
-      credentials: 'include',
-      keepalive: true,
-      ...(body !== undefined ? { body } : {}),
-    }).catch(() => undefined)
+    void sendWithRetry(path, headers, body).catch(() => undefined)
   } catch {
     // 同步抛错也吞掉。清场不能停在这一步。
   }
 }
 
+async function sendWithRetry(path: string, headers: Record<string, string>, body?: string): Promise<void> {
+  const doFetch = globalThis.fetch
+  const kind = path.startsWith('/assistant/') ? 'assistant' : 'advisor'
+  let status = 0
+  for (let attempt = 0; attempt < FORGET_RETRY_DELAYS_MS.length; attempt += 1) {
+    const wait = FORGET_RETRY_DELAYS_MS[attempt] ?? 0
+    if (wait > 0) await sleep(wait)
+    try {
+      const res = await doFetch(`${API_BASE_URL}${path}`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        keepalive: true,
+        ...(body !== undefined ? { body } : {}),
+      })
+      if (res.ok) return
+      status = typeof res.status === 'number' ? res.status : 0
+    } catch {
+      status = 0
+    }
+  }
+  console.warn(`[kiosk-clear] forget_failed kind=${kind} status=${status} attempts=${FORGET_RETRY_DELAYS_MS.length}`)
+}
+
 /**
  * 先取走登记再清空：同一次清场里再进来就是空操作。
- * 只在 http 模式发。失败一律吞掉，不许抛到清场外面。
+ * 只在 http 模式发。失败会重试，仍失败不许抛到清场外面。
  */
 export function forgetAiSessions(memberToken: string | null): void {
   try {

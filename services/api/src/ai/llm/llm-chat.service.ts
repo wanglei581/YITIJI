@@ -385,6 +385,16 @@ export class LlmChatService {
     if (current.n <= 0) this.inflight.delete(id)
   }
 
+  /**
+   * 身份暂时核验不了时，按请求里的会话号丢掉内存并作废在途。
+   * 不核归属：这一步还不知道是谁。调用方仍要回 503，不能当成已经清成功。
+   */
+  discardById(sessionId: string): void {
+    const id = sessionId.trim()
+    if (!id) return
+    this.dropSession(id)
+  }
+
   /** 归属对得上才删这一段对话。内存里还没有、但在途请求是这个人的，同样作废。 */
   forgetSession(sessionId: string, ownerKey: string): boolean {
     const id = sessionId.trim()

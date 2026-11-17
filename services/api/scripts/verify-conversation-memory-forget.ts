@@ -574,10 +574,10 @@ async function main(): Promise<void> {
     await advisor.ask(work9, markQa9, { endUserId: userId9, accessToken: null })
     const memberToken9 = bearer(userId9)
     const memberReq9 = { headers: { authorization: `Bearer ${memberToken9}` }, ip: '10.9.9.9' }
-    function memoriesRemain(): boolean {
+    function memoriesCleared(): boolean {
       const transcript = chat.getOwnedTranscript(chat9.result.sessionId, `u:${userId9}`)
-      return !!transcript?.some((turn) => turn.content.includes(markChat9))
-        && memory.read(work9).some((turn) => turn.content.includes(markQa9))
+      return !transcript?.some((turn) => turn.content.includes(markChat9))
+        && !memory.read(work9).some((turn) => turn.content.includes(markQa9))
     }
     const originalRedisGet = redis.get
     redis.get = async () => {
@@ -621,7 +621,8 @@ async function main(): Promise<void> {
     } finally {
       delete (prisma as { endUser?: unknown }).endUser
     }
-    check(memoriesRemain(), '场景 9 阳性：身份查询失败之后，两段原话都还在')
+    const workRow9 = await prisma.advisorSession.findUnique({ where: { id: work9 } })
+    check(memoriesCleared() && !!workRow9, '场景 9：身份查询失败时先清掉这两段内存，作业行还在库里')
 
     // ── 场景 10：两种凭据都在时，游客作业也清，但不能清别人的 ──
     const userBoth = `verify-both-${randomUUID()}`

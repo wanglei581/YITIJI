@@ -486,6 +486,11 @@ export class AdvisorService {
     return { forgotten: this.qaMemory.forget(sessionId) ? 1 : 0 }
   }
 
+  /** 身份暂时核验不了时，只丢掉这份作业的问答内存。不删库里的作业。 */
+  discardQaMemory(sessionId: string): void {
+    this.qaMemory.forget(sessionId)
+  }
+
   // ── 内部 ──────────────────────────────────────────────────
 
   /**

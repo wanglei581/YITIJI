@@ -34,6 +34,15 @@ function memberLookupUnavailable(): never {
   throw new ServiceUnavailableException(MEMBER_SESSION_STORE_UNAVAILABLE)
 }
 
+/** 清场专用：身份库暂时查不了。其它错误不能当成这一条。 */
+export function isMemberLookupUnavailable(error: unknown): boolean {
+  if (!(error instanceof ServiceUnavailableException)) return false
+  const body = error.getResponse()
+  if (typeof body !== 'object' || body === null) return false
+  const code = (body as { error?: { code?: unknown } }).error?.code
+  return code === MEMBER_SESSION_STORE_UNAVAILABLE.error.code
+}
+
 /**
  * Resolve an optional C-end member token.
  *
