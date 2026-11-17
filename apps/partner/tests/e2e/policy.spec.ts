@@ -73,7 +73,23 @@ test.describe('政策公告（mock 口径）', () => {
     await expect(page.getByRole('button', { name: '申领条件' })).toHaveCount(0)
   })
 
-  test('截止日期可选，过了就在列表显示已到期', async ({ page }) => {
+  test('待审核政策拒绝必须填原因，提交后显示已拒绝和原因', async ({ page }) => {
+  await gotoPartner(page, '/policy', '政策公告')
+  await waitForMockList(page)
+  const row = page.getByRole('row', { name: /关于就业见习岗位补贴申领的公告/ })
+  await row.getByRole('button', { name: '拒绝' }).click()
+  const dialog = page.getByRole('dialog', { name: '拒绝这条政策' })
+  await expect(dialog.getByRole('button', { name: '确认拒绝' })).toBeDisabled()
+  await dialog.getByLabel('拒绝原因').fill('   ')
+  await expect(dialog.getByRole('button', { name: '确认拒绝' })).toBeDisabled()
+  await dialog.getByLabel('拒绝原因').fill('材料清单和原文对不上')
+  await dialog.getByRole('button', { name: '确认拒绝' }).click()
+  await expect(page.getByText('「关于就业见习岗位补贴申领的公告（演示）」已拒绝。')).toBeVisible()
+  await expect(row.getByText('已拒绝', { exact: true })).toBeVisible()
+  await expect(row.getByText('驳回原因：材料清单和原文对不上')).toBeVisible()
+})
+
+test('截止日期可选，过了就在列表显示已到期', async ({ page }) => {
   await gotoPartner(page, '/policy', '政策公告')
   await waitForMockList(page)
 

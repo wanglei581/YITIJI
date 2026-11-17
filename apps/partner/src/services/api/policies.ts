@@ -221,6 +221,8 @@ export interface PartnerPoliciesServiceInterface {
   deletePolicy(id: string): Promise<void>
   /** 本机构审核通过（只接受 pending / reviewing；终态不可回退，改内容会自动回到待审核） */
   approvePolicy(id: string): Promise<PartnerPolicyRecord>
+  /** 本机构拒绝。原因必填，服务端缺原因时返回 REJECT_REASON_REQUIRED。 */
+  rejectPolicy(id: string, reason: string): Promise<PartnerPolicyRecord>
   /**
    * 本机构发布。responsibilityAcknowledged 原样取自页面上的确认勾选，由服务端判：
    * 不是 true 一律 400 POLICY_RESPONSIBILITY_ACK_REQUIRED，前端不替用户默认勾上。
@@ -287,6 +289,7 @@ const httpAdapter: PartnerPoliciesServiceInterface = {
     await req<{ success: boolean }>('DELETE', `/partner/policies/${id}`)
   },
   approvePolicy: (id) => req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/review`, { action: 'approve' }),
+  rejectPolicy: (id, reason) => req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/review`, { action: 'reject', reason }),
   releasePolicy: (id, input) =>
     req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/release`, { responsibilityAcknowledged: input.responsibilityAcknowledged }, true),
   previewDraftCheck: (input) => req('POST', '/partner/policies/draft-check', input, true),
@@ -453,6 +456,20 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
   async deletePolicy(id) {
     const idx = mockRows.findIndex((r) => r.id === id)
     if (idx >= 0) mockRows.splice(idx, 1)
+  },
+  async rejectPolicy(id, reason) {
+    const hit = mockRows.find((r) => r.id === id)
+    if (!hit) throw new ApiHttpError('POLICY_NOT_FOUND', '不存在', 404)
+    const trimmed = reason.trim()
+    if (!trimmed) throw new ApiHttpError('REJECT_REASON_REQUIRED', 'reject 必须提供 reason', 400)
+    if (hit.reviewStatus === 'approved' || hit.reviewStatus === 'rejected') {
+      throw new ApiHttpError('INVALID_STATE_TRANSITION', `审核终态 ${hit.reviewStatus} 不可回退,需机构重新编辑提审`, 400)
+    }
+    hit.reviewStatus = 'rejected'
+    hit.publishStatus = 'draft'
+    hit.rejectReason = trimmed
+    hit.updatedAt = now()
+    return { ...hit }
   },
   async approvePolicy(id) {
     const hit = mockRows.find((r) => r.id === id)
