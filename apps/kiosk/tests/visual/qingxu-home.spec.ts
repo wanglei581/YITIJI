@@ -723,6 +723,28 @@ test('首页免费使用：本机配置读失败则不画 @w1-kiosk', async ({ p
   await expectFreeAndNoticeApart(home)
 })
 
+test('首页免费使用：全 0 的下一轮有正价，收费句出现、角标消失 @w1-kiosk', async ({ page, api }) => {
+  let scan = 0
+  registerHomeApi(api, [homeFair()], machinePricing(0, 0))
+  api.mapJson('GET', HOME_CONFIG, (json) => {
+    const base = json && typeof json === 'object' ? json as Record<string, unknown> : {}
+    const pricing = machinePricing(0, 0)
+    const effective = { ...(pricing.effective as Record<string, number>), scan }
+    return { ...base, homeFreeBadge: true, pricing: { ...pricing, effective } }
+  })
+  await page.clock.install()
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  const badge = home.locator('.qxt-greet').getByLabel('免费使用')
+  await expect(badge).toBeVisible()
+  await expect(home.locator('.qxt-home-foot')).not.toContainText(PRICE_NOTICE)
+  scan = 100
+  await page.clock.fastForward(5 * 60 * 1000)
+  await expect(home.locator('.qxt-home-foot')).toContainText(PRICE_NOTICE)
+  await expect(badge).toHaveCount(0)
+  await expectFreeAndNoticeApart(home)
+})
+
 // 2026-11-08：本轮八个旧地址及各自深链均 replace 回首页。
 for (const prefix of [
   '/resume/career-plan', '/resume/self-assessment', '/resume/job-fit', '/resume/materials',
