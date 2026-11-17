@@ -38,6 +38,7 @@ import { RESUME_VOICE_AUDIO_FIELD, RESUME_VOICE_MAX_AUDIO_BYTES, type ResumeVoic
 import type { ResumeOptimizeResponseDto } from './dto/resume-optimize.dto'
 import { AssistantChatRequestDto } from './dto/assistant-chat.dto'
 import type { AssistantChatResponseDto } from './dto/assistant-chat.dto'
+import { AssistantChatAvailability } from './assistant-chat-availability.service'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -165,6 +166,7 @@ export class AiController {
     // 生产模块已引入 FilesModule，Nest 仍会注入；拿不到时旧路径在扣次数前直接拒绝，不跳过文件确认。
     @Optional() private readonly files?: FilesService,
     @Optional() private readonly serviceOrders?: ServiceOrderService,
+    @Optional() private readonly assistantAvailability?: AssistantChatAvailability,
   ) {}
 
   /** 先复用 AI 访问守卫/用量中间件的惰性缓存；直接调用 handler 时再验签。 */
@@ -608,16 +610,14 @@ export class AiController {
     else await this.audit.write(exportAudit)
     return result
   }
-
   @Post('assistant/chat')
-  @TerminalScopedThrottle(12) // 对话式调用比单次生成频繁，但远低于此前落进的 60 次/分钟公共桶
-  @AiUse('generate')
-
+  @TerminalScopedThrottle(12) @AiUse('generate')
   async chatWithAssistant(
     @Body() dto: AssistantChatRequestDto,
     @Req() req: ReqLike,
   ): Promise<AssistantChatResponseDto> {
-    // 匿名是产品口径（不加 Guard）；这里只加限流与日配额，不加认证门槛。
+    const gate = this.assistantAvailability
+    const refusal = typeof gate?.refusal === 'function' ? await gate.refusal() : null; if (refusal) throw new ServiceUnavailableException({ error: refusal })
     const chatMember = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
     const quotaTicket = await this.publicQuota.consume('assistant_chat', {
       member: chatMember?.endUserId ?? null,
