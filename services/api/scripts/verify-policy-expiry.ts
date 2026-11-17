@@ -392,35 +392,69 @@ async function main(): Promise<void> {
     assert.ok((await redis.ttl(eveningKey)) > 60, '旧缓存不能靠删键来掩盖跨日问题')
     console.log('  PASS 社区动态缓存跨过北京时间零点不再返回过期政策')
 
-    console.log('PASS verify:policy-expiry')
-  } finally {
-    try {
-      if (ddl) {
-        if (prisma.dbKind === 'sqlite') {
-          await ddl.$executeRawUnsafe('DROP TRIGGER IF EXISTS verify_policy_auto_expire_fail')
-        } else {
-          await ddl.$executeRawUnsafe('DROP TRIGGER IF EXISTS verify_policy_auto_expire_fail ON "AuditLog"')
-          await ddl.$executeRawUnsafe('DROP FUNCTION IF EXISTS verify_policy_auto_expire_fail()')
-        }
+    const auditRow = await seedPublished(`审计同成_${suffix}`, '审计失败必须回滚', {
+      validThrough: new Date(`${yesterday}T00:00:00.000Z`),
+    })
+    const opened = createPrismaClient(process.env['DATABASE_URL'] ?? '')
+    await opened.client.$connect()
+    ddl = opened.client
+    const auditCount = (targetId: string) => prisma.auditLog.count({ where: { action: 'policy.auto_expire', targetId } })
+    const installAuditFailure = async (on: boolean) => {
+      if (prisma.dbKind === 'sqlite') {
+        await opened.client.$executeRawUnsafe('DROP TRIGGER IF EXISTS verify_policy_auto_expire_fail')
+        if (!on) return
+        await opened.client.$executeRawUnsafe(
+          `CREATE TRIGGER verify_policy_auto_expire_fail
+           BEFORE INSERT ON "AuditLog"
+           WHEN NEW."action" = 'policy.auto_expire'
+           BEGIN
+             SELECT RAISE(ABORT, 'injected audit insert failure');
+           END`,
+        )
+        return
       }
-    } catch (error) {
-      console.error('drop audit injection failed', error)
+      await opened.client.$executeRawUnsafe('DROP TRIGGER IF EXISTS verify_policy_auto_expire_fail ON "AuditLog"')
+      await opened.client.$executeRawUnsafe('DROP FUNCTION IF EXISTS verify_policy_auto_expire_fail()')
+      if (!on) return
+      await opened.client.$executeRawUnsafe(
+        `CREATE FUNCTION verify_policy_auto_expire_fail() RETURNS trigger
+         LANGUAGE plpgsql AS $$
+         BEGIN
+           IF NEW."action" = 'policy.auto_expire' THEN
+             RAISE EXCEPTION 'injected audit insert failure';
+           END IF;
+           RETURN NEW;
+         END $$`,
+      )
+      await opened.client.$executeRawUnsafe(
+        `CREATE TRIGGER verify_policy_auto_expire_fail
+         BEFORE INSERT ON "AuditLog"
+         FOR EACH ROW EXECUTE FUNCTION verify_policy_auto_expire_fail()`,
+      )
     }
-    if (redis) {
-      if (redisKeys.length > 0) await redis.del(...redisKeys).catch(() => undefined)
-      await redis.quit().catch(() => redis?.disconnect())
-    }
-    await ddl?.$disconnect().catch(() => undefined)
-    if (fileIds.length > 0) await prisma.fileObject.deleteMany({ where: { id: { in: fileIds } } })
-    await prisma.auditLog.deleteMany({ where: { OR: [{ targetId: { in: ids } }, { actorId: userRow.id }] } })
-    await prisma.policyPost.deleteMany({ where: { sourceOrgId: orgId } })
-    await prisma.user.deleteMany({ where: { id: userRow.id } })
-    await prisma.organization.deleteMany({ where: { id: orgId } })
-    await prisma.onModuleDestroy()
-  }
-}
+    await installAuditFailure(true)
+    await assert.rejects(
+      () => expiry.expirePastDeadline(),
+      (error: unknown) => {
+        // libsql 把触发器的 SQLITE_CONSTRAINT_TRIGGER 标成外键错误，原文在 driverAdapterError 里。
+        assert.match(errorText(error), /injected audit insert failure/)
+        return true
+      },
+    )
+    assert.equal((await prisma.policyPost.findUnique({ where: { id: auditRow } }))?.publishStatus, 'published')
+    assert.equal(await auditCount(auditRow), 0, '审计没写进去时不得留下过期状态')
+    await installAuditFailure(false)
+    await expiry.expirePastDeadline()
+    assert.equal((await prisma.policyPost.findUnique({ where: { id: auditRow } }))?.publishStatus, 'expired')
+    assert.equal(await auditCount(auditRow), 1, '恢复后恰好一条 policy.auto_expire')
+    await expiry.expirePastDeadline()
+    assert.equal(await auditCount(auditRow), 1, '第三次跑不得再写')
+    const raceRow = await seedPublished(`审计并发_${suffix}`, '只有一方写审计', {
+      validThrough: new Date(`${yesterday}T00:00:00.000Z`),
+    })
+    const [left, right] = await Promise.all([expiry.expirePastDeadline(), expiry.expirePastDeadline()])
+    assert.equal(left + right, 1, '并发下只有一方把这一行改成功')
+    assert.equal((await prisma.policyPost.findUnique({ where: { id: raceRow } }))?.publishStatus, 'expired')
+    assert.equal(await auditCount(raceRow), 1, '并发下只写一条审计')
+    console.log('  PASS 到期下架与审计同成同败，并发只写一条')
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
