@@ -88,6 +88,11 @@ test('勾选 A 批后再筛到 B 批，勾选归零且按钮写本批', async ({
   await expect(page.getByRole('button', { name: '批量生成绑定码（本批 2 台）', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '作废绑定码（本批 2 台）', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '重新生成绑定码（本批 2 台）', exact: true })).toBeVisible()
+
+  await batchFilter.fill(batchA)
+  await expect(page.getByRole('checkbox', { name: '选择 BA-1' })).not.toBeChecked()
+  await expect(page.getByRole('checkbox', { name: '选择 BA-2' })).not.toBeChecked()
+  await expect(page.getByTestId('terminal-batch-selected-count')).toHaveText('已勾选 0 台')
   await assertNoTechLeak(page)
 })
 
