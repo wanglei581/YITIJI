@@ -2509,9 +2509,10 @@ test('interview setup: opening probe down keeps start shut, offers the practice 
   await expect(page.getByRole('button', { name: /先看面试技巧/ })).toBeVisible()
   await expect(page.locator('[data-qxt-ask="on"]')).toHaveText('问小青：这场练习怎么设')
   await primary.click()
-  expect(api.requestCount('POST', '/api/v1/mock-interviews')).toBe(1)
+  // 题目单是点下去之后的异步请求，click 返回时还没发出。
+  await expect.poll(() => api.requestCount('POST', '/api/v1/mock-interviews')).toBe(1)
   expect(api.requestCount('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/start`)).toBe(0)
-  expect(api.requestCount('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/practice-sheet`)).toBe(1)
+  await expect.poll(() => api.requestCount('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/practice-sheet`)).toBe(1)
 })
 
 test('interview setup: the not-ready note shows from step 1, so nobody fills three steps before finding out @w3-kiosk', async ({ page, api }) => {
