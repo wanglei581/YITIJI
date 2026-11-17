@@ -2366,7 +2366,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 152 个文件</summary>
+<summary><code>services/api/scripts/</code> — 154 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2440,10 +2440,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/policy-publish-fixture.ts` | `verify-content-trust-publish-gate.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-policy-publish-gates.ts` |
 | `services/api/scripts/support/recruitment-wave2-full-inventory.ts` | `verify-recruitment-wave2-full-inventory.ts` |
 | `services/api/scripts/support/recruitment-wave2-public-snapshot.ts` | `verify-recruitment-wave2-full-inventory.ts` |
+| `services/api/scripts/support/resume-optimize-after-match-r1h.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/resume-optimize-after-match.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/resume-optimize-export-contract.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/resume-optimize-fetch-stub.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/resume-optimize-original-content.ts` | `verify-resume-optimize.ts` |
+| `services/api/scripts/support/resume-optimize-regression-corpus.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/scan-panel-wording.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/serializable-race-barrier.ts` | `verify-first-admin-bootstrap-postgres.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-print-retry-lock-postgres.ts`<br/>`verify-service-order-open-ref-postgres.ts` |
 | `services/api/scripts/support/service-order-verify-fixture.ts` | `verify-service-orders-concurrency.ts`<br/>`verify-service-orders.ts` |
@@ -2641,7 +2643,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/llm-job-fit.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-fit.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-miniapp-review-backend.ts` |
 | `services/api/src/ai/resume/llm-resume-evidence.ts` | `verify-resume-diagnosis-context.ts` |
 | `services/api/src/ai/resume/llm-resume-generate.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-optimize.ts` |
-| `services/api/src/ai/resume/llm-resume-optimize.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-radical-fold.ts`<br/>`verify-resume-radical-font-fold.ts` |
+| `services/api/src/ai/resume/llm-resume-optimize.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-optimize-live-gate.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-radical-fold.ts`<br/>`verify-resume-radical-font-fold.ts` |
 | `services/api/src/ai/resume/llm-resume.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-optimize.ts` |
 | `services/api/src/ai/resume/llm-self-assessment.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/resume/ocr/baidu-ocr.provider.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-resume-extraction.ts` |

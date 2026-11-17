@@ -1,4 +1,5 @@
 import type { ResumeOptimizeModule } from '../interfaces/ai-provider.interface'
+import { normalizeResumeStructureText } from './resume-structure'
 
 /**
  * 一体机能否一键换上，只看优化稿某个字符串字段是否 includes(after)
@@ -97,6 +98,48 @@ function uniqueFoldedHit(resume: unknown, core: string): string | undefined {
   return hits.length === 1 ? hits[0] : undefined
 }
 
+/** 归一化后只差一个字，且较长的一边不少于 8 字。标点差异归一后相等也算。 */
+export function optimizeAfterNearlySame(left: string, right: string): boolean {
+  const a = normalizeResumeStructureText(left)
+  const b = normalizeResumeStructureText(right)
+  if (!a || !b) return false
+  if (a === b) return true
+  const gap = Math.abs(a.length - b.length)
+  if (gap > 1 || Math.max(a.length, b.length) < 8) return false
+  return levenshteinAtMostOne(a, b)
+}
+
+function levenshteinAtMostOne(left: string, right: string): boolean {
+  const a = [...left]
+  const b = [...right]
+  if (Math.abs(a.length - b.length) > 1) return false
+  let edits = 0
+  let i = 0
+  let j = 0
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i += 1; j += 1; continue }
+    edits += 1
+    if (edits > 1) return false
+    if (a.length > b.length) i += 1
+    else if (b.length > a.length) j += 1
+    else { i += 1; j += 1 }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1
+}
+
+/** 稿里恰好出现一次、且与 after 只差一个字的行，返回这一行原文。同一句出现两次也不取。 */
+function uniqueNearHit(resume: unknown, core: string): string | undefined {
+  const hits: string[] = []
+  for (const field of collectStrings(resume)) {
+    for (const line of field.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed === core) continue
+      if (optimizeAfterNearlySame(trimmed, core)) hits.push(trimmed)
+    }
+  }
+  return hits.length === 1 ? hits[0] : undefined
+}
+
 export function alignOptimizeModuleAfter<T extends OptimizeAfterDraft>(draft: T): {
   result: T
   stats: OptimizeAfterMatchStats
@@ -113,7 +156,7 @@ export function alignOptimizeModuleAfter<T extends OptimizeAfterDraft>(draft: T)
       stats.verbatim += 1
       return module
     }
-    const hit = uniqueFoldedHit(draft.optimizedResume, core)
+    const hit = uniqueFoldedHit(draft.optimizedResume, core) ?? uniqueNearHit(draft.optimizedResume, core)
     if (hit === undefined) {
       stats.unmatched += 1
       return module
