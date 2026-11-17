@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2214 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2223 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -445,7 +445,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 668 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 672 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -525,7 +525,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/assistant/AdvisorTools.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-kiosk-parked-core4.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx` | `verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs` |
 | `apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-field-safety.mjs`<br/>`verify-assistant-voice.ts` |
-| `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-assistant-voice.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
+| `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-availability.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-assistant-voice.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
 | `apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/assistant/AssistantSheets.tsx` | `verify-kiosk-parked-core4.mjs` |
 | `apps/kiosk/src/pages/assistant/AssistantTaskPicker.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
@@ -538,6 +538,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/assistant/assistant-qingxu-input.css` | `verify-assistant-trtc-guard.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/assistant-qingxu.css` | `verify-lightflow-k2a-ai-career.mjs`<br/>`verify-profile-feedback-inkpaper.mjs` |
 | `apps/kiosk/src/pages/assistant/assistant-touch.css` | `verify-advisor-provider-gate.mjs` |
+| `apps/kiosk/src/pages/assistant/assistantLockFromProbe.ts` | `verify-kiosk-ai-availability.mjs` |
+| `apps/kiosk/src/pages/assistant/useAssistantChatLock.ts` | `verify-kiosk-ai-availability.mjs` |
 | `apps/kiosk/src/pages/auth/LoginPage.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-qr-login-ui.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-user-center-wave0.mjs` |
 | `apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx` | `verify-fusion-shell.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-qr-login-ui.mjs` |
 | `apps/kiosk/src/pages/auth/ScanQrLoginPanel.tsx` | `verify-lightflow-k1-public-entry.mjs`<br/>`verify-qr-login-ui.mjs` |
@@ -592,11 +594,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/interview/InterviewReportsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewSessionPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-mic-capability-truth.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewSetupExtras.tsx` | `verify-lightflow-k2c-interview.mjs`<br/>`verify-guest-file-proof.ts` |
-| `apps/kiosk/src/pages/interview/InterviewSetupPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-guest-file-proof.ts` |
+| `apps/kiosk/src/pages/interview/InterviewSetupPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-availability.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-guest-file-proof.ts` |
 | `apps/kiosk/src/pages/interview/InterviewShell.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewTipsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/interview-service-desk.css` | `verify-lightflow-k2c-interview.mjs` |
+| `apps/kiosk/src/pages/interview/interviewStartControl.ts` | `verify-kiosk-ai-availability.mjs` |
 | `apps/kiosk/src/pages/interview/interviewWorkbenchModel.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-guest-file-proof.ts` |
 | `apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-mic-capability-truth.mjs` |
@@ -609,6 +612,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/interview/styles/interview-session.css` | `verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/styles/interview-shell.css` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/touch/InterviewHubTouch.tsx` | `verify-lightflow-k2c-interview.mjs` |
+| `apps/kiosk/src/pages/interview/useMockInterviewAvailability.ts` | `verify-kiosk-ai-availability.mjs` |
 | `apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
 | `apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-page-size.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/pages/job-fairs/FairMapPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
@@ -2526,7 +2530,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 705 个文件</summary>
+<summary><code>services/api/src/</code> — 710 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2574,14 +2578,17 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai-access/ai-access.decorator.ts` | `verify-ai-access.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-scan-device-settings.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai-access/ai-access.guard.ts` | `verify-ai-access.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai-access/ai-access.module.ts` | `verify-ai-access.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-self-assessment-ai-gate.ts` |
-| `services/api/src/ai-access/ai-access.service.ts` | `verify-admin-ai-access-ui.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-self-assessment-ai-gate.ts`<br/>`verify-self-assessment-append-file-scope.ts` |
+| `services/api/src/ai-access/ai-access.service.ts` | `verify-admin-ai-access-ui.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-availability-alignment.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-self-assessment-ai-gate.ts`<br/>`verify-self-assessment-append-file-scope.ts` |
 | `services/api/src/ai/ai-log.service.ts` | `verify-advisor-work.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-cost-runtime.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-device-fault-intercept.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-career-plan.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-miniapp-review-backend.ts`<br/>`verify-mock-interview-consent.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-mock-interview.ts`<br/>`verify-resume-parse-intent-http.ts` |
 | `services/api/src/ai/ai-public-quota.service.ts` | `verify-ai-public-quota.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-intent-runner.ts`<br/>`verify-resume-parse-quota-once.ts` |
 | `services/api/src/ai/ai-request-guard.ts` | `verify-ai-public-quota.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-timeout-concurrency.ts` |
 | `services/api/src/ai/ai-result.cleanup.task.ts` | `verify-ai-quota.ts`<br/>`verify-ai-usage-retention.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-job-ai-backend.ts` |
-| `services/api/src/ai/ai.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-cost-runtime.ts`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-guest-file-proof.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-resume-voice-generate.ts`<br/>`verify-throttle-dimension.ts` |
-| `services/api/src/ai/ai.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-fair-visit-plan.ts`<br/>`verify-governed-job-fit.ts`<br/>`verify-self-assessment-ai-gate.ts`<br/>`verify-trtc-ownership.ts` |
+| `services/api/src/ai/ai.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-availability-alignment.ts`<br/>`verify-ai-cost-runtime.ts`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-guest-file-proof.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-resume-voice-generate.ts`<br/>`verify-throttle-dimension.ts` |
+| `services/api/src/ai/ai.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-availability-alignment.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-fair-visit-plan.ts`<br/>`verify-governed-job-fit.ts`<br/>`verify-self-assessment-ai-gate.ts`<br/>`verify-trtc-ownership.ts` |
 | `services/api/src/ai/ai.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-persistence-consistency.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-result-ownership.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-service-orders.ts` |
+| `services/api/src/ai/assistant-availability.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-availability-alignment.ts` |
+| `services/api/src/ai/assistant-chat-availability.service.ts` | `verify-ai-availability-alignment.ts` |
+| `services/api/src/ai/assistant-chat-availability.ts` | `verify-ai-availability-alignment.ts` |
 | `services/api/src/ai/career-plan.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-career-plan.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-resume-ai-consent-wiring.ts` |
 | `services/api/src/ai/dto/assistant-chat.dto.ts` | `verify-assistant-policy-context.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
 | `services/api/src/ai/dto/resume-generate.dto.ts` | `verify-resume-export-facts-contract.mjs`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-template-fill.ts` |
@@ -2591,7 +2598,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/interfaces/ai-provider.interface.ts` | `verify-ai-contract-mirror.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-parse-intent-runner.ts`<br/>`verify-resume-radical-fold.ts`<br/>`verify-resume-radical-font-fold.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
 | `services/api/src/ai/job-fit.controller.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-governed-job-fit.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-fit-print.ts`<br/>`verify-job-fit.ts`<br/>`verify-kiosk-job-board-switch.ts` |
 | `services/api/src/ai/kiosk-ai-capabilities.controller.ts` | `verify-ai-access.ts`<br/>`verify-kiosk-ai-capabilities.ts`<br/>`verify-throttle-dimension.ts` |
-| `services/api/src/ai/kiosk-ai-capabilities.ts` | `verify-kiosk-ai-capabilities.ts` |
+| `services/api/src/ai/kiosk-ai-capabilities.ts` | `verify-ai-availability-alignment.ts`<br/>`verify-kiosk-ai-capabilities.ts` |
 | `services/api/src/ai/llm/ai-config-audit.ts` | `verify-ai-contract-mirror.mjs` |
 | `services/api/src/ai/llm/ai-config.controller.ts` | `verify-ai-config.ts`<br/>`verify-ai-endpoint-allowlist.ts` |
 | `services/api/src/ai/llm/ai-prompt-safety.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts` |
@@ -2600,7 +2607,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/llm/deepseek-thinking.ts` | `verify-llm-thinking-off.ts` |
 | `services/api/src/ai/llm/llm-base-url.ts` | `verify-ai-config.ts` |
 | `services/api/src/ai/llm/llm-chat.service.ts` | `verify-ai-config.ts`<br/>`verify-ai-content-moderation.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-assistant-device-fault-intercept.ts`<br/>`verify-assistant-device-fault.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
-| `services/api/src/ai/llm/llm-config.service.ts` | `verify-ai-config.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-kiosk-ai-capabilities.ts`<br/>`verify-llm-connectivity.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-print-param-suggestion.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
+| `services/api/src/ai/llm/llm-config.service.ts` | `verify-ai-availability-alignment.ts`<br/>`verify-ai-config.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-kiosk-ai-capabilities.ts`<br/>`verify-llm-connectivity.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-print-param-suggestion.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/ai/llm/llm-failure.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-llm-account-unavailable.ts` |
 | `services/api/src/ai/llm/llm-guard.ts` | `verify-ai-content-moderation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-assistant-device-fault.ts`<br/>`verify-llm-guard.ts` |
 | `services/api/src/ai/llm/llm-http.ts` | `verify-ai-content-moderation.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-llm-timeout-concurrency.ts` |
@@ -3013,11 +3020,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/mock-interview/interview-report-pdf.service.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-aigc-pdf-metadata.ts`<br/>`verify-cjk-font.ts`<br/>`verify-mock-interview-consent.ts`<br/>`verify-mock-interview.ts` |
 | `services/api/src/mock-interview/interview-transcript-pdf.service.ts` | `verify-mock-interview.ts` |
 | `services/api/src/mock-interview/interview-transcript-print.service.ts` | `verify-mock-interview-deadline.ts`<br/>`verify-mock-interview.ts` |
+| `services/api/src/mock-interview/mock-interview-availability.service.ts` | `verify-ai-availability-alignment.ts` |
 | `services/api/src/mock-interview/mock-interview-charge.ts` | `verify-ai-quota-coverage.ts` |
 | `services/api/src/mock-interview/mock-interview-deadline.ts` | `verify-mock-interview-deadline.ts` |
-| `services/api/src/mock-interview/mock-interview-llm.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mock-interview-consent.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-mock-interview.ts` |
-| `services/api/src/mock-interview/mock-interview.controller.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-cost-runtime.ts`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-guest-file-proof.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-mock-interview.ts`<br/>`verify-multipart-field-nesting.ts` |
-| `services/api/src/mock-interview/mock-interview.module.ts` | `verify-ai-down-fallbacks.mjs` |
+| `services/api/src/mock-interview/mock-interview-llm.service.ts` | `verify-ai-availability-alignment.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mock-interview-consent.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-mock-interview.ts` |
+| `services/api/src/mock-interview/mock-interview.controller.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-availability-alignment.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-cost-runtime.ts`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-guest-file-proof.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-mock-interview.ts`<br/>`verify-multipart-field-nesting.ts` |
+| `services/api/src/mock-interview/mock-interview.module.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-availability-alignment.ts` |
 | `services/api/src/mock-interview/mock-interview.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-beijing-display-time.ts`<br/>`verify-guest-file-proof.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-mock-interview-consent.ts`<br/>`verify-mock-interview-deadline.ts`<br/>`verify-mock-interview.ts`<br/>`verify-resume-ai-consent-wiring.ts` |
 | `services/api/src/notifications/notifications.controller.ts` | `verify-backend-p0-contracts.mjs` |
 | `services/api/src/official-channels/dto/official-channel.dto.ts` | `verify-official-channels.ts` |
@@ -3224,12 +3232,13 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/terminals/toolbox-governance.ts` | `verify-toolbox-micro-app-platform.ts`<br/>`verify-toolbox-review-workflow.ts` |
 | `services/api/src/terminals/toolbox-policy.ts` | `verify-terminal-device-config.ts`<br/>`verify-toolbox-micro-app-platform.ts` |
 | `services/api/src/terminals/toolbox-projection.ts` | `verify-toolbox-review-workflow.ts` |
+| `services/api/src/trtc/digital-human-availability.ts` | `verify-ai-availability-alignment.ts` |
 | `services/api/src/trtc/tencent-api.util.ts` | `verify-ai-endpoint-allowlist.ts` |
 | `services/api/src/trtc/trtc-llm-safety.ts` | `verify-assistant-device-fault.ts` |
 | `services/api/src/trtc/trtc-session-registry.service.ts` | `verify-ai-safety-lexicon.ts`<br/>`verify-trtc-session-deadline.ts` |
-| `services/api/src/trtc/trtc.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
+| `services/api/src/trtc/trtc.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-availability-alignment.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/trtc/trtc.module.ts` | `verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
-| `services/api/src/trtc/trtc.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assistant-device-fault.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-session-deadline.ts`<br/>`verify-trtc-terminal-http.ts` |
+| `services/api/src/trtc/trtc.service.ts` | `verify-ai-availability-alignment.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assistant-device-fault.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-session-deadline.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/upload-sessions/upload-scene.ts` | `verify-upload-scene.ts` |
 | `services/api/src/upload-sessions/upload-session-object-delete.ts` | `verify-upload-sessions.ts` |
 | `services/api/src/upload-sessions/upload-sessions.controller.ts` | `verify-ai-access.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions.ts` |

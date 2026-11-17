@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 659,
+    "endpointCount": 661,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -6320,6 +6320,16 @@
         ]
       },
       {
+        "controller": "services/api/src/ai/assistant-availability.controller.ts",
+        "handler": "AssistantAvailabilityController.availabilityProbe",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/assistant/availability",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
         "controller": "services/api/src/ai/ai.controller.ts",
         "handler": "AiController.chatWithAssistant",
         "method": "POST",
@@ -10106,6 +10116,16 @@
           "MockInterviewService",
           "TtsService"
         ]
+      },
+      {
+        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
+        "handler": "CreateInterviewDto.availability",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/mock-interviews/availability",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
@@ -15064,7 +15084,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 825,
+      "reachableFileCount": 829,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18145,7 +18165,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1016
+      "sourceFileCount": 1020
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21885,6 +21905,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-availability.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
@@ -21937,6 +21958,12 @@
     ],
     "apps/kiosk/src/pages/assistant/assistant-touch.css": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs"
+    ],
+    "apps/kiosk/src/pages/assistant/assistantLockFromProbe.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-availability.mjs"
+    ],
+    "apps/kiosk/src/pages/assistant/useAssistantChatLock.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-availability.mjs"
     ],
     "apps/kiosk/src/pages/auth/LoginPage.tsx": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
@@ -22199,6 +22226,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-availability.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
@@ -22221,6 +22249,9 @@
     ],
     "apps/kiosk/src/pages/interview/interview-service-desk.css": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/interviewStartControl.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-availability.mjs"
     ],
     "apps/kiosk/src/pages/interview/interviewWorkbenchModel.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
@@ -22267,6 +22298,9 @@
     ],
     "apps/kiosk/src/pages/interview/touch/InterviewHubTouch.tsx": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/useMockInterviewAvailability.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-availability.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
@@ -27234,6 +27268,7 @@
     "services/api/src/ai-access/ai-access.service.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts",
@@ -27282,6 +27317,7 @@
     ],
     "services/api/src/ai/ai.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
@@ -27308,6 +27344,7 @@
     ],
     "services/api/src/ai/ai.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
@@ -27342,6 +27379,16 @@
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-service-orders.ts"
+    ],
+    "services/api/src/ai/assistant-availability.controller.ts": [
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-availability-alignment.ts"
+    ],
+    "services/api/src/ai/assistant-chat-availability.service.ts": [
+      "services/api/scripts/verify-ai-availability-alignment.ts"
+    ],
+    "services/api/src/ai/assistant-chat-availability.ts": [
+      "services/api/scripts/verify-ai-availability-alignment.ts"
     ],
     "services/api/src/ai/career-plan.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -27413,6 +27460,7 @@
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
     "services/api/src/ai/kiosk-ai-capabilities.ts": [
+      "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts"
     ],
     "services/api/src/ai/llm/ai-config-audit.ts": [
@@ -27457,6 +27505,7 @@
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
     "services/api/src/ai/llm/llm-config.service.ts": [
+      "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
@@ -30088,6 +30137,9 @@
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
+    "services/api/src/mock-interview/mock-interview-availability.service.ts": [
+      "services/api/scripts/verify-ai-availability-alignment.ts"
+    ],
     "services/api/src/mock-interview/mock-interview-charge.ts": [
       "services/api/scripts/verify-ai-quota-coverage.ts"
     ],
@@ -30095,6 +30147,7 @@
       "services/api/scripts/verify-mock-interview-deadline.ts"
     ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
+      "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
@@ -30107,6 +30160,7 @@
     "services/api/src/mock-interview/mock-interview.controller.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
@@ -30118,7 +30172,8 @@
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
     "services/api/src/mock-interview/mock-interview.module.ts": [
-      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs"
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "services/api/scripts/verify-ai-availability-alignment.ts"
     ],
     "services/api/src/mock-interview/mock-interview.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -31677,6 +31732,9 @@
     "services/api/src/terminals/toolbox-projection.ts": [
       "services/api/scripts/verify-toolbox-review-workflow.ts"
     ],
+    "services/api/src/trtc/digital-human-availability.ts": [
+      "services/api/scripts/verify-ai-availability-alignment.ts"
+    ],
     "services/api/src/trtc/tencent-api.util.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
@@ -31689,6 +31747,7 @@
     ],
     "services/api/src/trtc/trtc.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
@@ -31698,6 +31757,7 @@
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/trtc/trtc.service.ts": [
+      "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -34181,6 +34241,29 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:jobfairs-terminal-priority"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/assistant/assistantLockFromProbe.ts",
+          "apps/kiosk/src/pages/assistant/useAssistantChatLock.ts",
+          "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
+          "apps/kiosk/src/pages/interview/interviewStartControl.ts",
+          "apps/kiosk/src/pages/interview/useMockInterviewAvailability.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-ai-availability.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-ai-availability"
       ],
       "wired": true
     },
@@ -40169,6 +40252,7 @@
           "services/api/src/ai-access/ai-access.module.ts",
           "services/api/src/ai-access/ai-access.service.ts",
           "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/assistant-availability.controller.ts",
           "services/api/src/ai/career-plan.controller.ts",
           "services/api/src/ai/fair-visit-plan.controller.ts",
           "services/api/src/ai/job-fit.controller.ts",
@@ -40211,6 +40295,38 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-access"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai-access/ai-access.service.ts",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/ai.module.ts",
+          "services/api/src/ai/assistant-availability.controller.ts",
+          "services/api/src/ai/assistant-chat-availability.service.ts",
+          "services/api/src/ai/assistant-chat-availability.ts",
+          "services/api/src/ai/kiosk-ai-capabilities.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/mock-interview/mock-interview-availability.service.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
+          "services/api/src/mock-interview/mock-interview.module.ts",
+          "services/api/src/trtc/digital-human-availability.ts",
+          "services/api/src/trtc/trtc.controller.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-availability-alignment.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-availability-alignment"
       ],
       "wired": true
     },
