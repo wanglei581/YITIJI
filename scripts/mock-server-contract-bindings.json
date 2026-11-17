@@ -22,7 +22,17 @@
     "  clientType  { file, name } —— 前端自己声明的响应类型；null 表示前端直接用 shared 类型。",
     "  mocks       [{ file, fn }] —— 返回该响应的 mock 函数；门禁读它的 return 对象字面量。",
     "  optionalOnServer  服务端可选、mock 允许不填的路径（默认由类型的 ? 推出，这里只做补充）。",
-    "  opaquePaths 显式声明「该子树不做逐字段比对」的路径 + 原因（例如服务端是 Record/any）。"
+    "  opaquePaths 显式声明「该子树不做逐字段比对」的路径 + 原因（例如服务端是 Record/any）。",
+    "  requiredIds 这些 id 必须出现在 enforced 里。删掉对应登记、id 还留在这张表，门禁变红。",
+    "              没列入的登记仍按原来的逐条检查，不必都标成必需。"
+  ],
+  "requiredIds": [
+    "admin.terminal-batch.created",
+    "admin.terminal-batch.created-row",
+    "admin.terminal-batch.bind-codes",
+    "admin.terminal-batch.issued-code",
+    "admin.terminal-batch.skipped",
+    "admin.terminal-batch.revoke"
   ],
   "enforced": [
     {
