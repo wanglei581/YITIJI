@@ -89,10 +89,10 @@ test('自动刷新失败时保留上一份列表，并写明不是现状', async
   await expect.poll(() => alerts.count()).toBeGreaterThan(0)
   alerts.failNext()
   await page.clock.fastForward(60_000)
-  await expect(page.getByText(/自动刷新失败，下面是 \d{2}:\d{2}:\d{2} 的数据，不是现状/)).toBeVisible()
+  await expect(page.getByText(/自动刷新失败，以下为上次成功获取的数据（\d{2}:\d{2}:\d{2}），不代表现状。/)).toBeVisible()
   await expect(page.getByText(PROBE_TITLE)).toBeVisible()
   await expect(page.getByText('当前无告警')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '刷新' })).toHaveCount(1)
+  await expect(page.getByRole('button', { name: '重新获取' })).toHaveCount(1)
 })
 
 test('离开告警页后不再请求告警列表', async ({ page }) => {

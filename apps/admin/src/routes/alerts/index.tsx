@@ -287,7 +287,7 @@ export default function AlertsPage() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className={`text-[13px] ${autoRefreshFailed ? 'text-error-fg' : 'text-neutral-500'}`}>
             {autoRefreshFailed
-              ? `自动刷新失败，下面是 ${formatClock(lastRefreshAt)} 的数据，不是现状`
+              ? `自动刷新失败，以下为上次成功获取的数据（${formatClock(lastRefreshAt)}），不代表现状。`
               : `最后刷新 ${formatClock(lastRefreshAt)}`}
           </p>
           <button
@@ -296,7 +296,7 @@ export default function AlertsPage() {
             className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-4 text-[13px] font-bold text-neutral-700 transition-colors hover:bg-neutral-50"
           >
             <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            刷新
+            重新获取
           </button>
         </div>
       )}
