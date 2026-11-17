@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-17：运维包 O1 诊断报告 PDF 复用公共中文字体（分支 `claude/ops-o1-1117`，未推送）
+
+- 文泉驿候选改为 PostScript 名 `WenQuanYiMicroHei`。诊断报告不再自带一份候选表，改走 `cjkFontCandidates`。每个候选先在单独文档里 `font()` 真加载，失败换下一个，再注册到最终文档。
+- 诊断报告因此也会尝试 `JOB_MATERIAL_PDF_FONT_PATH`。加载失败就换下一个。测试注入的 `fontCandidates` 还在。
+
 ## 2026-11-17：运维包 O1 文件清理定时任务防退化（分支 `claude/ops-o1-1117`，未推送）
 
 - 新增单测读取 `@nestjs/schedule` 写在方法上的 `SCHEDULE_CRON_OPTIONS`。文件清理每分钟、每小时，材料清理每小时，扫描任务三条每分钟，间隔保持原表达式。`FilesModule` 的 providers 含 `FilesCleanupTask`，`AppModule` 引入了 `ScheduleModule`。
