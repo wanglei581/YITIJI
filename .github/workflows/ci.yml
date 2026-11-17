@@ -668,6 +668,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-settings
           # 保存收费设置撞上改绑：绑定版本过期回 409，不把旧价写进新机构，也不关改绑之后才出现的待付单。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-binding-race
+          # 机构改成公共就业点位：名下终端价目清空、版本加一；改回非公共不复活旧价。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-public-reset
           # 一体机按次付款：收费机器建单、开始前占用、没做成退款；不收费的机器不建单。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-orders
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-orders-concurrency
@@ -1146,6 +1148,7 @@ jobs:
         run: |
           createdb -h localhost -U ci p1d_charge_verify
           pnpm verify:terminal-charge-binding-race:postgres
+          pnpm verify:terminal-charge-public-reset:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy

@@ -3,7 +3,7 @@
  *
  * 机构类型在代码里有五处，漏一处的后果各不相同，都不会在类型检查里暴露：
  *   1. CreateOrgDto / UpdateOrgDto 的 PARTNER_TYPES（入参白名单）—— 漏了：后台建机构直接 400；
- *   2. admin-orgs.service.ts 的 ORG_TYPE_MATRIX（场景模板与模块上限）—— 漏了：ORG_TYPE_MATRIX_VIOLATION；
+ *   2. org-type-matrix.ts 的 ORG_TYPE_MATRIX（由 admin-orgs.service.ts 再导出）—— 漏了：ORG_TYPE_MATRIX_VIOLATION；
  *   3. partner-capabilities.ts 的能力矩阵 —— 漏了：该机构登录机构后台后数据接入、政策页 403；
  *   4. shared ORG_TYPE_SCENE_TEMPLATE —— 漏了：管理员后台选了类型带不出场景，保存被服务端拒；
  *   5. shared PARTNER_TYPE_LABELS —— 漏了：管理员后台下拉里根本选不到。
