@@ -18142,7 +18142,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 101,
+      "reachableFileCount": 102,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -18666,7 +18666,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 104
+      "sourceFileCount": 105
     }
   },
   "dataModel": {
@@ -24864,8 +24864,15 @@
     "apps/partner/src/routes/login/LegalDocsModal.tsx": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/partner/src/routes/login/UnregisteredPhoneNotice.tsx": [
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
+    ],
     "apps/partner/src/routes/login/index.tsx": [
-      "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+      "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
+    ],
+    "apps/partner/src/routes/login/login.css": [
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
     ],
     "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
@@ -25000,7 +25007,8 @@
       "services/api/scripts/verify-jobfair-checkin.ts"
     ],
     "apps/partner/src/services/auth/index.ts": [
-      "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+      "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
     ],
     "apps/terminal-agent/config/agent-config.example.json": [
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
@@ -37083,6 +37091,27 @@
       "package": "@ai-job-print/partner",
       "scriptNames": [
         "@ai-job-print/partner::verify:job-quality-dashboard-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/partner/src/routes/login/UnregisteredPhoneNotice.tsx",
+          "apps/partner/src/routes/login/index.tsx",
+          "apps/partner/src/routes/login/login.css",
+          "apps/partner/src/services/auth/index.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/partner/scripts/verify-partner-phone-verify-guide.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/partner",
+      "scriptNames": [
+        "@ai-job-print/partner::verify:partner-phone-verify-guide"
       ],
       "wired": true
     },
