@@ -5,10 +5,12 @@ import type {
   CreateTerminalBatchInput,
   TerminalBatchBindCodeResult,
   TerminalBatchCreated,
+  TerminalBatchCreatedRow,
   TerminalBatchIssuedCode,
   TerminalBatchRevokeResult,
   TerminalBatchRowInput,
   TerminalBatchSelectionInput,
+  TerminalBatchSkipped,
 } from './terminalBatch'
 
 interface HeldTerminal {
@@ -137,16 +139,9 @@ export const adminDeviceMock = {
         codeState: 'none',
       }
       held.unshift(terminal)
-      return {
-        terminalId: terminal.id,
-        terminalCode: terminal.terminalCode,
-        displayName: terminal.displayName,
-        locationLabel: terminal.locationLabel,
-        orgId: terminal.orgId,
-        orgName: terminal.orgName,
-      }
+      return mockTerminalBatchCreatedRow(terminal)
     })
-    return { batchId, count: created.length, terminals: created }
+    return mockTerminalBatchCreated(batchId, created)
   },
   async issueTerminalBatchBindCodes(input: TerminalBatchSelectionInput): Promise<TerminalBatchBindCodeResult> {
     return issueHeld(input, false)
@@ -160,7 +155,7 @@ export const adminDeviceMock = {
         revokedCount += 1
       }
     }
-    return { revokedCount, terminalCount: targets.filter((target) => target !== null).length }
+    return mockTerminalBatchRevokeResult(revokedCount, targets.filter((target) => target !== null).length)
   },
   async reissueTerminalBatchBindCodes(input: TerminalBatchSelectionInput): Promise<TerminalBatchBindCodeResult> {
     const targets = selectHeld(input)
@@ -186,29 +181,63 @@ function issueHeld(input: TerminalBatchSelectionInput, alreadyRevoked: boolean):
   const skipped: TerminalBatchBindCodeResult['skipped'] = []
   for (const target of targets) {
     if (!target) {
-      skipped.push({ terminalId: null, terminalCode: '', reason: '终端不存在' })
+      skipped.push(mockTerminalBatchSkipped(null, '', '终端不存在'))
       continue
     }
     if (!target.enabled) {
-      skipped.push({ terminalId: target.id, terminalCode: target.terminalCode, reason: '已停用' })
+      skipped.push(mockTerminalBatchSkipped(target.id, target.terminalCode, '已停用'))
       continue
     }
     if (target.lifecycleStatus !== 'planned') {
-      skipped.push({ terminalId: target.id, terminalCode: target.terminalCode, reason: '已激活' })
+      skipped.push(mockTerminalBatchSkipped(target.id, target.terminalCode, '已激活'))
       continue
     }
     if (!alreadyRevoked && target.codeState === 'unused') target.codeState = 'revoked'
     target.codeState = 'unused'
-    issued.push({
-      terminalId: target.id,
-      terminalCode: target.terminalCode,
-      displayName: target.displayName,
-      locationLabel: target.locationLabel,
-      bindCode: mockCode(),
-      expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
-    })
+    issued.push(mockTerminalBatchIssuedCode(target, mockCode(), new Date(Date.now() + 10 * 60_000).toISOString()))
   }
+  return mockTerminalBatchBindCodeResult(issued, skipped)
+}
+
+function mockTerminalBatchCreatedRow(terminal: HeldTerminal): TerminalBatchCreatedRow {
+  return {
+    terminalId: terminal.id,
+    terminalCode: terminal.terminalCode,
+    displayName: terminal.displayName,
+    locationLabel: terminal.locationLabel,
+    orgId: terminal.orgId,
+    orgName: terminal.orgName,
+  }
+}
+
+function mockTerminalBatchCreated(batchId: string, rows: TerminalBatchCreatedRow[]): TerminalBatchCreated {
+  return { batchId, count: rows.length, terminals: rows }
+}
+
+function mockTerminalBatchIssuedCode(terminal: HeldTerminal, bindCode: string, expiresAt: string): TerminalBatchIssuedCode {
+  return {
+    terminalId: terminal.id,
+    terminalCode: terminal.terminalCode,
+    displayName: terminal.displayName,
+    locationLabel: terminal.locationLabel,
+    bindCode,
+    expiresAt,
+  }
+}
+
+function mockTerminalBatchSkipped(terminalId: string | null, terminalCode: string, reason: string): TerminalBatchSkipped {
+  return { terminalId, terminalCode, reason }
+}
+
+function mockTerminalBatchBindCodeResult(
+  issued: TerminalBatchIssuedCode[],
+  skipped: TerminalBatchSkipped[],
+): TerminalBatchBindCodeResult {
   return { issued, skipped }
+}
+
+function mockTerminalBatchRevokeResult(revokedCount: number, terminalCount: number): TerminalBatchRevokeResult {
+  return { revokedCount, terminalCount }
 }
 
 function uniqueInOrder(ids: string[]): string[] {

@@ -21,10 +21,12 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { BadRequestException, HttpException, Module, ValidationPipe, type ValidationError } from '@nestjs/common'
-import { NestFactory } from '@nestjs/core'
+import { APP_GUARD, NestFactory } from '@nestjs/core'
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { AuditService } from '../src/audit/audit.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
+import { buildThrottlerConfig } from '../src/common/throttler/terminal-throttle'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
 import { RedisService } from '../src/common/redis/redis.service'
@@ -146,6 +148,7 @@ async function main(): Promise<void> {
   const jwt = new JwtService({ secret: 'verify-terminal-batch-activation-jwt-secret' })
 
   @Module({
+    imports: [ThrottlerModule.forRoot(buildThrottlerConfig())],
     controllers: [AdminTerminalBatchController],
     providers: [
       { provide: PrismaService, useValue: prisma },
@@ -156,6 +159,7 @@ async function main(): Promise<void> {
       { provide: TerminalBatchService, useValue: batches },
       JwtAuthGuard,
       RolesGuard,
+      { provide: APP_GUARD, useClass: ThrottlerGuard },
     ],
   })
   class FixtureModule {}
@@ -181,6 +185,7 @@ async function main(): Promise<void> {
     await app.listen(0, '127.0.0.1')
     const port = (app.getHttpServer().address() as AddressInfo).port
     const partnerToken = jwt.sign({ sub: partnerId, ver: 0 })
+    const adminToken = jwt.sign({ sub: adminId, ver: 0 })
 
     const okPrefix = `A${suffix}`
     prefixes.push(okPrefix)
@@ -456,6 +461,32 @@ async function main(): Promise<void> {
     const forbiddenCount = await prisma.terminal.count({ where: { terminalCode: { startsWith: forbiddenPrefix } } })
     assert.equal(forbiddenCount, 0)
     console.log('PASS 非管理员 403')
+
+    // 发码和重发各有自己的限流桶。有效期走重发，第 11 次走发码，互不占额度。
+    for (const ttlMinutes of [0, 61, 120]) {
+      const ttlResponse = await fetch(`http://127.0.0.1:${port}/api/v1/admin/terminals/batches/bind-codes/reissue`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ terminalIds: [freshId], ttlMinutes }),
+      })
+      await ttlResponse.arrayBuffer()
+      assert.equal(ttlResponse.status, 400, `有效期 ${ttlMinutes} 分钟应 400，实际 ${ttlResponse.status}`)
+    }
+    console.log('PASS 有效期 0、61、120 分钟都被拒绝')
+
+    let eleventhStatus = 0
+    for (let attempt = 1; attempt <= 11; attempt += 1) {
+      const limited = await fetch(`http://127.0.0.1:${port}/api/v1/admin/terminals/batches/bind-codes`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ terminalIds: [freshId] }),
+      })
+      await limited.arrayBuffer()
+      eleventhStatus = limited.status
+      if (attempt <= 10) assert.equal(limited.status, 201, `第 ${attempt} 次批量发码应 201，实际 ${limited.status}`)
+    }
+    assert.equal(eleventhStatus, 429, `第 11 次批量发码应 429，实际 ${eleventhStatus}`)
+    console.log('PASS 同一管理员一分钟内第 11 次批量发码被限流')
 
     console.log(postgres ? 'verify:terminal-batch-activation:postgres PASS' : 'verify:terminal-batch-activation PASS')
   } finally {

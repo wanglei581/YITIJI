@@ -16,17 +16,19 @@ export interface CreateTerminalBatchInput {
   rows?: TerminalBatchRowInput[]
 }
 
+export interface TerminalBatchCreatedRow {
+  terminalId: string
+  terminalCode: string
+  displayName: string | null
+  locationLabel: string | null
+  orgId: string | null
+  orgName: string | null
+}
+
 export interface TerminalBatchCreated {
   batchId: string
   count: number
-  terminals: Array<{
-    terminalId: string
-    terminalCode: string
-    displayName: string | null
-    locationLabel: string | null
-    orgId: string | null
-    orgName: string | null
-  }>
+  terminals: TerminalBatchCreatedRow[]
 }
 
 export interface TerminalBatchSelectionInput {
