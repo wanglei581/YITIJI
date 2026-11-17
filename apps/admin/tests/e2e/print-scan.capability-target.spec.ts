@@ -161,6 +161,7 @@ test('登记确认前切换终端后，确认不会对任何一台发保存', as
   await expect(page.getByText('将把『新一号（new01）』的『材料包』登记为『可用（对用户开放）』')).toBeVisible()
   expect(calls.filter((call) => call.method === 'PUT')).toEqual([])
   await terminalSelect(page).selectOption('term-ksk')
+  await expect(page.locator('input[value="B-TABLE"]')).toBeVisible()
   await expect(page.getByRole('button', { name: '确认', exact: true })).toHaveCount(0)
   await expect(page.getByText(/将把『/)).toHaveCount(0)
   await page.waitForTimeout(400)
