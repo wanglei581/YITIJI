@@ -59,6 +59,7 @@ async function assertNotProduction(collectors: ReturnType<typeof attachCollector
 }
 
 type ExportedFile = { fileId: string; filename: string; signedUrl: string }
+type ExportedReport = ExportedFile & { taskId: string }
 
 function asExportFile(body: unknown): ExportedFile {
   const record = body && typeof body === 'object' ? body as Record<string, unknown> : {}
@@ -148,6 +149,32 @@ async function readEditorValues(page: Page): Promise<string[]> {
   const paper = page.locator('.qxt-paperbox textarea, .qxt-paperbox input')
   const locator = (await paper.count()) > 0 ? paper : page.locator('textarea')
   return locator.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value))
+}
+
+/** 走查环境常常没有终端心跳，主按钮会停用。停用只挡点击，不挡 handleNext。 */
+async function clickPreviewNext(page: Page): Promise<void> {
+  const next = page.locator('footer.qxt-dock button.qxt-btn-pri')
+  await expect(next, '预览页应有去确认页的主按钮').toBeVisible({ timeout: 15_000 })
+  await next.evaluate((el) => {
+    const button = el as HTMLButtonElement
+    button.disabled = false
+    button.click()
+  })
+}
+
+/** 确认页回到预览，再进确认，再回预览，再回报告。验回执在来回一趟之后还在。 */
+async function walkPreviewConfirmRoundTrip(page: Page): Promise<void> {
+  const backToPreview = page.getByRole('button', { name: '返回修改', exact: true })
+  await expect(backToPreview, '确认页应能返回预览').toBeVisible({ timeout: 15_000 })
+  await backToPreview.click()
+  await page.waitForURL((url) => url.pathname === '/print/desk' && url.searchParams.get('step') === 'preview', { timeout: 15_000 })
+  await clickPreviewNext(page)
+  await page.waitForURL((url) => url.pathname === '/print/confirm', { timeout: 15_000 })
+  await page.getByRole('button', { name: '返回修改', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/print/desk' && url.searchParams.get('step') === 'preview', { timeout: 15_000 })
+  await page.getByRole('button', { name: '上一步', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/resume/report', { timeout: 15_000 })
+  await waitReady(page)
 }
 
 async function returnFromPrintToReport(page: Page): Promise<void> {
@@ -290,8 +317,8 @@ async function exportReport(
   collectors: ReturnType<typeof attachCollectors>,
   label: string,
   name: RegExp,
-): Promise<ExportedFile> {
-  const held: { file: ExportedFile | null } = { file: null }
+): Promise<ExportedReport> {
+  const held: { file: ExportedReport | null } = { file: null }
   await recordStep({
     page, journey, step: `report-${label}`, control: label,
     selectorHint: `button:${label}`, kind: 'click', collectors,
@@ -304,7 +331,9 @@ async function exportReport(
       await confirmFactsIfOpen(page, journey, collectors)
       const response = await pending
       expect(response.ok(), `${label}应返回成功`).toBeTruthy()
-      held.file = asExportFile(await response.json())
+      const taskId = new URL(response.url()).pathname.match(/\/resume\/records\/([^/]+)\/export/)?.[1] ?? ''
+      expect(taskId, `${label}的地址应带本次任务编号`).not.toBe('')
+      held.file = { ...asExportFile(await response.json()), taskId }
       await expect(page.getByTestId('resume-report-export-result')).toContainText(held.file.filename)
     },
   })
@@ -336,8 +365,24 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
     await page.getByRole('button', { name: '生成二维码带走' }).click()
     await assertQrEncodes(page, reportPdf.signedUrl, reportPdf.filename)
     await closePreviewIfOpen(page)
-    await clickReportButton(page, journey, collectors, /打印这份报告/, '打印这份报告')
+    await recordStep({
+      page, journey, step: 'report-打印这份报告', control: '打印这份报告',
+      selectorHint: 'button:打印这份报告', kind: 'click', collectors,
+      act: async () => {
+        await page.getByRole('button', { name: /打印这份报告/ }).first().click()
+        await confirmFactsIfOpen(page, journey, collectors)
+        await page.waitForURL((url) => url.pathname === '/print/confirm', { timeout: 12_000 })
+        await shot(page, journey, 'report-print-landed')
+        await walkPreviewConfirmRoundTrip(page)
+        await closePreviewIfOpen(page)
+      },
+    })
     await expect(page).toHaveURL(/\/resume\/report/)
+    const carriedTaskId = await page.evaluate(() => {
+      const usr = (window.history.state as { usr?: { taskId?: unknown } } | null)?.usr
+      return typeof usr?.taskId === 'string' ? usr.taskId : ''
+    })
+    expect(carriedTaskId, '预览 → 确认 → 回预览 → 回报告，本次 taskId 还在').toBe(reportPdf.taskId)
     await expect(reportResult, '从打印页回来，这份报告的导出结果还在').toContainText(reportPdf.filename)
     await expect(page.getByRole('button', { name: '生成二维码带走' })).toBeVisible()
     await assertTakeawayNotStored(page, reportPdf.signedUrl, '从打印页回来')

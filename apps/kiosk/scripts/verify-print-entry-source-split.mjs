@@ -105,16 +105,22 @@ for (const [handler, marker] of [
   )
 }
 
-// 打印链只从打印交接上下文读 source：跳转带来的临时状态里只有交接编号，
-// 登录回跳、返回预览、刷新之后 source 仍在（以前靠 route state 和会话双通道，临时状态一丢就退回上一份）。
+// 打印链只从打印交接上下文读 source。去确认页带交接编号；报告导出回执可以
+// 作为已经校验过的 printReturnState 原样带回。文件、参数、检查结论、来源不进路由状态。
+const carryAt = previewPage.indexOf('const carriedReturn = readPrintReturnCarry(')
+const carryEnd = previewPage.indexOf('\n  }\n', carryAt)
+const carrySlice = carryAt >= 0 ? previewPage.slice(carryAt, carryEnd) : ''
 assert(
   materialCheckPage.includes('const source = session?.source ?? handoff?.source') &&
     !materialCheckPage.includes('location.state') &&
     previewPage.includes('const source = handoff?.source') &&
-    previewPage.includes("navigate('/print/confirm', { state: { printContextId: saved.contextId } })") &&
+    carrySlice.includes("navigate('/print/confirm'") &&
+    carrySlice.includes('printContextId: saved.contextId') &&
+    carrySlice.includes('printReturnState: carriedReturn') &&
+    !/\b(file|params|materialCheck|source)\s*:/.test(carrySlice) &&
     confirmPage.includes('const source = handoff?.source') &&
     !/state\?\.(file|params|source|materialCheck)\b/.test(confirmPage),
-  '打印流程只从打印交接上下文读 source 与文件身份，跳转只带交接编号',
+  '打印流程只从打印交接上下文读 source 与文件身份；去确认页只多带校验过的回执返回状态',
 )
 
 for (const file of flowPages) {
