@@ -5,18 +5,15 @@
  * 打开个人收费，就是同意向个人收打印费，没出纸就要把这笔钱退回去。
  * 公共就业点位生效价永远是 0，应付为 0，不会进到退款。
  *
- * 出纸未确认、打印中报告丢失、部分出纸、缺纸、空错误码都不自动退。
- * 文案仍写「请稍后重试 / 重新上传」的设备故障也不在这里退：自助重打还开着，
- * 先退掉就会把已付单改成已退，重打被拒。排队超时未领取不在那组里，超时没出纸要退。
+ * 自动原路退只认「确定没交给打印机」的允许名单。终端状态上报没有阶段字段，
+ * 同一个码若在交给打印机前后都会出现，就不能整码放进名单。
+ * PRINT_COMMAND_FAILED 作为上报码只出现在调用 print() 之前（下载失败、队列还没送去打印）。
+ * print() 已经调用之后的命令失败会被改写成 PRINT_JOB_UNCONFIRMED，不在名单里。
+ * 名单外、以后新出现的码一律不自动退。缺纸即使发生在预检、文件还没交出去，也不自动退。
+ * PRINT_QUEUE_TIMEOUT 是服务端排队超时未领取，不是终端上报码，原文写明没有出纸，留在名单里。
  * 已按大于 0 付过、又明确没出纸，才走这里。退款失败复用第 2 期 a 的告警，类型单独一条。
  */
 import { BadRequestException } from '@nestjs/common'
-import {
-  PAPER_EMPTY_ERROR_CODE,
-  PARTIAL_OUTPUT_ERROR_CODE,
-  PRINT_JOB_UNCONFIRMED_ERROR_CODE,
-  PRINTING_REPORT_LOST_ERROR_CODE,
-} from '../print-jobs/paid-anomaly-disposition'
 import type { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { readPersonalChargeEnabled } from './effective-user-prices'
@@ -34,21 +31,24 @@ export interface NoPaperRefundDeps {
   refund?: Pick<RefundService, 'refund'>
 }
 
-const UNCERTAIN_ERROR_CODES = new Set<string>([
-  PRINT_JOB_UNCONFIRMED_ERROR_CODE,
-  PRINTING_REPORT_LOST_ERROR_CODE,
-])
-
-/** 用户还能重打或重传的失败。自动退会关掉这条路，所以留给重打。 */
-const RETRY_STILL_OPEN_ERROR_CODES = new Set<string>([
+/**
+ * 确定没交给打印机，才自动原路退。
+ * 出处都在终端程序：下载失败与队列准备失败是 task-runner 在 print() 之前上报的
+ * PRINT_COMMAND_FAILED；校验失败是 DOWNLOAD_HASH_MISMATCH；预检失败是
+ * PRINTER_NOT_FOUND / PRINTER_OFFLINE / PRINTER_ERROR；本地状态写不下去是
+ * LOCAL_TASK_STATE_PERSIST_FAILED；文件不存在与不支持的格式在 print() 里、
+ * 派发开始前返回，并原样上报。PRINT_QUEUE_TIMEOUT 由服务端在领取前写成失败。
+ */
+const EXPLICIT_NO_PAPER_ERROR_CODES = new Set<string>([
+  'PRINT_COMMAND_FAILED',
   'DOWNLOAD_HASH_MISMATCH',
   'PRINTER_NOT_FOUND',
   'PRINTER_OFFLINE',
   'PRINTER_ERROR',
-  'PRINT_TIMEOUT',
-  'PRINT_COMMAND_FAILED',
-  'UNSUPPORTED_FILE_TYPE',
+  'LOCAL_TASK_STATE_PERSIST_FAILED',
   'FILE_NOT_FOUND',
+  'UNSUPPORTED_FILE_TYPE',
+  'PRINT_QUEUE_TIMEOUT',
 ])
 
 function exceptionCode(error: unknown): string | null {
@@ -62,15 +62,11 @@ function exceptionCode(error: unknown): string | null {
   return null
 }
 
-/** 只有失败且错误码明确表示没出纸，才自动退。不确定和部分出纸留在这里会被删掉时门禁变红。 */
+/** 只有失败，且错误码在「确定没交给打印机」的允许名单里，才自动退。 */
 function isExplicitNoPaper(status: string, errorCode: string | null): boolean {
   if (status !== 'failed') return false
   if (!errorCode) return false
-  if (errorCode === PARTIAL_OUTPUT_ERROR_CODE) return false
-  if (UNCERTAIN_ERROR_CODES.has(errorCode)) return false
-  if (errorCode === PAPER_EMPTY_ERROR_CODE) return false
-  if (RETRY_STILL_OPEN_ERROR_CODES.has(errorCode)) return false
-  return true
+  return EXPLICIT_NO_PAPER_ERROR_CODES.has(errorCode)
 }
 
 async function pushPrintReturnAlert(orderId: string): Promise<void> {

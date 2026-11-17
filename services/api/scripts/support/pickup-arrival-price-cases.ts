@@ -30,6 +30,7 @@ import {
   PRINT_JOB_UNCONFIRMED_ERROR_CODE,
   PRINTING_REPORT_LOST_ERROR_CODE,
 } from '../../src/print-jobs/paid-anomaly-disposition'
+import { runNoPaperAllowlistCases } from './pickup-arrival-no-paper-allowlist-cases'
 import {
   restoreTerminalChargeFixture,
   setTerminalUserPrintPrices,
@@ -55,7 +56,7 @@ function assertWiring(): void {
   assert.match(source('src/print-jobs/print-queue-timeout.ts'), /settleExplicitNoPaperFromReportedFailure\(/)
   assert.match(source('src/terminals/terminals-agent.service.ts'), /settleExplicitNoPaperFromReportedFailure\(/)
   assert.match(source('src/payment/print-no-paper-refund.ts'), /if \(!enabled\) return 'signaled'/)
-  assert.match(source('src/payment/print-no-paper-refund.ts'), /UNCERTAIN_ERROR_CODES\.has\(errorCode\)/)
+  assert.match(source('src/payment/print-no-paper-refund.ts'), /EXPLICIT_NO_PAPER_ERROR_CODES\.has\(errorCode\)/)
   assert.match(source('src/payment/print-no-paper-refund.ts'), /reason: PAID_NO_PAPER_AUTO_REASON/)
 }
 
@@ -301,6 +302,13 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     assert.notEqual(explicitAgain, 'refunded')
     assert.equal(await db.refund.count({ where: { orderId: explicitId } }), 1)
 
+    await runNoPaperAllowlistCases(db, {
+      tag,
+      terminalId: pricedTerminalId,
+      orderIds,
+      taskIds,
+    })
+
     const repeatId = await createdOrders({
       suffix: 'repeat',
       amountCents: 200,
@@ -308,7 +316,7 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
       paymentSource: 'offline',
       taskStatus: 'failed',
     })
-    await attachTask(repeatId, 'DRIVER_FAULT')
+    await attachTask(repeatId, 'FILE_NOT_FOUND')
     let refundCalls = 0
     const repeatOrder = await db.order.findUniqueOrThrow({ where: { id: repeatId } })
     const countingRefund = {
@@ -376,7 +384,7 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
       paymentSource: 'offline',
       taskStatus: 'failed',
     })
-    await attachTask(partialId, 'DRIVER_FAULT', { completed: true })
+    await attachTask(partialId, 'PRINT_COMMAND_FAILED', { completed: true })
     let partialCalls = 0
     const partial = await settleExplicitNoPaperFromReportedFailure(db, `pt_${partialId}`, {
       refund: { refund: async () => { partialCalls += 1; throw new Error('部分出纸不应退款') } },
@@ -391,7 +399,7 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
       paymentSource: 'sandbox',
       taskStatus: 'failed',
     })
-    await attachTask(failedId, 'DRIVER_FAULT')
+    await attachTask(failedId, 'DOWNLOAD_HASH_MISMATCH')
     const failedProvider = {
       channel: 'sandbox',
       refund: async () => ({ status: 'failed' as const, channelRefundNo: null }),
