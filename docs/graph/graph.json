@@ -20250,7 +20250,7 @@
         ]
       },
       {
-        "fieldCount": 35,
+        "fieldCount": 36,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -26285,6 +26285,7 @@
       "services/api/scripts/verify-release-observation-contract.mjs",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
       "services/api/scripts/verify-terminal-printer-queue.ts",
@@ -26645,6 +26646,7 @@
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
@@ -30534,6 +30536,7 @@
     ],
     "services/api/src/payment/terminal-charge-settings.ts": [
       "services/api/scripts/verify-service-orders-concurrency.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/src/payment/terminal-charge.contract.ts": [
@@ -30544,6 +30547,7 @@
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-service-orders.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
@@ -31039,6 +31043,7 @@
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -31501,7 +31506,8 @@
       "services/api/scripts/verify-license-runtime.ts",
       "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
-      "services/api/scripts/verify-service-orders-concurrency.ts"
+      "services/api/scripts/verify-service-orders-concurrency.ts",
+      "services/api/scripts/verify-terminal-charge-binding-race.ts"
     ],
     "services/api/src/terminals/terminal-session.service.ts": [
       "services/api/scripts/verify-ai-safety-lexicon.ts",
@@ -49173,6 +49179,30 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:terminal-bind-code"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/payment/terminal-charge-settings.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-terminal-charge-binding-race.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:terminal-charge-binding-race",
+        "@ai-job-print/api::verify:terminal-charge-binding-race:postgres"
       ],
       "wired": true
     },

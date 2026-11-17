@@ -11,6 +11,15 @@
 - 冲突五处。`docs/graph/README.md`、`gates.md`、`graph.json`、`orphans.md` 不手改，用 `node scripts/generate-project-graph.mjs` 整套重生。`services/api/src/orgs/partner-stats.service.ts` 只在导入处冲突：本分支要招聘托管开关，主线要按机器收费的价目类型与生效价，两套导入都留，后文两边的调用已自动合上。
 - 自动合并且两边都改过：`.github/workflows/ci.yml`（本分支招聘托管门禁，主线免费角标、收费设置、服务单门禁）、`apps/kiosk/package.json`（本分支 `verify:recruitment-hosting-open`，主线 `verify:resume-fact-additions`）、`packages/shared/src/types/device.ts`（本分支改 `recruitmentHosting` 注释，主线加 `homeFreeBadge` 与 `pricing`）。
 
+## 2026-11-15：收费设置保存核对绑定版本，改绑在途不能把旧价写进新机构（分支 `claude/pricing-p1d-1115`，未推送）
+
+- 来由：补全线第十七任 P1d。管理员在终端抽屉里改绑机构的请求已经在服务端提交、响应还没回到页面时点「保存收费设置」，旧的向用户收费价会写进新机构，顶上却写「改绑机构，收费设置已复位」。
+- 用绑定版本号，不用机构 id。机构 id 在改走又改回、或解绑后再绑再解绑时会和读取时一样，旧价仍能写进去。`orgBoundAt` 在未绑定时是空，解绑后再绑再解绑也会撞上同一个空值。`orgBindingGeneration` 每次归属真变化加一（含解绑，机构没变不加），与最后落在哪个机构无关，并且放进同一条 `updateMany` 的 WHERE。SQLite 和 PostgreSQL 都不会在核对和写入之间漏掉并发改绑。
+- 保存收费设置必须带回读取时的版本。同一事务里对不上就回 409 `TERMINAL_CHARGE_SETTINGS_STALE`（「机构刚改过，收费设置已复位，请重新读取后再改」），不写价、不关待付单。改绑仍复位成机构承担、清空价目、记审计，并照旧关掉当时的待付单。
+- 后台改绑在途时停用「保存收费设置」。收到这个 409 就提示上面那句并重读，不留下旧价。
+- 默认值没变：新机器机构承担、五个价 0、个人收费总开关关。公共就业点位仍不收费。没有与岗位、招聘、投递挂钩的收费。
+- 没推送，没上线。
+
 ## 2026-11-15：收钱后端并上已含收费第 1 期的主线（未推送）
 
 - 分支 `claude/pricing-p2a-1113` 从 `039abd8d0` 合并 `origin/main` `17dbea8e0`（PR #1641，收费第 1 期含 P1c 返工）。
