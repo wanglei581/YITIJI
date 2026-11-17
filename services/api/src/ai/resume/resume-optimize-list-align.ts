@@ -90,6 +90,38 @@ export function omittedColumnText(raw: string, shown: string): string {
 }
 
 /**
+ * 原稿各行是顿号或右括号的 1、2、3 整栏时，返回这种标点。
+ * 点号栏不在这里认：点号后可能是「1.5倍」「1.0架构」，不能按编号剥。
+ */
+function looseNumberedColumnKind(lines: string[]): 'dun' | 'paren' | null {
+  const filled = lines.map((line) => line.trim()).filter(Boolean)
+  if (filled.length < 2) return null
+  const hits = filled.map((line) => classifyLeadingIndex(line))
+  if (hits.some((hit) => !hit || hit.maybe)) return null
+  const kind = hits[0]?.kind
+  if (kind !== 'dun' && kind !== 'paren') return null
+  if (!hits.every((hit, index) => hit?.kind === kind && hit.num === index + 1)) return null
+  return kind
+}
+
+/**
+ * 原稿已是顿号或右括号整栏时，模型行即使被打乱、只剩一行，也去掉行首「1、」「2）」。
+ * 编号后紧跟数字（「1、05亿…」）同样剥。点号不走这里。
+ */
+function stripLooseColumnIndex(line: string, kind: 'dun' | 'paren'): string {
+  const text = line.trim().replace(BULLET_RE, '').trim()
+  const match = kind === 'dun'
+    ? /^(\d{1,2})\s*、/u.exec(text)
+    : /^(\d{1,2})\s*[)）]/u.exec(text)
+  const digits = match?.[1]
+  if (!match || digits === undefined) return line
+  const num = Number(digits)
+  if (!Number.isInteger(num) || num < 1) return line
+  const rest = text.slice(match[0].length).trim()
+  return rest || line
+}
+
+/**
  * 一整栏（技能、证书或一段描述）各行成套用「1. 2. 3.」「1、2、」「1）2）」这类递增编号时，只剥行首编号。
  * 只有一行、数字不连续、或「2.5D」「3.0版本」「1.5年」这种不成套的，原样留下。
  * 「1.3D」只有在同栏其余行是明确的 2. 3. … 时才剥，剥完正文仍是「3D」。
@@ -222,7 +254,10 @@ export function alignOriginalList(
   options?: AlignOriginalListOptions,
 ): { list: string[]; missing: string[] } {
   const sourceLines = stripNumberedColumn(lines)
-  const sourceModel = stripNumberedColumn(model)
+  const looseKind = looseNumberedColumnKind(lines)
+  const sourceModel = stripNumberedColumn(model).map((line) => (
+    looseKind ? stripLooseColumnIndex(line, looseKind) : line
+  ))
   const norm = normalizeResumeStructureText
   const modules = (options?.modules ?? []).map((module) => ({ module, used: false }))
   const covered = new Set<string>()
