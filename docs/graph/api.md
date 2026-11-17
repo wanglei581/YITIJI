@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`659` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`663` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -1191,6 +1191,15 @@
 | GET | `/api/v1/admin/release-observation-plans` | AdminReleaseObservationController.list | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
 | POST | `/api/v1/admin/release-observation-plans` | AdminReleaseObservationController.create | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
 | PATCH | `/api/v1/admin/release-observation-plans/:planId` | AdminReleaseObservationController.update | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+
+## `services/api/src/terminals/admin-terminal-batch.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/admin/terminals/batches` | AdminTerminalBatchController.create | admin | TerminalBatchService | AuditLog<br/>Organization<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential |
+| POST | `/api/v1/admin/terminals/batches/bind-codes` | AdminTerminalBatchController.issue | admin | TerminalBatchService | AuditLog<br/>Organization<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential |
+| POST | `/api/v1/admin/terminals/batches/bind-codes/reissue` | AdminTerminalBatchController.reissue | admin | TerminalBatchService | AuditLog<br/>Organization<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential |
+| POST | `/api/v1/admin/terminals/batches/bind-codes/revoke` | AdminTerminalBatchController.revoke | admin | TerminalBatchService | AuditLog<br/>Organization<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential |
 
 ## `services/api/src/terminals/admin-terminals.controller.ts`
 

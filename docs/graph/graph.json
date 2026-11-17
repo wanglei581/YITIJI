@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 659,
+    "endpointCount": 663,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -5593,6 +5593,98 @@
         "services": [
           "AuditService",
           "TerminalToolboxService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminal-batch.controller.ts",
+        "handler": "AdminTerminalBatchController.create",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential"
+        ],
+        "path": "/api/v1/admin/terminals/batches",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/terminal-batch.service.ts"
+        ],
+        "services": [
+          "TerminalBatchService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminal-batch.controller.ts",
+        "handler": "AdminTerminalBatchController.issue",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential"
+        ],
+        "path": "/api/v1/admin/terminals/batches/bind-codes",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/terminal-batch.service.ts"
+        ],
+        "services": [
+          "TerminalBatchService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminal-batch.controller.ts",
+        "handler": "AdminTerminalBatchController.reissue",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential"
+        ],
+        "path": "/api/v1/admin/terminals/batches/bind-codes/reissue",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/terminal-batch.service.ts"
+        ],
+        "services": [
+          "TerminalBatchService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminal-batch.controller.ts",
+        "handler": "AdminTerminalBatchController.revoke",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential"
+        ],
+        "path": "/api/v1/admin/terminals/batches/bind-codes/revoke",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/terminal-batch.service.ts"
+        ],
+        "services": [
+          "TerminalBatchService"
         ]
       },
       {
@@ -14273,7 +14365,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 288,
+      "reachableFileCount": 291,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -15060,7 +15152,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 315
+      "sourceFileCount": 318
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -19848,6 +19940,7 @@
           "services/api/src/recruitment-content/recruitment-content-read.service.ts",
           "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
+          "services/api/src/terminals/terminal-batch.service.ts",
           "services/api/src/terminals/terminal-org-assignment.ts",
           "services/api/src/terminals/terminals-admin.service.ts"
         ]
@@ -20257,7 +20350,7 @@
         ]
       },
       {
-        "fieldCount": 35,
+        "fieldCount": 36,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -20318,6 +20411,7 @@
           "services/api/src/support-contact/support-contact.service.ts",
           "services/api/src/terminals/kiosk-job-board.service.ts",
           "services/api/src/terminals/release-observation.service.ts",
+          "services/api/src/terminals/terminal-batch.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
           "services/api/src/terminals/terminal-org-assignment.ts",
@@ -20335,6 +20429,7 @@
           "Terminal"
         ],
         "usedBy": [
+          "services/api/src/terminals/terminal-batch.service.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts"
         ]
@@ -26648,6 +26743,7 @@
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
@@ -26990,6 +27086,9 @@
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-scan-input-lockout-telemetry.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-terminal-batch-activation.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-terminal-credentials.ts": [
@@ -28157,6 +28256,7 @@
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -28478,6 +28578,7 @@
       "services/api/scripts/verify-scan-device-b8.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
@@ -28532,6 +28633,7 @@
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-home-free-badge.ts"
     ],
@@ -28560,6 +28662,7 @@
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-home-free-badge.ts"
     ],
@@ -28728,6 +28831,7 @@
       "services/api/scripts/verify-service-orders.ts",
       "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-home-free-badge.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
@@ -31038,6 +31142,7 @@
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -31345,6 +31450,9 @@
     "services/api/src/terminals/admin-printers.controller.ts": [
       "services/api/scripts/verify-admin-printer-output.ts"
     ],
+    "services/api/src/terminals/admin-terminal-batch.controller.ts": [
+      "services/api/scripts/verify-terminal-batch-activation.ts"
+    ],
     "services/api/src/terminals/admin-terminals.controller.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-free-print-quota.ts",
@@ -31418,6 +31526,9 @@
       "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts"
     ],
+    "services/api/src/terminals/terminal-batch.service.ts": [
+      "services/api/scripts/verify-terminal-batch-activation.ts"
+    ],
     "services/api/src/terminals/terminal-capabilities.service.ts": [
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
@@ -31470,6 +31581,7 @@
     ],
     "services/api/src/terminals/terminal-credential-security.service.ts": [
       "services/api/scripts/verify-copy-c1b.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
@@ -31526,6 +31638,7 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -31539,6 +31652,7 @@
     "services/api/src/terminals/terminal-utils.ts": [
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "services/api/src/terminals/terminals-admin.service.ts": [
@@ -31558,6 +31672,7 @@
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -31593,6 +31708,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
@@ -47502,6 +47618,7 @@
           "services/api/scripts/verify-resume-export-formats.ts",
           "services/api/scripts/verify-resume-report-export.ts",
           "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
+          "services/api/scripts/verify-terminal-batch-activation.ts",
           "services/api/scripts/verify-terminal-credentials.ts",
           "services/api/scripts/verify-terminal-device-config.ts",
           "services/api/scripts/verify-terminal-provisioning.ts",
@@ -49110,6 +49227,38 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:support-contact"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/admin-terminal-batch.controller.ts",
+          "services/api/src/terminals/terminal-batch.service.ts",
+          "services/api/src/terminals/terminal-credential-security.service.ts",
+          "services/api/src/terminals/terminal-toolbox.service.ts",
+          "services/api/src/terminals/terminal-utils.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-terminal-batch-activation.ts",
+      "helper": true,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:terminal-batch-activation",
+        "@ai-job-print/api::verify:terminal-batch-activation:postgres"
       ],
       "wired": true
     },
