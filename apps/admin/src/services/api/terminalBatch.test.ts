@@ -64,6 +64,27 @@ test('121 字名称报第 1 行超上限，201 字点位报第 2 行，普通行
   assert.match(mixed.errors[0] ?? '', /200/)
 })
 
+test('空行也占行号：空行在前报第 2 行，空行在中间报第 3 行', () => {
+  const tooLongName = '名'.repeat(121)
+  const leadingBlank = parseTerminalBatchPaste(`\n${tooLongName}`, [])
+  assert.deepEqual(leadingBlank.rows, [])
+  assert.equal(leadingBlank.errors.length, 1)
+  assert.match(leadingBlank.errors[0] ?? '', /第 2 行/)
+  assert.match(leadingBlank.errors[0] ?? '', /名称/)
+
+  const middleBlank = parseTerminalBatchPaste(`大厅甲,一楼东\n\n${tooLongName}`, [])
+  assert.equal(middleBlank.rows.length, 1)
+  assert.equal(middleBlank.rows[0]?.displayName, '大厅甲')
+  assert.equal(middleBlank.errors.length, 1)
+  assert.match(middleBlank.errors[0] ?? '', /第 3 行/)
+  assert.match(middleBlank.errors[0] ?? '', /120/)
+
+  const both = parseTerminalBatchPaste(`\n大厅甲,一楼东\n\n${tooLongName}`, [])
+  assert.equal(both.rows.length, 1)
+  assert.equal(both.errors.length, 1)
+  assert.match(both.errors[0] ?? '', /第 4 行/)
+})
+
 test('制表符和回车开头同样加单引号，含逗号的公式先加引号再按 CSV 转义', () => {
   const tabbed = formatBindCodeCsv([row({ displayName: '\tcmd' })])
   assert.equal(cellsOf(tabbed)[1], "'\tcmd")

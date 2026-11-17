@@ -70,11 +70,13 @@ export function parseTerminalBatchPaste(
   text: string,
   organizations: Array<{ id: string; name: string }>,
 ): { rows: TerminalBatchRowInput[]; errors: string[] } {
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0)
+  const lines = text.split(/\r?\n/)
   const rows: TerminalBatchRowInput[] = []
   const errors: string[] = []
-  lines.forEach((line, index) => {
+  lines.forEach((raw, index) => {
     const lineNo = index + 1
+    const line = raw.trim()
+    if (line.length === 0) return
     const columns = line.split(/[,，\t]/).map((column) => column.trim())
     const name = columns[0] ?? ''
     const location = columns[1] ?? ''
