@@ -746,6 +746,13 @@ async function main(): Promise<void> {
     let restoreError: unknown
     try {
       await restoreTerminalChargeFixture(prisma)
+      // 夹具按第一次改之前的快照写回。这两台是本门禁新建的，快照应是机构承担；
+      // 再强制写一次，避免快照没记上时把「向用户收费」留在共用库里。
+      await prisma.terminal.updateMany({
+        where: { id: { in: [T, T2] } },
+        data: { userChargeMode: 'org_pays' },
+      })
+      await prisma.terminalServicePrice.deleteMany({ where: { terminalId: { in: [T, T2] } } })
     } catch (error) {
       restoreError = error
     }
