@@ -257,11 +257,14 @@ export function ensureProjectOriginalLines(
     if (!item.role?.trim() && roleFromTitle && isTitleLike(roleFromTitle, RESTORED_ROLE_MAX)) item.role = roleFromTitle
     const rawDescription = item.description ?? ''
     const rawRows = rawDescription.split('\n')
-    // 先按整栏剥（「1.5倍」打头且后面是 2. 3. 时仍剥成「5倍」）。整栏认不出来时，再逐行剥明确编号，点号后的小数和「1.0」不动。
+    // 先按整栏剥（「1.5倍」打头且后面是 2. 3. 时仍剥成「5倍」）。只有原稿描述是成套编号时，才逐行剥明确编号，并丢掉对不上原稿或改写的句子。普通散文改写（Kk）不走这一步。
     const columnStripped = stripNumberedColumn(rawRows)
-    const preparedRows = numberedSourceColumn(rawRest) ? columnStripped.map((line) => stripClearLeadingIndex(line)) : columnStripped
-    const keptRows = preparedRows.filter((line) => !line.trim() || groundedDescriptionLine(line, rawRest, modules))
-    const description = keptRows.join('\n')
+    const preparedRows = numberedSourceColumn(rawRest)
+      ? columnStripped
+        .map((line) => stripClearLeadingIndex(line))
+        .filter((line) => !line.trim() || groundedDescriptionLine(line, rawRest, modules))
+      : columnStripped
+    const description = preparedRows.join('\n')
     if (description !== rawDescription) item.description = description
     const role = item.role?.trim() ?? ''
     const uncovered = rest.filter((line) => {
