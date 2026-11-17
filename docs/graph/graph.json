@@ -14273,7 +14273,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 288,
+      "reachableFileCount": 289,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -15060,7 +15060,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 315
+      "sourceFileCount": 316
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
