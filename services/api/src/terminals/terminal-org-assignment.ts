@@ -6,11 +6,14 @@ import { terminalOrgBindingWrite } from './terminal-org-binding'
 import { revokeTerminalCopyAuthorization } from '../copy-jobs/copy-authorization'
 import { assertCanBindTerminal } from '../licenses/license-gate'
 import { retirePendingServiceOrders } from '../payment/service-order.retire'
+import { readTerminalChargeResetSnapshot, type TerminalChargeResetSnapshot } from '../payment/terminal-charge-reset-snapshot'
 
 export type TerminalOrgAssignmentAudit = (tx: PrismaTransactionClient, result: AssignTerminalOrgResult & {
   deploymentIds: string[]
   effectiveAt: string
   chargeSettingsReset: boolean
+  /** 这次真的复位时，复位前的收费方式、五个价和总开关。机构没变则是 null。 */
+  chargeSettingsBefore: TerminalChargeResetSnapshot | null
 }) => Promise<unknown>
 
 /** Rebinding, ownership interval closure and required audit commit or roll back together. */
@@ -42,6 +45,7 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
   const oldOrgId = terminal.orgId
   const result = { terminalId: terminal.terminalCode, terminalCode: terminal.terminalCode, oldOrgId, newOrgId: orgId, orgName }
   let chargeSettingsReset = false
+  let chargeSettingsBefore: TerminalChargeResetSnapshot | null = null
   await prisma.$transaction(async (tx) => {
     const changed = await tx.terminal.updateMany({
       where: { id: terminal.id, orgId: oldOrgId },
@@ -65,6 +69,7 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
       data: oldOrgId === orgId ? binding : { ...binding, orgBindingGeneration: { increment: 1 } },
     })
     if (oldOrgId !== orgId) {
+      chargeSettingsBefore = await readTerminalChargeResetSnapshot(tx, terminal.id)
       await revokeTerminalCopyAuthorization(tx, terminal.id)
       await tx.serviceDeployment.updateMany({
         where: { terminalId: terminal.id, endedAt: null },
@@ -79,6 +84,7 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
       deploymentIds: oldOrgId !== orgId && active ? [active.id] : [],
       effectiveAt: effectiveAt.toISOString(),
       chargeSettingsReset,
+      chargeSettingsBefore,
     })
   })
   if (oldOrgId !== orgId) {
