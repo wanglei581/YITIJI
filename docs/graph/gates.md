@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2215 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2216 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -188,7 +188,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 186 个文件</summary>
+<summary><code>apps/admin/src/</code> — 187 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -196,6 +196,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/layouts/AdminLayoutWrapper.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/layouts/adminNav.ts` | `verify-admin-billing-ui.mjs`<br/>`verify-admin-content-trust-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/admin/src/lib/auditActionLabels.ts` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-ai-safety-lexicon.ts` |
+| `apps/admin/src/lib/kioskPayScreenNote.ts` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/lib/printErrorText.ts` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/main.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/account-settings/AdminInitialPhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |

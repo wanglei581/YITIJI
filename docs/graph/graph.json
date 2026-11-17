@@ -20727,6 +20727,9 @@
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
+    "apps/admin/src/lib/kioskPayScreenNote.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/lib/printErrorText.ts": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
@@ -32405,6 +32408,7 @@
           "apps/admin/scripts/verify-console-batch7-copy.mjs",
           "apps/admin/scripts/verify-console-privacy-copy.mjs",
           "apps/admin/src/lib/auditActionLabels.ts",
+          "apps/admin/src/lib/kioskPayScreenNote.ts",
           "apps/admin/src/lib/printErrorText.ts",
           "apps/admin/src/routes/ai-services/AiLogsTable.tsx",
           "apps/admin/src/routes/billing/index.tsx",
