@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 659,
+    "endpointCount": 661,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -6201,6 +6201,30 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
+        "handler": "CreateAdvisorSessionDto.forget",
+        "method": "POST",
+        "models": [
+          "AdvisorArtifact",
+          "AdvisorPin",
+          "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
+          "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
+        ],
+        "path": "/api/v1/advisor/sessions/:sessionId/forget",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/advisor/advisor.service.ts"
+        ],
+        "services": [
+          "AdvisorService"
+        ]
+      },
+      {
+        "controller": "services/api/src/advisor/advisor.controller.ts",
         "handler": "CreateAdvisorSessionDto.pin",
         "method": "POST",
         "models": [
@@ -6391,6 +6415,16 @@
         "services": [
           "AssistantSummaryService"
         ]
+      },
+      {
+        "controller": "services/api/src/ai/assistant-session-forget.controller.ts",
+        "handler": "AssistantSessionForgetController.forget",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/assistant/sessions/forget",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/ai/ai.controller.ts",
@@ -8752,6 +8786,7 @@
         "method": "GET",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -8848,6 +8883,7 @@
         "method": "GET",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -8867,6 +8903,7 @@
         "method": "GET",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -9398,6 +9435,7 @@
         "method": "GET",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -14118,6 +14156,7 @@
         "method": "POST",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
@@ -14140,6 +14179,7 @@
         "method": "DELETE",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
@@ -14162,6 +14202,7 @@
         "method": "GET",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
@@ -14184,6 +14225,7 @@
         "method": "POST",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
@@ -14206,6 +14248,7 @@
         "method": "POST",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
@@ -14228,6 +14271,7 @@
         "method": "POST",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
@@ -14250,6 +14294,7 @@
         "method": "POST",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "AuditLog",
           "FairMaterialPrintBridge",
@@ -15064,7 +15109,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 825,
+      "reachableFileCount": 826,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18145,7 +18190,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1016
+      "sourceFileCount": 1017
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18759,7 +18804,8 @@
         "usedBy": [
           "services/api/src/advisor/advisor-retention.task.ts",
           "services/api/src/advisor/advisor.service.ts",
-          "services/api/src/advisor/assistant-summary.service.ts"
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts"
         ]
       },
       {
@@ -24255,6 +24301,9 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
+    "apps/kiosk/src/services/api/aiSessionForget.ts": [
+      "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs"
+    ],
     "apps/kiosk/src/services/api/benefitActivities.ts": [
       "apps/kiosk/scripts/verify-kiosk-parked-core4.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
@@ -26587,6 +26636,7 @@
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-copy-quota.ts",
@@ -27148,18 +27198,27 @@
     ],
     "services/api/src/advisor/advisor-artifact.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
-      "services/api/scripts/verify-beijing-display-time.ts"
+      "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-beijing-display-time.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts"
     ],
     "services/api/src/advisor/advisor-artifact.types.ts": [
       "services/api/scripts/verify-advisor-work.ts"
     ],
     "services/api/src/advisor/advisor-pdf.service.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-cjk-font.ts"
+    ],
+    "services/api/src/advisor/advisor-qa-memory.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts"
     ],
     "services/api/src/advisor/advisor-retention.task.ts": [
       "services/api/scripts/verify-advisor-work.ts",
@@ -27167,37 +27226,48 @@
     ],
     "services/api/src/advisor/advisor-skills.ts": [
       "services/api/scripts/verify-advisor-work.ts",
-      "services/api/scripts/verify-assistant-device-fault-intercept.ts"
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
+      "services/api/scripts/verify-assistant-voice.ts"
     ],
     "services/api/src/advisor/advisor.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
-      "services/api/scripts/verify-ai-quota-coverage.ts"
+      "services/api/scripts/verify-ai-quota-coverage.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts"
     ],
     "services/api/src/advisor/advisor.module.ts": [
-      "services/api/scripts/verify-ai-user-text-retention.ts"
+      "services/api/scripts/verify-ai-user-text-retention.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts"
     ],
     "services/api/src/advisor/advisor.service.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
-      "services/api/scripts/verify-assistant-device-fault-intercept.ts"
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts"
     ],
     "services/api/src/advisor/assistant-summary.service.ts": [
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
     "services/api/src/advisor/llm-advisor.service.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-device-fault.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
     "services/api/src/ai-access/admin-ai-access.controller.ts": [
@@ -27230,6 +27300,7 @@
       "services/api/scripts/verify-self-assessment-append-file-scope.ts"
     ],
     "services/api/src/ai/ai-log.service.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-runtime.ts",
@@ -27237,8 +27308,10 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
@@ -27282,6 +27355,7 @@
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
@@ -27300,6 +27374,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-policy-context.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-governed-job-fit.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts",
@@ -27333,6 +27408,9 @@
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-service-orders.ts"
     ],
+    "services/api/src/ai/assistant-session-forget.controller.ts": [
+      "services/api/scripts/verify-conversation-memory-forget.ts"
+    ],
     "services/api/src/ai/career-plan.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
@@ -27344,6 +27422,9 @@
       "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
+    ],
+    "services/api/src/ai/dto/assistant-sessions-forget.dto.ts": [
+      "services/api/scripts/verify-conversation-memory-forget.ts"
     ],
     "services/api/src/ai/dto/resume-generate.dto.ts": [
       "apps/kiosk/scripts/verify-resume-export-facts-contract.mjs",
@@ -27442,6 +27523,7 @@
       "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
@@ -27455,6 +27537,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-policy-context.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-llm-connectivity.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
@@ -28032,6 +28115,7 @@
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
@@ -28041,6 +28125,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-assistant-device-fault-intercept.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
@@ -28052,6 +28137,7 @@
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-cos-files.ts",
@@ -28091,6 +28177,7 @@
       "services/api/scripts/verify-member-print-audit-postgres.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
+      "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
@@ -28354,6 +28441,12 @@
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-policy-publish-gates.ts"
     ],
+    "services/api/src/common/conversation-memory-bridge.ts": [
+      "services/api/scripts/verify-conversation-memory-forget.ts"
+    ],
+    "services/api/src/common/conversation-memory.module.ts": [
+      "services/api/scripts/verify-conversation-memory-forget.ts"
+    ],
     "services/api/src/common/crypto/email-identity.ts": [
       "services/api/scripts/verify-partner-email-login-alias.ts"
     ],
@@ -28493,6 +28586,7 @@
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-content-pipeline-e2e.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-free-print-quota.ts",
@@ -28618,6 +28712,8 @@
       "services/api/scripts/verify-package-order-idempotency.ts"
     ],
     "services/api/src/common/pii/llm-input-mask.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/common/pii/pii-masker.ts": [
@@ -28682,6 +28778,7 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts",
@@ -29703,11 +29800,16 @@
       "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
+    "services/api/src/member-assets/member-assets.module.ts": [
+      "services/api/scripts/verify-conversation-memory-forget.ts"
+    ],
     "services/api/src/member-assets/member-assets.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
@@ -29751,11 +29853,13 @@
     ],
     "services/api/src/member-auth/member-auth.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-sms-egress-limits.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-auth.service.ts": [
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-auth.ts",
@@ -29808,6 +29912,7 @@
     "services/api/src/member-auth/sms/sms-sender.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-sms-provider-errors.ts",
       "services/api/scripts/verify-member-step-up.helpers.ts",
@@ -30866,6 +30971,7 @@
       "services/api/scripts/verify-admin-printer-output.ts",
       "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
@@ -30895,6 +31001,7 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-contract-review-http.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-copy-c1a.ts",
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-copy-quota.ts",
@@ -33067,6 +33174,7 @@
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/services/api/advisor.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
+          "apps/kiosk/src/services/api/aiSessionForget.ts",
           "apps/kiosk/src/services/api/careerPlan.ts",
           "apps/kiosk/src/services/api/contractReview.ts",
           "apps/kiosk/src/services/api/fairVisitPlan.ts",
@@ -40101,6 +40209,32 @@
         "dirs": [],
         "files": [
           "services/api/src/advisor/advisor-artifact.service.ts",
+          "services/api/src/advisor/advisor-pdf.service.ts",
+          "services/api/src/advisor/advisor-qa-memory.ts",
+          "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/pii/llm-input-mask.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-advisor-qa-history-mask.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:advisor-qa-history-mask"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/advisor/advisor-artifact.service.ts",
           "services/api/src/advisor/advisor-artifact.types.ts",
           "services/api/src/advisor/advisor-pdf.service.ts",
           "services/api/src/advisor/advisor-retention.task.ts",
@@ -40847,7 +40981,9 @@
           "services/api/src/advisor/advisor-retention.task.ts",
           "services/api/src/advisor/advisor.module.ts",
           "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/advisor/assistant-summary.service.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ],
         "missing": []
@@ -41096,9 +41232,16 @@
           "apps/miniapp/pages/assistant/assistant.js",
           "apps/miniapp/pages/assistant/assistant.wxml",
           "apps/miniapp/utils/api.js",
+          "services/api/src/advisor/advisor-artifact.service.ts",
+          "services/api/src/advisor/advisor-pdf.service.ts",
+          "services/api/src/advisor/advisor-skills.ts",
+          "services/api/src/advisor/advisor.service.ts",
           "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -41965,6 +42108,50 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:contract-review:timeout"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/advisor/advisor-artifact.service.ts",
+          "services/api/src/advisor/advisor-qa-memory.ts",
+          "services/api/src/advisor/advisor.controller.ts",
+          "services/api/src/advisor/advisor.module.ts",
+          "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/ai.module.ts",
+          "services/api/src/ai/assistant-session-forget.controller.ts",
+          "services/api/src/ai/dto/assistant-sessions-forget.dto.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/conversation-memory-bridge.ts",
+          "services/api/src/common/conversation-memory.module.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/pii/llm-input-mask.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/member-assets/member-assets.module.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-auth/member-auth.module.ts",
+          "services/api/src/member-auth/member-auth.service.ts",
+          "services/api/src/member-auth/sms/sms-sender.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-conversation-memory-forget.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:conversation-memory-forget"
       ],
       "wired": true
     },
@@ -45016,6 +45203,7 @@
         "files": [
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/member-assets/member-assets.controller.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/prisma/prisma.service.ts"
