@@ -3,7 +3,8 @@
 // 价在本机终端配置的 pricing.effective 上。
 // 角标：开关为真，并且五个生效价都读到、且都是 0，才返回 true。
 // 任一价大于 0、价读不齐、配置读不到或没有开关，角标一律 false。
-// 同一轮配置同时给出「是否收费」。角标和收费句都用这一对结果，不各读一次。
+// 同一轮配置同时给出「是否收费」：读到的有效价里有一个大于 0 就是收费，缺的键不算 0。
+// 读不齐且没有正价，或整段价目读不到，不算收费。角标和收费句都用这一对结果，不各读一次。
 // 新一轮两个都先不显示。30 秒没回来按失败，之后才到的成功也不再采用。
 // 终端号变了立刻两个都撤下并重读；不是当前终端的结果丢掉。
 
@@ -22,19 +23,29 @@ export interface KioskHomeFreeBadgeInput {
   config: unknown
 }
 
-function readEffectiveCents(config: unknown): number[] | null {
+function readKnownPrices(config: unknown): { known: number[]; complete: boolean } | null {
   if (typeof config !== 'object' || config === null) return null
   const pricing = (config as { pricing?: unknown }).pricing
   if (typeof pricing !== 'object' || pricing === null) return null
   const effective = (pricing as { effective?: unknown }).effective
   if (typeof effective !== 'object' || effective === null) return null
-  const cents: number[] = []
+  const known: number[] = []
+  let complete = true
   for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
     const value = (effective as Record<string, unknown>)[key]
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return null
-    cents.push(value)
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      complete = false
+      continue
+    }
+    known.push(value)
   }
-  return cents
+  return { known, complete }
+}
+
+function readEffectiveCents(config: unknown): number[] | null {
+  const read = readKnownPrices(config)
+  if (!read?.complete) return null
+  return read.known
 }
 
 /** 纯判定。调用方传入已经取好的本机配置（含 pricing）。 */
@@ -46,11 +57,11 @@ export function kioskHomeFreeBadgeVisible(input: KioskHomeFreeBadgeInput): boole
   return cents.every((value) => value === 0)
 }
 
-/** 五个生效价都读到，并且至少有一个大于 0。读不齐、读不到不当成在收费。 */
+/** 读到的有效价里至少有一个大于 0。缺的键不算 0；一个正价都没有，或价目整体读不到，不当成在收费。 */
 export function kioskEffectivePricesCharged(config: unknown): boolean {
-  const cents = readEffectiveCents(config)
-  if (!cents) return false
-  return cents.some((value) => value > 0)
+  const read = readKnownPrices(config)
+  if (!read) return false
+  return read.known.some((value) => value > 0)
 }
 
 export interface KioskHomeFreeBadgePollingOverrides {
