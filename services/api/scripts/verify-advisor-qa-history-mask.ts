@@ -14,6 +14,7 @@ import { AdvisorPdfService } from '../src/advisor/advisor-pdf.service'
 import { AdvisorQaMemory } from '../src/advisor/advisor-qa-memory'
 import { LlmAdvisorService } from '../src/advisor/llm-advisor.service'
 import { maskUserTextForLlmText } from '../src/common/pii/llm-input-mask'
+import { ADVISOR_SESSION_TOPIC, SKILL_REASONS } from '../src/advisor/advisor-skills'
 
 // ============================================================
 // 作业面追问：用户原话存进内存前遮盖，发给模型前再遮一遍。
@@ -203,6 +204,30 @@ async function main(): Promise<void> {
     const body3 = captured[0]!.body
     assert(body3.includes(markRaw), '阳性：直接写进内存的那条原话确实拼进了第三轮请求')
     assert(!body3.includes(PHONE), '第二层：内存里混进原话时，发出去之前也会遮掉')
+
+    const freshMark = textMark('新开场标记')
+    installFakeLlm(JSON.stringify({ skill: 'qa', reason: `模型复述了手机${PHONE}和${freshMark}` }))
+    const fresh = await svc.createSession(`新开场想问空窗，手机${PHONE}，${freshMark}`, owner)
+    const freshDump = JSON.stringify(fresh)
+    assert(
+      fresh.skillReason != null
+        && (Object.values(SKILL_REASONS) as string[]).includes(fresh.skillReason)
+        && !freshDump.includes(PHONE)
+        && !freshDump.includes(freshMark),
+      '新会话的判型理由是固定说明，不含原话和手机号',
+    )
+    await prisma.advisorSession.delete({ where: { id: fresh.sessionId } })
+
+    const legacyMark = textMark('旧理由原话')
+    const legacyReason = `${legacyMark}，开场就留了手机${PHONE}`
+    await prisma.advisorSession.update({
+      where: { id: sessionId },
+      data: { skillReason: legacyReason },
+    })
+    const viewed = await svc.getSession(sessionId, owner)
+    const dumped = JSON.stringify(viewed)
+    assert(!dumped.includes(PHONE) && !dumped.includes(legacyMark), '旧行判型理由不再把原话和手机号带回视图')
+    assert(viewed.skillReason === SKILL_REASONS.qa && viewed.topic === ADVISOR_SESSION_TOPIC, '旧行判型理由换成这一型的固定说明，topic 仍是固定标签')
 
     console.log(`\n=== 作业面追问历史遮盖通过：${passCount} PASS ===\n`)
   } finally {

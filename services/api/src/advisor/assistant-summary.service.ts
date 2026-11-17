@@ -48,7 +48,7 @@ export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
 import { AiQuotaService } from '../ai/quota/ai-quota.service'
 import { quotaSequence, runWithAiQuota } from '../ai/quota/ai-quota-run'
 import { AdvisorArtifactService } from './advisor-artifact.service'
-import { ADVISOR_DISCLAIMER, ASSISTANT_SUMMARY_TOPIC } from './advisor-skills'
+import { ADVISOR_DISCLAIMER, ASSISTANT_SUMMARY_SKILL_REASON, ASSISTANT_SUMMARY_TOPIC } from './advisor-skills'
 import type { QaPinsPayload } from './advisor-artifact.types'
 
 // ============================================================
@@ -213,7 +213,7 @@ export class AssistantSummaryService {
         skill: 'qa',
         status: 'completed',
         topic: ASSISTANT_SUMMARY_TOPIC,
-        skillReason: '由小青助手本次对话浓缩',
+        skillReason: ASSISTANT_SUMMARY_SKILL_REASON,
         skillSource: 'llm',
         slotsJson: JSON.stringify({
           source: { value: 'assistant', filledAt: nowIso },

@@ -15,6 +15,8 @@ import {
   ASSISTANT_SUMMARY_TOPIC,
   COMPARE_LIMITS,
   SKILL_SPECS,
+  displayedSkillReason,
+  switchSkillReason,
   SLOT_DRAFT_BLANK_POLICY,
   deriveStatus,
   isEvidenceLevel,
@@ -174,7 +176,7 @@ export class AdvisorService {
       data: {
         skill,
         skillSource: 'user_override',
-        skillReason: `你把作业型改成了「${SKILL_SPECS[skill].label}」——已填的内容都还在。`,
+        skillReason: switchSkillReason(skill),
         status: deriveStatus(skill, slots, await this.hasArtifact(row.id, skill)),
       },
     })
@@ -551,7 +553,7 @@ export class AdvisorService {
       skill,
       skillLabel: spec.label,
       skillTagline: spec.tagline,
-      skillReason: row.skillReason,
+      skillReason: displayedSkillReason(skill, row.skillReason),
       /** llm / fallback / user_override —— fallback 时前端应说明「这次按关键词判的型」 */
       skillSource: row.skillSource,
       status: deriveStatus(skill, slots, artifacts.length > 0),

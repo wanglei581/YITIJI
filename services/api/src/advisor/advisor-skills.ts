@@ -159,6 +159,30 @@ export const SKILL_SPECS: Readonly<Record<AdvisorSkill, AdvisorSkillSpec>> = {
   },
 }
 
+/** 小青对话浓缩成作业时写入的固定判型说明。 */
+export const ASSISTANT_SUMMARY_SKILL_REASON = '由小青助手本次对话浓缩'
+
+/** 用户主动换型时写入的固定说明。标签来自作业型注册表，不含用户原话。 */
+export function switchSkillReason(skill: AdvisorSkill): string {
+  return `你把作业型改成了「${SKILL_SPECS[skill].label}」——已填的内容都还在。`
+}
+
+const FIXED_SKILL_REASONS = new Set<string>([
+  ...Object.values(SKILL_REASONS),
+  ...ADVISOR_SKILLS.map((skill) => switchSkillReason(skill)),
+  ASSISTANT_SUMMARY_SKILL_REASON,
+])
+
+/**
+ * 读视图时只回固定说明。
+ * 旧行的 skillReason 可能抄过开场原话，不能原样返回。
+ */
+export function displayedSkillReason(skill: AdvisorSkill, stored: string | null): string | null {
+  if (stored == null) return null
+  if (FIXED_SKILL_REASONS.has(stored)) return stored
+  return SKILL_REASONS[skill]
+}
+
 // ── 输入槽状态 ────────────────────────────────────────────────
 
 export interface StoredSlotValue {
