@@ -66,8 +66,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/orders` | AdminOrdersReadonlyController.list | admin | AdminOrdersReadonlyService | EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Terminal |
-| GET | `/api/v1/admin/orders/:id` | AdminOrdersReadonlyController.getById | admin | AdminOrdersReadonlyService | EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Terminal |
+| GET | `/api/v1/admin/orders` | AdminOrdersReadonlyController.list | admin | AdminOrdersReadonlyService | EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Refund<br/>Terminal |
+| GET | `/api/v1/admin/orders/:id` | AdminOrdersReadonlyController.getById | admin | AdminOrdersReadonlyService | EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Refund<br/>Terminal |
 
 ## `services/api/src/admin-print-scan/admin-print-scan.controller.ts`
 

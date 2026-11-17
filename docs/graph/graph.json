@@ -3514,6 +3514,7 @@
           "Order",
           "PaymentAttempt",
           "PrintTaskStatusLog",
+          "Refund",
           "Terminal"
         ],
         "path": "/api/v1/admin/orders",
@@ -3536,6 +3537,7 @@
           "Order",
           "PaymentAttempt",
           "PrintTaskStatusLog",
+          "Refund",
           "Terminal"
         ],
         "path": "/api/v1/admin/orders/:id",
@@ -20091,6 +20093,7 @@
           "Order"
         ],
         "usedBy": [
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
