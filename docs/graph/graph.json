@@ -15152,7 +15152,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 318
+      "sourceFileCount": 319
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -28850,6 +28850,7 @@
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
+      "services/api/scripts/verify-terminal-batch-activation.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
@@ -49241,6 +49242,7 @@
           "services/api/src/common/guards/jwt-auth.guard.ts",
           "services/api/src/common/guards/roles.guard.ts",
           "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/common/throttler/terminal-throttle.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/admin-terminal-batch.controller.ts",
           "services/api/src/terminals/terminal-batch.service.ts",
@@ -50526,6 +50528,17 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/services/api/terminalBatch.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
