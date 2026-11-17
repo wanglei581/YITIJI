@@ -13,6 +13,7 @@ import {
   saveTerminalChargeSettings,
   type TerminalChargeSettingsView,
 } from '../../services/api/terminalCharge'
+import { KIOSK_PAY_SCREEN_NOTE } from '../../lib/kioskPayScreenNote'
 
 const REASON_TEXT: Record<EffectivePriceReason, string> = {
   public_site: '公共就业点位，永远免费',
@@ -48,12 +49,22 @@ function yuanFields(view: TerminalChargeSettingsView): Record<TerminalChargeServ
   return fields
 }
 
-function effectiveLine(view: TerminalChargeSettingsView): string {
+const KIOSK_GAP_KEYS = ['resume_optimize', 'mock_interview', 'scan'] as const
+
+function showsKioskPayGap(yuan: Record<TerminalChargeServiceKey, string>): boolean {
+  return KIOSK_GAP_KEYS.some((key) => {
+    const cents = parseYuan(yuan[key])
+    return cents !== null && cents > 0
+  })
+}
+
+function effectiveLine(view: TerminalChargeSettingsView, gap: boolean): string {
   const parts = TERMINAL_CHARGE_SERVICE_KEYS.map((key) => {
     const row = view.prices[key]
     return `${TERMINAL_CHARGE_SERVICE_LABELS[key]} ¥${yuanText(row.effectiveCents)}（${REASON_TEXT[row.reason]}）`
   })
-  return `现在实际向用户收：${parts.join('；')}`
+  const base = `现在实际向用户收：${parts.join('；')}`
+  return gap ? `${base} ${KIOSK_PAY_SCREEN_NOTE}` : base
 }
 
 export function TerminalChargeSettingsSection({
@@ -209,8 +220,9 @@ export function TerminalChargeSettingsSection({
                 />
               </label>
             ))}
+            {showsKioskPayGap(yuan) ? <p className="text-xs leading-relaxed text-warning-fg">{KIOSK_PAY_SCREEN_NOTE}</p> : null}
           </div>
-          <p className="text-xs leading-relaxed text-neutral-600">{effectiveLine(view)}</p>
+          <p className="text-xs leading-relaxed text-neutral-600">{effectiveLine(view, showsKioskPayGap(yuan))}</p>
           {locked ? null : (
             <button
               type="button"
