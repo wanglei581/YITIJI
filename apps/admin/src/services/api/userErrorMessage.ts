@@ -32,6 +32,7 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   REFUND_HOLD_NOT_FOUND: '没有待人工处理的退款，不能做这一步。',
   REFUND_HOLD_ALREADY_RESOLVED: '这笔待人工退款刚刚已经被处理，请刷新后再看。',
   REFUND_REMAINDER_REQUIRED: '这单只退了一部分。请退还剩余金额，不能用这三步把已经成功的退款再记一次。',
+  PARTIAL_REFUND_CANNOT_CLOSE: '这单只退了一部分，不能直接关单。剩下的钱请再退，或留在待人工。',
   ORDER_INVALID_TRANSITION: '当前支付状态不允许此操作',
   VALIDATION_FAILED: '提交内容未通过校验，请检查后重试',
   CONTENT_TRUST_INACTIVE: '来源机构内容信任未生效，无法发布',

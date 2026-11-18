@@ -21,6 +21,7 @@ export type PendingRefundChannelQuery = (input: {
 
 const HOLD_STATUSES = ['failed', 'manual_review', 'pending'] as const
 const NOT_REFUNDED_NOTE = '这笔钱不会记成已退回'
+const PARTIAL_CLOSE_MESSAGE = '这单只退了一部分，不能直接关单。剩下的钱请再退，或留在待人工。'
 
 function deny(code: string, message: string): BadRequestException {
   return new BadRequestException({ error: { code, message } })
@@ -239,16 +240,25 @@ export async function resolvePrintReturnHold(
       if (released) {
         throw deny('PAPER_ALREADY_OUT_CANNOT_CLOSE', '纸已经出去，不能关单。钱还在的话请走核对后仍退款。')
       }
+      if (order.payStatus === 'partial_refunded') {
+        throw deny('PARTIAL_REFUND_CANNOT_CLOSE', PARTIAL_CLOSE_MESSAGE)
+      }
       const closedRefund = await tx.refund.updateMany({
         where: { id: refund.id, status: { in: [...HOLD_STATUSES] } },
         data: { status: 'closed' },
       })
       if (closedRefund.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
       const closedOrder = await tx.order.updateMany({
-        where: { id: orderId, payStatus: order.payStatus },
+        where: { id: orderId, payStatus: order.payStatus, NOT: { payStatus: 'partial_refunded' } },
         data: { payStatus: 'closed', taskStatus: task && task.status === 'pending' ? 'cancelled' : order.taskStatus },
       })
-      if (closedOrder.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
+      if (closedOrder.count !== 1) {
+        const currentPay = await tx.order.findUnique({ where: { id: orderId }, select: { payStatus: true } })
+        if (currentPay?.payStatus === 'partial_refunded') {
+          throw deny('PARTIAL_REFUND_CANNOT_CLOSE', PARTIAL_CLOSE_MESSAGE)
+        }
+        throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
+      }
       if (task && task.printOutcome !== 'printed' && (task.status === 'pending' || task.status === 'failed')) {
         await tx.printTask.updateMany({
           where: { id: task.id, status: { in: ['pending', 'failed'] } },
@@ -379,7 +389,13 @@ export async function resolvePrintReturnHold(
     }
   })
   } catch (error) {
-    if (action === 'confirm_refunded' && exceptionCode(error) === 'PAPER_ALREADY_RELEASED') {
+    const rejectedCode = exceptionCode(error)
+    const rejectedDetail = action === 'confirm_refunded' && rejectedCode === 'PAPER_ALREADY_RELEASED'
+      ? '纸已经放行或已经出去，确认退成不能用'
+      : action === 'close_order' && rejectedCode === 'PARTIAL_REFUND_CANNOT_CLOSE'
+        ? PARTIAL_CLOSE_MESSAGE
+        : null
+    if (rejectedDetail && rejectedCode) {
       await db.auditLog.create({
         data: {
           actorId: null,
@@ -390,8 +406,8 @@ export async function resolvePrintReturnHold(
           payloadJson: JSON.stringify({
             action,
             operatorId,
-            code: 'PAPER_ALREADY_RELEASED',
-            detail: '纸已经放行或已经出去，确认退成不能用',
+            code: rejectedCode,
+            detail: rejectedDetail,
           }),
         },
       })
