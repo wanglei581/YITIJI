@@ -258,13 +258,25 @@ export function MeProfileLoading() {
   )
 }
 
-export function MeEmptyPack({ sentence, children, note }: { sentence: string; children: ReactNode; note?: ReactNode }) {
+export function MeEmptyPack({
+  sentence,
+  children,
+  note,
+  exitsClassName,
+}: {
+  sentence: string
+  children: ReactNode
+  note?: ReactNode
+  /** 只给这一页的出路卡加类。不传时仍是 me-stack，其它「我的」页不变。 */
+  exitsClassName?: string
+}) {
   const contact = useSupportContact()
+  const stackClass = exitsClassName ? `me-stack ${exitsClassName}` : 'me-stack'
   return (
     <div className="me-state">
       <p className="me-p">{sentence}</p>
       {note}
-      <div className="me-stack">{children}</div>
+      <div className={stackClass}>{children}</div>
       <QxTouchCallout kind="remind" icon="call">{helpNeededLine(contact)}</QxTouchCallout>
     </div>
   )

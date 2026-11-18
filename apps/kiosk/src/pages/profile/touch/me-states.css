@@ -268,6 +268,34 @@
   animation: qxt-me-glow 9s ease-in-out infinite alternate;
 }
 
+/* 只收口「我的打印订单」三组出路卡。插画列同一宽度，卡片等分高度。
+   窄屏仍走下面 max-width:719px 把插画收到 72px 的规则，这里不覆盖。 */
+@media (min-width: 720px) {
+  [data-qx-page="me"] .me-orders-exits.me-stack {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  [data-qx-page="me"] .me-orders-exits .me-exit {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  [data-qx-page="me"] .me-orders-exits .me-exit-art {
+    flex: 0 0 240px;
+    width: 240px;
+    min-width: 240px;
+    max-width: 240px;
+  }
+
+  [data-qx-page="me"] .me-orders-exits .me-exit-art .me-art {
+    height: auto;
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
+  }
+}
+
 @media (max-width: 719px) {
   /* 紧凑意图带默认 410px。390 宽再加底栏和导航，正文容不下一整行账号卡，
      行顶会被意图带挡住。只在本页放掉这个下限，并收一收带内间距。 */

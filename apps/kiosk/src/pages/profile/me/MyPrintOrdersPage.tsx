@@ -276,7 +276,7 @@ export function MyPrintOrdersPage() {
   } else if (items.length === 0 && pendingPickup.presence === 'hidden') {
     body = (
       <div className="me-state" data-testid="qx-me-fallback">
-        <MeEmptyPack sentence="还没有打印订单。没登录时在这台机器上打的单不会进这个账号。">
+        <MeEmptyPack exitsClassName="me-orders-exits" sentence="还没有打印订单。没登录时在这台机器上打的单不会进这个账号。">
           <LicenseLock><MeExitCard art="usb" artWidth={120} title="去打印" desc="U 盘、手机或扫描都可以" onClick={() => navigate('/print-scan')} /></LicenseLock>
           {miniOn
             ? <LicenseLock><MeExitCard art="phone" artWidth={96} title="输到机码取件" desc="手机上下的到店单，到机器上输入到机码" onClick={() => navigate('/print/pickup-claim')} /></LicenseLock>
@@ -294,7 +294,7 @@ export function MyPrintOrdersPage() {
       <>
         {pickupBlock}
         {exits.length > 0 ? (
-          <div className="me-stack" data-testid="pending-pickup-exits">
+          <div className="me-stack me-orders-exits" data-testid="pending-pickup-exits">
             {exits.map((card) => {
               const node = (
                 <MeExitCard
@@ -398,7 +398,7 @@ export function MyPrintOrdersPage() {
         ) : null}
 
         {filtered.length > 0 && filtered.length < 7 && expandedId === null ? (
-          <div className="me-stack">
+          <div className="me-stack me-orders-exits">
             <LicenseLock><MeExitCard art="usb" artWidth={110} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} /></LicenseLock>
             <MeExitCard art="stack" artWidth={110} title="去我的文档" desc="从已保存的文件里再选一份" onClick={() => navigate('/me/documents')} />
           </div>

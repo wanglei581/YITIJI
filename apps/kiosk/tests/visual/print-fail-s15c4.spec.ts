@@ -155,3 +155,131 @@ test('out-of-paper takeaway expiry does not add a second service phone @w2', asy
   expect(await phoneHits()).toBe(1)
   await expect(paper.getByText('工作人员')).toHaveCount(0)
 })
+
+function registerMemberLogin(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: {
+      success: true,
+      data: { token: 's15c4-member-token', user: { id: 'member-s15c4', phoneMasked: '138****8000', nickname: '打印会员' } },
+    },
+  })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+}
+
+async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === returnTo)
+}
+
+const PENDING_ROW = {
+  kind: 'cloud_single',
+  orderId: 'ord-pending-1',
+  title: '简历.pdf',
+  itemCount: 1,
+  claimableHere: true,
+  createdAt: '2026-11-19T06:20:00.000Z',
+  billablePages: 2,
+  terminal: { displayName: 'KSK-001', locationLabel: '就业服务大厅' },
+}
+
+function timelineOf(items: unknown[]): { status: number; json: unknown } {
+  return { status: 200, json: { success: true, data: { items, nextCursor: null, total: items.length } } }
+}
+
+function ordersOf(items: unknown[]): { status: number; json: unknown } {
+  return { status: 200, json: { success: true, data: { items, nextCursor: null, total: items.length } } }
+}
+
+function oneOrder(id: string, fileName: string): Record<string, unknown> {
+  return {
+    id,
+    status: 'completed',
+    fileName,
+    createdAt: '2026-11-18T02:40:00.000Z',
+    completedAt: '2026-11-18T02:40:00.000Z',
+    copies: 1,
+    colorMode: 'black_white',
+    duplex: 'simplex',
+    paperSize: 'A4',
+    amountCents: 0,
+    payStatus: 'paid',
+    paymentSource: 'free',
+    billablePages: 1,
+    discountCents: 0,
+    refundedAmountCents: 0,
+  }
+}
+
+async function exitCardGeometry(page: Page): Promise<Array<{ x: number; h: number }>> {
+  const cards = page.locator('.me-orders-exits .me-exit')
+  await expect(cards).toHaveCount(2)
+  return cards.evaluateAll((nodes) => nodes.map((card) => {
+    const title = card.querySelector('b')
+    if (!title) throw new Error('出路卡没有标题')
+    const cardBox = card.getBoundingClientRect()
+    const titleBox = title.getBoundingClientRect()
+    return { x: titleBox.x, h: cardBox.height }
+  }))
+}
+
+function expectCardsAligned(boxes: Array<{ x: number; h: number }>): void {
+  expect(Math.abs(boxes[0].x - boxes[1].x)).toBeLessThanOrEqual(4)
+  expect(Math.abs(boxes[0].h - boxes[1].h)).toBeLessThanOrEqual(4)
+}
+
+test('print order exit cards share title inset and height across the four states @w2', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  registerShell(api)
+  registerMemberLogin(api)
+  registerPrinterStatus(api, { value: 'ready' })
+  api.respond('GET', '/api/v1/me/print-orders', ordersOf([]))
+  api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([PENDING_ROW]))
+
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  await expect(page.getByTestId('pending-pickup-exits')).toBeVisible()
+  expectCardsAligned(await exitCardGeometry(page))
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+
+  api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([{
+    ...PENDING_ROW,
+    claimableHere: false,
+    terminal: { displayName: 'KSK-001', locationLabel: '就业服务大厅' },
+  }]))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('去哪台取')).toBeVisible()
+  expectCardsAligned(await exitCardGeometry(page))
+
+  api.respond('GET', '/api/v1/me/print-orders', ordersOf([oneOrder('order-1', '求职简历.pdf')]))
+  api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([]))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('求职简历.pdf')).toBeVisible()
+  expectCardsAligned(await exitCardGeometry(page))
+
+  api.respond('GET', '/api/v1/me/print-orders', ordersOf([
+    oneOrder('order-1', '求职简历.pdf'),
+    oneOrder('order-2', '作品集.pdf'),
+    oneOrder('order-3', '成绩单.pdf'),
+  ]))
+  api.respond('GET', '/api/v1/me/print-orders/timeline', { status: 500, json: { error: { code: 'INTERNAL', message: 'boom' } } })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByTestId('pending-pickup-error')).toBeVisible()
+  expectCardsAligned(await exitCardGeometry(page))
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+})
