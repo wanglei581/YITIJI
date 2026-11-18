@@ -215,7 +215,7 @@ export class LlmAdvisorService {
       '\n只输出 JSON：{"skill":"qa|slot_fill|compare","reason":"一句话说明为什么按这个型办（用第二人称对用户说）"}',
     )
     try {
-      const masked = maskUserTextForLlmText(topic.slice(0, 600), 'advisor_classify')
+      const masked = maskUserTextForLlmText(topic, 'advisor_classify').slice(0, 600)
       const raw = await this.callLlm(sys, `【用户诉求】${masked}`, ctx.onLlmCall)
       const parsed = this.parseJson<{ skill?: unknown; reason?: unknown }>(raw)
       const skill = parsed?.skill
@@ -247,11 +247,12 @@ export class LlmAdvisorService {
     const recent = history.slice(-6)
     const historyUsers = recent.filter((turn) => turn.role === 'user').map((turn) => turn.content)
     // 一次遮完：历史里若仍有原话，和本轮同一个号码共用占位编号。已经是占位的文字再遮一遍保持原样。
+    // 先遮盖再截断。身份证号若正好跨在 600 字上，先截断会把前半段原号送出去。
     const maskedPieces = maskUserTextsForLlmText(
-      [...historyUsers, question.slice(0, 600)],
+      [...historyUsers, question],
       'advisor_qa',
     )
-    const maskedQuestion = maskedPieces[maskedPieces.length - 1] ?? ''
+    const maskedQuestion = (maskedPieces[maskedPieces.length - 1] ?? '').slice(0, 600)
     const maskedHistoryUsers = maskedPieces.slice(0, -1)
     const parts: string[] = []
     if (recent.length > 0) {

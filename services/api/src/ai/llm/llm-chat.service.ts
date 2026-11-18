@@ -501,7 +501,8 @@ export class LlmChatService {
       }
     }
     session.deviceFaultJustAnswered = false
-    session.messages.push({ role: 'user', content: input.message })
+    const userTurn = { role: 'user' as const, content: input.message }
+    session.messages.push(userTurn)
     const skill = input.skill
     const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
     const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()
@@ -518,9 +519,13 @@ export class LlmChatService {
       if (error instanceof AiContentBlockedError) {
         const reply = refusalMessage(error.category)
         // 被拦的原话不能留在会话历史里：下一轮会带着整段历史再发给模型，检查点会再次命中，
-        // 这个会话之后每句话都会被拒答。输出侧命中时用户原话没问题，保留它，把拒答记进历史。
-        if (error.direction === 'input') session.messages.pop()
-        else session.messages.push({ role: 'assistant', content: reply })
+        // 这个会话之后每句话都会被拒答。按这一条消息本身删，不能 pop：同会话并发时
+        // 后到的正常问题会排在末尾，pop 会把它弹掉、被拦原话留下。
+        // 输出侧命中时用户原话没问题，保留它，把拒答记进历史。
+        if (error.direction === 'input') {
+          const index = session.messages.lastIndexOf(userTurn)
+          if (index >= 0) session.messages.splice(index, 1)
+        } else session.messages.push({ role: 'assistant', content: reply })
         session.updatedAt = Date.now()
         this.writeBack(sessionId, session, capturedEpoch)
         return { sessionId, reply, intent: classifyIntent(input.message), actions: [] }

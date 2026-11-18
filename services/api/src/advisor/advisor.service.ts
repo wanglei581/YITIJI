@@ -386,7 +386,7 @@ export class AdvisorService {
         // 内存不留原话。场景名与这一问发给模型时相同；模型回答只见过遮盖后的文本，照旧存。
         this.qaMemory.append(
           sessionId,
-          maskUserTextForLlmText(question.trim().slice(0, 600), 'advisor_qa'),
+          maskUserTextForLlmText(question.trim(), 'advisor_qa').slice(0, 600),
           value.answer,
           ownerKey,
           capturedEpoch,

@@ -104,8 +104,10 @@ async function initFallbackDb(): Promise<void> {
       `CREATE TABLE "EndUser" ("id" TEXT NOT NULL PRIMARY KEY, "phoneHash" TEXT NOT NULL, "phoneEnc" TEXT NOT NULL, "wxOpenId" TEXT, "nickname" TEXT, "enabled" BOOLEAN NOT NULL DEFAULT true, "status" TEXT NOT NULL DEFAULT 'active', "statusChangedAt" DATETIME, "closingRequestedAt" DATETIME, "anonymizedAt" DATETIME, "lastLoginAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE UNIQUE INDEX "EndUser_phoneHash_key" ON "EndUser"("phoneHash")`,
       `CREATE TABLE "AuditLog" ("id" TEXT NOT NULL PRIMARY KEY, "actorId" TEXT, "actorRole" TEXT NOT NULL, "action" TEXT NOT NULL, "targetType" TEXT NOT NULL, "targetId" TEXT, "payloadJson" TEXT NOT NULL DEFAULT '{}', "ipAddress" TEXT, "userAgent" TEXT, "requestId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-      `CREATE TABLE "AiServiceLog" ("id" TEXT NOT NULL PRIMARY KEY, "operation" TEXT NOT NULL, "provider" TEXT, "status" TEXT NOT NULL, "latencyMs" INTEGER, "errorCode" TEXT, "tokenUsageJson" TEXT NOT NULL DEFAULT '{}', "estimatedCostCny" REAL, "terminalId" TEXT, "endUserId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+      `CREATE TABLE "AiServiceLog" ("id" TEXT NOT NULL PRIMARY KEY, "operation" TEXT NOT NULL, "provider" TEXT, "status" TEXT NOT NULL, "latencyMs" INTEGER, "errorCode" TEXT, "tokenUsageJson" TEXT NOT NULL DEFAULT '{}', "estimatedCostCny" REAL, "terminalId" TEXT, "endUserId" TEXT, "clientDeclarationJson" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE TABLE "AdvisorSession" ("id" TEXT NOT NULL PRIMARY KEY, "endUserId" TEXT, "accessTokenHash" TEXT, "skill" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'collecting', "topic" TEXT NOT NULL, "skillReason" TEXT, "skillSource" TEXT NOT NULL DEFAULT 'llm', "slotsJson" TEXT NOT NULL DEFAULT '{}', "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "expiresAt" DATETIME NOT NULL)`,
+      `CREATE TABLE "AdvisorPin" ("id" TEXT NOT NULL PRIMARY KEY, "sessionId" TEXT NOT NULL, "idx" INTEGER NOT NULL, "content" TEXT NOT NULL, "evidenceLevel" TEXT NOT NULL, "sourceNote" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+      `CREATE TABLE "AdvisorArtifact" ("id" TEXT NOT NULL PRIMARY KEY, "sessionId" TEXT NOT NULL, "kind" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'completed', "payloadJson" TEXT NOT NULL, "provider" TEXT NOT NULL, "fileId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "expiresAt" DATETIME NOT NULL)`,
     ])
   } finally {
     client.close()
@@ -246,6 +248,35 @@ async function main(): Promise<void> {
       idTurns.length === 1 && !idTurns[0]!.content.includes(idNo) && !idTurns[0]!.content.includes(email),
       '内存里这一轮没有原身份证号和原邮箱',
     )
+
+    // 590 个字后再放 18 位身份证。先截到 600 会留下前 10 位原号，遮盖认不出整号。
+    const boundaryPrefix = idNo.slice(0, 10)
+    const boundaryQuestion = `${'甲'.repeat(590)}${idNo}尾`
+    installFakeLlm(answerJson)
+    await svc.ask(sessionId, boundaryQuestion, owner)
+    assert(captured.length === 1, '阳性：跨 600 字边界的这一轮发出了模型请求')
+    const boundaryBody = captured[0]!.body
+    assert(boundaryBody.includes('[身份证_'), '跨边界：出站请求里有身份证占位')
+    assert(!boundaryBody.includes(idNo) && !boundaryBody.includes(boundaryPrefix), '跨边界：出站请求里没有整号，也没有先截断留下的前 10 位')
+    const boundaryTurns = memory.read(sessionId).filter((turn) => turn.role === 'user' && turn.content.includes('甲'.repeat(20)))
+    const boundaryTurn = boundaryTurns[boundaryTurns.length - 1]
+    assert(
+      boundaryTurn !== undefined
+        && boundaryTurn.content.includes('[身份证_')
+        && !boundaryTurn.content.includes(idNo)
+        && !boundaryTurn.content.includes(boundaryPrefix),
+      '跨边界：内存里没有整号，也没有先截断留下的前 10 位',
+    )
+    installFakeLlm(JSON.stringify({ skill: 'qa', reason: '跨边界判型' }))
+    const boundarySession = await svc.createSession(boundaryQuestion, owner)
+    assert(captured.length === 1, '阳性：跨边界的开场判型发出了模型请求')
+    const classifyBody = captured[0]!.body
+    assert(
+      classifyBody.includes('[身份证_') && !classifyBody.includes(idNo) && !classifyBody.includes(boundaryPrefix),
+      '跨边界：判型出站请求先遮盖再截断，没有整号也没有前 10 位',
+    )
+    assert(!JSON.stringify(boundarySession).includes(idNo) && !JSON.stringify(boundarySession).includes(boundaryPrefix), '跨边界：新建会话的返回里没有这段证件号')
+    await prisma.advisorSession.delete({ where: { id: boundarySession.sessionId } })
 
     console.log(`\n=== 作业面追问历史遮盖通过：${passCount} PASS ===\n`)
   } finally {

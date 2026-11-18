@@ -8,6 +8,7 @@
  *   三个方法同样去掉会话号两端空白。同一条被挤掉后，新抓住的代次能对上，旧的不能。
  * D 两个清场接口在身份查询 503 时，只清这个令牌自己的内存并作废在途，作业行仍在库里。
  *   别人的会话号即使写在请求里也不动。
+ * 同会话并发时，被拦的那一条按消息本身删除，不把后到的正常问题弹掉。
  */
 import { randomUUID } from 'node:crypto'
 import { HttpException, ValidationPipe } from '@nestjs/common'
@@ -703,5 +704,66 @@ export async function runInflightForgetScenarios(ctx: InflightForgetContext): Pr
   } finally {
     redis.get = originalGetCross
     resetRedisCooldownForTests()
+  }
+
+  const userRace = `verify-pop-${randomUUID()}`
+  await createUser(userRace)
+  const ownerRace = `u:${userRace}`
+  const seedMark = textMark('并发前一轮')
+  const seededRace = await chat.chat(
+    { message: seedMark, channel: 'kiosk' } as never,
+    undefined,
+    ownerRace,
+  ) as { sessionId: string }
+  const cfg = (chat as unknown as {
+    config: { getConfig: (feature: string) => { forbiddenWords: string[] } }
+  }).config.getConfig('assistant_chat')
+  const previousWords = cfg.forbiddenWords
+  const previousFetch = globalThis.fetch
+  cfg.forbiddenWords = ['禁词样例']
+  let releaseFetch = (): void => undefined
+  const fetchGate = new Promise<void>((resolve) => { releaseFetch = resolve })
+  globalThis.fetch = (async () => {
+    await fetchGate
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({ choices: [{ message: { content: '模型的回答' } }] }),
+    }
+  }) as typeof fetch
+  const normalMark = textMark('正常问题')
+  try {
+    const forbiddenPending = chat.chat(
+      { message: `${textMark('被拦原话')}禁词样例`, channel: 'kiosk', sessionId: seededRace.sessionId } as never,
+      undefined,
+      ownerRace,
+    ) as Promise<{ reply: string }>
+    const normalPending = chat.chat(
+      { message: normalMark, channel: 'kiosk', sessionId: seededRace.sessionId } as never,
+      undefined,
+      ownerRace,
+    ) as Promise<{ reply: string }>
+    await new Promise<void>((resolve) => { setImmediate(resolve) })
+    const mid = transcriptOf(chat, seededRace.sessionId, ownerRace)
+    check(
+      mid.includes(seedMark) && mid.includes(normalMark) && !mid.includes('禁词样例'),
+      '同会话并发：被拦原话删掉时，后到的正常问题还在，被拦原话不留',
+    )
+    releaseFetch()
+    const [forbiddenAnswer, normalAnswer] = await Promise.all([forbiddenPending, normalPending])
+    const done = transcriptOf(chat, seededRace.sessionId, ownerRace)
+    check(
+      forbiddenAnswer.reply.length > 0
+        && normalAnswer.reply.length > 0
+        && done.includes(seedMark)
+        && done.includes(normalMark)
+        && !done.includes('禁词样例'),
+      '同会话并发：两轮都返回之后，转写里仍是正常问题，没有被拦原话',
+    )
+  } finally {
+    releaseFetch()
+    cfg.forbiddenWords = previousWords
+    globalThis.fetch = previousFetch
   }
 }
