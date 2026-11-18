@@ -29,6 +29,7 @@ import { PrintDoneUnverified } from './components/PrintDoneUnverified'
 import { UNKNOWN_NO_TASK_SUBTITLE, UNKNOWN_TASK_SUBTITLE } from './components/printDoneUnverifiedCopy'
 import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
 import { failureCopy, failureSummaryRows, faultScreenTakeawayMiss, feeInfoCopy, paymentRow, printerJamConfirmed, retryBlockedReason, shownFailureReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
+import { rememberConfirmedJam } from './printDoneJamLatch'
 import { CONTACT_ENTRY_LABEL, PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintDoneRecordSection } from './components/PrintDoneSections'
@@ -178,6 +179,14 @@ export function PrintDonePage() {
   const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : resultState
   // 重新提交打印要打印机现在能出纸才有意义；只在失败态读状态（成功态、核验中不发这条请求）。
   const device = useTerminalDeviceStatus(resultState === 'failed')
+  // 这一页只要读到过一次确认卡纸就记住。之后状态变成就绪，标题和胶囊也不退回「可能卡纸」。
+  const jamLatchTaskId = useRef<string | null>(null)
+  jamLatchTaskId.current = rememberConfirmedJam(
+    jamLatchTaskId.current,
+    taskId,
+    visual === 'paper-jam' && printerJamConfirmed(device),
+  )
+  const jamHeld = Boolean(taskId) && jamLatchTaskId.current === taskId
   // 没配服务电话时，「查看《隐私政策》里的联系方式」要有个真能点开的入口。
   const openContact = needsContactEntry(support) ? () => navigate(PRIVACY_CONTACT_ROUTE) : undefined
 
@@ -545,7 +554,7 @@ export function PrintDonePage() {
       : { fact: paymentFactOf(amountCents), amountCents }
     const faultOrderNo = publicOrderNo(takeaway?.orderNo) ?? displayOrderNo
     const canRetry = Boolean(takeaway?.canRetry)
-    const confirmedJam = variant === 'paper-jam' && printerJamConfirmed(device)
+    const confirmedJam = variant === 'paper-jam' && jamHeld
     return (
       <PrintDoneFailed
         variant={variant}

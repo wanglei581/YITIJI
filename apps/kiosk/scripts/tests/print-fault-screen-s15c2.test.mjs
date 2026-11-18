@@ -44,6 +44,7 @@ const failedModel = await import(transpile(join(kioskRoot, 'src/pages/print/comp
   '../printProgressModel': progressUrl,
 }))
 const progress = await import(progressUrl)
+const jamLatch = await import(transpile(join(kioskRoot, 'src/pages/print/printDoneJamLatch.ts')))
 const reactStub = toDataUrl('export function useEffect() {} export function useMemo(fn) { return fn() } export function useState(v) { return [v, () => {}] } export function useSyncExternalStore(_sub, get) { return get() }')
 const clientStub = toDataUrl('export const API_BASE_URL = ""\nexport const IS_MOCK_MODE = true')
 const screenStub = toDataUrl('export function getTerminalId() { return null } export function subscribeTerminalIdentity() { return () => {} }')
@@ -110,7 +111,8 @@ test('PRINTER_ERROR 不出现确定的「打印机卡纸」，公开状态 paper
   assert.equal(failedModel.printerJamConfirmed({ loading: false, kind: 'error', printer: { errorCode: 'hardwareError' } }), false)
 
   const page = readFileSync(join(kioskRoot, 'src/pages/print/PrintDonePage.tsx'), 'utf8')
-  assert.match(page, /const confirmedJam = variant === 'paper-jam' && printerJamConfirmed\(device\)/)
+  assert.match(page, /rememberConfirmedJam\(\s*jamLatchTaskId\.current,\s*taskId,\s*visual === 'paper-jam' && printerJamConfirmed\(device\),/)
+  assert.match(page, /const confirmedJam = variant === 'paper-jam' && jamHeld/)
   assert.match(page, /confirmedJam,/)
   assert.doesNotMatch(unconfirmedText, /工作人员/)
 })
@@ -205,6 +207,37 @@ test('确认卡纸时设备上报写成打印机卡纸，未确认仍用对照�
   assert.equal(unconfirmedReason, table)
   assert.match(unconfirmedReason, /可能卡纸/)
   assert.doesNotMatch(confirmedText, /工作人员/)
+})
+
+test('先读到确认卡纸再变成就绪，这一单标题仍是打印机卡纸；换一单或从未确认则退回可能卡纸', () => {
+  const order = 'job-jam-1'
+  const titleWhen = (held, current) => failedModel.failureCopy({
+    variant: 'paper-jam',
+    confirmedJam: held === current,
+    money,
+    orderNo: 'ORD-LATCH',
+    canRetry: false,
+  }).title
+
+  let held = jamLatch.rememberConfirmedJam(null, order, false)
+  assert.equal(held, null)
+  assert.equal(titleWhen(held, order), '打印机出了故障（可能卡纸）')
+
+  held = jamLatch.rememberConfirmedJam(held, order, true)
+  assert.equal(held, order)
+  held = jamLatch.rememberConfirmedJam(held, order, false)
+  assert.equal(held, order, '卡纸被清掉后这一单仍记住')
+  assert.equal(titleWhen(held, order), '打印机卡纸')
+
+  const other = 'job-jam-2'
+  const switched = jamLatch.rememberConfirmedJam(held, other, false)
+  assert.equal(switched, null, '换一单且没有再确认，不沿用上一单')
+  assert.equal(titleWhen(switched, other), '打印机出了故障（可能卡纸）')
+
+  const never = jamLatch.rememberConfirmedJam(null, order, false)
+  assert.equal(never, null)
+  assert.equal(titleWhen(never, order), '打印机出了故障（可能卡纸）')
+  assert.doesNotMatch(titleWhen(held, order), /工作人员/)
 })
 
 test('缺纸、卡纸、离线不论能否重提，服务电话都只在第 3 步出现一次', async () => {
