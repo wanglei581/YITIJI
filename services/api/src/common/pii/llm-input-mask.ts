@@ -35,6 +35,7 @@
 // ============================================================
 
 import { Logger, ServiceUnavailableException } from '@nestjs/common'
+import { llmMaskPlaceholderPattern } from './mask-placeholder'
 import { assertNoHighConfidencePii, maskContractPages } from './pii-masker'
 
 const logger = new Logger('LlmInputMask')
@@ -68,8 +69,7 @@ const FALLBACK_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
  * 遮盖占位符 token，形态与 pii-masker 的 placeholderFor 输出严格一致。
  * 用于把模型回包里的占位符换回原值。
  */
-const PLACEHOLDER_TOKEN =
-  /\[(?:劳动者|用人单位|身份证|手机号|银行卡|邮箱|详细地址|统一社会信用代码)_\d+\]/gu
+const PLACEHOLDER_TOKEN = llmMaskPlaceholderPattern('gu')
 
 export interface LlmInputMaskResult {
   /** 遮盖后的文本。**这就是应当送模型的文本**，调用方不得再用原文拼 prompt。 */

@@ -4,12 +4,11 @@
  */
 import { ServiceUnavailableException } from '@nestjs/common'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextsForLlmReversible } from '../../common/pii/llm-input-mask'
+import { llmMaskPlaceholderPattern } from '../../common/pii/mask-placeholder'
 
 export const AI_LAYOUT_ADJUST_TOO_LONG = 'AI_LAYOUT_ADJUST_TOO_LONG'
 export const AI_LAYOUT_ADJUST_TOO_LONG_MESSAGE =
   '这份简历一次放不下。请先删短一些内容，再试一次；也可以直接按现在的版式导出。'
-
-const PLACEHOLDER = /\[(?:劳动者|用人单位|身份证|手机号|银行卡|邮箱|详细地址|统一社会信用代码)_\d+\]/g
 
 /**
  * 18 位证件号。末位可以是数字或 X。
@@ -63,7 +62,7 @@ export function cutMaskedLayoutText(text: string, limit: number): string {
   if (limit <= 0) return ''
   if (text.length <= limit) return text
   let cut = limit
-  const re = new RegExp(PLACEHOLDER.source, 'g')
+  const re = llmMaskPlaceholderPattern('g')
   for (const match of text.matchAll(re)) {
     const start = match.index ?? 0
     const end = start + match[0].length

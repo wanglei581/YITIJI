@@ -17,7 +17,9 @@ import { LlmFairVisitPlanService } from '../src/ai/resume/llm-fair-visit-plan.se
 import { LlmJobFitService } from '../src/ai/resume/llm-job-fit.service'
 import { LlmResumeService } from '../src/ai/resume/llm-resume.service'
 import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
-import { LLM_MASK_INPUT_LIMIT } from '../src/common/pii/llm-input-mask'
+import { LLM_MASK_INPUT_LIMIT, maskUserTextsForLlmReversible } from '../src/common/pii/llm-input-mask'
+import { LLM_MASK_PLACEHOLDER_CATEGORIES, llmMaskPlaceholderPattern } from '../src/common/pii/mask-placeholder'
+import { cutMaskedLayoutText, maskLayoutAdjustOutbound } from '../src/ai/resume/layout-adjust-mask'
 import { JobAiLlmService } from '../src/job-ai/job-ai-llm.service'
 import { MockInterviewLlmService } from '../src/mock-interview/mock-interview-llm.service'
 import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
@@ -117,6 +119,11 @@ function assertNoLongDigitRun(label: string): void {
     const run = body.match(/\d{15,}/u)
     if (run) fail(`${label} 出站有 ${run[0].length} 位连续数字`)
   }
+}
+
+function hasPartialPlaceholder(text: string): boolean {
+  const stripped = text.replace(llmMaskPlaceholderPattern('g'), '')
+  return stripped.includes('[') || stripped.includes(']')
 }
 
 async function main(): Promise<void> {
@@ -331,6 +338,56 @@ async function main(): Promise<void> {
     action: 'reformat',
   }), [ID, id2, PREFIX, prefix2, phone, bank])
   assertNoLongDigitRun('排版简历JSON里手机号粘着身份证')
+
+  const produced = maskUserTextsForLlmReversible([
+    '姓名：张三。',
+    '甲方：测试公司。',
+    ID,
+    phone,
+    'user@example.com',
+    bank,
+    '住址：北京市东城区景山前街4号。',
+    '统一社会信用代码：91310000MA1FL2XW30。',
+  ], 'layout_placeholder_kinds')
+  const seen = new Set<string>()
+  for (const text of produced.texts) {
+    for (const match of text.matchAll(/\[[^\[\]\n]+_\d+\]/gu)) {
+      const token = match[0]
+      const official = llmMaskPlaceholderPattern('u')
+      if (!official.test(token)) fail(`占位符 ${token} 不在遮盖函数的种类里`)
+      seen.add(token.slice(1, token.lastIndexOf('_')))
+    }
+  }
+  for (const category of LLM_MASK_PLACEHOLDER_CATEGORIES) {
+    if (!seen.has(category)) fail(`遮盖没有产出 ${category}`)
+  }
+  if (seen.size !== LLM_MASK_PLACEHOLDER_CATEGORIES.length) fail(`遮盖多产出了占位符：${[...seen].join('、')}`)
+  pass('遮盖占位符种类与截断认得的是同一份')
+
+  const kept = cutMaskedLayoutText(`${'乙'.repeat(4)}[身份证_1]${'丙'.repeat(30)}`, 20)
+  if (!kept.includes('[身份证_1]')) fail('截断丢掉了已经完整落在窗口里的占位符')
+  pass('窗口里完整的占位符保留')
+
+  for (const category of LLM_MASK_PLACEHOLDER_CATEGORIES) {
+    const token = `[${category}_1]`
+    const cut = cutMaskedLayoutText(`${'乙'.repeat(16)}${token}${'丙'.repeat(10)}`, 20)
+    if (hasPartialPlaceholder(cut)) fail(`截断从 ${category} 占位符中间劈开`)
+    if (cut.includes(token)) fail(`切点落在 ${category} 占位符里却整段留下`)
+  }
+  pass('截断切点落在任一占位符里都退到占位符前面')
+
+  const straddled = maskLayoutAdjustOutbound({
+    originalText: `${'乙'.repeat(16)}${ID}${'丙'.repeat(10)}`,
+    resumeValues: '没有号码',
+    resumeJson: JSON.stringify(emptyResume()),
+    maxOriginalChars: 20,
+  })
+  if (straddled.maskedOriginal.includes(ID) || straddled.maskedOriginal.includes(PREFIX)) {
+    fail('占位符回退出站仍有证件号')
+  }
+  if (/\d{15,}/u.test(straddled.maskedOriginal)) fail('占位符回退出站有 15 位以上连续数字')
+  if (hasPartialPlaceholder(straddled.maskedOriginal)) fail('占位符回退出站留下半截占位符')
+  pass('排版截断落在身份证占位符里时整段退回')
 
   console.log(`verify:mask-before-truncate ${passCount} PASS`)
 }

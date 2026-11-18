@@ -1,3 +1,5 @@
+import { llmMaskPlaceholderPattern, type LlmMaskPlaceholderCategory } from './mask-placeholder'
+
 // ============================================================
 // PII 遮盖引擎（S0-2 前身：contract-review/contract-review-pii-masker.ts）
 //
@@ -56,7 +58,7 @@ export interface ContractMaskResult {
   readonly restoreMap?: ReadonlyMap<string, string>
 }
 
-type MaskCategory = '劳动者' | '用人单位' | '身份证' | '手机号' | '银行卡' | '邮箱' | '详细地址' | '统一社会信用代码'
+type MaskCategory = LlmMaskPlaceholderCategory
 
 type Candidate = Readonly<{
   start: number; end: number; category: MaskCategory; key: string; priority: number
@@ -252,7 +254,7 @@ const MASKED_NEXT_FIELD_PREFIXES = [
   /(?:银行卡号?|银行账户|银行账号|账户号?|账号)\s*[:：]?\s*\[银行卡_\d+\]/uy,
   /统一社会信用代码\s*[:：]?\s*\[统一社会信用代码_\d+\]/uy,
 ] as const
-const PLACEHOLDER_AT = /\[(劳动者|用人单位|身份证|手机号|银行卡|邮箱|详细地址|统一社会信用代码)_\d+\]/uy
+const PLACEHOLDER_AT = llmMaskPlaceholderPattern('uy', true)
 const FIELD_VALUE_SEPARATOR_AT = /(?:\s*[:：]\s*|\s+)/uy
 const TAIL_SEPARATOR_AT = /[，,;；]\s*/uy
 const PLACEHOLDER_CONNECTOR_AT = /(?:在|的)/uy
