@@ -15275,7 +15275,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 836,
+      "reachableFileCount": 837,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18356,7 +18356,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1025
+      "sourceFileCount": 1026
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -23402,6 +23402,10 @@
       "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/printOrders/pendingPickupExits.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -35592,6 +35596,7 @@
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json",
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
+          "apps/kiosk/src/pages/profile/me/printOrders/pendingPickupExits.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx",
           "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css",
@@ -36450,6 +36455,7 @@
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json",
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
+          "apps/kiosk/src/pages/profile/me/printOrders/pendingPickupExits.ts",
           "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx",
