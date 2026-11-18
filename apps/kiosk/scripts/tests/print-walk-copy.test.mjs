@@ -604,7 +604,8 @@ test('I-11 缺纸、卡纸的下一步不等人「加完纸」「处理好」，
   }
   // 卡纸、缺纸（没有重提出口）的第三步用「机器暂时打不了」的标准句：我们已收到提醒、请稍后再来、怎么找到我们。
   for (const copy of [jam, noRetry]) {
-    assert.match(copy.steps[2].detail, /这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请/)
+    assert.match(copy.steps[2].detail, /这台机器暂时打不了。请稍后再来；需要帮助请/)
+    assert.doesNotMatch(copy.steps[2].detail, /我们已经收到提醒/)
     assert.match(copy.steps[2].title, /订单号 ORD-2026102/)
   }
   // 有重提出口：第三步说清是机器恢复后才点，整份重打。

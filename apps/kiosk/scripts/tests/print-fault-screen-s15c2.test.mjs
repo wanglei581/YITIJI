@@ -175,6 +175,27 @@ test('三态失败页上服务电话只出现一次，设备上报和带走失�
   assert.match(page, /faultScreenTakeawayMiss\(/)
 })
 
+test('三态失败页里订单还在和已收到提醒各只说一次', () => {
+  for (const variant of ['paper-jam', 'offline', 'out-of-paper']) {
+    for (const fact of ['free', 'paid']) {
+      const copy = failedModel.failureCopy({
+        variant,
+        confirmedJam: variant === 'paper-jam',
+        money: { fact, amountCents: fact === 'paid' ? 200 : 0 },
+        orderNo: 'ORD-ONCE',
+        canRetry: false,
+      })
+      const text = screenText(copy)
+      const kept = (text.match(/你的订单还在/g) ?? []).length
+      const reminded = (text.match(/我们已经收到提醒，会尽快处理/g) ?? []).length
+      assert.equal(reminded, 1, `${variant}/${fact} 已收到提醒应只出现一次`)
+      assert.equal(kept, fact === 'paid' ? 0 : 1, `${variant}/${fact} 你的订单还在出现次数`)
+      assert.doesNotMatch(copy.steps[2].detail, /我们已经收到提醒，会尽快处理/)
+      assert.doesNotMatch(copy.steps.map((step) => step.title).join('\n'), /你的订单还在/)
+    }
+  }
+})
+
 test('缺纸胶囊和卡纸、离线同一写法，写成前缀加打印机缺纸', () => {
   const paid = { fact: 'paid', amountCents: 200 }
   const free = { fact: 'free', amountCents: 0 }
