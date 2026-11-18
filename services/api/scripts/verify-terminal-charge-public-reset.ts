@@ -143,7 +143,12 @@ async function main(): Promise<void> {
     await prisma.terminalServicePrice.create({ data: { terminalId: TERM_PRICED, serviceKey: 'scan', unitCents: 500 } })
     await prisma.terminalServicePrice.create({ data: { terminalId: TERM_PRICED, serviceKey: 'print_bw_page', unitCents: 80 } })
     await prisma.terminalServicePrice.create({ data: { terminalId: TERM_OTHER, serviceKey: 'print_bw_page', unitCents: 80 } })
-    await prisma.platformSetting.create({ data: { key: PERSONAL_CHARGE_SETTING_KEY, value: 'true' } })
+    // CI 里两条收费门禁接连用同一个 PostgreSQL 库，这个键可能已由前一条建好：有就改成开，没有就建。
+    await prisma.platformSetting.upsert({
+      where: { key: PERSONAL_CHARGE_SETTING_KEY },
+      create: { key: PERSONAL_CHARGE_SETTING_KEY, value: 'true' },
+      update: { value: 'true' },
+    })
 
     const beforePriced = {
       userChargeMode: 'user_pays',
