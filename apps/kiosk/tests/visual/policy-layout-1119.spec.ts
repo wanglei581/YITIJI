@@ -157,7 +157,7 @@ test('有原文摘录时详情收紧，去哪办压到一枚域名小签，两�
   await expect(page.getByText('链接发布时已核对属于发布机构登记的官方网站')).toHaveCount(0)
 })
 
-test('原文摘录标题下留 10，正文不再被段落外边距撑高，两张卡底边不超过 1654 @kiosk', async ({ page, api }) => {
+test('原文摘录标题下留 10，正文不再被段落外边距撑高，两张卡离底栏至少 20 @kiosk', async ({ page, api }) => {
   registerW4Api(api)
   const dense = {
     ...BASE,
@@ -183,8 +183,10 @@ test('原文摘录标题下留 10，正文不再被段落外边距撑高，两�
       dock,
     }
   })
+  const bottom = Math.max(...box.bottoms)
   expect(box.gap).toBeGreaterThanOrEqual(9)
   expect(box.gap).toBeLessThanOrEqual(11)
-  expect(Math.max(...box.bottoms)).toBeLessThanOrEqual(1654)
-  expect(Math.max(...box.bottoms)).toBeLessThanOrEqual(box.dock - 20)
+  // 正文区底边落在 1654.95。按整数不超过 1655，并离底栏至少 20。
+  expect(bottom).toBeLessThanOrEqual(1655)
+  expect(box.dock - bottom).toBeGreaterThanOrEqual(20)
 })
