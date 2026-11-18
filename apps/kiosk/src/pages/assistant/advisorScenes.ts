@@ -232,7 +232,7 @@ export interface CockpitSignals {
   loading: boolean
   /** 本次会话最后一轮的结果 kind；还没问过为 null。 */
   lastTurn: 'ai' | 'not-ai' | 'error' | null
-  /** 只来自 `/assistant/chat` 的实测 providerLabel，未问过为 unknown。 */
+  /** 对话探针或 `/assistant/chat` 的实测。没探到、没问过都是 unknown，不写成可用。 */
   availability: 'available' | 'unavailable' | 'unknown'
   /** 输入框里有没有还没发出的字。 */
   hasDraft: boolean

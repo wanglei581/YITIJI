@@ -34,7 +34,31 @@ function routeBlock(source: string, decorator: string): string {
   return match?.[0] ?? ''
 }
 
+const TRTC_FIXTURE: Record<string, string> = {
+  TRTC_SDK_APP_ID: '1400000001',
+  TRTC_SDK_SECRET_KEY: 'verify-trtc-sdk-key-not-real',
+  TENCENT_SECRET_ID: 'verify-tencent-id-not-real',
+  TENCENT_SECRET_KEY: 'verify-tencent-key-not-real',
+  TRTC_LLM_API_KEY: 'verify-trtc-llm-key-not-real',
+  TRTC_TTS_CONFIG_JSON: '{"TTSType":"tencent"}',
+}
+
+function installTrtcFixture(): () => void {
+  const saved = new Map<string, string | undefined>()
+  for (const [key, value] of Object.entries(TRTC_FIXTURE)) {
+    saved.set(key, process.env[key])
+    process.env[key] = value
+  }
+  return () => {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+}
+
 async function main(): Promise<void> {
+  const restoreTrtc = installTrtcFixture()
   const root = path.resolve(__dirname, '..')
   const controllerSource = readFileSync(path.join(root, 'src/trtc/trtc.controller.ts'), 'utf8')
   const moduleSource = readFileSync(path.join(root, 'src/trtc/trtc.module.ts'), 'utf8')
@@ -44,7 +68,11 @@ async function main(): Promise<void> {
   assert.doesNotMatch(stopBlock, /@UseGuards\(TerminalIdentityGuard\)/, 'POST /trtc/session/stop must stay open to the capability token')
   assert.match(moduleSource, /TerminalsModule/, 'TrtcModule must import TerminalsModule so the guard can be constructed')
   assert.match(moduleSource, /AiModule/, 'TrtcModule must import AiModule so the digital_human switch can be read')
-  assert.match(startBlock, /getConfig\('digital_human'\)/, 'POST /trtc/session must read the digital_human enable bit before starting a billed session')
+  assert.match(moduleSource, /AiAccessModule/, 'TrtcModule must import AiAccessModule so pause and budget use the same check')
+  // 启用位不再写在控制器里：能力表和建会话共用 digitalHumanVerdict，里面才读 getConfig('digital_human')。
+  // 控制器留一份 getConfig 字面量会变成第二套判断，所以这里改断言共用函数。
+  assert.match(startBlock, /digitalHumanVerdict\(/, 'POST /trtc/session must use the shared digital-human verdict before a billed session')
+  assert.doesNotMatch(startBlock, /getConfig\('digital_human'\)/, 'enable bit stays inside the shared verdict, not a second copy on the route')
 
   const terminalA = 'trtc_http_terminal_a'
   let digitalHumanEnabled = true
@@ -209,6 +237,7 @@ async function main(): Promise<void> {
 
     assert.equal(passed, 6)
   } finally {
+    restoreTrtc()
     await app.close()
   }
   console.log('ALL PASS trtc terminal identity HTTP')

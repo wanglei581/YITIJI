@@ -181,6 +181,8 @@ jobs:
           #    但没有任何 CI job 执行它们。全部只读取仓库源码/文档文本，
           #    不 import services/api/src、不碰 Prisma、不连 DB，故留在本步。
           pnpm --filter @ai-job-print/kiosk verify:advisor-provider-gate
+          # 小青 / 数字人 / 模拟面试「能不能用」与页面降级。纯读一体机源码并编译无依赖判定，不连库。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-availability
           pnpm --filter @ai-job-print/kiosk verify:public-screen-mask
           pnpm --filter @ai-job-print/kiosk verify:file-retention-ui
           pnpm --filter @ai-job-print/kiosk verify:home-narrow-visual-balance
@@ -947,6 +949,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-throttle-dimension
           # 一体机 AI 能力仪表：匿名可读、不调用计费 AI、15 个 key 全覆盖且响应不含密钥。
           pnpm --filter @ai-job-print/api verify:kiosk-ai-capabilities
+          # 探针与真实调用同一判断（小青文字、数字人、模拟面试）。临时目录配置，不连库、不调模型。
+          pnpm --filter @ai-job-print/api verify:ai-availability-alignment
           # 匿名公网 AI 端点（/assistant/chat、/resume/parse）的限流 + 日配额。
           pnpm --filter @ai-job-print/api verify:ai-public-quota
           # 简历解析首答丢失：持久意图、Redis 原子配额、单次模型调用及 HTTP 双头兼容。

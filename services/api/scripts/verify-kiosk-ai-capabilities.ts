@@ -104,7 +104,7 @@ async function main(): Promise<void> {
 
     process.env['AI_PROVIDER'] = 'mock'
     const svc = new LlmConfigService()
-    const listed = listKioskAiCapabilities(svc)
+    const listed = await listKioskAiCapabilities(svc)
     assertItems('list()', listed.items)
     assertNoLeak('list()', listed)
     const planned = listed.items.filter((item) =>
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
     pass('无密钥时 LLM 能力为 off')
 
     svc.update({ enabled: true }, 'print_param_prefill')
-    const prefillOn = listKioskAiCapabilities(svc).items.find((item) => item.key === 'print_param_prefill')
+    const prefillOn = (await listKioskAiCapabilities(svc)).items.find((item) => item.key === 'print_param_prefill')
     if (!prefillOn || prefillOn.status !== 'available') {
       fail(`print_param_prefill 仅 enabled 即 available，实际 ${JSON.stringify(prefillOn)}`)
     }
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
     const testKey = 'sk-verify-kiosk-caps-not-a-real-key'
     svc.update({ enabled: true, apiKey: testKey }, 'assistant_chat')
     process.env['AI_PROVIDER'] = 'mock'
-    const mockListed = listKioskAiCapabilities(svc)
+    const mockListed = await listKioskAiCapabilities(svc)
     if (JSON.stringify(mockListed).includes(testKey)) {
       fail('list() 回带了 apiKey 明文')
     }
@@ -142,7 +142,7 @@ async function main(): Promise<void> {
     pass('mock 提供商为 degraded')
 
     process.env['AI_PROVIDER'] = 'llm'
-    const liveChat = listKioskAiCapabilities(svc).items.find((item) => item.key === 'assistant_chat')
+    const liveChat = (await listKioskAiCapabilities(svc)).items.find((item) => item.key === 'assistant_chat')
     if (!liveChat || liveChat.status !== 'available' || liveChat.providerName !== 'deepseek') {
       fail(`llm + 已配置应为 available，实际 ${JSON.stringify(liveChat)}`)
     }

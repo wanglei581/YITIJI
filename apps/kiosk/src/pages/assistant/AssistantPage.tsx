@@ -48,6 +48,7 @@ import {
 import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useAssistantDraftHandoff } from '../../services/assistantDraft'
 import { AssistantPolicyMarker } from './AssistantPolicyContext'
+import { useAssistantChatLock } from './useAssistantChatLock'
 import { useAssistantPolicyContext } from './useAssistantPolicyContext'
 import { AssistantTurnActions, AssistantWaitingCards } from './AssistantTurnPanels'
 import { AssistantTaskPicker } from './AssistantTaskPicker'
@@ -137,6 +138,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const [declaring, setDeclaring] = useState(false)
   const quickQuestions = selectedTask?.questions ?? GENERAL_QUESTIONS
   const [aiAvailability, setAiAvailability] = useState<AiAvailability>('unknown')
+  const [assistantProbeNonce, setAssistantProbeNonce] = useState(0)
+  useAssistantChatLock(setAiAvailability, assistantProbeNonce)
   const [turnFailed, setTurnFailed] = useState(false)
   // 每人每天的小青次数用完：锁到明天，通知条不用「这会儿没接上」那种本轮故障说法。
   const [quotaLocked, setQuotaLocked] = useState(false)
@@ -488,6 +491,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const recheckAdvisor = () => {
     setQuotaLocked(false)
     setAiAvailability('unknown')
+    setAssistantProbeNonce((nonce) => nonce + 1)
     setTurnFailed(false)
     resetConversation()
     focusComposer()

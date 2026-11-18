@@ -6,12 +6,9 @@ import type { Request } from 'express'
 import { TrtcService } from './trtc.service'
 import { RedisService } from '../common/redis/redis.service'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
+import { AiAccessService } from '../ai-access/ai-access.service'
 import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
-
-/** 与全局 AI 暂停同一句、同一个码：本功能位关掉时不另造说法。 */
-const DIGITAL_HUMAN_OFF = {
-  error: { code: 'AI_PAUSED', message: 'AI 服务暂停中，打印扫描照常' },
-} as const
+import { digitalHumanVerdict } from './digital-human-availability'
 
 // 对外 taskId 是每会话随机停止能力令牌，Redis 值才是真实腾讯 TaskId。
 // 同厅终端即使 IP/UA 相同，也无法猜到或复用其他会话的停止令牌。
@@ -29,6 +26,7 @@ export class TrtcController {
     private readonly redis: RedisService,
     // 归属门禁直接 new 两个参数。不注入时不在这里挡；生产模块和建会话 HTTP 门禁都会注入。
     @Optional() private readonly llmConfig?: LlmConfigService,
+    @Optional() private readonly aiAccess?: AiAccessService,
   ) {}
 
   /**
@@ -57,11 +55,9 @@ export class TrtcController {
       throw new BadRequestException({ error: { code: 'INVALID_USER_ID', message: 'userId 只允许字母、数字、下划线，最长 64 字符' } })
     }
     const userId = rawUserId || `user_${Date.now()}`
-    // 只读启用位，不看密钥、模型是否就绪：数字人通话不走这里配置的大模型。
-    // 必须在 startSession 之前拒绝，否则腾讯云会话已经开始计费。
-    if (this.llmConfig && !this.llmConfig.getConfig('digital_human').enabled) {
-      throw new ServiceUnavailableException(DIGITAL_HUMAN_OFF)
-    }
+    // 与能力表同一个判断，必须在 startSession 之前拒绝，否则腾讯云会话已经开始计费。
+    const verdict = await digitalHumanVerdict(this.aiAccess, this.llmConfig)
+    if (verdict.refusal) throw new ServiceUnavailableException({ error: verdict.refusal })
     const result = await this.trtcService.startSession(userId)
     const stopSecret = randomBytes(32).toString('base64url')
     try {

@@ -49,6 +49,32 @@ export class AiAccessService {
 
   clearCache(): void { this.cache = null }
 
+  /**
+   * 会花钱的生成 / 语音，以及仍受暂停约束的导出，在进模型前的同一道拒绝。
+   * 先暂停，再到当日预算。读接口不走这里。登录和声明不在这道里。
+   */
+  async paidAiRefusal(
+    kind: 'generate' | 'voice' | 'export',
+    config?: AiAccessConfig,
+  ): Promise<{ code: string; message: string; details?: string[] } | null> {
+    const current = config ?? await this.getConfig()
+    if (current.paused) return { code: 'AI_PAUSED', message: 'AI 服务暂停中，打印扫描照常' }
+    if (kind !== 'generate' && kind !== 'voice') return null
+    try {
+      await this.budget?.assertWithinBudget()
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        const body = error.getResponse()
+        if (body && typeof body === 'object' && 'error' in body) {
+          const err = (body as { error?: { code?: string; message?: string; details?: string[] } }).error
+          if (err?.code && err.message) return { code: err.code, message: err.message, ...(err.details ? { details: err.details } : {}) }
+        }
+      }
+      throw error
+    }
+    return null
+  }
+
   async update(patch: Partial<AiAccessConfig>, actorId: string, reason: string, ipAddress?: string | null): Promise<AiAccessConfig> {
     if (!reason?.trim()) throw new BadRequestException({ error: { code: 'REASON_REQUIRED', message: '请填写切换事由' } })
     const before = await this.getConfig()
@@ -77,10 +103,8 @@ export class AiAccessService {
     if (current.maintenance && (maintenanceBlocked || (kind && kind !== 'read'))) throw new ServiceUnavailableException({ error: { code: 'MAINTENANCE_MODE', message: '设备维护中，请稍后再来' } })
     if (!kind || kind === 'read') return
     const notConfigured = aiPlatformBlockFor(kind); if (notConfigured) throw new ServiceUnavailableException({ error: notConfigured }) // F-11 生产缺 AI 配置：如实 503，绝不回退 mock
-    if (current.paused) throw new ServiceUnavailableException({ error: { code: 'AI_PAUSED', message: 'AI 服务暂停中，打印扫描照常' } })
-    // P1-2a 每日金额硬上限：与 AI 暂停同一层，只拦会花钱的生成 / 语音；导出不调模型，不拦。
-    // 超限 503 AI_BUDGET_EXHAUSTED；读不到当日花费 503 AI_BUDGET_UNAVAILABLE（失败关闭）。
-    if (kind === 'generate' || kind === 'voice') await this.budget?.assertWithinBudget()
+    const paid = await this.paidAiRefusal(kind, current)
+    if (paid) throw new ServiceUnavailableException({ error: paid })
     // 「开始 AI 前」是更严的一档，导出与打印同样要登录
     const needsLogin = (current.loginGate === 'before_generate' && (kind === 'generate' || kind === 'voice' || kind === 'export'))
       || (current.loginGate === 'before_export' && kind === 'export')

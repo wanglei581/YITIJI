@@ -103,6 +103,26 @@
 - 空态失败句和编辑页模板读失败句都是跑真实模块、渲染出屏上字再比对。空态短语取自 `docs/design/kiosk-redesign-2026-08/23-resume-optimize.html:961`。模板句共用 `ResumeFormatChooser.tsx:226` 的开头，后半仍是「会使用默认版式；排版调整照常可用。」
 - 验证：`verify:resume-optimize` 通过；`verify:w3a-ai-records` 18 过 0 败。api `tsc --noEmit` 2354 个文件、kiosk 1259 个文件，退出码都是 0。全仓 lint 0 error。图谱 `--check` 通过。反向检查四条都红，随后用 `git checkout` 还原。交互走查 7 条、优化草稿浏览器用例 34 条通过。没有推送。
 
+## 2026-11-18：数字人可用判断与真实建会话共用委托地址校验（分支 `claude/ai-availability-1117`，未推送）
+
+- 能力表 `digital_human` 在凭证齐之后，用 `buildTrtcSessionDelegatedConfigs` 拼出与建会话相同的模型、语音合成配置，再调用同一个 `assertTrtcDelegatedEndpoints`。坏 JSON 或地址不在白名单时，能力表说不可用，真实建会话回 503 `AI_ENDPOINT_NOT_ALLOWED`，不占会话、不请求腾讯云。原因句与真实拒绝相同，不含凭证字段名。
+- 没推送，没上线。没改岗位、招聘会、打印硬件、收费、数据库和密钥。
+
+## 2026-11-18：模拟面试题目单手动退路不再被 AI 可用性闸门拦住（分支 `claude/ai-availability-1117`，未推送）
+
+- `POST /mock-interviews` 与 `POST /mock-interviews/:id/practice-sheet` 改为豁免 AI 可用性闸门，只留全机维护。建配置和通用题目单不调模型。全站暂停、当天预算、平台未开通、登录档和声明不再把这两条一起拦掉。开场、答题、结束仍要调模型，标记不变。
+- 一体机声明表这两条改为 exempt，与服务端一致。
+- 门禁穿过真实全局守卫：模型没配、全站暂停、预算耗尽、平台没开通时建配置和题目单都成功，开场仍拒绝。供应商替身下开场返回替身题目，且只打一次。
+- 没推送，没上线。没改岗位、招聘会、打印硬件、收费、数据库和密钥。
+
+## 2026-11-17：小青、数字人、模拟面试「能不能用」与真实调用对齐（分支 `claude/ai-availability-1117`，未推送）
+
+- 小青文字对话新增只读 `GET /api/v1/assistant/availability`，与 `POST /assistant/chat` 共用 `assistant_chat` 判断。顾问探针仍看 `advisor_work`。一体机 `/assistant` 只有探针明确不能用才锁输入。
+- 数字人能力表 `digital_human` 与 `POST /trtc/session` 共用 `digitalHumanVerdict`（凭证、功能位、全站暂停、当天预算）。缺凭证回 503 `AI_NOT_CONFIGURED`。平台没开通时能力表原因仍是「AI 服务暂未开通」，通话接口仍回平台闸门原来的拒绝体。后台说明改为这个开关管语音通话，开着还要凭证齐且没被暂停或额度拦住。
+- 模拟面试新增只读 `GET /api/v1/mock-interviews/availability`，与开场共用 `mock_interview` 判断。设置页不能用时不亮「创建并开始练习」，主按钮改为「打印通用题目单」（建配置后出纸，不 start），「先看面试技巧」仍在。探针读失败不说成能用，也不说成不能用。
+- 浏览器用例（w3，1080×1920，本机已跑）：小青探针不能用时锁输入，打印扫描、政策、已有简历还在，不发对话；探针网络失败时顶栏仍是「AI 状态待本轮返回确认」，输入坞还在。练面试：不能用时主按钮是「打印通用题目单」且不 start，第 1 步就有说明，探不到不说成能用，能用时同一按钮能创建。
+- 没推送，没上线。
+
 ## 2026-11-17：简历「新增事实本人确认」第十一版收货返工（未推送）
 
 - 分支 `claude/resume-r2k-1117`。末段「一位数字加十」不再看到十就截断：十后面紧跟数字，或紧跟万、亿、千、百、十，就把后面并进同一条，读数和停在十的原文不同。两份规则仍逐字节相同。
