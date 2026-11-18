@@ -181,12 +181,19 @@ export function priorOutputTrayLine(flags: {
   return null
 }
 
-/** 卡纸说明的副标题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。 */
-export function jamOrderKeptLine(fact: PaymentFact): string {
-  // 不写「处理好后可以继续打印」：现场没人处理，说清是谁在管（我们已收到提醒）、订单还在就够了（走查 I-11）。
+/**
+ * 失败副题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。
+ * fault 写这一态的设备事实。不写「处理好后可以继续打印」：现场没人处理，说清是谁在管（我们已收到提醒）、订单还在就够了（走查 I-11）。
+ */
+export function orderKeptFaultLine(fact: PaymentFact, fault: string): string {
   return fact === 'paid'
-    ? '你的订单和已付金额都保留着。机器卡纸，我们已经收到提醒，会尽快处理'
-    : '你的订单还在。机器卡纸，我们已经收到提醒，会尽快处理'
+    ? `你的订单和已付金额都保留着。${fault}，我们已经收到提醒，会尽快处理`
+    : `你的订单还在。${fault}，我们已经收到提醒，会尽快处理`
+}
+
+/** 卡纸说明的副标题。公开状态确实是卡纸时才用。 */
+export function jamOrderKeptLine(fact: PaymentFact): string {
+  return orderKeptFaultLine(fact, '机器卡纸')
 }
 
 /** 小青区首句的前半截：先说钱的事实，再说任务阶段（稿「支付成功，正在出纸。」）。 */

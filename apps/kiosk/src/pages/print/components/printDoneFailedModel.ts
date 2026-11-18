@@ -14,7 +14,7 @@ import { helpNeededLine, machineCannotPrintLine, printProblemLine } from '../../
 import { MINIAPP_DISPLAY_NAME } from '../../../copy/miniappLinkCopy'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_CARD } from '../../../lib/fileName'
 import { formatCents } from '../cashierStatus'
-import { jamOrderKeptLine, jobSubline, outOfPaperPill, sameCodeResumeLine, type OutOfPaperMoney } from '../printProgressModel'
+import { jamOrderKeptLine, jobSubline, orderKeptFaultLine, outOfPaperPill, sameCodeResumeLine, type OutOfPaperMoney } from '../printProgressModel'
 
 export type FailureVariant = 'failed' | 'paper-jam' | 'out-of-paper' | 'offline'
 
@@ -88,6 +88,11 @@ export function failureCopy(input: {
   /** 订单视图上的续打资格。没带来时只看 canRetry。 */
   reprintAllowed?: boolean | null
   reprintRemaining?: number | null
+  /**
+   * 只有公开打印机状态确实是卡纸（mapTerminalPrinterStatus 把 paper_jam / jam 收成 errorCode paperJam）才说死「打印机卡纸」。
+   * PRINTER_ERROR 但状态不是卡纸、或状态还在读，都写成「打印机出了故障（可能卡纸）」。
+   */
+  confirmedJam?: boolean
 }): FailureCopy {
   const { variant, money, orderNo, canRetry } = input
   const resumeLine = sameCodeResumeLine({
@@ -102,10 +107,12 @@ export function failureCopy(input: {
   const help = printProblemLine()
 
   if (variant === 'paper-jam') {
+    const confirmed = input.confirmedJam === true
+    const fault = confirmed ? '打印机卡纸' : '打印机出了故障（可能卡纸）'
     return {
-      title: '打印机卡纸',
-      subtitle: jamOrderKeptLine(money.fact),
-      pill: `${paidLabelOf(money)} · 打印机卡纸`,
+      title: fault,
+      subtitle: confirmed ? jamOrderKeptLine(money.fact) : orderKeptFaultLine(money.fact, fault),
+      pill: `${paidLabelOf(money)} · ${fault}`,
       stepsLabel: STEPS_LABEL,
       steps: [
         { title: '把出纸口里已经出来的纸取走收好', detail: '别留在机器上。' },
@@ -279,6 +286,19 @@ export function paymentRow(money: OutOfPaperMoney): SummaryRow {
  * 打印机恢复后状态刷新（每分钟一次）按钮自己亮起。读不到就按不能算（和打印预览、核价页一个口径：状态没读到不放行）。
  * 返回 null = 现在能提交；返回一句话 = 不能提交的原因，放在按钮下面。
  */
+/**
+ * 公开打印机状态是不是卡纸。
+ * useTerminalDeviceStatus 的 mapTerminalPrinterStatus：心跳在线且 printerStatus 为 paper_jam 或别名 jam 时，
+ * kind 是 error、printer.errorCode 是 paperJam。还在读、离线、缺纸、其它故障都不是。
+ */
+export function printerJamConfirmed(device: {
+  loading: boolean
+  kind: 'ready' | 'offline' | 'error' | 'low_paper' | 'unknown'
+  printer: { errorCode?: string }
+}): boolean {
+  return !device.loading && device.kind === 'error' && device.printer.errorCode === 'paperJam'
+}
+
 export function retryBlockedReason(device: {
   loading: boolean
   printerReady: boolean

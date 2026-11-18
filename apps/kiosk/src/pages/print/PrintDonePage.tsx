@@ -27,7 +27,7 @@ import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { PrintDoneUnverified } from './components/PrintDoneUnverified'
 import { UNKNOWN_NO_TASK_SUBTITLE, UNKNOWN_TASK_SUBTITLE } from './components/printDoneUnverifiedCopy'
 import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
-import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, retryBlockedReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
+import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, printerJamConfirmed, retryBlockedReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
 import { CONTACT_ENTRY_LABEL, PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintDoneRecordSection } from './components/PrintDoneSections'
@@ -541,7 +541,14 @@ export function PrintDonePage() {
     return (
       <PrintDoneFailed
         variant={variant}
-        copy={failureCopy({ variant, money, orderNo: faultOrderNo, canRetry, pickupSource: state.pickupSource === true })}
+        copy={failureCopy({
+          variant,
+          money,
+          orderNo: faultOrderNo,
+          canRetry,
+          pickupSource: state.pickupSource === true,
+          confirmedJam: variant === 'paper-jam' && printerJamConfirmed(device),
+        })}
         rows={failureSummaryRows({ orderNo: faultOrderNo, file: file ?? null, params: params ?? null, money, reason: failureReason })}
         free={amountCents === 0}
         retry={{ available: canRetry, blockedReason: retryBlockedReason(device), busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}
