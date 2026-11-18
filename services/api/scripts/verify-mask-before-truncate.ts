@@ -479,7 +479,7 @@ async function main(): Promise<void> {
   ], 'layout_placeholder_kinds')
   const seen = new Set<string>()
   for (const text of produced.texts) {
-    for (const match of text.matchAll(/\[[^\[\]\n]+_\d+\]/gu)) {
+    for (const match of text.matchAll(/\[[^\]\n[]+_\d+\]/gu)) {
       const token = match[0]
       const official = llmMaskPlaceholderPattern('u')
       if (!official.test(token)) fail(`占位符 ${token} 不在遮盖函数的种类里`)
