@@ -12,6 +12,7 @@ import {
   shouldSignalPaidUnfulfilledRefund,
   PAID_UNFULFILLED_PENDING_REFUND_REASON,
 } from '../payment/pending-refund-signal'
+import { orderRefundBlocksOutcome, writePrintOutcomeIfRefundClear } from '../payment/refund-paper-exclusion'
 
 export const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
 export const PRINT_OUTCOME_PRINTED = 'printed'
@@ -132,21 +133,26 @@ export class AdminPrintJobsVerifyOutcomeService {
       Boolean(task.order && shouldSignalPaidUnfulfilledRefund(task.order))
 
     await this.prisma.$transaction(async (tx) => {
-      const cas = await tx.printTask.updateMany({
-        where: {
-          id: task.id,
-          status: 'failed',
-          errorCode: PRINT_JOB_UNCONFIRMED_ERROR_CODE,
-          printOutcome: null,
-        },
-        data: { printOutcome: outcome },
-      })
-      if (cas.count !== 1) {
+      const wrote = task.order
+        ? await writePrintOutcomeIfRefundClear(tx, this.prisma.dbKind, {
+          taskId: task.id,
+          orderId: task.order.id,
+          outcome,
+          unconfirmedErrorCode: PRINT_JOB_UNCONFIRMED_ERROR_CODE,
+        })
+        : false
+      if (!wrote) {
+        const blocked = task.order ? await orderRefundBlocksOutcome(tx, task.order.id) : false
         throw new ConflictException({
-          error: {
-            code: 'PRINT_TASK_STATE_CONFLICT',
-            message: '任务状态在核查期间发生变化，请刷新后重试',
-          },
+          error: blocked
+            ? {
+              code: 'PRINT_OUTCOME_REFUND_BLOCKED',
+              message: '这单已经在退或已经退成，不能再核验出纸结果。',
+            }
+            : {
+              code: 'PRINT_TASK_STATE_CONFLICT',
+              message: '任务状态在核查期间发生变化，请刷新后重试',
+            },
         })
       }
 

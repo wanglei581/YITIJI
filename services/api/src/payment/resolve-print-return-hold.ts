@@ -2,13 +2,13 @@
  * 待人工的三种解开办法。改状态在一个事务里做完，改完只剩一种状态。
  * 确认退成才把钱记成已退。改为出纸和关单都不把钱记成已退。
  * 在途退款改为出纸要先查渠道。已经出纸不能关单。
- * 确认退成把「还没放行出纸」写进订单的条件更新，和领取抢同一行。
- * 抢输了整笔回滚，拒绝审计写在事务外，才留得下。
+ * 确认退成把「还没放行出纸」写进同一条订单更新：任务状态，以及 printOutcome=printed。
+ * 和领取、核验出纸抢同一行。抢输了整笔回滚，拒绝审计写在事务外，才留得下。
  */
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
-import { paperAlreadyReleased } from './refund-paper-exclusion'
+import { markOrderIfPaperUnreleased, paperAlreadyReleased } from './refund-paper-exclusion'
 import { settlementAfterSuccess } from './refund-remainder'
 
 export type PrintReturnResolution = 'confirm_refunded' | 'release_paper' | 'close_order'
@@ -21,8 +21,6 @@ export type PendingRefundChannelQuery = (input: {
 
 const HOLD_STATUSES = ['failed', 'manual_review', 'pending'] as const
 const NOT_REFUNDED_NOTE = '这笔钱不会记成已退回'
-
-const RELEASED_ORDER_TASK = ['claimed', 'printing', 'completed'] as const
 
 function deny(code: string, message: string): BadRequestException {
   return new BadRequestException({ error: { code, message } })
@@ -299,20 +297,13 @@ export async function resolvePrintReturnHold(
           reason: refund.reason,
         }, order)
       if (settlement) {
-        const marked = await tx.order.updateMany({
-          where: {
-            id: orderId,
-            payStatus: { in: ['paid', 'refunding', 'partial_refunded'] },
-            taskStatus: { notIn: [...RELEASED_ORDER_TASK] },
-          },
-          data: {
-            payStatus: settlement.payStatus,
-            refundedAmountCents: settlement.refundedAmountCents,
-            refundReason: settlement.refundReason,
-            ...(settlement.payStatus === 'refunded' ? { refundedAt: new Date() } : {}),
-          },
+        const marked = await markOrderIfPaperUnreleased(tx, db.dbKind, orderId, {
+          payStatus: settlement.payStatus,
+          refundedAmountCents: settlement.refundedAmountCents,
+          refundReason: settlement.refundReason,
+          refundedAt: settlement.payStatus === 'refunded' ? new Date() : null,
         })
-        if (marked.count === 0) {
+        if (!marked) {
           const current = await tx.order.findUnique({
             where: { id: orderId },
             select: { taskStatus: true, printTaskId: true },

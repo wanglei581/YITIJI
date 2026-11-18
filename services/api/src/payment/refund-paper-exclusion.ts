@@ -3,6 +3,7 @@
  * 领取和开退款都要在自己的事务里调用，避免一边改已退、一边把任务领走。
  */
 import { BadRequestException } from '@nestjs/common'
+import type { DbKind } from '../prisma/create-client'
 import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { STALE_ATTEMPT_REFUND_REASON } from './print-no-paper-refund.constants'
@@ -206,4 +207,180 @@ export async function rejectClaimForRefund(db: HoldDb, orderId: string, taskId: 
   if (!await findBlockingRefund(db, orderId)) return false
   await writeClaimBlock(db, orderId, taskId)
   return true
+}
+
+const NOT_STALE_REASON = {
+  OR: [
+    { reason: null },
+    { reason: { not: STALE_ATTEMPT_REFUND_REASON } },
+  ],
+}
+
+/** 已在退或已退成（原因是空也算）。过期付款的退款不挡住后来这一笔。 */
+export async function orderRefundBlocksOutcome(
+  db: HoldDb,
+  orderId: string,
+): Promise<boolean> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: { payStatus: true, taskStatus: true },
+  })
+  if (!order || order.payStatus !== 'paid') return true
+  if (order.taskStatus === 'claimed' || order.taskStatus === 'printing' || order.taskStatus === 'completed') {
+    return true
+  }
+  const row = await db.refund.findFirst({
+    where: {
+      orderId,
+      status: { in: ['pending', 'success'] },
+      ...NOT_STALE_REASON,
+    },
+    select: { id: true },
+  })
+  return row != null
+}
+
+export interface UnreleasedRefundMark {
+  payStatus: 'refunded' | 'partial_refunded'
+  refundedAmountCents: number
+  refundReason: string | null
+  refundedAt: Date | null
+}
+
+/**
+ * 确认退成改支付状态的那一条更新。
+ * PostgreSQL 在同一条语句里先锁订单、再锁打印任务：任务已领、正在打、已完成，
+ * 或 printOutcome 已是 printed，这条更新就不命中。只写 printOutcome 的核验抢的是同一行。
+ */
+export async function markOrderIfPaperUnreleased(
+  tx: PrismaTransactionClient,
+  dbKind: DbKind,
+  orderId: string,
+  data: UnreleasedRefundMark,
+): Promise<boolean> {
+  if (dbKind === 'postgres') {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>`
+      WITH locked_order AS MATERIALIZED (
+        SELECT o."id", o."printTaskId"
+        FROM "Order" o
+        WHERE o."id" = ${orderId}
+          AND o."payStatus" IN ('paid', 'refunding', 'partial_refunded')
+          AND o."taskStatus" NOT IN ('claimed', 'printing', 'completed')
+        FOR UPDATE
+      ),
+      locked_task AS MATERIALIZED (
+        SELECT t."id"
+        FROM "PrintTask" t
+        JOIN locked_order o ON t."id" = o."printTaskId"
+        WHERE t."status" NOT IN ('claimed', 'printing', 'completed')
+          AND (t."printOutcome" IS NULL OR t."printOutcome" <> 'printed')
+        FOR UPDATE
+      )
+      UPDATE "Order" o
+      SET "payStatus" = ${data.payStatus},
+          "refundedAmountCents" = ${data.refundedAmountCents},
+          "refundReason" = ${data.refundReason},
+          "refundedAt" = CASE
+            WHEN ${data.payStatus} = 'refunded' THEN ${data.refundedAt}
+            ELSE o."refundedAt"
+          END,
+          "updatedAt" = CURRENT_TIMESTAMP
+      FROM locked_order
+      WHERE o."id" = locked_order."id"
+        AND (
+          locked_order."printTaskId" IS NULL
+          OR EXISTS (SELECT 1 FROM locked_task)
+        )
+      RETURNING o."id"
+    `
+    return rows.length === 1
+  }
+  const order = await tx.order.findUnique({
+    where: { id: orderId },
+    select: { printTaskId: true, payStatus: true, taskStatus: true },
+  })
+  if (!order) return false
+  if (order.payStatus !== 'paid' && order.payStatus !== 'refunding' && order.payStatus !== 'partial_refunded') {
+    return false
+  }
+  if (order.taskStatus === 'claimed' || order.taskStatus === 'printing' || order.taskStatus === 'completed') {
+    return false
+  }
+  if (order.printTaskId) {
+    const held = await tx.printTask.updateMany({
+      where: {
+        id: order.printTaskId,
+        status: { notIn: ['claimed', 'printing', 'completed'] },
+        OR: [
+          { printOutcome: null },
+          { printOutcome: { not: 'printed' } },
+        ],
+      },
+      data: { updatedAt: new Date() },
+    })
+    if (held.count !== 1) return false
+  }
+  const marked = await tx.order.updateMany({
+    where: {
+      id: orderId,
+      payStatus: { in: ['paid', 'refunding', 'partial_refunded'] },
+      taskStatus: { notIn: ['claimed', 'printing', 'completed'] },
+    },
+    data: {
+      payStatus: data.payStatus,
+      refundedAmountCents: data.refundedAmountCents,
+      refundReason: data.refundReason,
+      ...(data.payStatus === 'refunded' && data.refundedAt ? { refundedAt: data.refundedAt } : {}),
+    },
+  })
+  return marked.count === 1
+}
+
+/**
+ * 核验出纸写 printOutcome。同一条语句先锁订单：已在退、已退成，或纸已经放行，就不写。
+ */
+export async function writePrintOutcomeIfRefundClear(
+  tx: PrismaTransactionClient,
+  dbKind: DbKind,
+  input: { taskId: string; orderId: string; outcome: string; unconfirmedErrorCode: string },
+): Promise<boolean> {
+  if (dbKind === 'postgres') {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>`
+      WITH locked_order AS MATERIALIZED (
+        SELECT o."id"
+        FROM "Order" o
+        WHERE o."id" = ${input.orderId}
+          AND o."payStatus" = 'paid'
+          AND o."taskStatus" NOT IN ('claimed', 'printing', 'completed')
+          AND NOT EXISTS (
+            SELECT 1 FROM "Refund" r
+            WHERE r."orderId" = o."id"
+              AND r."status" IN ('pending', 'success')
+              AND (r."reason" IS NULL OR r."reason" <> ${STALE_ATTEMPT_REFUND_REASON})
+          )
+        FOR UPDATE
+      )
+      UPDATE "PrintTask" t
+      SET "printOutcome" = ${input.outcome},
+          "updatedAt" = CURRENT_TIMESTAMP
+      WHERE t."id" = ${input.taskId}
+        AND t."status" = 'failed'
+        AND t."errorCode" = ${input.unconfirmedErrorCode}
+        AND t."printOutcome" IS NULL
+        AND EXISTS (SELECT 1 FROM locked_order)
+      RETURNING t."id"
+    `
+    return rows.length === 1
+  }
+  if (await orderRefundBlocksOutcome(tx, input.orderId)) return false
+  const cas = await tx.printTask.updateMany({
+    where: {
+      id: input.taskId,
+      status: 'failed',
+      errorCode: input.unconfirmedErrorCode,
+      printOutcome: null,
+    },
+    data: { printOutcome: input.outcome },
+  })
+  return cas.count === 1
 }
