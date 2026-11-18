@@ -29940,6 +29940,7 @@
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan.ts",
+      "services/api/scripts/verify-conversation-memory-forget-inflight.ts",
       "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-document-page-count.ts",
@@ -42361,6 +42362,7 @@
           "services/api/src/ai/llm/llm-chat.service.ts",
           "services/api/src/common/conversation-epoch.ts",
           "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-auth/member-auth.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
