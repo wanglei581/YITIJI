@@ -151,7 +151,6 @@
 .policy-read-pager { display: flex; align-items: center; gap: 16px; flex: none; }
 .policy-read-pager span { min-width: 190px; text-align: center; font-size: 24px; font-weight: 700; }
 .qxt-screen .policy-read-pager .qxt-btn { flex: 1; min-width: 0; height: 88px; min-height: 88px; }
-.qxt-screen .policy-read-pager .qxt-btn:disabled { opacity: 1; background: var(--qxt-well); color: var(--qxt-ink-3); border-color: transparent; cursor: default; }
 .qxt-screen .policy-read-sheet > .policy-read-close { flex: none; width: 100%; height: 88px; min-height: 88px; }
 .policy-read-note { margin: 0; font-size: 22px; line-height: 1.5; color: var(--qxt-ink-3); text-align: center; flex: none; }
 
