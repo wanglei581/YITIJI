@@ -7,6 +7,9 @@
  * 核对在事务外、写入又不带版本条件：外面读到的还是 0，随后改绑，事务把旧价写进去，并关掉这张新单。
  *
  * 默认临时 SQLite。--postgres 时 DATABASE_URL 必须是本机 PostgreSQL，库名含 p1d_charge_verify。
+ * --postgres 另测读和写之间的窗口：保存事务已经读过版本，第一次写终端之前，另一条事务把机构改走并提交。
+ * 带版本条件的 updateMany 必须落空，保存 409，库里仍是改绑后的机构承担、没有价目。
+ * 上面那条在事务开始前注入，删掉版本条件它仍绿；只有这条窗口能抓住。
  * 密钥必须写在任何 import 之前。swc 会把 import 提前。
  */
 process.env['NODE_ENV'] = 'test'
@@ -34,6 +37,8 @@ const API_ROOT = resolve(__dirname, '..')
 const ORG_ID = 'org-race-school'
 const TERMINAL_ID = 'term-race'
 const KEEP_ORDER_ID = 'race-keep'
+const WINDOW_ORG_ID = 'org-window'
+const WINDOW_TERMINAL_ID = 'term-window'
 const postgres = process.argv.includes('--postgres')
 
 function pushSchema(url: string): void {
@@ -53,6 +58,93 @@ function staleCode(error: unknown): string | undefined {
   if (!(error instanceof ConflictException)) return undefined
   const body = error.getResponse() as { error?: { code?: string } }
   return body.error?.code
+}
+
+function staleMessage(error: unknown): string | undefined {
+  if (!(error instanceof ConflictException)) return undefined
+  const body = error.getResponse() as { error?: { message?: string } }
+  return body.error?.message
+}
+
+/**
+ * 保存事务里的第一次 terminal.updateMany 之前，用另一条连接把机构改走并提交。
+ * SQLite 整库一把锁，这里会死锁，所以只在 PostgreSQL 上跑。
+ */
+async function assertReadThenRebindWindow(prisma: PrismaService): Promise<void> {
+  await prisma.organization.create({ data: { id: WINDOW_ORG_ID, name: '窗口学校', type: 'school' } })
+  await prisma.terminal.create({
+    data: {
+      id: WINDOW_TERMINAL_ID,
+      terminalCode: 'WINDOW-1',
+      agentToken: 'agent-window',
+      deviceFingerprint: 'fp-window',
+      userChargeMode: 'user_pays',
+    },
+  })
+  await prisma.terminalServicePrice.create({
+    data: { terminalId: WINDOW_TERMINAL_ID, serviceKey: 'resume_optimize', unitCents: 100 },
+  })
+
+  let armed = true
+  let injected = false
+  const wrapped = Object.create(prisma) as PrismaService
+  wrapped.$transaction = ((fn: (tx: unknown) => Promise<unknown>, ...rest: unknown[]) => {
+    return prisma.$transaction(async (tx) => {
+      const terminal = new Proxy(tx.terminal, {
+        get(target, prop) {
+          if (prop === 'updateMany') {
+            return async (...args: unknown[]) => {
+              if (armed) {
+                armed = false
+                injected = true
+                await assignTerminalOrganization(prisma, WINDOW_TERMINAL_ID, WINDOW_ORG_ID, new Date(), async () => undefined)
+              }
+              const method = Reflect.get(target, prop) as (...inner: unknown[]) => Promise<unknown>
+              return method.apply(target, args)
+            }
+          }
+          const value = Reflect.get(target, prop)
+          return typeof value === 'function' ? (value as (...inner: unknown[]) => unknown).bind(target) : value
+        },
+      })
+      const proxied = new Proxy(tx, {
+        get(target, prop) {
+          if (prop === 'terminal') return terminal
+          const value = Reflect.get(target, prop)
+          return typeof value === 'function' ? (value as (...inner: unknown[]) => unknown).bind(target) : value
+        },
+      })
+      return fn(proxied)
+    }, ...(rest as []))
+  }) as PrismaService['$transaction']
+
+  const prices = Object.fromEntries(TERMINAL_CHARGE_SERVICE_KEYS.map((key) => [key, key === 'resume_optimize' ? 100 : 0]))
+  let rejected: unknown
+  try {
+    await saveTerminalChargeSettings(wrapped, WINDOW_TERMINAL_ID, {
+      userChargeMode: 'user_pays',
+      prices,
+      orgBindingGeneration: 0,
+    }, 'window-admin')
+  } catch (error) {
+    rejected = error
+  }
+  assert.equal(injected, true, '改绑必须在保存事务第一次写终端之前提交')
+  assert.equal(
+    staleCode(rejected),
+    TERMINAL_CHARGE_SETTINGS_STALE_CODE,
+    `读版本之后改绑，保存必须 409，实际 ${staleCode(rejected) ?? (rejected instanceof Error ? rejected.message : '成功')}`,
+  )
+  assert.equal(staleMessage(rejected), TERMINAL_CHARGE_SETTINGS_STALE_MESSAGE)
+  const row = await prisma.terminal.findUnique({
+    where: { id: WINDOW_TERMINAL_ID },
+    select: { orgId: true, userChargeMode: true, orgBindingGeneration: true, servicePrices: { select: { unitCents: true } } },
+  })
+  assert.equal(row?.orgId, WINDOW_ORG_ID)
+  assert.equal(row?.orgBindingGeneration, 1, '改绑已经加上版本')
+  assert.equal(row?.userChargeMode, 'org_pays', '旧价不能写进新机构')
+  assert.equal(row?.servicePrices.length, 0, '旧价目不能写进去')
+  console.log('PASS verify:terminal-charge-binding-race:postgres window')
 }
 
 async function main(): Promise<void> {
@@ -150,6 +242,7 @@ async function main(): Promise<void> {
     assert.equal(order?.closeReason ?? null, null)
     assert.equal(order?.amountCents, 100)
     assert.equal(order?.channelClosePending, false)
+    if (postgres) await assertReadThenRebindWindow(prisma)
     console.log(`PASS verify:terminal-charge-binding-race${postgres ? ':postgres' : ''}`)
   } finally {
     await prisma.onModuleDestroy()

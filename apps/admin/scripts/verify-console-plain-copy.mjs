@@ -405,9 +405,11 @@ const common = { '@ai-job-print/ui': ui, '@ai-job-print/shared': shared, '../Pag
   '../components/FilterChip': { FilterChip: () => null }, 'lucide-react': {} }
 let billingStates = []
 const billingHooks = { ...hooks([]), useState: () => [billingStates.shift(), () => {}] }
+const kioskPayScreenNote = runFile('apps/admin/src/lib/kioskPayScreenNote.ts')
 const billing = runFile('apps/admin/src/routes/billing/index.tsx', {
   ...common, react: billingHooks,
   '../../services/api/adminBilling': {},
+  '../../lib/kioskPayScreenNote': kioskPayScreenNote,
 }, '\nexport { PriceConfigSection, ReconciliationSection }\n')
 billingStates = ['price']
 // 页头直接展开 Page，避免继续调用尚无数据的子区块。

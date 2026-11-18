@@ -8,11 +8,11 @@
  * 加载不了。键、上限、总开关键与共享包必须一致，由
  * verify:terminal-charge-settings 核对。
  *
- * 公共就业三类不在这里抄名单。服务端权威是 `ORG_TYPE_MATRIX`（与共享包
- * `ORG_TYPE_SCENE_TEMPLATE` 同一张对应关系），sceneTemplate 为
- * public_employment 的类型一律锁 0。
+ * 公共就业三类不在这里抄名单。服务端权威是 `org-type-matrix` 的
+ * `ORG_TYPE_MATRIX`（与共享包 `ORG_TYPE_SCENE_TEMPLATE` 同一张对应关系），
+ * sceneTemplate 为 public_employment 的类型一律锁 0。
  */
-import { ORG_TYPE_MATRIX } from '../orgs/admin-orgs.service'
+import { ORG_TYPE_MATRIX } from '../orgs/org-type-matrix'
 
 export const TERMINAL_CHARGE_SERVICE_KEYS = [
   'resume_optimize',

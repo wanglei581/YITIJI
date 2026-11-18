@@ -593,6 +593,23 @@ async function main(): Promise<void> {
     const resetBefore = await prisma.auditLog.count({
       where: { action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
     })
+    const beforeMode = await prisma.terminal.findUniqueOrThrow({
+      where: { id: PUBLIC_TERMINAL },
+      select: { userChargeMode: true, servicePrices: { select: { serviceKey: true, unitCents: true } } },
+    })
+    const beforeSwitch = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
+    const beforePrices: Record<string, number | null> = {}
+    for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
+      const row = beforeMode.servicePrices.find((item) => item.serviceKey === key)
+      beforePrices[key] = row === undefined ? null : row.unitCents
+    }
+    const expectedBefore = {
+      userChargeMode: beforeMode.userChargeMode,
+      personalChargeEnabled: beforeSwitch?.value === 'true',
+      prices: beforePrices,
+    }
+    assert.equal(expectedBefore.prices.resume_optimize, null, '这台改绑前没设过简历优化价，快照必须是空')
+    assert.equal(expectedBefore.prices.scan, 500, '这台改绑前扫描价是库里的 500')
     const rebound = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: ORG_OTHER }, adminHeaders)
     expectStatus(rebound, 200, '公共点位改绑到非公共机构')
     assert.equal(rebound.json.data?.chargeSettingsReset, true, '改绑机构的响应要标明收费设置已复位')
@@ -611,7 +628,14 @@ async function main(): Promise<void> {
       where: { action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
     })
     assert.equal(resetAfter, resetBefore + 1, '改绑机构要记收费设置复位审计')
-    console.log('PASS 改绑机构后收费设置复位为 org_pays 且五个价清 0')
+    const resetAudit = await prisma.auditLog.findFirst({
+      where: { action: TERMINAL_CHARGE_RESET_ON_REBIND_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
+      orderBy: { createdAt: 'desc' },
+    })
+    const resetPayload = JSON.parse(resetAudit?.payloadJson ?? '{}') as { before?: typeof expectedBefore }
+    assert.deepEqual(resetPayload.before, expectedBefore, '复位审计要和改绑前库里的收费方式、五个价、总开关一致')
+    assert.equal(/phone|mobile|姓名|realName|userName|displayName/.test(resetAudit?.payloadJson ?? ''), false, '复位审计详情不带手机号或姓名')
+    console.log('PASS 改绑机构后收费设置复位为 org_pays 且五个价清 0，审计记下复位前')
 
     await prisma.terminal.update({ where: { id: PUBLIC_TERMINAL }, data: { userChargeMode: 'user_pays' } })
     await prisma.terminalServicePrice.create({

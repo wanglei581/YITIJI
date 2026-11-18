@@ -178,6 +178,7 @@ export default function TerminalsPage() {
   function handleChargeSaved(terminalId: string, view: TerminalChargeSettingsView) {
     const savedAt = nextChargeSettingsClock()
     setChargePatch((current) => ({ ...current, [terminalId]: { charge: chargeSummary(view), savedAt } }))
+    setChargeResetNotice(null)
   }
 
   function openBindCodeModal(terminal: AdminTerminalRecord) {

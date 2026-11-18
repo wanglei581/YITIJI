@@ -315,6 +315,8 @@ async function main(): Promise<void> {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const priorSwitch = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
+  let restoreError: unknown
+  let failed: unknown
   try {
     await prisma.order.findFirst({ select: { id: true } })
   } catch {
@@ -741,11 +743,19 @@ async function main(): Promise<void> {
     check(offline.status === 403 && offline.code === 'PRINT_TERMINAL_NOT_READY', '本机离线：403 PRINT_TERMINAL_NOT_READY（与到机码入口同一检查）', String(offline.code))
 
     console.log(`\nALL PASS (${passed})`)
+  } catch (error) {
+    failed = error
   } finally {
     setPrintScanCapabilityModeForTest(null)
-    let restoreError: unknown
     try {
       await restoreTerminalChargeFixture(prisma)
+      // 夹具按第一次改之前的快照写回。这两台是本门禁新建的，快照应是机构承担；
+      // 再强制写一次，避免快照没记上时把「向用户收费」留在共用库里。
+      await prisma.terminal.updateMany({
+        where: { id: { in: [T, T2] } },
+        data: { userChargeMode: 'org_pays' },
+      })
+      await prisma.terminalServicePrice.deleteMany({ where: { terminalId: { in: [T, T2] } } })
     } catch (error) {
       restoreError = error
     }
@@ -763,8 +773,10 @@ async function main(): Promise<void> {
       try { rmSync(path.join(process.env.FILE_STORAGE_DIR!, key), { force: true }) } catch { /* ignore */ }
     }
     if (fallbackDbPath) rmSync(fallbackDbPath, { force: true })
-    if (restoreError) throw restoreError
   }
+  // 复位失败仍盖过用例失败，和原先在 finally 里抛出的顺序一样；不能写在 finally 里。
+  if (restoreError) throw restoreError
+  if (failed) throw failed
 }
 
 main().catch((error: unknown) => {

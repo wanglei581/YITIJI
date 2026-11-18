@@ -169,6 +169,7 @@ export class AdminTerminalsController {
           terminalCode: assignment.terminalCode,
           oldOrgId: assignment.oldOrgId,
           newOrgId: assignment.newOrgId,
+          before: assignment.chargeSettingsBefore,
         },
         ipAddress: extractIp(req),
         userAgent: extractUa(req),

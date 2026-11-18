@@ -16,8 +16,10 @@ import {
   adminBillingService,
   type AdminPriceConfigItem,
   type PersonalChargeOverview,
+  type PersonalChargeTerminalRow,
   type ReconciliationReport,
 } from '../../services/api/adminBilling'
+import { chargeListKind, KIOSK_PAY_SCREEN_NOTE } from '../../lib/kioskPayScreenNote'
 
 const SERVICE_LABELS: Record<string, string> = {
   print_bw_page: '黑白打印（每页）',
@@ -363,6 +365,39 @@ function ReconciliationSection() {
   )
 }
 
+function ChargeTerminalLine({ terminal }: { terminal: PersonalChargeTerminalRow }) {
+  return (
+    <li>
+      <span className="font-mono">{terminal.terminalCode}</span>
+      {' '}{terminal.displayName || '未命名'}{' '}{terminal.locationLabel || '未设置点位'}
+      <span className="mt-0.5 block text-xs text-neutral-600">
+        {TERMINAL_CHARGE_SERVICE_KEYS.map((key) => `${TERMINAL_CHARGE_SERVICE_LABELS[key]} ${yuan(terminal.prices[key] ?? 0)}`).join('；')}
+      </span>
+    </li>
+  )
+}
+
+function ChargeTerminalLists({ terminals }: { terminals: PersonalChargeTerminalRow[] }) {
+  const printing = terminals.filter((terminal) => chargeListKind(terminal.prices) === 'print')
+  const kioskGap = terminals.filter((terminal) => chargeListKind(terminal.prices) === 'kiosk_gap')
+  return (
+    <div className="mt-1 space-y-3">
+      <section aria-label="打印在收费">
+        <p className="font-medium">打印在收费</p>
+        {printing.length === 0 ? <p className="mt-1 text-neutral-500">现在没有。</p> : (
+          <ul className="mt-1 space-y-2">{printing.map((terminal) => <ChargeTerminalLine key={terminal.terminalCode} terminal={terminal} />)}</ul>
+        )}
+      </section>
+      {kioskGap.length === 0 ? null : (
+        <section aria-label="一体机付款屏还没上线">
+          <p className="font-medium">{KIOSK_PAY_SCREEN_NOTE}</p>
+          <ul className="mt-1 space-y-2">{kioskGap.map((terminal) => <ChargeTerminalLine key={terminal.terminalCode} terminal={terminal} />)}</ul>
+        </section>
+      )}
+    </div>
+  )
+}
+
 const PERSONAL_CHARGE_PREREQUISITES = [
   '打印要出版主管部门书面答复或印刷经营许可证',
   '每个点位的分支机构登记',
@@ -431,17 +466,7 @@ function PersonalChargeSwitchCard() {
             {overview.terminals.length === 0 ? (
               <p className="mt-1 text-neutral-500">现在没有。要同时是向用户收费、不是公共就业点位、并且至少有一个价大于 0。</p>
             ) : (
-              <ul className="mt-1 space-y-2">
-                {overview.terminals.map((terminal) => (
-                  <li key={terminal.terminalCode}>
-                    <span className="font-mono">{terminal.terminalCode}</span>
-                    {' '}{terminal.displayName || '未命名'}{' '}{terminal.locationLabel || '未设置点位'}
-                    <span className="mt-0.5 block text-xs text-neutral-600">
-                      {TERMINAL_CHARGE_SERVICE_KEYS.map((key) => `${TERMINAL_CHARGE_SERVICE_LABELS[key]} ${yuan(terminal.prices[key] ?? 0)}`).join('；')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <ChargeTerminalLists terminals={overview.terminals} />
             )}
           </div>
           <div>

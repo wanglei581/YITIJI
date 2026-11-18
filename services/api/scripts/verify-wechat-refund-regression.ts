@@ -42,7 +42,7 @@ import {
 } from '../src/payment/providers/wechat-pay.provider'
 import { PricingService } from '../src/payment/pricing.service'
 import { RefundService } from '../src/payment/refund.service'
-import { adoptDevPrintSeedPrices } from './support/terminal-charge-fixture'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
@@ -61,7 +61,7 @@ function pass(msg: string): void {
 }
 function fail(msg: string): never {
   console.error(`  FAIL ${msg}`)
-  process.exit(1)
+  throw new Error(`FAIL_GATE: ${msg}`)
 }
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
   try {
@@ -285,6 +285,7 @@ async function main(): Promise<void> {
 
     console.log(`\n  ✅ verify:wechat-refund-regression 全部通过（${passCount} checks）\n`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     if (priorSwitch) {
       await prisma.platformSetting.upsert({

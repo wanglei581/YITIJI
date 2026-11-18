@@ -21,7 +21,7 @@ import { join } from 'path'
 import { AuditService } from '../src/audit/audit.service'
 import { AdminBillingService } from '../src/payment/admin-billing.service'
 import { AdminUpdatePriceConfigDto } from '../src/payment/dto/admin-billing.dto'
-import { setTerminalUserPrintPrices } from './support/terminal-charge-fixture'
+import { restoreTerminalChargeFixture, setTerminalUserPrintPrices } from './support/terminal-charge-fixture'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
@@ -34,7 +34,7 @@ function pass(message: string): void {
 }
 function fail(message: string): never {
   console.error(`  FAIL ${message}`)
-  process.exit(1)
+  throw new Error(`FAIL_GATE: ${message}`)
 }
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
   try {
@@ -394,6 +394,7 @@ async function main(): Promise<void> {
 
     console.log(`\n  ✅ verify:admin-billing 全部通过（${passCount} checks）\n`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await seedDevDefaultPriceConfig(prisma) // 复位开发默认价
     await prisma.terminalServicePrice.deleteMany({ where: { terminalId: quoteTerminalId } }).catch(() => undefined)
     await prisma.terminal.deleteMany({ where: { id: quoteTerminalId } }).catch(() => undefined)
