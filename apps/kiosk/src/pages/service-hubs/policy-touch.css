@@ -25,6 +25,8 @@
 .policy-min-body .policy-min-foot { text-align: center; }
 .policy-min-list { display: flex; flex-direction: column; gap: 18px; }
 .qxt-screen .policy-min-card { width: 100%; min-height: 252px; padding: 22px 26px; display: flex; flex-direction: column; gap: 12px; text-align: left; background: var(--qxt-card); border: 1.5px solid var(--qxt-line); border-radius: 26px; }
+/* 搜索结果照稿 .p17-res .pol。列表行仍是上面的 252。 */
+.qxt-screen .policy-search-list .policy-min-card { min-height: 220px; padding: 26px 34px; gap: 10px; }
 .policy-min-card b { font-size: 30px; line-height: 1.4; overflow-wrap: anywhere; }
 .policy-min-summary { font-size: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .policy-min-meta { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; font-size: 20px; color: var(--qxt-ink-2); }

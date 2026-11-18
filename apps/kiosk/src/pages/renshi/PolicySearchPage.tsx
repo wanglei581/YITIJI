@@ -106,7 +106,7 @@ export function PolicySearchPage() {
       <p>{tooLong.body}</p>
     </section>}
     {found && found.items.length > 0 && <>
-      <div className="policy-min-list" data-testid="policy-search-list">
+      <div className="policy-min-list policy-search-list" data-testid="policy-search-list">
         {found.items.map((policy) => <PolicyGuideRow key={policy.id} policy={policy} highlight={word}
           categoryLabel={categoryLabel(policy.audience)} deadlineLabel={policyDeadlineLabel(policy.validThrough)}
           showHandling={false}
