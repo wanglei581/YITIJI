@@ -219,6 +219,8 @@ function assertPrivateUseKept(): void {
 /**
  * 原文里两个长数字，截断丢掉后一个。模型若把空洞补成旧序号，不能还原出被丢掉的号码。
  * 字段值里的第三串完整留下，还原只对上它自己。
+ * 出站正文里看不见的序号，按可见标记的 nonce 补出来再还原，也不得带回丢掉的号码。
+ * 摘掉 dropAbsentTokens 时，这条会红；只查正文里还在的标记则仍然全绿。
  */
 function assertTruncationHoleDoesNotCrossWire(): void {
   const kept = '1'.repeat(11)
@@ -238,13 +240,31 @@ function assertTruncationHoleDoesNotCrossWire(): void {
   if (out.restore(out.maskedResumeValues) !== other) fail('截断空洞 另一段号码串到了字段值')
   if (out.restore('[长数字_2]').includes(dropped)) fail('截断空洞 旧序号还原出了丢掉的号码')
   const token = /⦃[0-9a-f]+:\d+⦄/gu
+  const seen: Array<{ nonce: string; counter: number; token: string }> = []
   for (const text of [out.maskedOriginal, out.maskedResumeValues, out.maskedResumeJson]) {
     for (const match of text.matchAll(token)) {
-      if (out.restore(match[0]).includes(dropped)) fail('截断空洞 出站标记还能还原出丢掉的号码')
+      const whole = match[0]
+      const parsed = /^⦃([0-9a-f]+):(\d+)⦄$/u.exec(whole)
+      if (!parsed || !parsed[1] || !parsed[2]) fail('截断空洞 出站标记认不出来')
+      seen.push({ nonce: parsed[1], counter: Number(parsed[2]), token: whole })
+      if (out.restore(whole).includes(dropped)) fail('截断空洞 出站标记还能还原出丢掉的号码')
     }
   }
   if (recoverableDigits(out.maskedOriginal).includes(dropped)) fail('截断空洞 出站原文还能拼出丢掉的号码')
+  const nonce = seen[0]?.nonce
+  if (!nonce || seen.some((item) => item.nonce !== nonce)) fail('截断空洞 出站标记不是同一次请求')
+  const counters = new Set(seen.map((item) => item.counter))
+  const missing: number[] = []
+  for (let counter = Math.min(...counters); counter <= Math.max(...counters); counter += 1) {
+    if (!counters.has(counter)) missing.push(counter)
+  }
+  if (missing.length === 0) fail('截断空洞 出站序号连着，缺号还原钉不住')
+  for (const counter of missing) {
+    const synthetic = `⦃${nonce}:${counter}⦄`
+    if (out.restore(synthetic).includes(dropped)) fail('截断空洞 缺号标记还原出了丢掉的号码')
+  }
   pass('截断后占位符不串号')
+  pass('截断缺号按可见标记补出来，还原不出丢掉的号码')
 }
 
 /**
