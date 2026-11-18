@@ -88,6 +88,8 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   printRefundReason: string | null
   refundLedgerNo: string | null
   refundLedgerCents: number | null
+  /** 应付额（分）。服务端按退款公式算好，按钮只展示这个数。 */
+  payableCents: number
 }
 
 export interface AdminOrderReadonlyPage {
@@ -263,6 +265,7 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   ownerType: 'member',
   userLabel: '演示会员',
   terminalCode: 'KSK-001',
+  payableCents: 0,
   // mock 用 null 而非 'kiosk'：让 mock 模式下也能看到「未标注」这个真实存在的存量态，
   // 避免开发期误以为所有单都有渠道。
   channel: null,
@@ -338,6 +341,7 @@ function demoRefundDetail(): AdminOrderReadonlyDetail | null {
     id: 'ord_mock_refund',
     orderNo: 'ORD-20261105-7A3C91E204',
     amountCents: scenario === 'zero' ? 0 : 100,
+    payableCents: scenario === 'zero' ? 0 : 100,
     payStatus: 'paid',
     taskStatus: 'failed',
     refundEligible: true,
@@ -550,7 +554,7 @@ function demoServiceOrders(): AdminOrderReadonlyDetail[] {
       closeReason: null,
       updatedAt: '2026-11-13T12:21:00+08:00',
     },
-  ]
+  ].map((row) => ({ ...row, payableCents: row.amountCents }))
 }
 
 let serviceDemoState = demoServiceOrders()

@@ -58,7 +58,8 @@ export async function runP2b4Cases(
   const actions = readRepo('apps/admin/src/routes/orders/OrderPaymentActions.tsx')
   const holds = readRepo('apps/admin/src/routes/orders/PrintReturnHoldActions.tsx')
   const controller = readRepo('services/api/src/payment/admin-order-actions.controller.ts')
-  assert.match(actions, /Math\.max\(0, detail\.amountCents - detail\.discountCents\)/)
+  assert.match(actions, /detail\.payableCents/)
+  assert.match(readRepo('services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts'), /payableCents\(row\)/)
   assert.match(holds, /确认退成/)
   assert.match(holds, /refundLedgerCents/)
   assert.match(holds, /核对后仍退款/)
@@ -327,6 +328,17 @@ export async function runP2b4Cases(
   const repriced = await db.order.findUniqueOrThrow({ where: { id: priced.id } })
   assert.equal(repriced.amountCents, 200)
   assert.equal(repriced.discountCents, 0)
+  assert.equal((await admin.getById(priced.id)).payableCents, 200)
+  const cut = await seed('cut', {
+    amountCents: 300,
+    discountCents: 100,
+    paymentSource: 'offline',
+    printStatus: 'failed',
+  })
+  assert.equal((await admin.getById(cut.orderId)).payableCents, 200)
+  const cutRefund = await refunds.refund(cut.orderId, { reason: '按实付退' })
+  assert.equal(cutRefund.refund.amountCents, 200)
+  assert.equal(cutRefund.refund.status, 'success')
   const payment = new OnlinePaymentService(
     db,
     new AuditService(db),

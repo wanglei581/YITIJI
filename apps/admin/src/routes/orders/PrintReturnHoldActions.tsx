@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { adminOrdersReadonlyService } from '../../services/api/adminOrdersReadonly'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import type { OrderDetailControls } from './useOrderDetail'
-import { amountText, orderPaperReleased } from './orderDisplay'
+import { amountText, autoRefundStatusText, orderPaperReleased, payStatusPresentation } from './orderDisplay'
 
 const BLOCKS_NEW_REFUND = new Set(['pending', 'failed', 'manual_review', 'success'])
 
@@ -28,7 +28,7 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
     setNote(null)
     try {
       const result = await adminOrdersReadonlyService.resolvePrintReturnHold(detail.id, action)
-      setNote(`已处理。支付状态 ${result.payStatus}，退款状态 ${result.refundStatus}。金额 ${amountText(result.amountCents, detail.currency)}。`)
+      setNote(`已处理。支付状态 ${payStatusPresentation(result.payStatus).label}，退款状态 ${autoRefundStatusText(result.refundStatus)}。金额 ${amountText(result.amountCents, detail.currency)}。`)
       void refresh()
       await openDetail(detail.id)
     } catch (err) {
@@ -95,7 +95,7 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
               <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="请填写核对说明（必填）" rows={2} maxLength={500} className="w-full resize-none rounded-[9px] border border-neutral-900/10 bg-surface px-3 py-2 text-[13px]" />
               <div className="flex gap-2">
                 <button type="button" disabled={!reason.trim() || pending !== null} onClick={() => void submitVerified()} className="inline-flex h-9 items-center rounded-[9px] bg-error px-4 text-[13px] font-bold text-white disabled:opacity-40">
-                  {pending === 'verified' ? '处理中…' : `确认退回 ${amountText(Math.max(0, detail.amountCents - detail.discountCents), detail.currency)}`}
+                  {pending === 'verified' ? '处理中…' : `确认退回 ${amountText(detail.payableCents, detail.currency)}`}
                 </button>
                 <button type="button" disabled={pending !== null} onClick={() => { setVerifiedOpen(false); setReason('') }} className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-700">
                   取消

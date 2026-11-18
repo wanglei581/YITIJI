@@ -36,6 +36,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
+import { payableCents } from './pending-refund-signal'
 import { settleServiceRefundNotify } from './service-order.payment'
 import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput, type RefundExecuteResult } from './payment-provider.types'
 import { notifyPrintReturnHold } from './print-return-alert'
@@ -319,8 +320,8 @@ export class RefundService {
       const paymentSource = order.paymentSource ?? ''
       if (!REFUNDABLE_SOURCES.has(paymentSource)) throw new BadRequestException('REFUND_CHANNEL_UNSUPPORTED')
       channel = paymentSource
-      // 退款额 = 实付资金 = 应付 − 抵扣（免费/全额券单为 0，不动资金）。
-      amountCents = Math.max(0, order.amountCents - order.discountCents)
+      // 退款额 = 实付资金 = 应付额。与后台按钮上的 payableCents 是同一个函数。
+      amountCents = payableCents(order)
     }
 
     // 同一事务里先看有没有在办的退款、纸有没有放行，再改成退款中。

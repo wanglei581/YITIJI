@@ -209,7 +209,7 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
                       <p className="mt-0.5 text-xs text-neutral-500">
                         {detail.refundRequired
                           ? `${detail.refundReason === 'ONLINE_PAID_PENDING_REFUND' ? '渠道已收款但订单未转已支付' : '已付款未出纸'}。系统不会自动出款；只有管理员点确认后才会向支付渠道发起。金额以本页服务端金额为准。`
-                          : `退款 ${amountText(Math.max(0, detail.amountCents - detail.discountCents), detail.currency)}，操作不可撤销，仅管理员可执行`}
+                          : `退款 ${amountText(detail.payableCents, detail.currency)}，操作不可撤销，仅管理员可执行`}
                       </p>
                     </div>
                     <button

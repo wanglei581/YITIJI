@@ -11,6 +11,7 @@ import {
   ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES,
   ONLINE_PAID_PENDING_REFUND_REASON,
   PAID_UNFULFILLED_PENDING_REFUND_REASON,
+  payableCents,
 } from '../payment/pending-refund-signal'
 import { explainPrintRefund } from '../payment/print-return-disposition'
 import type {
@@ -298,6 +299,7 @@ export class AdminOrdersReadonlyService {
       refundedAt: row.refundedAt ? row.refundedAt.toISOString() : null,
       refundReason: row.refundReason,
       discountCents: row.discountCents,
+      payableCents: payableCents(row),
       refundedAmountCents: row.refundedAmountCents,
       printTaskId: row.type === 'copy' ? null : row.printTaskId ?? null,
       print: row.printTask && summary
