@@ -83,6 +83,29 @@ test('搜索结果行最低 220、内边距 26/34、间距 10，四条和页脚�
   await expect(page.locator('.policy-min-list:not(.policy-search-list) .policy-min-card').first()).toHaveCSS('min-height', '252px')
 })
 
+test('搜索结果卡之间是 16，政策列表卡之间仍是 18 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  await routePolicies(page, [1, 2, 3, 4].map(searchHit))
+  await page.goto('/policy-service')
+  await page.getByTestId('policy-search-input').click()
+  await page.getByTestId('policy-search-input').fill('专搜')
+  await page.getByTestId('policy-search-go').click()
+  await expect(page.getByRole('heading', { level: 1, name: '找到 4 条含「专搜」的政策' })).toBeVisible()
+  const searchGaps = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.policy-search-list .policy-min-card')].map((el) => el.getBoundingClientRect())
+    return rows.slice(1).map((box, index) => Math.round(box.top - rows[index]!.bottom))
+  })
+  expect(searchGaps).toEqual([16, 16, 16])
+  await page.goto('/renshi?audience=startup')
+  const list = page.locator('.policy-min-list:not(.policy-search-list) .policy-min-card')
+  await expect(list).toHaveCount(4)
+  const listGaps = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.policy-min-list:not(.policy-search-list) .policy-min-card')].map((el) => el.getBoundingClientRect())
+    return rows.slice(1).map((box, index) => Math.round(box.top - rows[index]!.bottom))
+  })
+  expect(listGaps).toEqual([18, 18, 18])
+})
+
 test('有原文摘录时详情收紧，去哪办压到一枚域名小签，两张卡在底栏之上 @kiosk', async ({ page, api }) => {
   registerW4Api(api)
   const verified = {
