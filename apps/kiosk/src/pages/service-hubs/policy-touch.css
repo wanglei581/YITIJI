@@ -102,7 +102,9 @@
 .policy-search-field .policy-search-mag { flex: none; color: var(--qxt-ink-3); }
 .policy-search-field.is-on .policy-search-mag { color: var(--qxt-teal-ink); }
 .policy-search-field.is-bad .policy-search-mag { color: var(--qxt-clay-ink); }
-.policy-search-field input { flex: 1; min-width: 0; height: 72px; border: 0; outline: none; background: transparent; color: var(--qxt-ink); font: 500 32px/1.45 var(--qx-sans); }
+.policy-search-field input { flex: 1; min-width: 0; height: 72px; border: 0; background: transparent; color: var(--qxt-ink); font: 500 32px/1.45 var(--qx-sans); }
+.qxt-screen .policy-search-field input:focus,
+.qxt-screen .policy-search-field input:focus-visible { outline: none; }
 .policy-search-field input::placeholder { color: var(--qxt-ink-3); font-size: 26px; font-weight: 400; }
 .policy-search-field input:disabled { color: var(--qxt-ink-3); }
 .policy-search-kbi { flex: none; color: var(--qxt-ink-3); display: inline-flex; }
