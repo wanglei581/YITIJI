@@ -292,8 +292,18 @@ export function paymentRow(money: OutOfPaperMoney): SummaryRow {
   return { key: 'pay', label: '支付状态', value: '以订单为准' }
 }
 
-/** 三态失败页的「设备上报」只留设备那一句，不把第 3 步的服务电话再贴一遍。普通失败仍用已经换成无人值守口径的整句。 */
-export function shownFailureReason(variant: FailureVariant, deviceReason: string, presentedReason: string): string {
+/**
+ * 三态失败页的「设备上报」只留设备那一句，不把第 3 步的服务电话再贴一遍。
+ * 公开状态已经确认是卡纸时，改成与「打印机缺纸，当前无法打印。」「打印机离线，当前无法打印。」同一写法。
+ * 还没确认时仍用对照表那句。普通失败仍用已经换成无人值守口径的整句。
+ */
+export function shownFailureReason(
+  variant: FailureVariant,
+  deviceReason: string,
+  presentedReason: string,
+  confirmedJam = false,
+): string {
+  if (variant === 'paper-jam' && confirmedJam) return '打印机卡纸，当前无法打印。'
   if (variant === 'paper-jam' || variant === 'out-of-paper' || variant === 'offline') return deviceReason
   return presentedReason
 }

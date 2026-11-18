@@ -545,6 +545,7 @@ export function PrintDonePage() {
       : { fact: paymentFactOf(amountCents), amountCents }
     const faultOrderNo = publicOrderNo(takeaway?.orderNo) ?? displayOrderNo
     const canRetry = Boolean(takeaway?.canRetry)
+    const confirmedJam = variant === 'paper-jam' && printerJamConfirmed(device)
     return (
       <PrintDoneFailed
         variant={variant}
@@ -554,14 +555,14 @@ export function PrintDonePage() {
           orderNo: faultOrderNo,
           canRetry,
           pickupSource: state.pickupSource === true,
-          confirmedJam: variant === 'paper-jam' && printerJamConfirmed(device),
+          confirmedJam,
         })}
         rows={failureSummaryRows({
           orderNo: faultOrderNo,
           file: file ?? null,
           params: params ?? null,
           money,
-          reason: shownFailureReason(variant, verification?.failureReason ?? '', failureReason),
+          reason: shownFailureReason(variant, verification?.failureReason ?? '', failureReason, confirmedJam),
         })}
         free={amountCents === 0}
         retry={{ available: canRetry, blockedReason: retryBlockedReason(device), busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}

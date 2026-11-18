@@ -110,7 +110,8 @@ test('PRINTER_ERROR 不出现确定的「打印机卡纸」，公开状态 paper
   assert.equal(failedModel.printerJamConfirmed({ loading: false, kind: 'error', printer: { errorCode: 'hardwareError' } }), false)
 
   const page = readFileSync(join(kioskRoot, 'src/pages/print/PrintDonePage.tsx'), 'utf8')
-  assert.match(page, /confirmedJam: variant === 'paper-jam' && printerJamConfirmed\(device\)/)
+  assert.match(page, /const confirmedJam = variant === 'paper-jam' && printerJamConfirmed\(device\)/)
+  assert.match(page, /confirmedJam,/)
   assert.doesNotMatch(unconfirmedText, /工作人员/)
 })
 
@@ -173,8 +174,37 @@ test('三态失败页上服务电话只出现一次，设备上报和带走失�
   assert.doesNotMatch(retryCopy.fine, /服务电话/)
   assert.match(failedModel.faultScreenTakeawayMiss('failed'), /打印有问题？/)
   const page = readFileSync(join(kioskRoot, 'src/pages/print/PrintDonePage.tsx'), 'utf8')
-  assert.match(page, /shownFailureReason\(variant, verification\?\.failureReason \?\? '', failureReason\)/)
+  assert.match(page, /shownFailureReason\(variant, verification\?\.failureReason \?\? '', failureReason, confirmedJam\)/)
   assert.match(page, /faultScreenTakeawayMiss\(/)
+})
+
+test('确认卡纸时设备上报写成打印机卡纸，未确认仍用对照表那句', () => {
+  const table = progress.errorCodeToMessage('PRINTER_ERROR')
+  const confirmedReason = failedModel.shownFailureReason('paper-jam', table, '整句不该上屏', true)
+  assert.equal(confirmedReason, '打印机卡纸，当前无法打印。')
+  assert.equal(progress.errorCodeToMessage('PAPER_EMPTY'), '打印机缺纸，当前无法打印。')
+  assert.equal(progress.errorCodeToMessage('PRINTER_OFFLINE'), '打印机离线，当前无法打印。')
+  const confirmed = failedModel.failureCopy({
+    variant: 'paper-jam',
+    confirmedJam: true,
+    money,
+    orderNo: 'ORD-JAM-SURE',
+    canRetry: false,
+  })
+  const confirmedRows = failedModel.failureSummaryRows({
+    orderNo: 'ORD-JAM-SURE',
+    file: null,
+    params: null,
+    money,
+    reason: confirmedReason,
+  })
+  const confirmedText = [screenText(confirmed), ...confirmedRows.map((row) => row.value)].join('\n')
+  assert.equal((confirmedText.match(/可能卡纸/g) ?? []).length, 0)
+  assert.match(confirmedText, /打印机卡纸，当前无法打印。/)
+  const unconfirmedReason = failedModel.shownFailureReason('paper-jam', table, '整句不该上屏', false)
+  assert.equal(unconfirmedReason, table)
+  assert.match(unconfirmedReason, /可能卡纸/)
+  assert.doesNotMatch(confirmedText, /工作人员/)
 })
 
 test('缺纸、卡纸、离线不论能否重提，服务电话都只在第 3 步出现一次', async () => {
