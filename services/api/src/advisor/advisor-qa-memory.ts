@@ -70,7 +70,13 @@ export class AdvisorQaMemory {
     return captured
   }
 
-  /** 这一次请求结束（答完、抛错、设备故障早退）后注销登记。 */
+  /**
+   * 这一次请求结束（答完、抛错、设备故障早退）后注销登记。
+   * 没有登记就返回，不能在这里无条件放开。
+   * 清场、清扫、读取都不摘登记；只有这里摘，而且紧挨着放开。
+   * 登记已经没了还放开，会把另一次仍在途的钉一起放掉。
+   * 公开入口只在 advisor.service.ts 的 ask 里成对调用：进来就 begin，finally 里 end。
+   */
   end(sessionId: string): void {
     const id = sessionId.trim()
     const current = id ? this.inflight.get(id) : undefined

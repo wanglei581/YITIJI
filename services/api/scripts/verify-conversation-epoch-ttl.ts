@@ -143,6 +143,7 @@ async function main(): Promise<void> {
   cleared.release('cleared')
 
   assertAdvisorHoldSurvivesFlood()
+  assertPublicClearLeavesInflightPin()
   await assertChatKeepsInFlightAndRefusesClearedId()
 
   console.log(`verify:conversation-epoch-ttl ${passCount} PASS`)
@@ -181,6 +182,58 @@ function assertAdvisorHoldSurvivesFlood(): void {
     memory.read(slow).some((turn) => turn.content === '新代次问题'),
     '同一作业号新抓住的代次可以写回',
   )
+}
+
+/**
+ * agy 说 AdvisorQaMemory.end 在没有登记时提前返回，钉会泄漏。公开路径不成立。
+ * 清场、按归属清、清扫、读取都不摘在途登记，钉还在；结束才放开。
+ * 同一次作业进来两次时，结束一次只放开一根钉。
+ * 出处：advisor-qa-memory.ts 的 end，以及 advisor.service.ts ask 的 begin / finally end。
+ */
+function assertPublicClearLeavesInflightPin(): void {
+  const memory = new AdvisorQaMemory()
+  const id = 'pinned-public'
+  const owner = 'u:member-pinned'
+  memory.begin(id, owner)
+  memory.append(id, '问题', '回答', owner)
+  memory.forget(id)
+  memory.forgetIfOwner(id, owner)
+  memory.forgetOwner(owner)
+  memory.read(id)
+  memory.sweep()
+  check(
+    inflightCount(memory, id) === 1 && pinCount(memory, id) === 1,
+    '清场、按归属清、清扫、读取都不摘在途登记，钉还在',
+  )
+  memory.end(id)
+  check(
+    inflightCount(memory, id) === 0 && pinCount(memory, id) === 0,
+    '请求结束时登记还在，钉随之放开',
+  )
+  memory.end(id)
+  check(pinCount(memory, id) === 0, '没有登记时结束直接返回，钉不会被多放一次')
+
+  const twice = 'pinned-twice'
+  memory.begin(twice, null)
+  memory.begin(twice, null)
+  memory.forget(twice)
+  memory.end(twice)
+  check(
+    inflightCount(memory, twice) === 1 && pinCount(memory, twice) === 1,
+    '同一次作业还有一次在途时，结束只放开这一次的钉',
+  )
+  memory.end(twice)
+  check(inflightCount(memory, twice) === 0 && pinCount(memory, twice) === 0, '两次在途都结束后钉放开')
+}
+
+function inflightCount(memory: AdvisorQaMemory, id: string): number {
+  const inflight = (memory as unknown as { inflight: Map<string, { n: number }> }).inflight
+  return inflight.get(id)?.n ?? 0
+}
+
+function pinCount(memory: AdvisorQaMemory, id: string): number {
+  const epoch = (memory as unknown as { epoch: { pins: Map<string, number> } }).epoch
+  return epoch.pins.get(id) ?? 0
 }
 
 function hexId(n: number): string {
