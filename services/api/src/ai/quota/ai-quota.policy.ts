@@ -39,10 +39,29 @@ export interface PublishedDailyLimit {
 }
 
 /**
- * 没人发布快照时，dailyLimit 仍只读环境变量。
- * 旧的 `new AiQuotaService(prisma)` 和「刚改环境变量就要生效」的门禁都靠这一点。
+ * 一个进程里的上限快照。
+ * 写成功只清写的那一份。另一个进程要另建一份，不能和这份共用。
+ * 不传缓存时，读和写都落在本进程这一份上。
  */
-let publishedDailyLimits: { buckets: PublishedDailyLimit[]; expiresAt: number } | null = null
+export class DailyLimitCache {
+  private published: { buckets: PublishedDailyLimit[]; expiresAt: number } | null = null
+
+  read(now = Date.now()): PublishedDailyLimit[] | null {
+    if (!this.published || this.published.expiresAt <= now) return null
+    return this.published.buckets
+  }
+
+  publish(buckets: PublishedDailyLimit[], now = Date.now()): void {
+    this.published = { buckets, expiresAt: now + AI_QUOTA_LIMIT_CACHE_MS }
+  }
+
+  clear(): void {
+    this.published = null
+  }
+}
+
+/** 产品默认用这一份。每个进程各自一份模块状态，测试里的「另一进程」不要用它。 */
+export const processDailyLimitCache = new DailyLimitCache()
 
 export function aiQuotaDailyLimitKey(bucket: AiQuotaBucket): string {
   return `system:ai-quota-daily:${bucket}`
@@ -58,21 +77,24 @@ export function configuredDailyLimit(bucket: AiQuotaBucket): { value: number; so
   return { value: fallback, source: 'default', fallback }
 }
 
-export function readPublishedDailyLimits(now = Date.now()): PublishedDailyLimit[] | null {
-  if (!publishedDailyLimits || publishedDailyLimits.expiresAt <= now) return null
-  return publishedDailyLimits.buckets
+/**
+ * 没人发布快照时，dailyLimit 仍只读环境变量。
+ * 旧的 `new AiQuotaService(prisma)` 和「刚改环境变量就要生效」的门禁都靠这一点。
+ */
+export function readPublishedDailyLimits(now = Date.now(), cache: DailyLimitCache = processDailyLimitCache): PublishedDailyLimit[] | null {
+  return cache.read(now)
 }
 
-export function publishDailyLimits(buckets: PublishedDailyLimit[], now = Date.now()): void {
-  publishedDailyLimits = { buckets, expiresAt: now + AI_QUOTA_LIMIT_CACHE_MS }
+export function publishDailyLimits(buckets: PublishedDailyLimit[], now = Date.now(), cache: DailyLimitCache = processDailyLimitCache): void {
+  cache.publish(buckets, now)
 }
 
-export function clearDailyLimitCache(): void {
-  publishedDailyLimits = null
+export function clearDailyLimitCache(cache: DailyLimitCache = processDailyLimitCache): void {
+  cache.clear()
 }
 
-export function dailyLimit(bucket: AiQuotaBucket): number {
-  const cached = readPublishedDailyLimits()?.find((item) => item.bucket === bucket)
+export function dailyLimit(bucket: AiQuotaBucket, cache: DailyLimitCache = processDailyLimitCache): number {
+  const cached = cache.read()?.find((item) => item.bucket === bucket)
   if (cached) return cached.effective
   return configuredDailyLimit(bucket).value
 }

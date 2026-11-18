@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common'
 import { AuditService } from '../../audit/audit.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { RedisService } from '../../common/redis/redis.service'
@@ -7,11 +7,10 @@ import {
   AI_QUOTA_BUCKETS,
   AI_QUOTA_LIMIT_MAX,
   AI_QUOTA_LIMIT_TTL_SECONDS,
+  DailyLimitCache,
   aiQuotaDailyLimitKey,
-  clearDailyLimitCache,
   configuredDailyLimit,
-  publishDailyLimits,
-  readPublishedDailyLimits,
+  processDailyLimitCache,
   type PublishedDailyLimit,
 } from './ai-quota.policy'
 
@@ -30,25 +29,30 @@ const CHANGED_ACTION = 'ai.quota_daily_limit_changed'
 const FAILED_ACTION = 'ai.quota_daily_limit_failed'
 
 /**
- * 管理员改三个用途的每天免费次数。值在 Redis，本进程缓存 30 秒。
+ * 管理员改三个用途的每天免费次数。值在 Redis，这份缓存保留 30 秒。
+ * 不传缓存时用本进程那一份。写成功只清自己这份。
  * 读 Redis 失败时回落环境变量（环境变量没设就是 20 / 80 / 5），不当成 0，也不抛给扣次。
  */
 @Injectable()
 export class AiQuotaLimitService {
   private readonly logger = new Logger(AiQuotaLimitService.name)
+  private readonly limitCache: DailyLimitCache
 
   constructor(
     private readonly redis: RedisService,
     private readonly audit: AuditService,
     private readonly prisma: PrismaService,
-  ) {}
+    @Optional() cache?: DailyLimitCache,
+  ) {
+    this.limitCache = cache ?? processDailyLimitCache
+  }
 
   async getConfig(): Promise<AiQuotaDailyLimitConfig> {
     return this.ensureFresh()
   }
 
   async ensureFresh(): Promise<AiQuotaDailyLimitConfig> {
-    const cached = readPublishedDailyLimits()
+    const cached = this.limitCache.read()
     if (cached) return { buckets: cached }
     return this.loadFromRedis()
   }
@@ -66,7 +70,7 @@ export class AiQuotaLimitService {
       await this.recordFailure(actorId, after, ipAddress)
       throw error
     } finally {
-      clearDailyLimitCache()
+      this.limitCache.clear()
     }
     return this.getConfig()
   }
@@ -81,7 +85,7 @@ export class AiQuotaLimitService {
       await this.recordFailure(actorId, after, ipAddress)
       throw error
     } finally {
-      clearDailyLimitCache()
+      this.limitCache.clear()
     }
     return this.getConfig()
   }
@@ -90,12 +94,12 @@ export class AiQuotaLimitService {
     try {
       const raws = await Promise.all(AI_QUOTA_BUCKETS.map((bucket) => this.redis.get(aiQuotaDailyLimitKey(bucket))))
       const buckets = AI_QUOTA_BUCKETS.map((bucket, index) => this.resolve(bucket, raws[index]))
-      publishDailyLimits(buckets)
+      this.limitCache.publish(buckets)
       return { buckets }
     } catch (error) {
       this.logger.warn(`每天免费次数读 Redis 失败，改用服务器配置: ${(error as Error).message}`)
       const buckets = AI_QUOTA_BUCKETS.map((bucket) => this.envRow(bucket))
-      publishDailyLimits(buckets)
+      this.limitCache.publish(buckets)
       return { buckets }
     }
   }
