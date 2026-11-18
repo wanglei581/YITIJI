@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 662,
+    "endpointCount": 665,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -628,6 +628,60 @@
         ],
         "services": [
           "AiLogService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/quota/admin-ai-quota-limit.controller.ts",
+        "handler": "AdminAiQuotaLimitController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog"
+        ],
+        "path": "/api/v1/admin/ai/quota-limits",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/quota/ai-quota-limit.service.ts"
+        ],
+        "services": [
+          "AiQuotaLimitService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/quota/admin-ai-quota-limit.controller.ts",
+        "handler": "AdminAiQuotaLimitController.update",
+        "method": "PUT",
+        "models": [
+          "AuditLog"
+        ],
+        "path": "/api/v1/admin/ai/quota-limits",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/quota/ai-quota-limit.service.ts"
+        ],
+        "services": [
+          "AiQuotaLimitService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/quota/admin-ai-quota-limit.controller.ts",
+        "handler": "AdminAiQuotaLimitController.reset",
+        "method": "POST",
+        "models": [
+          "AuditLog"
+        ],
+        "path": "/api/v1/admin/ai/quota-limits/reset",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/quota/ai-quota-limit.service.ts"
+        ],
+        "services": [
+          "AiQuotaLimitService"
         ]
       },
       {
@@ -14318,7 +14372,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 292,
+      "reachableFileCount": 294,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -15105,7 +15159,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 320
+      "sourceFileCount": 322
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -20801,7 +20855,11 @@
     "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
+    "apps/admin/src/routes/ai-services/AiQuotaLimitPanel.tsx": [
+      "apps/admin/scripts/verify-admin-ai-quota-limit-ui.mjs"
+    ],
     "apps/admin/src/routes/ai-services/AiQuotaUsagePanel.tsx": [
+      "apps/admin/scripts/verify-admin-ai-quota-limit-ui.mjs",
       "apps/admin/scripts/verify-admin-ai-quota-ui.mjs",
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
@@ -20809,6 +20867,7 @@
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiUsagePanel.tsx": [
+      "apps/admin/scripts/verify-admin-ai-quota-limit-ui.mjs",
       "apps/admin/scripts/verify-admin-ai-quota-ui.mjs",
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
@@ -21380,6 +21439,9 @@
     ],
     "apps/admin/src/services/api/aiConfig.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+    ],
+    "apps/admin/src/services/api/aiQuotaLimits.ts": [
+      "apps/admin/scripts/verify-admin-ai-quota-limit-ui.mjs"
     ],
     "apps/admin/src/services/api/aiQuotaUsage.ts": [
       "apps/admin/scripts/verify-admin-ai-quota-ui.mjs"
@@ -26657,6 +26719,7 @@
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-admin-printer-output.ts",
       "services/api/scripts/verify-admin-session-revocation.ts",
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
@@ -27607,8 +27670,14 @@
     "services/api/src/ai/providers/zhipu.provider.stub.ts": [
       "services/api/scripts/verify-ai-cost-runtime.ts"
     ],
+    "services/api/src/ai/quota/admin-ai-quota-limit.controller.ts": [
+      "services/api/scripts/verify-ai-quota-admin.ts"
+    ],
     "services/api/src/ai/quota/ai-assistant-charge.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts"
+    ],
+    "services/api/src/ai/quota/ai-quota-limit.service.ts": [
+      "services/api/scripts/verify-ai-quota-admin.ts"
     ],
     "services/api/src/ai/quota/ai-quota-run.ts": [
       "services/api/scripts/verify-ai-quota-coverage.ts",
@@ -27622,12 +27691,14 @@
       "services/api/scripts/verify-ai-quota-api.ts"
     ],
     "services/api/src/ai/quota/ai-quota.policy.ts": [
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/ai/quota/ai-quota.service.ts": [
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts"
@@ -28138,6 +28209,7 @@
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-config.ts",
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -28554,6 +28626,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-platform-degradation.ts",
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
@@ -28624,6 +28697,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -28655,6 +28729,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -28677,6 +28752,7 @@
       "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/common/jwt-verifier.module.ts": [
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-production-runtime-gates.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
@@ -28786,6 +28862,7 @@
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-printer-output.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
@@ -30986,6 +31063,7 @@
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-quota-admin.ts",
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
@@ -31928,6 +32006,27 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:admin-ai-access-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/ai-services/AiQuotaLimitPanel.tsx",
+          "apps/admin/src/routes/ai-services/AiQuotaUsagePanel.tsx",
+          "apps/admin/src/routes/ai-services/AiUsagePanel.tsx",
+          "apps/admin/src/services/api/aiQuotaLimits.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-ai-quota-limit-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-ai-quota-limit-ui"
       ],
       "wired": true
     },
@@ -40627,6 +40726,36 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-public-quota"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/quota/admin-ai-quota-limit.controller.ts",
+          "services/api/src/ai/quota/ai-quota-limit.service.ts",
+          "services/api/src/ai/quota/ai-quota.policy.ts",
+          "services/api/src/ai/quota/ai-quota.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/jwt-verifier.module.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-quota-admin.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-quota-admin",
+        "@ai-job-print/api::verify:ai-quota-admin:postgres"
       ],
       "wired": true
     },
