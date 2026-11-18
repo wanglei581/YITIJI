@@ -208,15 +208,15 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     const contextKey = `${toolboxSkill ?? 'general'}:${selectedTaskId ?? 'none'}`
     if (previousContextRef.current === contextKey) return
     previousContextRef.current = contextKey
-    requestTokenRef.current += 1
-    sessionIdRef.current = newSessionId()
-    setMessages([welcomeMessage])
-    setInput('')
-    setLoading(false)
-    setCallActive(false)
-    setVoiceState(null)
-    // 换主题只清会话，不清可用性：provider 就绪与否是服务端事实，不随主题变。
-    setTurnFailed(false)
+    applyAssistantSessionClear(requestTokenRef, sessionIdRef, () => {
+      setMessages([welcomeMessage])
+      setInput('')
+      setLoading(false)
+      setCallActive(false)
+      setVoiceState(null)
+      // 换主题只清会话，不清可用性：provider 就绪与否是服务端事实，不随主题变。
+      setTurnFailed(false)
+    })
   }, [selectedTaskId, toolboxSkill, welcomeMessage])
 
   const aiLocked = aiAvailability === 'unavailable'
@@ -479,12 +479,12 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
   // 换个问题 / 回到提问：丢掉本机这段对话，换一个全新会话号（共享终端不留给下一句）。
   const resetConversation = () => {
-    requestTokenRef.current += 1
-    sessionIdRef.current = newSessionId()
-    setMessages([welcomeMessage])
-    setLoading(false)
-    setTurnFailed(false)
-    focusSection()
+    applyAssistantSessionClear(requestTokenRef, sessionIdRef, () => {
+      setMessages([welcomeMessage])
+      setLoading(false)
+      setTurnFailed(false)
+      focusSection()
+    })
   }
 
   const retryLastTurn = () => {

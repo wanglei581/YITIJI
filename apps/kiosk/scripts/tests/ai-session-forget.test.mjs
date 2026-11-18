@@ -429,6 +429,20 @@ test('清场时小青页换掉会话号，页面不卸载也不再送上一位�
   assert.doesNotMatch(effect, /requestTokenRef\.current \+= 1/)
   assert.doesNotMatch(effect, /sessionIdRef\.current = newSessionId\(\)/)
 
+  const themeStart = page.indexOf('const contextKey = ')
+  const theme = page.slice(themeStart, page.indexOf('}, [selectedTaskId, toolboxSkill, welcomeMessage])', themeStart))
+  assert.match(theme, /applyAssistantSessionClear\(\s*requestTokenRef,\s*sessionIdRef,/)
+  assert.match(theme, /setCallActive\(false\)/)
+  assert.doesNotMatch(theme, /requestTokenRef\.current \+= 1/)
+  assert.doesNotMatch(theme, /sessionIdRef\.current = newSessionId\(\)/)
+
+  const resetStart = page.indexOf('const resetConversation = () => {')
+  const reset = page.slice(resetStart, page.indexOf('const retryLastTurn', resetStart))
+  assert.match(reset, /applyAssistantSessionClear\(\s*requestTokenRef,\s*sessionIdRef,/)
+  assert.match(reset, /focusSection\(\)/)
+  assert.doesNotMatch(reset, /requestTokenRef\.current \+= 1/)
+  assert.doesNotMatch(reset, /sessionIdRef\.current = newSessionId\(\)/)
+
   const { applyAssistantSessionClear } = await loadSessionClear()
   const sessionIdRef = { current: 'a'.repeat(32) }
   const requestTokenRef = { current: 2 }
