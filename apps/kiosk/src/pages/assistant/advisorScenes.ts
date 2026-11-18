@@ -2,13 +2,15 @@
 // advisorScenes — AI顾问专项技能场景文案 + 会话工具
 //
 // 从 AssistantPage.tsx 拆出（CLAUDE.md §8：单文件 500 行以上新增功能前必须评估
-// 拆分）。这里只有**静态文案与纯函数**，不含状态、不含请求、不含 JSX。
+// 拆分）。这里是静态文案，加上本次到访的会话号。不含请求、不含 JSX。
+// 会话号铸出来就登记，供离场清场使用；原话不进这个登记。
 // 页面语法（任务选择 → 真实对话 → 独立输入区）与请求组装仍在 AssistantPage.tsx。
 // ============================================================
 
 import type { AssistantAction, AssistantSkill } from '@ai-job-print/shared'
 import type { KioskIconName } from '../../components/kiosk-icon'
 import { isRecruitmentRoute } from '../../hooks/useRecruitmentHosting'
+import { rememberAssistantSession } from '../../services/api/aiSessionForget'
 
 export interface ConsultationTask {
   id: 'resume' | 'interview' | 'jobs' | 'workplace'
@@ -189,9 +191,15 @@ export const GENERAL_QUESTIONS = [
   '灵活就业社保补贴怎么申请？需要什么材料？',
 ] as const
 
-// 共享触控终端每次进入或切换咨询主题都使用全新 sessionId，且不持久化。
+// 共享触控终端每次进入或切换咨询主题都使用全新会话号，且不持久化。
+// 16 字节随机数的小写十六进制，和清场接口认的格式相同。铸出来就登记，
+// 回复还没回来时离场，清场请求也带得上这个号。
 export function newSessionId(): string {
-  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  const bytes = new Uint8Array(16)
+  globalThis.crypto.getRandomValues(bytes)
+  const id = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  rememberAssistantSession(id)
+  return id
 }
 
 /**

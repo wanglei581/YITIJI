@@ -464,7 +464,12 @@ export class LlmChatService {
         if (this.sessions.size >= size) break
       }
       if (this.sessions.size >= MAX_ASSISTANT_SESSIONS) this.evictOldest()
-      sessionId = randomBytes(16).toString('hex')
+      // 这次到访自己铸的 32 位十六进制号还没被占用，就沿用。离场清场在回复回来之前
+      // 才能按这个号作废。已经有人占着（含别的归属）或还在路上，就另铸，不顶掉别人的会话。
+      const unusedVisitId = /^[0-9a-f]{32}$/.test(requestedId)
+        && !this.sessions.has(requestedId)
+        && !this.inflight.has(requestedId)
+      sessionId = unusedVisitId ? requestedId : randomBytes(16).toString('hex')
       session = { messages: [], updatedAt: now, ownerKey }
       created = true
       this.sessions.set(sessionId, session)
