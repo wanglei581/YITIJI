@@ -124,7 +124,7 @@ async function main(): Promise<void> {
   assertQuotaRoutesAreRead()
   const apiRoot = resolve(__dirname, '..')
   const moduleSource = readFileSync(resolve(apiRoot, 'src/ai/quota/ai-quota.module.ts'), 'utf8')
-  assert.match(moduleSource, /controllers:\s*\[AiQuotaController\]/, 'AiQuotaModule 必须注册控制器')
+  assert.match(moduleSource, /controllers:\s*\[[^\]]*AiQuotaController[^\]]*\]/, 'AiQuotaModule 必须注册控制器')
   if ((process.env.NODE_ENV ?? '').trim().toLowerCase() === 'production')
     process.env.NODE_ENV = 'test'
   process.env.NODE_ENV ||= 'test'

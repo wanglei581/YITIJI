@@ -17,6 +17,7 @@
     "verify:admin-ai-access-ui": "node scripts/verify-admin-ai-access-ui.mjs",
     "verify:admin-ai-usage-ui": "node scripts/verify-admin-ai-usage-ui.mjs",
     "verify:admin-ai-quota-ui": "node scripts/verify-admin-ai-quota-ui.mjs",
+    "verify:admin-ai-quota-limit-ui": "node scripts/verify-admin-ai-quota-limit-ui.mjs",
     "verify:service-desk-dashboard-ui": "node scripts/verify-service-desk-dashboard-ui.mjs",
     "verify:data-request-ui": "node ../kiosk/scripts/verify-data-request-ui.mjs",
     "verify:admin-users-ui": "node scripts/verify-admin-users-ui.mjs",
