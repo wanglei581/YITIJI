@@ -42,6 +42,8 @@ import {
 } from '../src/ai/quota/ai-quota.policy'
 
 const LIMIT_NAMES = ['AI_QUOTA_RESUME_DAILY', 'AI_QUOTA_ASSISTANT_DAILY', 'AI_QUOTA_INTERVIEW_DAILY', 'AI_QUOTA_GUEST_TERMINAL_DAILY'] as const
+/** 别的进程最迟生效的规格期限。不读产品缓存常量，改成 60 秒时这一条要红。 */
+const CROSS_PROCESS_REFRESH_MS = 30_000
 const ADMIN_NAME = '青岛市南中心运营员林静'
 const ADMIN_PHONE = '13800001123'
 
@@ -219,7 +221,7 @@ async function main() {
         await client.set(aiQuotaDailyLimitKey('ai_resume'), '15', 'EX', 60 * 60)
         await client.set(aiQuotaDailyLimitKey('ai_assistant'), '16', 'EX', 60 * 60)
         await client.set(aiQuotaDailyLimitKey('ai_interview'), '17', 'EX', 60 * 60)
-        clock += AI_QUOTA_LIMIT_CACHE_MS - 1
+        clock += CROSS_PROCESS_REFRESH_MS - 1
         assert.equal(dailyLimit('ai_resume'), 20)
         await limits.ensureFresh()
         assert.equal(dailyLimit('ai_resume'), 20)
