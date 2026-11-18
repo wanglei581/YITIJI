@@ -323,6 +323,30 @@ test('缺纸、卡纸、离线能重提时，整屏「订单还在」恰好一�
   }
 })
 
+test('已付离线页副句和三步里订单在只说一次，缺纸第 2 步按能否重提分开', () => {
+  for (const canRetry of [false, true]) {
+    const copy = failedModel.failureCopy({
+      variant: 'offline',
+      money: { fact: 'paid', amountCents: 200 },
+      orderNo: 'ORD-OFF-PAID',
+      canRetry,
+    })
+    const head = [copy.subtitle, ...copy.steps.flatMap((step) => [step.title, step.detail])].join('\n')
+    const hits = (head.match(/订单和支付记录都在|订单和已付金额都保留着/g) ?? []).length
+    assert.equal(hits, 1, `canRetry=${canRetry} 副句加三步里这两句合计应恰好一次`)
+    assert.equal(copy.steps[1].title, '是否处理费用、处理多少，以订单记录为准')
+    assert.equal(copy.steps[1].detail, '本机不会自动处理费用。')
+  }
+  for (const fact of ['free', 'paid']) {
+    const money = { fact, amountCents: fact === 'paid' ? 200 : 0 }
+    const noRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-PAPER', canRetry: false })
+    const withRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-PAPER', canRetry: true })
+    assert.doesNotMatch(noRetry.steps[1].detail, /只有本页的「重新提交打印」能整份重打/, `${fact} 不能重提时第 2 步不该指向不存在的按钮`)
+    assert.match(noRetry.steps[1].detail, /本页没有「重新提交打印」/)
+    assert.match(withRetry.steps[1].detail, /只有本页的「重新提交打印」能整份重打/)
+  }
+})
+
 test('三态失败页里订单还在和已收到提醒各只说一次', () => {
   for (const variant of ['paper-jam', 'offline', 'out-of-paper']) {
     for (const fact of ['free', 'paid']) {

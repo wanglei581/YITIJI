@@ -146,7 +146,7 @@ export function failureCopy(input: {
       steps: [
         LOOK_AT_TRAY,
         paid
-          ? { title: '订单和支付记录都在', detail: '是否处理费用、处理多少，以订单记录为准；本机不会自动处理费用。' }
+          ? { title: '是否处理费用、处理多少，以订单记录为准', detail: '本机不会自动处理费用。' }
           : { title: '是否补打，以订单记录为准', detail: '本机不会自动补打。' },
         canRetry
           ? retryStep(money, help)
@@ -175,7 +175,13 @@ export function failureCopy(input: {
       stepsLabel: STEPS_LABEL,
       steps: [
         LOOK_AT_TRAY,
-        { title: '纸匣空了，这次打印也不会自己接着打', detail: '机器恢复后，只有本页的「重新提交打印」能整份重打。' },
+        {
+          title: '纸匣空了，这次打印也不会自己接着打',
+          // 不能重提时这一页没有那个按钮，不能再说只有它能整份重打。
+          detail: canRetry
+            ? '机器恢复后，只有本页的「重新提交打印」能整份重打。'
+            : '本页没有「重新提交打印」。加纸后也不会自动续打。',
+        },
         third,
       ],
       fine: `纸匣已空，这次打印不会在加纸后自动继续。${kept}；只有本页出现「重新提交打印」按钮时，才能自己重打一次${free ? '。' : '，且不会重复收费。'}${money2}`,
