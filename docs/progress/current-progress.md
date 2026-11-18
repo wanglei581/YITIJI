@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-18：数字人可用判断与真实建会话共用委托地址校验（分支 `claude/ai-availability-1117`，未推送）
+
+- 能力表 `digital_human` 在凭证齐之后，用 `buildTrtcSessionDelegatedConfigs` 拼出与建会话相同的模型、语音合成配置，再调用同一个 `assertTrtcDelegatedEndpoints`。坏 JSON 或地址不在白名单时，能力表说不可用，真实建会话回 503 `AI_ENDPOINT_NOT_ALLOWED`，不占会话、不请求腾讯云。原因句与真实拒绝相同，不含凭证字段名。
+- 没推送，没上线。没改岗位、招聘会、打印硬件、收费、数据库和密钥。
+
 ## 2026-11-18：模拟面试题目单手动退路不再被 AI 可用性闸门拦住（分支 `claude/ai-availability-1117`，未推送）
 
 - `POST /mock-interviews` 与 `POST /mock-interviews/:id/practice-sheet` 改为豁免 AI 可用性闸门，只留全机维护。建配置和通用题目单不调模型。全站暂停、当天预算、平台未开通、登录档和声明不再把这两条一起拦掉。开场、答题、结束仍要调模型，标记不变。

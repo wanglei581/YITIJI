@@ -27081,6 +27081,9 @@
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
     ],
+    "services/api/scripts/verify-q22b-manual-interview-http.ts": [
+      "services/api/scripts/verify-ai-availability-alignment.ts"
+    ],
     "services/api/scripts/verify-recruitment-hosting-default-off.ts": [
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
@@ -27337,6 +27340,7 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai-access/ai-access.module.ts": [
@@ -27350,6 +27354,7 @@
       "services/api/scripts/verify-ai-availability-alignment.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts"
     ],
@@ -27370,6 +27375,7 @@
       "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
     "services/api/src/ai/ai-public-quota.service.ts": [
@@ -27597,6 +27603,7 @@
       "services/api/scripts/verify-llm-connectivity.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
@@ -28627,6 +28634,7 @@
       "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
@@ -28875,6 +28883,7 @@
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
@@ -30209,14 +30218,16 @@
     ],
     "services/api/src/mock-interview/asr/asr.service.ts": [
       "services/api/scripts/verify-mock-interview-deadline.ts",
-      "services/api/scripts/verify-mock-interview.ts"
+      "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts"
     ],
     "services/api/src/mock-interview/asr/tts.service.ts": [
       "services/api/scripts/verify-ai-cost-runtime.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
-      "services/api/scripts/verify-mock-interview.ts"
+      "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts"
     ],
     "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -30241,10 +30252,12 @@
     ],
     "services/api/src/mock-interview/interview-transcript-print.service.ts": [
       "services/api/scripts/verify-mock-interview-deadline.ts",
-      "services/api/scripts/verify-mock-interview.ts"
+      "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts"
     ],
     "services/api/src/mock-interview/mock-interview-availability.service.ts": [
-      "services/api/scripts/verify-ai-availability-alignment.ts"
+      "services/api/scripts/verify-ai-availability-alignment.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts"
     ],
     "services/api/src/mock-interview/mock-interview-charge.ts": [
       "services/api/scripts/verify-ai-quota-coverage.ts"
@@ -30261,7 +30274,8 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
-      "services/api/scripts/verify-mock-interview.ts"
+      "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts"
     ],
     "services/api/src/mock-interview/mock-interview.controller.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -30275,7 +30289,8 @@
       "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
-      "services/api/scripts/verify-multipart-field-nesting.ts"
+      "services/api/scripts/verify-multipart-field-nesting.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts"
     ],
     "services/api/src/mock-interview/mock-interview.module.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -30295,6 +30310,7 @@
       "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts",
       "services/api/scripts/verify-resume-ai-consent-wiring.ts"
     ],
     "services/api/src/notifications/notifications.controller.ts": [
@@ -31178,6 +31194,7 @@
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts",
+      "services/api/scripts/verify-q22b-manual-interview-http.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-reconciliation.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
@@ -40447,6 +40464,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/verify-q22b-manual-interview-http.ts",
           "services/api/src/ai-access/ai-access.service.ts",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.module.ts",
@@ -47627,6 +47645,35 @@
         "@ai-job-print/api::verify:publish-expiry-completeness"
       ],
       "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai-access/ai-access.guard.ts",
+          "services/api/src/ai-access/ai-access.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/mock-interview/asr/asr.service.ts",
+          "services/api/src/mock-interview/asr/tts.service.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
+          "services/api/src/mock-interview/mock-interview-availability.service.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-q22b-manual-interview-http.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {

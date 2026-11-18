@@ -23,6 +23,7 @@ import { LlmConfigService } from '../src/ai/llm/llm-config.service'
 import { MockInterviewAvailability } from '../src/mock-interview/mock-interview-availability.service'
 import { MockInterviewController } from '../src/mock-interview/mock-interview.controller'
 import { TrtcController } from '../src/trtc/trtc.controller'
+import { runQ22bDigitalHumanEndpoint } from './verify-q22b-digital-human-endpoint'
 import { runQ22bManualInterviewHttp } from './verify-q22b-manual-interview-http'
 
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'q22-avail-'))
@@ -110,18 +111,29 @@ const TRTC_FIXTURE: Record<string, string> = {
   TENCENT_SECRET_ID: 'verify-tencent-id-not-real',
   TENCENT_SECRET_KEY: 'verify-tencent-key-not-real',
   TRTC_LLM_API_KEY: 'verify-trtc-llm-key-not-real',
+  TRTC_LLM_API_URL: 'https://api.deepseek.com/v1/chat/completions',
   TRTC_TTS_CONFIG_JSON: '{"TTSType":"tencent"}',
 }
 
+/** 这些值会改掉默认 DeepSeek 地址或白名单。夹具期间清掉，结束再放回去。 */
+const TRTC_ENV_NOISE = [
+  'TRTC_LLM_CONFIG_JSON',
+  'TRTC_LLM_MODEL',
+  'TRTC_LLM_TYPE',
+  'TRTC_SYSTEM_PROMPT',
+  'TRTC_TTS_TYPE',
+  'TRTC_TTS_APP_ID',
+  'TENCENT_APP_ID',
+  'AI_ENDPOINT_ALLOWLIST',
+  'AI_ENDPOINT_ALLOWLIST_EXTRA',
+]
+
 function withoutTrtcEnv(): () => void {
   const saved = new Map<string, string | undefined>()
-  for (const key of Object.keys(TRTC_FIXTURE)) {
+  for (const key of [...Object.keys(TRTC_FIXTURE), ...TRTC_ENV_NOISE]) {
     saved.set(key, process.env[key])
     delete process.env[key]
   }
-  delete process.env['TRTC_TTS_TYPE']
-  delete process.env['TRTC_TTS_APP_ID']
-  delete process.env['TENCENT_APP_ID']
   return () => {
     for (const [key, value] of saved) {
       if (value === undefined) delete process.env[key]
@@ -286,6 +298,13 @@ async function main(): Promise<void> {
   } finally {
     restoreTrtc()
   }
+
+  await runQ22bDigitalHumanEndpoint({
+    access,
+    llm,
+    store,
+    setBudgetExhausted: (value) => { budgetExhausted = value },
+  })
 
   store.set('system:ai-access:paused', 'off')
   budgetExhausted = false
