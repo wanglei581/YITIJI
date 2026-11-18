@@ -133,3 +133,35 @@ test('有原文摘录时详情收紧，去哪办压到一枚域名小签，两�
   await expect(page.getByRole('heading', { level: 1, name: '高校毕业生创业补贴' })).toBeVisible()
   await expect(page.getByText('链接发布时已核对属于发布机构登记的官方网站')).toHaveCount(0)
 })
+
+test('原文摘录标题下留 10，正文不再被段落外边距撑高，两张卡底边不超过 1654 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  const dense = {
+    ...BASE,
+    id: 'policy-dense',
+    externalUrl: 'https://hrss.example.gov.cn/policy',
+    externalUrlVerified: true,
+    whoCanApply: '毕业学年内的普通高校毕业生\n属于城乡低保家庭、脱贫家庭、残疾或获得国家助学贷款等情形之一\n完整条件以发布机构原文为准',
+    requiredMaterials: '本人身份证\n学生证或学籍证明\n对应困难类型的证明材料\n本人银行卡',
+    whereToApply: '学校就业指导中心统一申报（学生活动中心二楼）\n补贴标准和申报时间以原文为准',
+    content: LONG,
+  }
+  await routePolicies(page, [dense])
+  await page.goto('/renshi?policy=policy-dense')
+  await expect(page.getByTestId('policy-excerpt')).toBeVisible()
+  const box = await page.evaluate(() => {
+    const head = document.querySelector('[data-testid="policy-excerpt"] .policy-excerpt-head')!
+    const text = document.querySelector('[data-testid="policy-excerpt"] .policy-excerpt')!
+    const tiles = [...document.querySelectorAll('.policy-min-actions .qxt-tile')].map((el) => el.getBoundingClientRect().bottom)
+    const dock = document.querySelector('.qxt-dock')!.getBoundingClientRect().top
+    return {
+      gap: text.getBoundingClientRect().top - head.getBoundingClientRect().bottom,
+      bottoms: tiles,
+      dock,
+    }
+  })
+  expect(box.gap).toBeGreaterThanOrEqual(9)
+  expect(box.gap).toBeLessThanOrEqual(11)
+  expect(Math.max(...box.bottoms)).toBeLessThanOrEqual(1654)
+  expect(Math.max(...box.bottoms)).toBeLessThanOrEqual(box.dock - 20)
+})
