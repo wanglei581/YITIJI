@@ -93,7 +93,7 @@ test('扫描价大于 0 时不显示', () => {
   assert.equal(kioskHomeFreeBadgeVisible({ config: configWith({ scan: 100, print_bw_page: 0, print_color_page: 0 }) }), false)
 })
 
-test('五个生效价里有一个大于 0 才算在收费，读不齐不算', () => {
+test('五个生效价里有一个大于 0 才算在收费，读不齐且没有已知正价不算', () => {
   const { kioskEffectivePricesCharged } = reader
   assert.equal(kioskEffectivePricesCharged(allFree), false)
   assert.equal(kioskEffectivePricesCharged(configWith({ scan: 100 })), true)

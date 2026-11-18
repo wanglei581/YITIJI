@@ -2,6 +2,8 @@
  * verify:service-orders 的后半：清场、退款、扫描重放和后台退款。
  * 由 verify-service-orders.ts 调用，不是单独的门禁。
  */
+// 与父门禁 verify-service-orders.ts 同值。托管声明门禁逐个文件查，拆出来的文件也要写一遍。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { RedisService } from '../src/common/redis/redis.service'

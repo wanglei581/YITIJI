@@ -2,6 +2,8 @@
  * verify:service-orders 的前半：建单、付款、简历改写、面试和扫描占用。
  * 由 verify-service-orders.ts 调用，不是单独的门禁。
  */
+// 与父门禁 verify-service-orders.ts 同值。托管声明门禁逐个文件查，拆出来的文件也要写一遍。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { RedisInflightLock } from '../src/ai/redis-inflight-lock'
