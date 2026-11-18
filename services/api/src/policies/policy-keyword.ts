@@ -50,7 +50,18 @@ function textContains(value: string, dbKind: DbKind): Prisma.StringFilter {
  * 再由只折 A-Z 的比较决定留哪一条。没有 ASCII 的段（例如纯汉字）仍按原段匹配。
  */
 function coarsePieces(segment: string): string[] {
-  const asciiRuns = segment.match(/[\u0000-\u007F]+/g) ?? []
+  const asciiRuns: string[] = []
+  let current = ''
+  for (const char of segment) {
+    // 按码点切。A-Z 和其余 ASCII 留在粗筛里；É、é、汉字整段不放进 contains。
+    if (char.charCodeAt(0) <= 0x7f) {
+      current += char
+    } else if (current.length > 0) {
+      asciiRuns.push(current)
+      current = ''
+    }
+  }
+  if (current.length > 0) asciiRuns.push(current)
   if (asciiRuns.length > 0 && asciiRuns.join('') !== segment) return asciiRuns
   return [segment]
 }
