@@ -1,6 +1,6 @@
 {
   "frozenAt": "2026-10-26",
-  "updatedAt": "2026-11-14",
+  "updatedAt": "2026-11-17",
   "note": "青序流光 · 触屏版，全页补稿第 5 版定稿（产品负责人 2026-10-27 看过并同意进仓库；第 4 版补稿 2026-10-26 定稿）；2026-11-05 政策最小闭环改政策三屏并加空态（policy-min.js），「我的 · 收藏」每条加取消（fix-me.js，方案屏 5「沿用 我的 · 收藏（加取消）」），产品负责人点「按方案开工」；2026-11-12 加动效第 1 版、省步版、首页「免费使用」（motion-1112.js、fast-1112.js、free-1112.js、xq-figure.webp，index.html 多加载三个脚本），产品负责人对四件回「都照推荐」；同日页内「减弱动效」开关放首页底部（reduce-toggle-1112.js），他选「放首页底部」；同日第二批补稿整批进仓库（fix-flow-1111.js、fix-ivscan-1111.js、fix-resume-1111.js，他回「整批进仓库」；进仓库前改两处示例字，screens4.js 导出页示例文件名统一为新媒体运营）。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md 不在冻结范围。",
   "files": {
     "app.js": "34dd3a5fe3fb2311e9a23e5a120f1289cfd4360ec44b08da31a72e177bf5779e",
@@ -17,12 +17,14 @@
     "fix-public.js": "565096d0285127f349cafd3f36a16b544c412a05f0b7eb8da4a18ccbbeb0ba65",
     "fix-resume-1111.js": "ec07dafcbf87b0613bd8036f6f8e7c6e8c9069de462da2776800f6defaa39a6c",
     "fix-resume2.js": "5e847ba4de75a399f104f5eb1c51f435ee3753fe01e7c501609a26816920bebc",
+    "fix-resume3.js": "d2544d8d443f2905eeffc7c1db2aaf0f760000eaf910d883f2aab5f3c1a9ac91",
     "fix-scan.js": "058ce31c8b47bec503fc75f9e9b35b40849bc73d93d44835619e1d9af66323cb",
     "free-1112.js": "dc0172cd1afe0266647c9076292b835b2899a47970c2187337cbf60beae809f5",
-    "index.html": "96c589ddc86054b8f6f7609823db8f739b8d5a19a3449473ef29ac52401cfe92",
+    "index.html": "9c2065fbbab086edcd93bcec297c0c823872c49725d72d27c5562434f84cb2a3",
     "map.js": "2a15f0cecd7c1cc70767797af98c4b6c56ad7188e8c2dca8083e1de3c4ff93da",
     "motion-1112.js": "0f98366529735a028c3b7e5affb6af695f944aec44a0338aa144f762743c1b3b",
     "pay-1113.js": "85285a10e10cb5b2c1b2ef5d3775fa8f7a8202f8dabbb31334287b635d2a9d27",
+    "policy-1117.js": "f847c1df50c29e7af46bddb6c4f37d1387418739607d5851fb88205c87c57a3d",
     "policy-min.js": "2301b81bb62fa775cf8e1065151ca81082e6c14234c1db1690ca28cd3005f4cb",
     "reduce-toggle-1112.js": "1eeacc3400b8b10fa925e798a70395868f227a66c97b9fcde3752f4cf820720f",
     "screens.js": "f1f594690d947f57008a10ad4432c8d236754018b1e903147ad314b4c87feece",

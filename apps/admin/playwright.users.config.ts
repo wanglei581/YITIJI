@@ -2,9 +2,10 @@ import { defineConfig } from '@playwright/test'
 import base from './playwright.config'
 
 // 用户注销用例需要 HTTP 适配器，沿用现有认证夹具及页面拦截，不访问真实用户。
+// 设备能力防误登记同样要拦真实 /api/v1 请求并可控延迟，只能跟这份 HTTP 构建跑，不能进 mock 包。
 export default defineConfig({
   ...base,
-  testMatch: /users\.closure\.spec\.ts$/,
+  testMatch: [/users\.closure\.spec\.ts$/, /print-scan\.capability-target\.spec\.ts$/],
   testIgnore: [],
   outputDir: '../../test-results/admin-users-e2e',
   workers: 1,

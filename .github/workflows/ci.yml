@@ -152,6 +152,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-peripheral-views
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
           pnpm --filter @ai-job-print/admin verify:admin-ai-usage-ui
+          pnpm --filter @ai-job-print/admin verify:admin-ai-quota-ui
           pnpm --filter @ai-job-print/admin verify:console-plain-copy
           pnpm --filter @ai-job-print/admin verify:admin-internal-accounts-ui
           pnpm --filter @ai-job-print/admin verify:admin-partner-contact-phone-ui
@@ -208,6 +209,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:kiosk-end-use
           # 无人值守标准句与公开服务联系方式（10/6）：读不到接口时按最保守的一套，号码 / 服务时间 / 附近终端 / 小程序发布从接口读，单测真跑源码。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-support-contact
+          # 招聘锁：终端配置缺 recruitmentHosting 按关，不退回 jobBoard。转译真实源码真跑，不连库。
+          pnpm --filter @ai-job-print/kiosk verify:recruitment-hosting-open
           # 现场无人值守（10/29）：一体机源码里不许教用户去找 / 联系现场工作人员。词表读自 unattendedCopy.ts；
           # 共享模块零容忍，页面目录的存量按待清名单只减不增（触屏版各页面包重写后逐个删条目）。纯读 apps/kiosk/src，不连库、不连网。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-unattended-copy
@@ -608,6 +611,7 @@ jobs:
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
           pnpm --filter @ai-job-print/partner verify:partner-relative-api-url
           pnpm --filter @ai-job-print/partner verify:partner-stats-contract
+          pnpm --filter @ai-job-print/partner verify:partner-phone-verify-guide
           pnpm --filter @ai-job-print/partner verify:partner-terminal-ops-honesty
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
           pnpm --filter @ai-job-print/kiosk verify:jobfair-commercial-closure
@@ -666,6 +670,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-home-free-badge
           # 每台机器谁付钱、五个价、公共点位锁 0、向个人收费总开关。默认配置下报价仍是 0。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-settings
+          # 保存收费设置撞上改绑：绑定版本过期回 409，不把旧价写进新机构，也不关改绑之后才出现的待付单。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-binding-race
           # 一体机按次付款：收费机器建单、开始前占用、没做成退款；不收费的机器不建单。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-orders
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-orders-concurrency
@@ -895,6 +901,7 @@ jobs:
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           pnpm --filter @ai-job-print/api verify:ai-quota
+          pnpm --filter @ai-job-print/api verify:ai-quota-api
           # Q2 全入口登记：每个 @AiUse('generate'|'voice') 路由要么接入按人次数、要么写明不计次理由；
           # 运行时用例 import services/api/src 并写隔离库，所以放在「Prepare fresh SQLite db」之后。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-quota-coverage
@@ -1133,6 +1140,18 @@ jobs:
           # 贴牌与授权两份迁移：SQLite 与临时 PostgreSQL 上升级保数据、CHECK 兜底、外键、零漂移
           pnpm verify:branding-license-migrations
           pnpm verify:first-order-http:postgres
+      - name: Terminal charge settings vs rebind race on isolated PostgreSQL
+        # 保存与改绑撞在同一时刻（READ COMMITTED）：绑定版本过期必须 409、库里不写旧价。
+        # 门禁要求库名含 p1d_charge_verify，并自己 db push 建表，所以单独建一个库，不碰 ai_job_print_ci。
+        working-directory: services/api
+        env:
+          PGPASSWORD: ci
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/p1d_charge_verify
+          POSTGRES_URL: postgresql://ci:ci@localhost:5432/p1d_charge_verify
+          VERIFICATION_DATABASE_TARGET: isolated
+        run: |
+          createdb -h localhost -U ci p1d_charge_verify
+          pnpm verify:terminal-charge-binding-race:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
@@ -1551,6 +1570,10 @@ jobs:
         # 合作机构后台此前 0 条浏览器用例。mock 模式预览包（vite --mode development），
         # 不连真实后端。命令走 package.json test:e2e，内部用 kiosk 已装的 Playwright。
         run: pnpm --filter @ai-job-print/partner test:e2e
+
+      - name: Run Partner phone verification guide browser E2E
+        # HTTP 构建；账号状态只由测试内 page.route 返回，不扩展生产 mock，不连真实后端。
+        run: pnpm --filter @ai-job-print/partner test:e2e --config=playwright.phone-guide.config.ts
 
       - name: Run Kiosk route sweep
         # 一体机全路由扫描：productionRoutePatterns 每条打开、不白屏、无 pageerror。
