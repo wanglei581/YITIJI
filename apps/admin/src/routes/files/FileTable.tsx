@@ -6,7 +6,7 @@ import { assetCategoryLabel, ownerTypeLabel, retentionPolicyLabel, retentionSetB
 
 interface FileTableProps {
   loading: boolean
-  error: boolean
+  error: string | null
   search: string
   files: ViewFile[]
   total: number
@@ -51,7 +51,7 @@ export function FileTable({ loading, error, search, files, total, page, pageSize
     <>
       <Card className="overflow-hidden p-0">
         <ConsoleTable items={files} columns={columns} loading={loading}
-          error={error ? { message: '文件数据加载失败，请稍后重试', onRetry } : null}
+          error={error ? { message: error, onRetry } : null}
           empty={{ title: search ? '未找到匹配的文件' : '当前筛选条件下无文件', description: search ? '请尝试其他关键词' : undefined }}
           page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange}
           rowClassName={(v) => v.clean === 'cleaned' ? 'opacity-50' : undefined}

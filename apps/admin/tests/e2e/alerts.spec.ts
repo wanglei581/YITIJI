@@ -21,7 +21,7 @@ test.describe('告警中心（mock 口径）', () => {
       await expect(page.getByText('关闭后不再出现在待处理')).toHaveCount(0)
     }
 
-    await page.getByRole('button', { name: '刷新' }).click()
+    await page.getByRole('button', { name: '重新获取' }).click()
     await expect(page.getByRole('heading', { name: '告警中心' })).toBeVisible()
   })
 })

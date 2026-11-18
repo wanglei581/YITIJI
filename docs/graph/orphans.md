@@ -419,6 +419,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 | 路径 | 判定依据 |
 | --- | --- |
+| `apps/admin/src/routes/alerts/useAutoRefresh.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/verify-compliance-copy.mjs、services/api/scripts/verify-production-runtime-gates.ts |
 | `apps/admin/src/routes/member-benefits/grantFormModel.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/partners/licenseValidation.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |

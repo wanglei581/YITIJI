@@ -741,6 +741,14 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font
+          # 字体真加载回退、文件列表用途、清理定时元数据：node:test，不连库。
+          pnpm --filter @ai-job-print/api verify:cjk-font-fallback
+          pnpm --filter @ai-job-print/api verify:file-list-purpose
+          pnpm --filter @ai-job-print/api verify:file-cleanup-schedule
+          # 管理员手动删除与手动清理：审计写不进则不删。自建临时 SQLite。
+          pnpm --filter @ai-job-print/api verify:file-admin-delete-audit
+          # 告警自动刷新计时器：假时钟跑真实 hook，不打开浏览器。
+          pnpm --filter @ai-job-print/admin verify:admin-alert-auto-refresh
           # 包 D：服务端文档转换（Word → PDF）契约 / 超时 / 并发 / 归属 / 能力为假时 fail-closed（fake 引擎，不需要 LibreOffice）
           pnpm --filter @ai-job-print/api verify:document-conversion
           pnpm --filter @ai-job-print/api verify:miniapp-code
@@ -1566,6 +1574,14 @@ jobs:
         working-directory: apps/admin
         run: node scripts/run-e2e.mjs --config=playwright.users.config.ts
 
+      - name: Run Admin alerts auto-refresh browser E2E
+        # 告警自动刷新要数到真实 fetch，并让第二次失败。默认 mock 套件不收这套。
+        run: pnpm --filter @ai-job-print/admin verify:admin-alerts-refresh-e2e
+
+      - name: Run Admin files actions browser E2E
+        # 文件管理的删除与清理要看失败响应体。默认 mock 套件不收这套。
+        run: pnpm --filter @ai-job-print/admin verify:admin-files-actions-e2e
+
       - name: Run Partner data-screen browser E2E
         run: pnpm --filter @ai-job-print/partner test:e2e:screen
 
@@ -1621,6 +1637,8 @@ jobs:
             test-results/admin-screen-e2e/**
             test-results/admin-screen-e2e-report/**
             test-results/admin-users-e2e/**
+            test-results/admin-alerts-refresh-e2e/**
+            test-results/admin-files-actions-e2e/**
             test-results/partner-e2e/**
             test-results/partner-e2e-report/**
             test-results/partner-screen-e2e/**

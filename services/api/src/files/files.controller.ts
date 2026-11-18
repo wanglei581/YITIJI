@@ -420,6 +420,26 @@ export class FilesController {
       throw new UnauthorizedException({ error: { code: 'AUTH_REQUIRED', message: '需登录后删除文件' } })
     }
     const finalReason = reason || 'manual delete'
+    if (requester.kind === 'user' && requester.role === 'admin') {
+      const result = await this.files.deleteAsAdmin(id, requester, finalReason, async (tx, file) => {
+        await this.audit.writeRequired(tx, {
+          actorId: requester.userId,
+          actorRole: 'admin',
+          action: 'file.delete',
+          targetType: 'file',
+          targetId: id,
+          payload: {
+            reason: finalReason,
+            filename: file.filename,
+            sensitiveLevel: file.sensitiveLevel,
+          },
+          ipAddress: extractIp(req),
+          userAgent: extractUa(req),
+          requestId: req.requestId ?? null,
+        })
+      })
+      return ApiResponse.ok(result)
+    }
     const result = await this.files.ownerDelete(id, requester, finalReason)
     await this.audit.write({
       // AuditLog.actorId 外键指向运营 User 表：会员删除 actorId 必须写 null，
@@ -447,17 +467,18 @@ export class FilesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async cleanupExpired(@CurrentUser() user: AuthedUser, @Req() req: ReqLike): Promise<ApiResponse<FileCleanupResponse>> {
-    const result = await this.files.cleanupExpired('manual')
-    await this.audit.write({
-      actorId: user.userId,
-      actorRole: 'admin',
-      action: 'file.cleanup_expired',
-      targetType: 'system',
-      targetId: null,
-      payload: { deletedCount: result.deletedCount, fileIds: result.deletedFileIds.slice(0, 50) },
-      ipAddress: extractIp(req),
-      userAgent: extractUa(req),
-      requestId: req.requestId ?? null,
+    const result = await this.files.cleanupExpired('manual', async (tx, fileIds) => {
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId,
+        actorRole: 'admin',
+        action: 'file.cleanup_expired',
+        targetType: 'system',
+        targetId: null,
+        payload: { deletedCount: fileIds.length, fileIds: fileIds.slice(0, 50) },
+        ipAddress: extractIp(req),
+        userAgent: extractUa(req),
+        requestId: req.requestId ?? null,
+      })
     })
     return ApiResponse.ok(result)
   }
