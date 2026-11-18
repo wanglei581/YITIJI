@@ -39,6 +39,7 @@ BEGIN
 END`
 
 let prisma: PrismaService
+let files: FilesService
 let controller: FilesController
 let storage: StorageService
 let admin: AuthedUser
@@ -169,12 +170,28 @@ async function auditCount(action: string, targetId: string | null): Promise<numb
   return prisma.auditLog.count({ where: { action, targetId } })
 }
 
+async function newCleanupAudits(beforeIds: Set<string>): Promise<Array<{ payloadJson: string }>> {
+  const rows = await prisma.auditLog.findMany({
+    where: { action: 'file.cleanup_expired' },
+    select: { id: true, payloadJson: true },
+  })
+  return rows.filter((row) => !beforeIds.has(row.id)).map((row) => ({ payloadJson: row.payloadJson }))
+}
+
+async function cleanupAuditIds(): Promise<Set<string>> {
+  const rows = await prisma.auditLog.findMany({
+    where: { action: 'file.cleanup_expired' },
+    select: { id: true },
+  })
+  return new Set(rows.map((row) => row.id))
+}
+
 describe('管理员删除与手动清理的审计必达', { concurrency: 1 }, () => {
   before(async () => {
     prepareDb()
     prisma = new PrismaService()
     storage = new StorageService()
-    const files = new FilesService(prisma, new AuditService(prisma), storage)
+    files = new FilesService(prisma, new AuditService(prisma), storage)
     const jwt = new JwtService({ secret: jwtSecret })
     const redis = {
       setJsonIfVersionNotOlder: async () => 'stored',
@@ -335,5 +352,126 @@ describe('管理员删除与手动清理的审计必达', { concurrency: 1 }, ()
     assert.equal(audits.length, 1)
     assert.equal(audits[0]?.actorRole, 'admin')
     assert.equal(audits[0]?.actorId, admin.userId)
+  })
+
+  test('管理员自己留下的墓碑，每次重试各写一条这一次的审计', async () => {
+    const file = await seedFile('admin-tomb', new Date(Date.now() + 86_400_000))
+    await setAuditInsertFailure(false)
+    const originalDelete = storage.deleteObject.bind(storage)
+    storage.deleteObject = () => Promise.reject(new Error('injected storage delete failure'))
+    try {
+      const err = await controller.remove(file.id, 'admin first', req()).then(
+        () => assert.fail('存储失败时不该成功'),
+        (error: unknown) => error,
+      )
+      assert.ok(err instanceof Error)
+      assert.match(err.message, /injected storage delete failure/)
+    } finally {
+      storage.deleteObject = originalDelete
+    }
+    assert.equal(await objectExists(file.storageKey), true)
+    assert.equal(await auditCount('file.delete', file.id), 1)
+    const tombstone = await prisma.fileObject.findUnique({ where: { id: file.id } })
+    assert.ok(tombstone?.deletedAt)
+    assert.equal(tombstone?.status, 'deleted')
+
+    await setAuditInsertFailure(true)
+    try {
+      const err = await controller.remove(file.id, 'admin second', req()).then(
+        () => assert.fail('审计失败时不该删掉对象'),
+        (error: unknown) => error,
+      )
+      const body = errorOf(err)
+      assert.equal(body.code, 'ADMIN_USER_AUDIT_UNAVAILABLE')
+      assert.match(body.message, /未删除/)
+      assert.equal(await objectExists(file.storageKey), true)
+      assert.equal(await auditCount('file.delete', file.id), 1)
+      const unchanged = await prisma.fileObject.findUnique({ where: { id: file.id } })
+      assert.equal(unchanged?.deletedAt?.toISOString(), tombstone?.deletedAt?.toISOString())
+      assert.equal(unchanged?.status, 'deleted')
+    } finally {
+      await setAuditInsertFailure(false)
+    }
+
+    const result = await controller.remove(file.id, 'admin third', req())
+    assert.equal(result.data.id, file.id)
+    assert.equal(result.data.status, 'deleted')
+    assert.equal(await objectExists(file.storageKey), false)
+    const audits = await prisma.auditLog.findMany({
+      where: { action: 'file.delete', targetId: file.id },
+      select: { actorRole: true, actorId: true },
+    })
+    assert.equal(audits.length, 2)
+    assert.ok(audits.every((row) => row.actorRole === 'admin' && row.actorId === admin.userId))
+  })
+
+  test('手动清理没有任何候选时仍写一条汇总审计', async () => {
+    await setAuditInsertFailure(false)
+    await controller.cleanupExpired(admin, req())
+    const beforeIds = await cleanupAuditIds()
+    const result = await controller.cleanupExpired(admin, req())
+    assert.equal(result.data.deletedCount, 0)
+    assert.deepEqual(result.data.deletedFileIds, [])
+    const mine = await newCleanupAudits(beforeIds)
+    assert.equal(mine.length, 1)
+    const payload = JSON.parse(mine[0]?.payloadJson ?? '{}') as { deletedCount?: number; fileIds?: string[] }
+    assert.equal(payload.deletedCount, 0)
+    assert.deepEqual(payload.fileIds ?? [], [])
+    const row = await prisma.auditLog.findFirst({
+      where: { action: 'file.cleanup_expired', id: { notIn: [...beforeIds] } },
+      select: { actorRole: true, actorId: true },
+    })
+    assert.equal(row?.actorRole, 'admin')
+    assert.equal(row?.actorId, admin.userId)
+  })
+
+  test('清理候选在落墓碑前被机构抢先删成墓碑时，不物理删对象，仍写汇总审计', async () => {
+    await setAuditInsertFailure(false)
+    await controller.cleanupExpired(admin, req())
+    const raced = await seedFile('cas-miss', new Date(Date.now() - 3_600_000), {
+      uploaderId: partnerUserId,
+      ownerId: orgId,
+    })
+    const plain = await seedFile('cas-plain', new Date(Date.now() - 3_600_000))
+    const svc = files as unknown as {
+      hasActivePrintTaskForFile(id: string): Promise<boolean>
+    }
+    const original = svc.hasActivePrintTaskForFile.bind(files)
+    svc.hasActivePrintTaskForFile = async (id: string) => {
+      if (id === raced.id) {
+        await prisma.fileObject.update({
+          where: { id },
+          data: {
+            deletedAt: new Date(),
+            deletedBy: `user:${partnerUserId}`,
+            deleteReason: 'org race',
+            status: 'deleted',
+            storageDeletePendingAt: new Date(),
+            storageDeleteAttempts: 1,
+            storageDeleteError: 'Error',
+          },
+        })
+      }
+      return original(id)
+    }
+    const beforeIds = await cleanupAuditIds()
+    try {
+      const result = await controller.cleanupExpired(admin, req())
+      assert.ok(result.data.deletedFileIds.includes(plain.id))
+      assert.equal(result.data.deletedFileIds.includes(raced.id), false)
+      assert.equal(await objectExists(raced.storageKey), true)
+      assert.equal(await objectExists(plain.storageKey), false)
+      const mine = await newCleanupAudits(beforeIds)
+      assert.equal(mine.length, 1)
+      const payload = JSON.parse(mine[0]?.payloadJson ?? '{}') as { fileIds?: string[] }
+      const fileIds = payload.fileIds ?? []
+      assert.equal(fileIds.includes(raced.id), false)
+      assert.ok(fileIds.includes(plain.id))
+      const racedRow = await prisma.fileObject.findUnique({ where: { id: raced.id } })
+      assert.equal(racedRow?.status, 'deleted')
+      assert.equal(racedRow?.deletedBy, `user:${partnerUserId}`)
+    } finally {
+      svc.hasActivePrintTaskForFile = original
+    }
   })
 })
