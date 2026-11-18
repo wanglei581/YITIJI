@@ -12,13 +12,44 @@ export const AI_LAYOUT_ADJUST_TOO_LONG_MESSAGE =
 const PLACEHOLDER = /\[(?:劳动者|用人单位|身份证|手机号|银行卡|邮箱|详细地址|统一社会信用代码)_\d+\]/g
 
 /**
- * 18 位证件号紧贴着下一个数字时，两侧都是数字，遮盖规则认不出。
- * 只在号和后面的数字之间插入换行，让下一号能单独被认出来。
+ * 18 位证件号。末位可以是数字或 X。
+ * 号后面紧贴数字，或号前面紧贴数字，遮盖规则的边界都对不上。
  */
-const GLUED_ID = /\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?=\d)/g
+const ID_BODY = String.raw`\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]`
+const GLUED_ID_AFTER = new RegExp(`${ID_BODY}(?=\\d)`, 'g')
+const GLUED_ID_BEFORE = new RegExp(`(?<=\\d)(?=${ID_BODY})`, 'g')
+/** 11 位手机号紧贴后面的数字。只看证件号后面有没有数字，拆不开这种。 */
+const GLUED_PHONE_AFTER = /(?<!\d)1[3-9]\d{9}(?=\d)/g
 
-export function separateGluedIdNumbers(text: string): string {
-  return text.replace(GLUED_ID, (hit) => `${hit}\n`)
+export function separateGluedIdNumbers(text: string, breakWith = '\n'): string {
+  return text
+    .replace(GLUED_ID_AFTER, (hit) => `${hit}${breakWith}`)
+    .replace(GLUED_ID_BEFORE, breakWith)
+    .replace(GLUED_PHONE_AFTER, (hit) => `${hit}${breakWith}`)
+}
+
+const JSON_GLUE_BREAK = '|'
+
+function separateGluedJsonStrings(json: string): string {
+  if (!json) return json
+  try {
+    return JSON.stringify(mapJsonStrings(JSON.parse(json) as unknown))
+  } catch {
+    return separateGluedIdNumbers(json, JSON_GLUE_BREAK)
+  }
+}
+
+function mapJsonStrings(value: unknown): unknown {
+  if (typeof value === 'string') return separateGluedIdNumbers(value, JSON_GLUE_BREAK)
+  if (Array.isArray(value)) return value.map((item) => mapJsonStrings(item))
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = mapJsonStrings(item)
+    }
+    return out
+  }
+  return value
 }
 
 function tooLong(): never {
@@ -56,7 +87,9 @@ export function maskLayoutAdjustOutbound(input: {
 } {
   const originalText = separateGluedIdNumbers(input.originalText)
   const resumeValues = separateGluedIdNumbers(input.resumeValues)
-  const resumeJson = input.resumeJson
+  // 换行写进 JSON 字符串再序列化会变成 \n，字母 n 贴着下一号，遮盖规则仍认不出。
+  // 字符串值里改用竖线，序列化后还是非数字边界。
+  const resumeJson = separateGluedJsonStrings(input.resumeJson)
   if (
     originalText.length > LLM_MASK_INPUT_LIMIT
     || resumeValues.length > LLM_MASK_INPUT_LIMIT

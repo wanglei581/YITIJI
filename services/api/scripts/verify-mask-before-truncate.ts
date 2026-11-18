@@ -106,6 +106,19 @@ function emptyResume(): GeneratedResume {
   }
 }
 
+function resumeWithDescription(description: string): GeneratedResume {
+  const resume = emptyResume()
+  resume.projects = [{ name: '项目甲', description }]
+  return resume
+}
+
+function assertNoLongDigitRun(label: string): void {
+  for (const body of captured) {
+    const run = body.match(/\d{15,}/u)
+    if (run) fail(`${label} 出站有 ${run[0].length} 位连续数字`)
+  }
+}
+
 async function main(): Promise<void> {
   const summary = new AssistantSummaryService(
     {} as never,
@@ -280,6 +293,44 @@ async function main(): Promise<void> {
     fail(`排版超过遮盖入口应明确失败，实际 ${tooLongStatus}/${tooLongCode}`)
   }
   pass('排版超过遮盖入口不送半截')
+
+  const bank = '6222021234567890'
+  const idEndingX = '11010119900307887X'
+  const plainResume = emptyResume()
+  await outboundClean('排版原文手机号紧贴身份证', () => optimize.adjustLayoutDraft({
+    currentResume: plainResume,
+    originalText: `说明${phone}${ID}结束`,
+    action: 'reformat',
+  }), [ID, id2, PREFIX, prefix2, phone, bank])
+  assertNoLongDigitRun('排版原文手机号紧贴身份证')
+
+  await outboundClean('排版原文末位X的身份证紧贴数字', () => optimize.adjustLayoutDraft({
+    currentResume: plainResume,
+    originalText: `说明${idEndingX}${bank}结束`,
+    action: 'reformat',
+  }), [ID, id2, PREFIX, prefix2, phone, bank, idEndingX])
+  assertNoLongDigitRun('排版原文末位X的身份证紧贴数字')
+
+  await outboundClean('排版简历JSON里两张身份证粘在一起', () => optimize.adjustLayoutDraft({
+    currentResume: resumeWithDescription(`${ID}${id2}`),
+    originalText: '说明里没有号码。',
+    action: 'reformat',
+  }), [ID, id2, PREFIX, prefix2, phone, bank])
+  assertNoLongDigitRun('排版简历JSON里两张身份证粘在一起')
+
+  await outboundClean('排版简历JSON里身份证粘着银行卡', () => optimize.adjustLayoutDraft({
+    currentResume: resumeWithDescription(`${ID}${bank}`),
+    originalText: '说明里没有号码。',
+    action: 'reformat',
+  }), [ID, id2, PREFIX, prefix2, phone, bank])
+  assertNoLongDigitRun('排版简历JSON里身份证粘着银行卡')
+
+  await outboundClean('排版简历JSON里手机号粘着身份证', () => optimize.adjustLayoutDraft({
+    currentResume: resumeWithDescription(`${phone}${ID}`),
+    originalText: '说明里没有号码。',
+    action: 'reformat',
+  }), [ID, id2, PREFIX, prefix2, phone, bank])
+  assertNoLongDigitRun('排版简历JSON里手机号粘着身份证')
 
   console.log(`verify:mask-before-truncate ${passCount} PASS`)
 }
