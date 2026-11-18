@@ -11,6 +11,7 @@ import {
   payableCents,
 } from './pending-refund-signal'
 import { PICKUP_VALIDITY_FROM_PAYMENT_MS } from './pickup-validity'
+import { settleClosedWindowUnprinted } from './closed-window-unprinted'
 import { RefundService } from './refund.service'
 
 /** 自动整单退的稳定原因。refundNo 仍是 `RFD-<orderNo>`，重复跑命中同一笔。 */
@@ -124,6 +125,33 @@ export class PickupExpiryRefundService {
           })
           continue
         }
+        result.failed += 1
+      }
+    }
+
+    const closedWindowRows = await this.prisma.order.findMany({
+      where: {
+        payStatus: 'paid',
+        amountCents: { gt: 0 },
+        printTaskId: null,
+        taskStatus: { notIn: ['claimed', 'printing', 'completed'] },
+        pickupStatus: { in: ['pending', 'expired', 'cancelled'] },
+        OR: [
+          { pickupStatus: { in: ['expired', 'cancelled'] } },
+          { pickupCodeExpiresAt: { lte: now } },
+        ],
+      },
+      orderBy: { paidAt: 'asc' },
+      take: limit,
+      select: { id: true },
+    })
+    result.scanned += closedWindowRows.length
+    for (const row of closedWindowRows) {
+      try {
+        const settled = await settleClosedWindowUnprinted(this.prisma, this.refunds, row.id)
+        if (settled === 'refunded') result.refunded += 1
+        else result.skipped += 1
+      } catch {
         result.failed += 1
       }
     }
