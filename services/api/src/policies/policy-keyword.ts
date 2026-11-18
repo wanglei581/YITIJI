@@ -45,6 +45,17 @@ function textContains(value: string, dbKind: DbKind): Prisma.StringFilter {
 }
 
 /**
+ * 粗筛用的片段。整段都是 ASCII 时原样交给 contains。
+ * 段里夹着非 ASCII 时只留下 ASCII 连续段，École 和 école 都会进内存，
+ * 再由只折 A-Z 的比较决定留哪一条。没有 ASCII 的段（例如纯汉字）仍按原段匹配。
+ */
+function coarsePieces(segment: string): string[] {
+  const asciiRuns = segment.match(/[\u0000-\u007F]+/g) ?? []
+  if (asciiRuns.length > 0 && asciiRuns.join('') !== segment) return asciiRuns
+  return [segment]
+}
+
+/**
  * 公开政策列表的可选关键词。
  * 先去掉首尾空白；空白等于不筛选。超长直接 400。
  * 英文字母不分大小写，其余字符按字面，标题或摘要命中即可。
@@ -64,12 +75,13 @@ export function policyKeywordPlan(raw: string | undefined, dbKind: DbKind): Poli
   // 这些字符不放进 contains，只拿去掉它们之后的各段做粗筛，避免一边按字面、另一边仍是通配。
   // 连续元字符切成空段后丢掉。没有元字符时整词就是一段，不能在这里把 literal 留空。
   const segments = keyword.split(/[%_\\]+/).filter((segment) => segment.length > 0)
-  if (segments.length === 0) {
-    // 关键词只有 % _ \。没法用 contains 缩小范围，调用方必须把公开列表整批取完再精筛。
+  const pieces = segments.flatMap(coarsePieces).filter((piece) => piece.length > 0)
+  if (pieces.length === 0) {
+    // 关键词只有 % _ \，或去掉之后没有可 contains 的片段。调用方整批取完再精筛。
     return { where: {}, literal: keyword }
   }
   const containsAll = (field: 'title' | 'summary'): Prisma.PolicyPostWhereInput => ({
-    AND: segments.map((segment) => ({ [field]: textContains(segment, dbKind) })),
+    AND: pieces.map((piece) => ({ [field]: textContains(piece, dbKind) })),
   })
   return {
     where: { OR: [containsAll('title'), containsAll('summary')] },
