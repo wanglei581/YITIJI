@@ -104,3 +104,25 @@ test('PRINTER_ERROR 不出现确定的「打印机卡纸」，公开状态 paper
   assert.match(page, /confirmedJam: variant === 'paper-jam' && printerJamConfirmed\(device\)/)
   assert.doesNotMatch(unconfirmedText, /工作人员/)
 })
+
+test('离线副题与卡纸同结构，同一屏不再混用请稍后重试和请稍后再来', () => {
+  for (const fact of ['free', 'paid', 'unknown']) {
+    const copy = failedModel.failureCopy({
+      variant: 'offline',
+      money: { fact, amountCents: fact === 'paid' ? 200 : fact === 'free' ? 0 : null },
+      orderNo: 'ORD-OFF',
+      canRetry: false,
+    })
+    const text = screenText(copy)
+    assert.match(copy.subtitle, fact === 'paid'
+      ? /你的订单和已付金额都保留着。打印机没连上，我们已经收到提醒，会尽快处理/
+      : /你的订单还在。打印机没连上，我们已经收到提醒，会尽快处理/)
+    assert.doesNotMatch(copy.subtitle, /打印机离线/)
+    assert.doesNotMatch(text, /请稍后重试/)
+    assert.match(copy.steps[2].detail, /请稍后再来/)
+    assert.doesNotMatch(text, /工作人员/)
+  }
+  const deviceLine = progress.errorCodeToMessage('PRINTER_OFFLINE')
+  assert.equal(deviceLine, '打印机离线，当前无法打印。')
+  assert.doesNotMatch(deviceLine, /请稍后重试|请稍后再来/)
+})

@@ -129,7 +129,7 @@ export function failureCopy(input: {
     const machine = machineCannotPrintLine(undefined, { orderKept: true })
     return {
       title: '打印机离线',
-      subtitle: '打印机离线，请稍后重试。',
+      subtitle: orderKeptFaultLine(money.fact, '打印机没连上'),
       pill: `${paidLabelOf(money)} · 打印机离线`,
       stepsLabel: STEPS_LABEL,
       steps: [

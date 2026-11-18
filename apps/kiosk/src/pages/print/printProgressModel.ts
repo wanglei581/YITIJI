@@ -240,7 +240,7 @@ export const FAIL_REASONS = [
 const ERROR_CODE_MESSAGES: Record<string, string> = {
   DOWNLOAD_HASH_MISMATCH: '文件校验未通过（上传可能中断或文件已变化），请返回重新上传后再打印',
   PRINTER_NOT_FOUND: `未找到打印机。${printProblemLine()}`,
-  PRINTER_OFFLINE: '打印机离线，请稍后重试。',
+  PRINTER_OFFLINE: '打印机离线，当前无法打印。',
   PAPER_EMPTY: '打印机缺纸，当前无法打印。',
   PRINTER_ERROR: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。',
   PRINT_JOB_UNCONFIRMED: `打印作业已提交到打印队列，但未确认完成。请先看纸张、卡纸和出纸口。${printProblemLine()}`,

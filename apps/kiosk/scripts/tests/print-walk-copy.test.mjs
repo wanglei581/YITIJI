@@ -558,7 +558,7 @@ const contactEntry = await import(transpile(join(kioskRoot, 'src/pages/print/com
 test('离线失败屏用离线标题和稍后再来，不叫人找工作人员', () => {
   const copy = failedModel.failureCopy({ variant: 'offline', money: { fact: 'free', amountCents: 0 }, orderNo: 'ORD-20261118-OFF', canRetry: false })
   assert.equal(copy.title, '打印机离线')
-  assert.match(copy.subtitle, /打印机离线，请稍后重试/)
+  assert.match(copy.subtitle, /你的订单还在。打印机没连上，我们已经收到提醒，会尽快处理/)
   assert.match(copy.steps[2].detail, /请稍后再来/)
   assert.match(copy.steps[2].detail, /这台机器暂时打不了/)
   assert.doesNotMatch(copyText(copy), /工作人员/)
@@ -569,7 +569,7 @@ test('缺纸、卡纸、离线的失败句保留各自原因，并带下一步�
   for (const [code, base] of [
     ['PAPER_EMPTY', '打印机缺纸，当前无法打印。'],
     ['PRINTER_ERROR', '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。'],
-    ['PRINTER_OFFLINE', '打印机离线，请稍后重试。'],
+    ['PRINTER_OFFLINE', '打印机离线，当前无法打印。'],
   ]) {
     const shown = progress.presentScreenFailure({
       errorCode: code,

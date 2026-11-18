@@ -140,7 +140,7 @@ test('paper-out, jam, and offline each show that reason plus the next step @kios
     {
       errorCode: 'PRINTER_OFFLINE',
       staff: '打印机离线，请联系工作人员检查设备',
-      reason: '打印机离线，请稍后重试。',
+      reason: '打印机离线，当前无法打印。',
     },
   ] as const
 
