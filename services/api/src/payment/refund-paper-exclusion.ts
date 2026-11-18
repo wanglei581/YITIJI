@@ -36,7 +36,14 @@ export function claimOrderNotBlockedByRefundWhere() {
                 { reason: { not: STALE_ATTEMPT_REFUND_REASON } },
               ],
             },
-            { status: 'success', reason: { not: STALE_ATTEMPT_REFUND_REASON } },
+            {
+              // 成功行也要单独写 reason 为空。SQL 里「不等于过期原因」匹配不到 NULL。
+              status: 'success',
+              OR: [
+                { reason: null },
+                { reason: { not: STALE_ATTEMPT_REFUND_REASON } },
+              ],
+            },
           ],
         },
       },
