@@ -144,6 +144,7 @@ async function main(): Promise<void> {
 
   assertAdvisorHoldSurvivesFlood()
   assertPublicClearLeavesInflightPin()
+  assertEarlyReturnReturnsToBaseline()
   await assertChatKeepsInFlightAndRefusesClearedId()
 
   console.log(`verify:conversation-epoch-ttl ${passCount} PASS`)
@@ -224,6 +225,62 @@ function assertPublicClearLeavesInflightPin(): void {
   )
   memory.end(twice)
   check(inflightCount(memory, twice) === 0 && pinCount(memory, twice) === 0, '两次在途都结束后钉放开')
+}
+
+/**
+ * 同一次作业进来两次，两次都结束，再结束一次。
+ * 第三次没有登记，走 end 里的提前返回。
+ * 若第二次进来覆盖了登记，第二次结束就会提前返回，钉留在 1，活表挤不掉。
+ * 出处：advisor-qa-memory.ts 的 end；agy-m1434i-reply.md 第三节第 2 条。
+ */
+function assertEarlyReturnReturnsToBaseline(): void {
+  const control = new AdvisorQaMemory()
+  control.begin('control-once', null)
+  control.end('control-once')
+
+  const memory = new AdvisorQaMemory()
+  const id = 'early-return'
+  const captured = memory.begin(id, null)
+  memory.begin(id, null)
+  memory.end(id)
+  memory.end(id)
+  memory.end(id)
+  memory.end('never-begun')
+  check(
+    pinCount(memory, id) === pinCount(control, 'control-once')
+      && liveCount(memory) === liveCount(control),
+    '两次在途都结束后再走提前返回，钉和活表槽位与一次成对结束相同',
+  )
+
+  const epoch = epochOf(memory)
+  epoch.cap = 2
+  for (let index = 0; index < 4; index += 1) {
+    const other = `early-other-${index}`
+    memory.begin(other, null)
+    memory.end(other)
+  }
+  check(pinCount(memory, id) === 0 && epoch.order.length <= epoch.cap, '提前返回之后灌满活表，钉是 0，槽位不超过容量')
+  check(!epoch.matches(id, captured), '提前返回之后灌满活表，这条会话的槽位回到可挤掉的基线')
+}
+
+function liveCount(memory: AdvisorQaMemory): number {
+  return epochOf(memory).current.size
+}
+
+function epochOf(memory: AdvisorQaMemory): {
+  cap: number
+  order: string[]
+  current: Map<string, number>
+  matches(id: string, captured: number): boolean
+} {
+  return (memory as unknown as {
+    epoch: {
+      cap: number
+      order: string[]
+      current: Map<string, number>
+      matches(id: string, captured: number): boolean
+    }
+  }).epoch
 }
 
 function inflightCount(memory: AdvisorQaMemory, id: string): number {
