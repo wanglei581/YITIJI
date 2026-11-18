@@ -1,26 +1,32 @@
 import { ApiHttpError } from './client'
 import type { AdminOrderReadonlyDetail, PrintReturnResolutionResult } from './adminOrdersReadonly'
 
-/** 只有浏览器用例写入这个键时才出现。默认列表不带这张单，也不带运营关注角标。 */
+/**
+ * 只有浏览器用例写入这个键时才出现。默认列表不带这张单，也不带运营关注角标。
+ * manual：渠道退款已经失败，三步都能做。pending：退款还在处理，改为出纸必须禁用。
+ */
 const HOLD_DEMO_KEY = 'mock:order-hold'
 const HOLD_ID = 'ord_mock_hold'
 const LEDGER_NO = 'RFD-HOLD-MANUAL'
 const LEDGER_CENTS = 200
 
 type HoldAction = 'confirm-refunded' | 'release-paper' | 'close'
+type HoldDemoMode = 'manual' | 'pending'
 
 let loaded = false
 let holdOrder: AdminOrderReadonlyDetail | null = null
 
-function holdDemoEnabled(): boolean {
+function holdDemoMode(): HoldDemoMode | null {
   try {
-    return localStorage.getItem(HOLD_DEMO_KEY) === 'manual'
+    const value = localStorage.getItem(HOLD_DEMO_KEY)
+    if (value === 'manual' || value === 'pending') return value
+    return null
   } catch {
-    return false
+    return null
   }
 }
 
-function freshHoldOrder(): AdminOrderReadonlyDetail {
+function freshHoldOrder(mode: HoldDemoMode): AdminOrderReadonlyDetail {
   const createdAt = new Date().toISOString()
   return {
     id: HOLD_ID,
@@ -71,8 +77,8 @@ function freshHoldOrder(): AdminOrderReadonlyDetail {
     },
     statusLogs: [{ fromStatus: 'pending', toStatus: 'failed', errorCode: null, createdAt }],
     autoRefund: false,
-    refundStatus: 'pending',
-    refundFailureReason: null,
+    refundStatus: mode === 'pending' ? 'pending' : 'failed',
+    refundFailureReason: mode === 'pending' ? null : '渠道退款失败',
     printRefundDisposition: 'manual',
     printRefundReason: '渠道未确认',
     refundLedgerNo: LEDGER_NO,
@@ -85,7 +91,8 @@ function freshHoldOrder(): AdminOrderReadonlyDetail {
 export function currentHoldDemo(): AdminOrderReadonlyDetail | null {
   if (!loaded) {
     loaded = true
-    holdOrder = holdDemoEnabled() ? freshHoldOrder() : null
+    const mode = holdDemoMode()
+    holdOrder = mode ? freshHoldOrder(mode) : null
   }
   return holdOrder
 }
@@ -99,6 +106,13 @@ export function resolveHoldDemo(id: string, action: HoldAction): PrintReturnReso
   }
   if (!order.refundLedgerNo) {
     throw new ApiHttpError('REFUND_HOLD_NOT_FOUND', '没有待人工处理的退款，不能做这一步。', 400)
+  }
+  if (action === 'release-paper' && order.refundStatus === 'pending') {
+    throw new ApiHttpError(
+      'REFUND_CHANNEL_UNCONFIRMED',
+      '渠道还没确认这笔退款失败。请先向渠道查证，确认失败后再改为出纸。',
+      400,
+    )
   }
   const payStatus = action === 'confirm-refunded' ? 'refunded' : action === 'close' ? 'closed' : 'paid'
   const refundStatus = action === 'confirm-refunded' ? 'success' : action === 'close' ? 'closed' : 'withdrawn'

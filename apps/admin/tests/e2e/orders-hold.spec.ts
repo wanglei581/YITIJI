@@ -70,4 +70,26 @@ test.describe('待人工退款三步处置', () => {
       await settleAdminPage(page, guards)
     })
   }
+
+  test('退款还在处理时，改为出纸是禁用的，并写明要先查渠道', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('mock:order-hold', 'pending'))
+    const guards = await openAuthed(page, '/orders')
+    await settleAdminPage(page, guards)
+
+    const row = page.locator('tbody tr').filter({ hasText: ORDER_NO })
+    await expect(row).toBeVisible()
+    await expect(row).toContainText('待退款')
+
+    await page.getByRole('button', { name: `查看订单 ${ORDER_NO}`, exact: true }).click()
+    const detail = page.getByRole('dialog', { name: `订单详情 · ${ORDER_NO}`, exact: true })
+    await expect(detail).toBeVisible()
+    await expect(detail.getByText('处理中', { exact: true })).toBeVisible()
+    const release = detail.getByRole('button', { name: '确认改为出纸', exact: true })
+    await expect(release).toBeVisible()
+    await expect(release).toBeDisabled()
+    await expect(detail.getByText('退款还在处理，先查渠道结果。', { exact: true })).toBeVisible()
+    await expect(detail.getByRole('button', { name: `确认退成 ${AMOUNT}`, exact: true })).toBeEnabled()
+    await expect(detail.getByRole('button', { name: '确认关单', exact: true })).toBeEnabled()
+    await settleAdminPage(page, guards)
+  })
 })
