@@ -41,6 +41,12 @@ export async function stageNewRefund(
         refundNo: input.refundNo,
         verifiedAfterPaper: input.verifiedAfterPaper,
       })
+      if (input.verifiedAfterPaper) {
+        await tx.refund.updateMany({
+          where: { orderId: input.orderId, status: { in: ['failed', 'manual_review'] } },
+          data: { status: 'withdrawn' },
+        })
+      }
       const taskGate = input.verifiedAfterPaper ? {} : { taskStatus: { notIn: [...ACTIVE_PRINT_TASK_STATES] } }
       const cas = input.collected
         ? await tx.order.updateMany({

@@ -4,8 +4,6 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 import type { OrderDetailControls } from './useOrderDetail'
 import { amountText, autoRefundStatusText, orderPaperReleased, payStatusPresentation } from './orderDisplay'
 
-const BLOCKS_NEW_REFUND = new Set(['pending', 'failed', 'manual_review', 'success'])
-
 export function PrintReturnHoldActions({ controls }: { controls: OrderDetailControls }) {
   const { detail, openDetail, refresh } = controls
   const [pending, setPending] = useState<string | null>(null)
@@ -20,7 +18,8 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
   const paperOut = orderPaperReleased(detail)
   const verified = detail.payStatus === 'paid'
     && paperOut
-    && !BLOCKS_NEW_REFUND.has(detail.refundStatus ?? '')
+    && detail.refundStatus !== 'pending'
+    && detail.refundStatus !== 'success'
 
   const run = async (action: 'confirm-refunded' | 'release-paper' | 'close') => {
     setPending(action)
@@ -68,9 +67,13 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
             三选一：确认已经退成、改为出纸，或关闭这张单。做完只剩一种状态。
           </p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={pending !== null} onClick={() => void run('confirm-refunded')} className="inline-flex h-9 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white disabled:opacity-40">
-              {pending === 'confirm-refunded' ? '处理中…' : `确认退成 ${amountText(detail.refundLedgerCents ?? 0, detail.currency)}`}
-            </button>
+            {paperOut ? (
+              <p className="text-xs text-neutral-600">纸已经出去。确认退成不能用，请走核对后仍退款。</p>
+            ) : (
+              <button type="button" disabled={pending !== null} onClick={() => void run('confirm-refunded')} className="inline-flex h-9 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white disabled:opacity-40">
+                {pending === 'confirm-refunded' ? '处理中…' : `确认退成 ${amountText(detail.refundLedgerCents ?? 0, detail.currency)}`}
+              </button>
+            )}
             {paperOut ? null : (
               <button type="button" disabled={pending !== null} onClick={() => void run('release-paper')} className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-800 disabled:opacity-40">
                 {pending === 'release-paper' ? '处理中…' : '确认改为出纸'}

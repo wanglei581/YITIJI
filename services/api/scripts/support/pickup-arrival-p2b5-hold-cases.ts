@@ -3,10 +3,15 @@
  */
 import assert from 'node:assert/strict'
 import { BadRequestException } from '@nestjs/common'
+import { AuditService } from '../../src/audit/audit.service'
+import { PaymentProviderRegistry } from '../../src/payment/payment-provider.factory'
+import { SandboxPaymentProvider } from '../../src/payment/providers/sandbox-payment.provider'
+import { RefundService } from '../../src/payment/refund.service'
 import { resolvePrintReturnHold, type PrintReturnResolution } from '../../src/payment/resolve-print-return-hold'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 
 const PAGES = JSON.stringify({ copies: 1, colorMode: 'black_white' })
+const SANDBOX_SECRET = 'verify-p2b5-sandbox-secret-0123456789abcd'
 
 export async function runP2b5PendingHoldCases(
   db: PrismaService,
@@ -211,6 +216,110 @@ export async function runP2b5HoldRaceCases(
     await db.auditLog.deleteMany({ where: { targetId: { in: created } } })
     await db.order.deleteMany({ where: { id: { in: created } } })
     await db.printTask.deleteMany({ where: { orderId: { in: created } } })
+    await db.terminal.delete({ where: { id: terminalId } }).catch(() => undefined)
+    await db.organization.delete({ where: { id: orgId } }).catch(() => undefined)
+  }
+}
+
+/** 已出纸且退款失败：确认退成拒绝，改为出纸被拒也写审计，只走核对后仍退款。 */
+export async function runP2b5PrintedConfirmCases(
+  db: PrismaService,
+  input: { tag: string; orderIds: string[]; taskIds: string[] },
+): Promise<void> {
+  const tag = input.tag
+  const orgId = `org_p2b5paper_${tag}`
+  const terminalId = `term_p2b5paper_${tag}`
+  const orderId = `ord_${tag}_p2b5_printed`
+  input.orderIds.push(orderId)
+  const taskId = `pt_${orderId}`
+  input.taskIds.push(taskId)
+  await db.organization.create({ data: { id: orgId, name: '已出纸退款', type: 'school_employment_center' } })
+  await db.terminal.create({
+    data: {
+      id: terminalId,
+      terminalCode: terminalId,
+      agentToken: `tok-${terminalId}`,
+      deviceFingerprint: `fp-${terminalId}`,
+      orgId,
+      enabled: true,
+      lifecycleStatus: 'active',
+    },
+  })
+  try {
+    await db.printTask.create({
+      data: {
+        id: taskId,
+        fileUrl: 'https://example.invalid/print',
+        fileMd5: 'md5',
+        status: 'completed',
+        printOutcome: 'printed',
+        orderId,
+        terminalId,
+      },
+    })
+    await db.order.create({
+      data: {
+        id: orderId,
+        orderNo: `P5${tag}paper`.slice(0, 32),
+        type: 'print',
+        terminalId,
+        amountCents: 200,
+        discountCents: 0,
+        payStatus: 'paid',
+        paymentSource: 'sandbox',
+        paidAt: new Date(),
+        pickupStatus: 'pending',
+        taskStatus: 'completed',
+        billablePages: 2,
+        printParamsJson: PAGES,
+        itemsJson: '[]',
+        channel: 'kiosk',
+        printTaskId: taskId,
+      },
+    })
+    await db.refund.create({
+      data: {
+        orderId,
+        refundNo: `RFD-PAPER-${tag}`,
+        amountCents: 200,
+        status: 'failed',
+        reason: '已出纸后退款失败',
+        channel: 'sandbox',
+      },
+    })
+    const confirmCode = await resolvePrintReturnHold(db, orderId, 'confirm_refunded', 'admin-test').then(
+      () => 'ok',
+      (error: unknown) => errorCode(error),
+    )
+    assert.equal(confirmCode, 'PAPER_ALREADY_RELEASED')
+    const afterConfirm = await db.order.findUniqueOrThrow({ where: { id: orderId } })
+    assert.equal(afterConfirm.payStatus, 'paid')
+    assert.equal((await db.refund.findUniqueOrThrow({ where: { refundNo: `RFD-PAPER-${tag}` } })).status, 'failed')
+    assert.equal((await db.printTask.findUniqueOrThrow({ where: { id: taskId } })).printOutcome, 'printed')
+    assert.equal(await db.auditLog.count({ where: { targetId: orderId, action: 'refund.paper_checked' } }), 0)
+    const releaseCode = await resolvePrintReturnHold(db, orderId, 'release_paper', 'admin-test').then(
+      () => 'ok',
+      (error: unknown) => errorCode(error),
+    )
+    assert.equal(releaseCode, 'PAPER_ALREADY_RELEASED')
+    assert.equal(await db.auditLog.count({ where: { targetId: orderId, action: 'refund.hold_rejected' } }), 1)
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: orderId } })).payStatus, 'paid')
+    const refunds = new RefundService(
+      db,
+      new AuditService(db),
+      new PaymentProviderRegistry([new SandboxPaymentProvider(SANDBOX_SECRET)]),
+    )
+    const done = await refunds.refund(orderId, { reason: '核对后仍退款', operatorId: 'admin-test', verifiedAfterPaper: true })
+    assert.equal(done.refund.status, 'success')
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: orderId } })).payStatus, 'refunded')
+    assert.equal((await db.printTask.findUniqueOrThrow({ where: { id: taskId } })).printOutcome, 'printed')
+    const checked = await db.auditLog.findFirst({ where: { targetId: orderId, action: 'refund.paper_checked' } })
+    assert.match(checked?.payloadJson ?? '', /核对后仍退款/)
+  } finally {
+    await db.refund.deleteMany({ where: { orderId } })
+    await db.auditLog.deleteMany({ where: { targetId: orderId } })
+    await db.order.deleteMany({ where: { id: orderId } })
+    await db.printTask.deleteMany({ where: { id: taskId } })
     await db.terminal.delete({ where: { id: terminalId } }).catch(() => undefined)
     await db.organization.delete({ where: { id: orgId } }).catch(() => undefined)
   }

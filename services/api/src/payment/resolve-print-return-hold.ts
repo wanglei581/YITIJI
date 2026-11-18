@@ -15,6 +15,48 @@ function deny(code: string, message: string): BadRequestException {
   return new BadRequestException({ error: { code, message } })
 }
 
+async function rejectReleasedPaper(
+  db: PrismaService,
+  orderId: string,
+  action: PrintReturnResolution,
+  operatorId: string,
+): Promise<void> {
+  const order = await db.order.findUnique({ where: { id: orderId } })
+  if (!order) return
+  const task = order.printTaskId
+    ? await db.printTask.findUnique({
+      where: { id: order.printTaskId },
+      select: { status: true, printOutcome: true },
+    })
+    : null
+  const released = paperAlreadyReleased({
+    taskStatus: task?.status ?? null,
+    orderTaskStatus: order.taskStatus,
+    printOutcome: task?.printOutcome ?? null,
+  })
+  if (!released) return
+  if (action === 'release_paper') {
+    await db.auditLog.create({
+      data: {
+        actorId: null,
+        actorRole: 'admin',
+        action: 'refund.hold_rejected',
+        targetType: 'order',
+        targetId: orderId,
+        payloadJson: JSON.stringify({
+          action,
+          operatorId,
+          detail: '纸已经出去，不能再改成出纸',
+        }),
+      },
+    })
+    throw deny('PAPER_ALREADY_RELEASED', '纸已经放行或已经出去，不能再改成出纸。')
+  }
+  if (action === 'confirm_refunded') {
+    throw deny('PAPER_ALREADY_RELEASED', '纸已经出去。确认退成不能用，请走核对后仍退款。')
+  }
+}
+
 export async function resolvePrintReturnHold(
   db: PrismaService,
   orderId: string,
@@ -28,6 +70,7 @@ export async function resolvePrintReturnHold(
   refundNo: string
   amountCents: number
 }> {
+  await rejectReleasedPaper(db, orderId, action, operatorId)
   return db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } })
     if (!order) throw new BadRequestException('ORDER_NOT_FOUND')
@@ -147,6 +190,7 @@ export async function resolvePrintReturnHold(
         },
       })
     } else {
+      if (released) throw deny('PAPER_ALREADY_RELEASED', '纸已经出去。确认退成不能用，请走核对后仍退款。')
       // 未付、支付中、已关闭：只把退款行记成成功，不改订单支付状态。
       // 已关闭的单不能再改成已退，否则和关单「钱不记成已退、纸不再出」打架。
       const leaveOrder = order.payStatus === 'unpaid' || order.payStatus === 'paying' || order.payStatus === 'closed'

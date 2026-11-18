@@ -37,7 +37,8 @@ export function refundBlocksPaper(input: {
   amountCents: number
   payStatus: string
   payableCents: number
-}): boolean {
+}, opts?: { allowFailedHold?: boolean }): boolean {
+  if (opts?.allowFailedHold && (input.status === 'failed' || input.status === 'manual_review')) return false
   if ((OPEN_REFUND_ROW_STATUSES as readonly string[]).includes(input.status)) return true
   if (input.status !== 'success') return false
   if (input.reason === STALE_ATTEMPT_REFUND_REASON) return false
@@ -53,6 +54,7 @@ async function blockingRefund(
   db: HoldDb,
   orderId: string,
   exceptRefundNo: string | null,
+  opts?: { allowFailedHold?: boolean },
 ): Promise<boolean> {
   const order = await db.order.findUnique({
     where: { id: orderId },
@@ -73,7 +75,7 @@ async function blockingRefund(
     amountCents: row.amountCents,
     payStatus: order.payStatus,
     payableCents,
-  }))
+  }, opts))
 }
 
 /** 放行出纸前：在办、失败、待人工，或已经按实付退成的，都不许出纸。过期付款的成功退款不挡住后来的新付款。 */
@@ -125,7 +127,7 @@ export async function assertCanOpenRefund(
   if (!released && opts.verifiedAfterPaper) {
     throw deny('PAPER_NOT_RELEASED', '这单还没放行出纸，请用这一页的普通退款。')
   }
-  if (await blockingRefund(db, orderId, opts.refundNo)) {
+  if (await blockingRefund(db, orderId, opts.refundNo, { allowFailedHold: opts.verifiedAfterPaper })) {
     throw deny(REFUND_ALREADY_OPEN_CODE, REFUND_ALREADY_OPEN_MESSAGE)
   }
 }
