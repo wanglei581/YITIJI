@@ -420,6 +420,7 @@ export class LlmChatService {
   /** 空闲超过 SESSION_TTL_MS 的会话立刻丢掉。每分钟扫，不等下一次对话。 */
   @Cron(CronExpression.EVERY_MINUTE)
   sweep(now = Date.now()): number {
+    this.epoch.sweep()
     const before = this.sessions.size
     this.pruneSessions(now)
     const removed = before - this.sessions.size

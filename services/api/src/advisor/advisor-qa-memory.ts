@@ -149,6 +149,7 @@ export class AdvisorQaMemory {
   /** 空闲超过 TTL 的作业问答立刻丢掉。每分钟扫，不等下一次追问。 */
   @Cron(CronExpression.EVERY_MINUTE)
   sweep(now = Date.now()): number {
+    this.epoch.sweep()
     const before = this.store.size
     for (const [id, entry] of this.store) {
       if (now - entry.updatedAt > TTL_MS) this.drop(id)
