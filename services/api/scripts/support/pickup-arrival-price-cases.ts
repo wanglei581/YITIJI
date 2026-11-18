@@ -31,6 +31,7 @@ import {
   PRINTING_REPORT_LOST_ERROR_CODE,
 } from '../../src/print-jobs/paid-anomaly-disposition'
 import { runArrivalHoldCases } from './pickup-arrival-hold-cases'
+import { assertArrivalQuoteAmounts } from './pickup-arrival-quote-cases'
 import { runArrivalMoneyCases } from './pickup-arrival-money-cases'
 import { runNoPaperAllowlistCases } from './pickup-arrival-no-paper-allowlist-cases'
 import {
@@ -64,6 +65,7 @@ function assertWiring(): void {
 
 export async function runPickupArrivalPriceCases(db: PrismaService, tag: string): Promise<void> {
   assertWiring()
+  assertArrivalQuoteAmounts()
   const orgId = `org_${tag}`
   const publicOrgId = `org_pub_${tag}`
   const pricedTerminalId = `term_priced_${tag}`
