@@ -474,7 +474,7 @@ export class TerminalAgentService implements OnModuleInit {
     const claimedPayloads: Array<Omit<ClaimTaskResponse, 'attempt'>> = []
     await recordBlockedClaimReason(this.prisma, terminalId)
 
-    // 已付才能领。退款在办或已按实付退成的不领。过期付款退成不挡住后来的新付款。
+    // 已付才能领。退款在办或已按实付退成的不领。过期付款的退款，不论在办、失败还是已退成，都不挡住后来的新付款。
     const claimableWhere = {
       status: 'pending' as const,
       terminalId,
@@ -490,7 +490,13 @@ export class TerminalAgentService implements OnModuleInit {
             refunds: {
               some: {
                 OR: [
-                  { status: { in: ['pending', 'failed', 'manual_review'] } },
+                  {
+                    status: { in: ['pending', 'failed', 'manual_review'] },
+                    OR: [
+                      { reason: null },
+                      { reason: { not: STALE_ATTEMPT_REFUND_REASON } },
+                    ],
+                  },
                   { status: 'success', reason: { not: STALE_ATTEMPT_REFUND_REASON } },
                 ],
               },

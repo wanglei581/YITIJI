@@ -4,6 +4,7 @@
  */
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
+import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { paperAlreadyReleased } from './refund-paper-exclusion'
 
 export type PrintReturnResolution = 'confirm_refunded' | 'release_paper' | 'close_order'
@@ -119,7 +120,12 @@ export async function resolvePrintReturnHold(
       if (withdrawn.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
       const reopened = await tx.order.updateMany({
         where: { id: orderId, payStatus: { in: ['paid', 'refunding'] } },
-        data: { payStatus: 'paid', taskStatus: 'pending' },
+        data: {
+          payStatus: 'paid',
+          taskStatus: 'pending',
+          // 未履约待退信号会让终端永远领不到。改为出纸就是要让这张单重新出纸。
+          ...(order.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON ? { refundReason: null } : {}),
+        },
       })
       if (reopened.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
       if (task && task.printOutcome !== 'printed' && (task.status === 'failed' || task.status === 'cancelled' || task.status === 'pending')) {

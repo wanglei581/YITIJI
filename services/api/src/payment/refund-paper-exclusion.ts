@@ -39,9 +39,9 @@ export function refundBlocksPaper(input: {
   payableCents: number
 }, opts?: { allowFailedHold?: boolean }): boolean {
   if (opts?.allowFailedHold && (input.status === 'failed' || input.status === 'manual_review')) return false
+  if (input.reason === STALE_ATTEMPT_REFUND_REASON) return false
   if ((OPEN_REFUND_ROW_STATUSES as readonly string[]).includes(input.status)) return true
   if (input.status !== 'success') return false
-  if (input.reason === STALE_ATTEMPT_REFUND_REASON) return false
   if (input.payStatus === 'refunded') return true
   return input.payableCents > 0 && input.amountCents >= input.payableCents
 }
@@ -78,7 +78,7 @@ async function blockingRefund(
   }, opts))
 }
 
-/** 放行出纸前：在办、失败、待人工，或已经按实付退成的，都不许出纸。过期付款的成功退款不挡住后来的新付款。 */
+/** 放行出纸前：在办、失败、待人工，或已经按实付退成的，都不许出纸。过期付款的退款，不论还在处理、失败还是已经退成，都不挡住后来的新付款。 */
 export async function findBlockingRefund(db: HoldDb, orderId: string): Promise<{ id: string } | null> {
   const order = await db.order.findUnique({
     where: { id: orderId },
