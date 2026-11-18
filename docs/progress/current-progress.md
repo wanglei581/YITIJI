@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-19：扫描完成页「核对到才说已存」补行为用例（未推送）
+
+- 分支 `claude/scan-return-docs-1118`。面板完成页那句小字的判断抽到 `apps/kiosk/src/pages/scan/scanResultDocumentsNote.ts`。登录且核对结果是查到这份 `fileId` 才返回「在「我的文档」查看与管理本次扫描件」；核对中、没查到、请求失败返回当场打印那句；未登录返回游客那句。`ScanResultExitRow.tsx` 只改为调用它，屏上文字、版式、按钮和启用条件不变。
+- 纯函数单测 `apps/kiosk/scripts/tests/scan-result-documents-note.test.mjs` 接进 `.github/workflows/ci.yml` 作业 `build-and-verify` 的「Cross-client deterministic static gates」。浏览器用例 `apps/kiosk/tests/visual/fusion-w2-scan-saved-note.spec.ts` 用 `api-router` 替身，不起真 API：列表含这份 `fileId` 时屏上是已存句；不含或返回 500 时是当场打印句、没有已存句。它由作业 `kiosk-browser-smoke` 的步骤「Run Kiosk browser smoke」经 `pnpm --filter @ai-job-print/kiosk test:browser:w2`（`playwright.w2.config.ts`，project `kiosk-1080x1920`，grep `/@w2/`）跑到。
+- 没改岗位、招聘会、打印、收费、数据库、密钥、小程序和生产配置。
+
 ## 2026-11-18：扫描回传文档并入当时的主线，图谱按 683 个门禁重生（未推送）
 
 - 分支 `claude/scan-return-docs-1118`。`git fetch origin && git merge origin/main` 时主线仍是 `d71f1c37c`，没有新提交，没有冲突。
