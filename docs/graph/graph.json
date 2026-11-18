@@ -15154,7 +15154,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 829,
+      "reachableFileCount": 830,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18235,7 +18235,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1020
+      "sourceFileCount": 1021
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -27313,6 +27313,7 @@
     ],
     "services/api/src/advisor/advisor-qa-memory.ts": [
       "services/api/scripts/verify-advisor-qa-history-mask.ts",
+      "services/api/scripts/verify-conversation-epoch-ttl.ts",
       "services/api/scripts/verify-conversation-memory-forget-inflight.ts",
       "services/api/scripts/verify-conversation-memory-forget-logout-switch.ts",
       "services/api/scripts/verify-conversation-memory-forget.ts"
@@ -27633,6 +27634,7 @@
       "services/api/scripts/verify-assistant-policy-context.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-conversation-epoch-ttl.ts",
       "services/api/scripts/verify-conversation-memory-forget-inflight.ts",
       "services/api/scripts/verify-conversation-memory-forget-logout-switch.ts",
       "services/api/scripts/verify-conversation-memory-forget.ts",
@@ -27876,6 +27878,9 @@
       "services/api/scripts/verify-job-fit-print.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-member-qa-records.ts"
+    ],
+    "services/api/src/ai/resume/layout-adjust-mask.ts": [
+      "services/api/scripts/verify-mask-before-truncate.ts"
     ],
     "services/api/src/ai/resume/llm-career-plan.service.ts": [
       "services/api/scripts/verify-ai-feature-keys.ts",
@@ -28859,6 +28864,9 @@
       "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-mask-before-truncate.ts"
+    ],
+    "services/api/src/common/pii/mask-placeholder.ts": [
       "services/api/scripts/verify-mask-before-truncate.ts"
     ],
     "services/api/src/common/pii/pii-masker.ts": [
@@ -42378,6 +42386,8 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/advisor/advisor-qa-memory.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
           "services/api/src/common/conversation-epoch.ts"
         ],
         "missing": []
@@ -44925,12 +44935,14 @@
           "services/api/src/advisor/llm-advisor.service.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
           "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/ai/resume/layout-adjust-mask.ts",
           "services/api/src/ai/resume/llm-career-plan.service.ts",
           "services/api/src/ai/resume/llm-fair-visit-plan.service.ts",
           "services/api/src/ai/resume/llm-job-fit.service.ts",
           "services/api/src/ai/resume/llm-resume-optimize.service.ts",
           "services/api/src/ai/resume/llm-resume.service.ts",
           "services/api/src/common/pii/llm-input-mask.ts",
+          "services/api/src/common/pii/mask-placeholder.ts",
           "services/api/src/job-ai/job-ai-llm.service.ts",
           "services/api/src/mock-interview/mock-interview-llm.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
