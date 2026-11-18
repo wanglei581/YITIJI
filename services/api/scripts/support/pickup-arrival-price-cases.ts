@@ -390,7 +390,7 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
       assert.equal(calls, 0)
       assert.equal(await db.refund.count({ where: { orderId: id } }), 0)
       const row = await db.order.findUniqueOrThrow({ where: { id } })
-      assert.equal(row.refundReason, PAID_UNFULFILLED_PENDING_REFUND_REASON)
+      assert.equal(row.refundReason, null, '缺纸和说不准不写成文件失效待退款')
       const detail = await new AdminOrdersReadonlyService(db).getById(id)
       assert.equal(detail.printRefundDisposition, 'manual')
       assert.equal(detail.autoRefund, false)
@@ -429,6 +429,11 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     })
     assert.equal(partial, 'manual', '三份里出了一份不能自动退')
     assert.equal(partialCalls, 0)
+    assert.equal(
+      (await db.order.findUniqueOrThrow({ where: { id: partialId } })).refundReason,
+      null,
+      '部分出纸不写成文件失效待退款',
+    )
     const partialReason = '材料包 3 份里出了 1 份，没有全部出纸，不能自动退'
     const partialDetail = await new AdminOrdersReadonlyService(db).getById(partialId)
     assert.equal(partialDetail.printRefundDisposition, 'manual')

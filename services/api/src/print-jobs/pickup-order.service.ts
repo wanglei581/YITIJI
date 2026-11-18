@@ -138,6 +138,9 @@ export class PickupOrderService {
    * 否则登录用户可以拿自己的单反复抵扣、给枚举续命）；审计 payload 记下入口。
    */
   async settleClaim(order: OrderRecord, terminal: { id: string }, via: PickupClaimVia) {
+    // 调用方手里的是核销开始时的码哈希。刷新订单只能更新终端占用和付款状态，不能把哈希换成库里的新码，
+    // 否则重发之后这一次仍会按新码认领成功。
+    const presentedCodeHash = order.pickupCodeHash
     await releaseStaleArrivalHold(this.prisma, order.id)
     const currentOrder = await this.prisma.order.findUnique({ where: { id: order.id } })
     if (!currentOrder) throw new NotFoundException('ORDER_NOT_FOUND')
@@ -211,7 +214,7 @@ export class PickupOrderService {
         where: { id: order.id },
         select: { pickupCodeHash: true },
       })
-      if (liveCode && liveCode.pickupCodeHash !== order.pickupCodeHash) {
+      if (liveCode && liveCode.pickupCodeHash !== presentedCodeHash) {
         if (via === 'member_order') {
           throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '这一单刚刚有变化，请刷新订单后再领取' } })
         }
@@ -253,7 +256,7 @@ export class PickupOrderService {
           id: priced.id,
           pickupStatus: 'pending',
           printTaskId: null,
-          pickupCodeHash: order.pickupCodeHash,
+          pickupCodeHash: presentedCodeHash,
           payStatus: { in: [...CLAIMABLE_PAY_STATUSES] },
         },
         data: { pickupStatus: 'claimed', pickupClaimedAt: new Date(), taskStatus: 'awaiting_payment' },
@@ -267,7 +270,7 @@ export class PickupOrderService {
       if (claimed.count !== 1) {
         const raced = await this.prisma.order.findUnique({ where: { id: priced.id } })
         if (!raced) throw new NotFoundException('ORDER_NOT_FOUND')
-        if (raced.pickupCodeHash !== order.pickupCodeHash) {
+        if (raced.pickupCodeHash !== presentedCodeHash) {
           // 到机码刚被重发：码入口照旧同文案防撞码；会员本机领取没输过码，说「这一单有变化」而不是「码无效」。
           if (via === 'member_order') {
             throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '这一单刚刚有变化，请刷新订单后再领取' } })

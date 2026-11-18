@@ -126,6 +126,9 @@ async function assertAlertsDisappear(status: (typeof STATUSES)[number], label: s
     aiUsageRecord: { findMany: async () => [], groupBy: async () => [] },
     serviceOrder: { findMany: async () => [], findFirst: async () => null },
     refund: { findMany: async () => [], findFirst: async () => null },
+    order: { findMany: async () => [] },
+    orderItem: { groupBy: async () => [] },
+    auditLog: { findMany: async () => [] },
     // 扫描仪告警先查已开通的 scan_device。这组夹具没有这项能力，返回空，打印机告警断言不变。
     terminalCapability: { findMany: async () => [] },
   }

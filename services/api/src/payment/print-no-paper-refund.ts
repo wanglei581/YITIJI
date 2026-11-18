@@ -174,15 +174,17 @@ export async function settleExplicitNoPaper(
 
   const partial = input.completedItemCount > 0
   const explicit = !partial && isExplicitNoPaper(input.taskStatus, input.errorCode)
-  await markPaidUnfulfilledRefundRequired(db, order)
 
   if (!explicit) {
+    // 缺纸、说不准、部分出纸不写「文件失效待退款」。那条信号只留给开关关着的明确没出纸，
+    // 以及文件确实不能再打的旧路径。这里只记待人工。
     await holdForManualReview(db, order.id, input)
     return 'manual'
   }
 
   const enabled = await readPersonalChargeEnabled(db)
   if (!enabled) {
+    await markPaidUnfulfilledRefundRequired(db, order)
     await rememberOnce(db, order.id, PRINT_NO_PAPER_MANUAL_AUDIT, {
       detail: switchOffRefundReason(),
       errorCode: input.errorCode,
@@ -291,4 +293,17 @@ export async function settleExplicitNoPaperFromReportedFailure(
     printOutcome: task.printOutcome,
     completedItemCount,
   }, deps)
+}
+
+/** 超时未确认等批量失败。退款决定失败不打断调用方已经写好的失败状态。 */
+export async function settleReportedTaskFailures(
+  db: PrismaService,
+  taskIds: string[],
+  onError?: (taskId: string, error: unknown) => void,
+): Promise<void> {
+  for (const taskId of taskIds) {
+    await settleExplicitNoPaperFromReportedFailure(db, taskId).catch((error: unknown) => {
+      onError?.(taskId, error)
+    })
+  }
 }

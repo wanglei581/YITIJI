@@ -126,18 +126,23 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
     return { disposition: null, refundStatus: 'pending', reason: null }
   }
   const printed = order.printTask?.printOutcome === 'printed'
+  const manualDetail = manualReasonFromAudit(audits)
+  // 开关关着仍用待退款信号。缺纸和说不准不写那条信号，只靠待人工审计认。
   const manual = order.payStatus === 'paid'
     && order.taskStatus === 'failed'
     && !printed
-    && order.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON
     && payableCents(order) > 0
+    && (
+      order.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON
+      || (order.refundReason == null && manualDetail != null)
+    )
   if (!manual) return { disposition: null, refundStatus: null, reason: null }
   const itemCount = await db.orderItem.count({ where: { orderId } })
   const completedItemCount = await db.orderItem.count({ where: { orderId, status: 'completed' } })
   return {
     disposition: 'manual',
     refundStatus: null,
-    reason: manualReasonFromAudit(audits) ?? manualHoldReason({
+    reason: manualDetail ?? manualHoldReason({
       errorCode: order.printTask?.errorCode ?? null,
       completedItemCount,
       itemCount,
@@ -159,12 +164,22 @@ export async function listPrintReturnHolds(db: PrismaService): Promise<PrintRetu
     select: { orderId: true, updatedAt: true, order: { select: { terminalId: true } } },
     orderBy: { updatedAt: 'asc' },
   })
+  const manualAudits = await db.auditLog.findMany({
+    where: { action: PRINT_NO_PAPER_MANUAL_AUDIT },
+    select: { targetId: true },
+  })
+  const manualAuditIds = [...new Set(
+    manualAudits.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
+  )]
   const manuals = await db.order.findMany({
     where: {
       payStatus: 'paid',
       taskStatus: 'failed',
-      refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON,
       refunds: { none: { reason: PAID_NO_PAPER_AUTO_REASON } },
+      OR: [
+        { refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON },
+        ...(manualAuditIds.length > 0 ? [{ id: { in: manualAuditIds }, refundReason: null }] : []),
+      ],
     },
     select: {
       id: true,

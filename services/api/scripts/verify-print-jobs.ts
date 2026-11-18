@@ -800,10 +800,12 @@ async function main() {
     }
 
     // 7a/7b/7c/7d：已知错误码（白名单）+ 敏感原始 errorMessage。
-    const knownFailId = await createClaimAndFail('失败任务-已知码', '2019-01-01T00:00:00.000Z', 'PRINTER_OFFLINE', RAW_SENSITIVE_MESSAGE)
+    // 这台夹具打开了个人收费。打印机离线是确定没交给打印机，上报后会原路退。
+    // 后面的重提和轮次改用缺纸单，缺纸不自动退。
+    const offlineFailId = await createClaimAndFail('失败任务-已知码', '2019-01-01T00:00:00.000Z', 'PRINTER_OFFLINE', RAW_SENSITIVE_MESSAGE)
 
     // DB 仍完整保留 Agent 原始 errorCode/errorMessage（后台排障可用）。
-    const dbFail = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const dbFail = await prisma.printTask.findUnique({ where: { id: offlineFailId } })
     if (dbFail?.status === 'failed' && dbFail.errorCode === 'PRINTER_OFFLINE' && dbFail.errorMessage === RAW_SENSITIVE_MESSAGE) {
       pass('7a. DB 仍完整保存 Agent 原始 errorCode/errorMessage（后台排障可用）')
     } else {
@@ -811,7 +813,7 @@ async function main() {
     }
 
     // getStatus() 只回白名单安全文案。
-    const userView = await printJobs.getStatus(knownFailId)
+    const userView = await printJobs.getStatus(offlineFailId)
     const safeExpected = '打印机离线，请稍后重试。'
     if (userView.failureReasonForUser === safeExpected && userView.errorMessage === safeExpected) {
       pass('7b. getStatus 已知错误码 → failureReasonForUser/errorMessage 均为白名单安全文案')
@@ -831,6 +833,15 @@ async function main() {
     // errorCode 仍下发（供前端本地映射兜底）。
     if (userView.errorCode === 'PRINTER_OFFLINE') pass('7d. getStatus 仍返回 errorCode（前端本地映射兜底用）')
     else fail(`7d. errorCode 未返回: ${userView.errorCode}`)
+    const offlineOrder = await prisma.order.findFirst({ where: { printTaskId: offlineFailId } })
+    const offlineRefunds = offlineOrder
+      ? await prisma.refund.count({ where: { orderId: offlineOrder.id, status: 'success' } })
+      : 0
+    if (offlineOrder?.payStatus === 'refunded' && offlineRefunds === 1) {
+      pass('7d2. 个人收费开着时，打印机离线确定没交给打印机，自动原路退')
+    } else {
+      fail(`7d2. 离线失败应已原路退: payStatus=${offlineOrder?.payStatus} refunds=${offlineRefunds}`)
+    }
 
     // 7e：未知错误码 → 统一默认安全文案，且不泄露原始敏感信息。
     const unknownFailId = await createClaimAndFail('失败任务-未知码', '2019-01-02T00:00:00.000Z', 'INTERNAL_SEGFAULT_0x1234', RAW_SENSITIVE_MESSAGE)
@@ -968,6 +979,7 @@ async function main() {
       fail(`8c. takeaway 异常: ${JSON.stringify({ orderId: takeaway.orderId, expiresAt: takeaway.expiresAt, signedUrl: takeaway.signedUrl })}`)
     }
 
+    const knownFailId = await createClaimAndFail('失败任务-可重提', '2018-01-01T00:00:00.000Z', 'PAPER_EMPTY', RAW_SENSITIVE_MESSAGE)
     const retryOrderBefore = await prisma.order.findFirst({ where: { printTaskId: knownFailId } })
     if (!retryOrderBefore) fail('8d 预备：失败单没有订单')
     const orderCountBefore = await prisma.order.count({ where: { printTaskId: knownFailId } })

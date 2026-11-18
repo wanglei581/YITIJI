@@ -29,7 +29,7 @@ import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../payment/pending-refund-signal'
-import { settleExplicitNoPaperFromReportedFailure } from '../payment/print-no-paper-refund'
+import { settleExplicitNoPaperFromReportedFailure, settleReportedTaskFailures } from '../payment/print-no-paper-refund'
 import {
   claimableFreshnessFilter,
   expireQueuedPrintTasks,
@@ -1098,6 +1098,11 @@ export class TerminalAgentService implements OnModuleInit {
     for (const taskId of terminalTaskIds) {
       await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
     }
+    await settleReportedTaskFailures(this.prisma, terminalTaskIds, (taskId, error) => {
+      this.logger.warn(
+        `PRINT_NO_PAPER_REFUND_FAILED task=${taskId} error=${error instanceof Error ? error.message : String(error)}`,
+      )
+    })
 
     const total = claimedCount + printingCount
     if (total > 0) {
