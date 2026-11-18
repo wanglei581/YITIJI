@@ -86,13 +86,42 @@ export function policyExcerptAbout(content: string): string {
   return `约 ${(Math.round(count / 10) * 10).toLocaleString('zh-CN')} 字`
 }
 
-export function policyExcerptPages(content: string, linesPerPage = 14): string[] {
-  const lines = content.split('\n')
+/** 阅读框大约能放 23 行，留一行，避免末行被裁。 */
+export const POLICY_READ_VISUAL_LINES = 22
+
+/** 按屏高翻。一行放不下就换页；比一整页还长的一行按字切开，不插入换行。 */
+export function policyExcerptPages(
+  content: string,
+  visualLinesPerPage = POLICY_READ_VISUAL_LINES,
+  lineChars = POLICY_EXCERPT_LINE_CHARS,
+): string[] {
+  const budget = Math.max(1, visualLinesPerPage)
+  const width = Math.max(1, lineChars)
   const pages: string[] = []
-  for (let index = 0; index < lines.length; index += linesPerPage) {
-    pages.push(lines.slice(index, index + linesPerPage).join('\n'))
+  let page = ''
+  let used = 0
+  const flush = () => {
+    pages.push(page)
+    page = ''
+    used = 0
   }
-  return pages.length ? pages : ['']
+  for (const line of content.split('\n')) {
+    const chars = Array.from(line)
+    const whole = Math.max(1, Math.ceil(chars.length / width))
+    if (used > 0 && whole <= budget && used + whole > budget) flush()
+    let index = 0
+    let first = true
+    do {
+      if (used >= budget) flush()
+      const piece = chars.slice(index, index + (budget - used) * width).join('')
+      page += (page && first ? '\n' : '') + piece
+      used += Math.max(1, Math.ceil(Array.from(piece).length / width))
+      index += Array.from(piece).length
+      first = false
+    } while (index < chars.length)
+  }
+  if (pages.length === 0 || page) pages.push(page)
+  return pages
 }
 
 export type PolicyGoneCopy = {

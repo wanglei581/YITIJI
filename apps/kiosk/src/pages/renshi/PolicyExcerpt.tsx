@@ -32,9 +32,9 @@ export function PolicyExcerpt({ content, title, source, published, onOverlay }: 
         </div>
         <div className="policy-read" data-testid="policy-excerpt-page">{pages[safePage]}</div>
         <div className="policy-read-pager">
-          <button type="button" disabled={safePage === 0} onClick={() => setPage((current) => Math.max(0, current - 1))}>上一页</button>
+          <button type="button" className="policy-min-button" disabled={safePage === 0} onClick={() => setPage((current) => Math.max(0, current - 1))}>上一页</button>
           <span>第 {safePage + 1} / {pages.length} 页</span>
-          <button type="button" disabled={safePage >= pages.length - 1} onClick={() => setPage((current) => Math.min(pages.length - 1, current + 1))}>下一页</button>
+          <button type="button" className="policy-min-button" disabled={safePage >= pages.length - 1} onClick={() => setPage((current) => Math.min(pages.length - 1, current + 1))}>下一页</button>
         </div>
         <p className="policy-read-note">这是发布机构填写的正文，原样显示，没有改动；办理以发布机构原文为准。</p>
         <button type="button" className="policy-min-button" data-testid="policy-excerpt-close" onClick={() => setOpen(false)}>收起</button>
