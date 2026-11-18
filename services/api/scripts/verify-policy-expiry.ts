@@ -404,6 +404,12 @@ async function main(): Promise<void> {
     const cafeIds = [cafeUpper, cafeLower]
     await assertCaseFold(`Cafe${caseMarker}`, cafeIds)
     await assertCaseFold(`cafe${caseMarker}`, cafeIds)
+    const ecoleUpper = await seedPublished(`学校École${caseMarker}`, '大写重音按字面')
+    const ecoleLower = await seedPublished(`学校école${caseMarker}`, '小写重音按字面')
+    // É 与 é 按字面。École 和 ÉCOLE 只差 A-Z，都只命中大写 É 那一条。école 只命中小写 é 那一条。
+    await assertCaseFold(`École${caseMarker}`, [ecoleUpper])
+    await assertCaseFold(`école${caseMarker}`, [ecoleLower])
+    await assertCaseFold(`ÉCOLE${caseMarker}`, [ecoleUpper])
     const aiIds = [aiUpper, aiLower]
     await assertCaseFold(`AI${caseMarker}`, aiIds)
     await assertCaseFold(`ai${caseMarker}`, aiIds)
@@ -417,15 +423,9 @@ async function main(): Promise<void> {
     await assertCaseFold(`ai%${caseMarker}`, percentCaseIds)
     assert.equal((await literalPage(`AI%${caseMarker}`)).data.some((row) => row.id === percentWild), false, '含 % 的关键词不得把百分号当成通配')
 
-    const ecoleUpper = await seedPublished(`学校École${caseMarker}`, '大写重音按字面')
-    const ecoleLower = await seedPublished(`学校école${caseMarker}`, '小写重音按字面')
     const ePercentUpper = await seedPublished(`比率É%${caseMarker}`, '重音百分号大写')
     const ePercentLower = await seedPublished(`比率é%${caseMarker}`, '重音百分号小写')
     const abLower = await seedPublished(`标记a_b${caseMarker}`, '下划线小写')
-    // É 与 é 按字面。École 和 ÉCOLE 只差 A-Z，都只命中大写 É 那一条。école 只命中小写 é 那一条。
-    await assertCaseFold(`École${caseMarker}`, [ecoleUpper])
-    await assertCaseFold(`école${caseMarker}`, [ecoleLower])
-    await assertCaseFold(`ÉCOLE${caseMarker}`, [ecoleUpper])
     await assertCaseFold(`É%${caseMarker}`, [ePercentUpper])
     await assertCaseFold(`é%${caseMarker}`, [ePercentLower])
     // 上面的 A_B 断言发生在这条小写夹具写入之前，期望仍是当时那一条。这里两种写法都要命中两条。
