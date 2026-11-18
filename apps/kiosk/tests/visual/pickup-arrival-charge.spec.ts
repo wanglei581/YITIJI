@@ -43,6 +43,7 @@ test('pickup arrival charge explains the machine price and offers pay or back @w
   await expect(back).toBeVisible()
 
   await back.click()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/orders/arrival-order/pay/abandon')).toBe(1)
   await expect(page.getByLabel('到机码输入框')).toBeVisible()
   await expect(page.getByTestId('pickup-arrival-charge')).toHaveCount(0)
 
@@ -103,6 +104,7 @@ test('返回后再输同一枚到机码，订单还在，仍然可以付款 @w2'
   await expect(notice).toContainText('付不成可以返回，订单还在，可以再来付款。')
   await expect(notice).not.toContainText(/岗位|招聘|投递/)
   await page.getByRole('button', { name: '返回', exact: true }).click()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/orders/arrival-order/pay/abandon')).toBe(1)
   await expect(page.getByLabel('到机码输入框')).toBeVisible()
   await expect(notice).toHaveCount(0)
 
@@ -121,6 +123,7 @@ test('换到不收费的机器再输同一枚到机码，不再要求付款 @w2'
   await page.getByLabel('到机码输入框').fill('28491703')
   await expect(page.getByTestId('pickup-arrival-charge')).toContainText('本单 2.00 元')
   await page.getByRole('button', { name: '返回', exact: true }).click()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/orders/arrival-order/pay/abandon')).toBe(1)
   await expect(page.getByLabel('到机码输入框')).toBeVisible()
 
   const context = await browser.newContext({ viewport: { width: 1080, height: 1920 }, locale: 'zh-CN' })

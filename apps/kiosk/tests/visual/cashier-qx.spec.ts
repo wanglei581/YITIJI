@@ -95,6 +95,21 @@ test('cashier renders real channels and sends the selected channel in the pay pa
   expect(payPayload).toEqual({ channel: 'alipay' })
 })
 
+test('退出支付会放弃这次付款并回到首页 @w2', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
+  await page.goto('/print/cashier')
+  await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
+  await expect(page.locator('[data-cashier-exit]')).toBeVisible()
+  const abandon = page.waitForRequest((request) =>
+    request.method() === 'POST' && request.url().includes(`/orders/${W2_ORDER.orderId}/pay/abandon`))
+  await page.locator('[data-cashier-exit]').click()
+  const request = await abandon
+  expect(request.headers()['x-payment-session-token']).toBe('fixture-payment-session')
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+})
+
 test('cashier pending-qr first screen: payment card, exit and dock labels all sit above the fold and stay whole @w2', async ({ page, api }) => {
   // 稿 cashier：通道说明行 + 方式分段 + 订单摘要（三行）+ 收款码卡（含标题与两行说明）+「退出支付」整块落在底栏之上，不靠滚动；
   // 出过码之后返回键是很长的「改参数需重新下单」，底栏三个键的字都不得被省略号截掉。

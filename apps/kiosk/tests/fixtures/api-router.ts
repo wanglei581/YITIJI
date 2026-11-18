@@ -175,6 +175,15 @@ export class ApiRouter {
           })
           return
         }
+        // 离开收银台或核码页会放弃这次付款。没单独登记的用例也回成功，避免拆卸时把这条新请求判成未处理。
+        if (request.method() === 'POST' && /^\/api\/v1\/orders\/[^/]+\/pay\/abandon$/.test(pathname)) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ released: true }),
+          })
+          return
+        }
         this.#unhandledRequests.add(key)
         await route.abort('internetdisconnected')
         return
