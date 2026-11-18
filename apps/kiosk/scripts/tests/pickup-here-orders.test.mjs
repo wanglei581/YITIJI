@@ -128,6 +128,57 @@ test('点单失败的可恢复说法不叫人输码', () => {
   assert.doesNotMatch(here.PICKUP_HERE_RESUME_NOTE, /到机码/)
 })
 
+test('我的打印订单里的手机待取单：本机可以来取，别的机器写去处，现场单不进', () => {
+  const rows = here.pendingPickupRows([
+    { kind: 'kiosk_task', orderId: 'task-1', title: '现场简历.pdf', itemCount: 1, claimableHere: true },
+    { kind: 'cloud_single', orderId: '', title: '空单号.pdf', itemCount: 1, claimableHere: true },
+    { kind: 'cloud_single', orderId: 'ord-here', title: '简历.pdf', itemCount: 1, claimableHere: true, pickupCode: '28491703' },
+    {
+      kind: 'cloud_single', orderId: 'ord-other', title: '别的机器.pdf', itemCount: 1, claimableHere: false,
+      terminal: { displayName: '2号机', locationLabel: '市人才市场' },
+    },
+    {
+      kind: 'package', orderId: 'pkg-far', title: null, itemCount: 2, claimableHere: false,
+      terminal: { displayName: '大厅', locationLabel: '大厅' },
+    },
+    { kind: 'cloud_single', orderId: 'ord-blank', title: '无名网点.pdf', itemCount: 1, claimableHere: false, terminal: null },
+    {
+      kind: 'cloud_single', orderId: 'ord-ctrl', title: '控制符.pdf', itemCount: 1, claimableHere: false,
+      terminal: { displayName: '3号机\u0000', locationLabel: '  西门  ' },
+    },
+  ])
+  assert.deepEqual(rows.map((row) => ({ orderId: row.orderId, claimableHere: row.claimableHere, elsewhere: row.elsewhere, label: row.label })), [
+    { orderId: 'ord-here', claimableHere: true, elsewhere: null, label: '简***.pdf' },
+    { orderId: 'ord-other', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到市人才市场的2号机领取', label: '别***.pdf' },
+    { orderId: 'pkg-far', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到大厅领取', label: '材料包 · 2 个文件' },
+    { orderId: 'ord-blank', claimableHere: false, elsewhere: here.PICKUP_HERE_OTHER_MACHINE, label: '无***.pdf' },
+    { orderId: 'ord-ctrl', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到西门的3号机领取', label: '控***.pdf' },
+  ])
+  const packed = JSON.stringify(rows)
+  assert.equal(packed.includes('28491703'), false)
+  assert.equal(packed.includes('简历.pdf'), false)
+  assert.equal(packed.includes('工作人员'), false)
+  assert.equal(here.pendingPickupPlace({
+    kind: 'cloud_single', orderId: 'x', title: null, itemCount: 1, claimableHere: false,
+    terminal: { displayName: '   ', locationLabel: '\u0007' },
+  }), null)
+})
+
+test('我的打印订单复用取件时间线，不另造接口', () => {
+  const page = readFileSync(join(kioskRoot, 'src/pages/profile/me/MyPrintOrdersPage.tsx'), 'utf8')
+  const section = readFileSync(join(kioskRoot, 'src/pages/profile/me/printOrders/PendingPickupSection.tsx'), 'utf8')
+  const api = readFileSync(join(kioskRoot, 'src/services/api/pickupHereOrdersApi.ts'), 'utf8')
+  assert.match(page, /usePendingPickupOrders/)
+  assert.match(page, /<PendingPickupSection/)
+  assert.match(section, /listPickupHereOrders/)
+  assert.match(section, /手机上还没取的单这次没读到/)
+  assert.match(section, /到这台取件/)
+  assert.match(section, /去哪台取/)
+  assert.match(api, /\/me\/print-orders\/timeline/)
+  assert.doesNotMatch(`${page}\n${section}`, /\/me\/print-orders\/pending|claim-here/)
+  assert.doesNotMatch(`${page}\n${section}`, /工作人员/)
+})
+
 test('点领取时服务端说不在这台机器：用服务端那句，空句或叫人找工作人员时用无人值守替身', () => {
   assert.equal(
     here.pickupHereMismatchMessage('这笔订单不在这台机器取件，请到下单时选的网点领取'),

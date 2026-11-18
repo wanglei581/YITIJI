@@ -493,6 +493,8 @@ const allowedPrintOrdersInkpaperChanged = new Set([
   // 这是同一个 PR 内第三处被迫加行的范围 allowlist（前两处见
   // verify-profile-print-orders-inkpaper.mjs 里的说明）。
   'apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts',
+  // S15c（2026-11-18）：手机待取单分区。只加白名单行，不改上面的行为断言。
+  'apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx',
 ])
 /** 2026-07-25：冻结项诚实文案 / 合规入口收口（允许主入口标签与 toast，不做视觉换装）。 */
 const allowedHonestCopyChanged = new Set([

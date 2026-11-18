@@ -28,6 +28,7 @@ import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock } from './qx/QxMeState
 import { MeActs, MeBtn, MeP, MeRow, MeRows, MeSeg } from '../touch/MeKit'
 import { MeEmptyPack, MeExitCard } from '../touch/MeStatePacks'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
+import { PendingPickupSection, pendingPickupBannerNote, usePendingPickupOrders } from './printOrders/PendingPickupSection'
 import {
   formatAmountCents,
   isFreeMemberOrder,
@@ -236,18 +237,41 @@ export function MyPrintOrdersPage() {
     return items.filter((i) => f.match(i.status))
   }, [items, filterKey])
 
-  const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 ? 'empty' : 'ready'
+  const pendingPickup = usePendingPickupOrders(isLoggedIn ? getToken() : null)
+  const pendingBlocking = isLoggedIn && state === 'ready' && items.length === 0
+    && (pendingPickup.presence === 'loading' || pendingPickup.presence === 'off')
+  const uiState = !isLoggedIn
+    ? 'login'
+    : state === 'loading' || pendingBlocking
+      ? 'loading'
+      : state === 'error'
+        ? 'error'
+        : state === 'ready' && items.length === 0 && pendingPickup.presence === 'hidden'
+          ? 'empty'
+          : 'ready'
+  const pickupNote = pendingPickupBannerNote(pendingPickup.presence)
   const miniOn = whenMiniapp(useSupportContact(isLoggedIn), 'on') !== ''
   const allLoadedFree = items.length > 0 && items.every(isFreeMemberOrder)
+  const pickupBlock = (
+    <>
+      {miniOn ? (
+        <button type="button" className="me-line" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/print/pickup-claim')}>
+          <b>手机上下的到店单，到机器上输到机码取件</b>
+          {pickupNote ? <small>{pickupNote}</small> : null}
+        </button>
+      ) : null}
+      <PendingPickupSection presence={pendingPickup.presence} rows={pendingPickup.rows} onReload={pendingPickup.reload} />
+    </>
+  )
 
   let body: ReactNode
   if (!isLoggedIn) {
     body = <QxMeLoginBlock title="登录后查看打印订单" />
-  } else if (state === 'loading') {
+  } else if (state === 'loading' || pendingBlocking) {
     body = <QxMeLoadingBlock title="正在加载打印订单" />
   } else if (state === 'error') {
     body = <QxMeErrorBlock onRetry={() => setReloadKey((k) => k + 1)} />
-  } else if (items.length === 0) {
+  } else if (items.length === 0 && pendingPickup.presence === 'hidden') {
     body = (
       <div className="me-state" data-testid="qx-me-fallback">
         <MeEmptyPack sentence="还没有打印订单。没登录时在这台机器上打的单不会进这个账号。">
@@ -258,6 +282,8 @@ export function MyPrintOrdersPage() {
         </MeEmptyPack>
       </div>
     )
+  } else if (items.length === 0) {
+    body = pickupBlock
   } else {
     const syncNote = autoRefreshChecking
         ? '正在同步进行中的订单…'
@@ -266,12 +292,7 @@ export function MyPrintOrdersPage() {
           : '进行中的订单会自动刷新。没登录时在这台机器上打的单不会进这个账号。'
     body = (
       <>
-        {miniOn ? (
-          <button type="button" className="me-line" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/print/pickup-claim')}>
-            <b>手机上下的到店单，到机器上输到机码取件</b>
-            <small>还没核销出打印任务的单，不在下面的列表里</small>
-          </button>
-        ) : null}
+        {pickupBlock}
         {/* 任务状态筛选（对已加载数据过滤） */}
         <MeSeg
           mode="pressed"

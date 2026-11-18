@@ -22,6 +22,11 @@ export function maskPickupFileName(name: string | null | undefined): string | nu
 }
 
 /** 时间线里用得到的字段。到机码和原始文件名不进这一层的输出。 */
+export interface PickupHereTerminal {
+  displayName?: string | null
+  locationLabel?: string | null
+}
+
 export interface PickupHereSource {
   kind: string
   orderId: string | null
@@ -30,6 +35,7 @@ export interface PickupHereSource {
   claimableHere: boolean
   createdAt?: string | null
   billablePages?: number | null
+  terminal?: PickupHereTerminal | null
 }
 
 export interface PickupHereRow {
@@ -64,6 +70,13 @@ export function pickupHereDetail(item: { createdAt?: string | null; billablePage
   return parts.length > 0 ? parts.join(' · ') : null
 }
 
+function pickupLabel(item: PickupHereSource): string {
+  if (item.kind === 'package') {
+    return Number.isInteger(item.itemCount) && item.itemCount > 0 ? `材料包 · ${item.itemCount} 个文件` : '材料包'
+  }
+  return maskPickupFileName(item.title) ?? '文件'
+}
+
 /** 只留手机单件和材料包，并且服务端已经判定能在这台机器领。现场单不进这张表。 */
 export function pickupHereRows(items: readonly PickupHereSource[]): PickupHereRow[] {
   const rows: PickupHereRow[] = []
@@ -71,10 +84,60 @@ export function pickupHereRows(items: readonly PickupHereSource[]): PickupHereRo
     if (item.claimableHere !== true) continue
     if (item.kind !== 'cloud_single' && item.kind !== 'package') continue
     if (typeof item.orderId !== 'string' || item.orderId.length === 0) continue
-    const label = item.kind === 'package'
-      ? (Number.isInteger(item.itemCount) && item.itemCount > 0 ? `材料包 · ${item.itemCount} 个文件` : '材料包')
-      : (maskPickupFileName(item.title) ?? '文件')
-    rows.push({ orderId: item.orderId, label, detail: pickupHereDetail(item) })
+    rows.push({ orderId: item.orderId, label: pickupLabel(item), detail: pickupHereDetail(item) })
+  }
+  return rows
+}
+
+export interface PendingPickupRow extends PickupHereRow {
+  claimableHere: boolean
+  /** 不在这台机器时的去处。能在这台领时为 null。 */
+  elsewhere: string | null
+}
+
+function cleanPlace(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null
+  // 网点名来自后台。控制字符不进句子。不用字符类正则，避免 no-control-regex。
+  let cleaned = ''
+  for (const ch of value) {
+    const code = ch.codePointAt(0) ?? 0
+    cleaned += code <= 31 || code === 127 ? ' ' : ch
+  }
+  const trimmed = cleaned.replace(/\s+/g, ' ').trim()
+  return trimmed || null
+}
+
+/** 有网点名或机器名就用来指路。两者都有且不同，写成「网点的机器」。 */
+export function pendingPickupPlace(item: PickupHereSource): string | null {
+  const name = cleanPlace(item.terminal?.displayName)
+  const location = cleanPlace(item.terminal?.locationLabel)
+  if (location && name && location !== name) return `${location}的${name}`
+  return location ?? name
+}
+
+export function pendingPickupElsewhere(place: string | null): string {
+  if (!place) return PICKUP_HERE_OTHER_MACHINE
+  return `这笔订单不在这台机器取件，请到${place}领取`
+}
+
+/**
+ * 我的打印订单里的手机待取单。
+ * 现场单不进这里（那些已经在打印任务列表里）。
+ * 不在这台机器的也留下，并写明去哪台取。没有订单号的不列。
+ */
+export function pendingPickupRows(items: readonly PickupHereSource[]): PendingPickupRow[] {
+  const rows: PendingPickupRow[] = []
+  for (const item of items) {
+    if (item.kind !== 'cloud_single' && item.kind !== 'package') continue
+    if (typeof item.orderId !== 'string' || item.orderId.length === 0) continue
+    const claimableHere = item.claimableHere === true
+    rows.push({
+      orderId: item.orderId,
+      label: pickupLabel(item),
+      detail: pickupHereDetail(item),
+      claimableHere,
+      elsewhere: claimableHere ? null : pendingPickupElsewhere(pendingPickupPlace(item)),
+    })
   }
   return rows
 }

@@ -130,6 +130,12 @@ export class ApiRouter {
       status: 200,
       json: kioskProfileBody(UNVERIFIED_KIOSK_PROFILE),
     })
+    // 我的打印订单登录后会读取件时间线（与取件页同一条 GET /me/print-orders/timeline）。
+    // 默认空列表：没有待取单时不画分区，既有「还没有打印订单」用例保持原句。要看有单或读失败的用例自行覆盖。
+    this.respond('GET', '/api/v1/me/print-orders/timeline', {
+      status: 200,
+      json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+    })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
       status: 200,
