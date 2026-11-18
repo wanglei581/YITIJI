@@ -9,7 +9,7 @@
  * 3. 我的打印订单列出手机上下、还没取的单（地址 ?login=1&pk=…#my-orders）：有待取单没有打印任务、
  *    有待取单也有打印任务、读失败、走错机器；另画读失败且没有打印任务。
  * 原有稿文件一个字不改，只包住它们画出来的屏。地址加 ?ps=0 看改前原样。
- * 状态键：S().pfRetry（blocked / ready / none）、S().pfTake（qr / miss）、S().pfJam、
+ * 状态键：S().pfRetry（blocked / ready / none）、S().pfTake（qr / miss / expired）、S().pfJam、
  *   S().pk（'' / rows / both / fail / fail-empty / elsewhere）、S().pkReload；S().printer 多一个值 jam。
  * 依据：分支 claude/print-status-s15c-1118 头 61c89198d（S15c2）的 printDoneFailedModel.ts、printProgressModel.ts、
  *   PrintDoneFailed.tsx、QxPrintHubView.tsx、PrintScanHomePage.tsx、PendingPickupSection.tsx、pendingPickupExits.ts、
@@ -30,7 +30,7 @@
       Object.defineProperty(s, '__ps19', { value: true, enumerable: false });
       if (Q.get('printer') === 'jam') s.printer = 'jam';
       s.pfRetry = ['ready', 'none'].indexOf(Q.get('pfRetry')) >= 0 ? Q.get('pfRetry') : 'blocked';
-      s.pfTake = Q.get('pfTake') === 'miss' ? 'miss' : 'qr';
+      s.pfTake = ['miss', 'expired'].indexOf(Q.get('pfTake')) >= 0 ? Q.get('pfTake') : 'qr';
       s.pfJam = Q.get('pfJam') === '1';
       s.pk = ['rows', 'both', 'fail', 'fail-empty', 'elsewhere'].indexOf(Q.get('pk')) >= 0 ? Q.get('pk') : '';
       s.pkReload = false;
@@ -107,8 +107,9 @@
 .pk-err p{flex:1;margin:0;font-size:24px;line-height:1.45;font-weight:700}
 .pk-err p span{display:block;font-size:22px;font-weight:600}
 .pk-page .fe-rows.few{flex:0 0 auto}
-.pk-exits .fe-exit>div:first-child{flex:none;width:250px;height:100%;display:grid;place-items:center}
-.pk-exits .fe-exit svg{width:auto;height:auto;max-width:250px;max-height:100%}
+.pk-exits .fe-exit{flex:1 1 0}
+.pk-exits .fe-exit>div:first-child{flex:none;width:240px;height:100%;display:grid;place-items:center}
+.pk-exits .fe-exit svg{width:auto;height:auto;max-width:240px;max-height:100%}
 .pk-err .btn{flex:none;min-width:0;height:72px;padding:0 26px;font-size:24px}
 `;
   document.head.appendChild(css);
@@ -121,9 +122,9 @@
       name: '打印失败：打印机缺纸（11/19 补稿）',
       code: 'PAPER_EMPTY',
       fault: () => '打印机缺纸',
-      subFault: () => '打印机缺纸',
+      subFault: () => '机器缺纸，加纸后也不会自动续打',
       step1: () => LOOK,
-      tail: '这次打印不会在加纸后自己接着打。',
+      tail: '',
       report: '打印机缺纸，当前无法打印。',
       blocked: () => '打印机现在还缺纸，暂时不能重新提交；机器恢复后，这个按钮会自己亮起。'
     },
@@ -132,10 +133,10 @@
       name: '打印失败：打印机出了故障（可能卡纸）（11/19 补稿）',
       code: 'PRINTER_ERROR',
       fault: () => (S().pfJam ? '打印机卡纸' : '打印机出了故障（可能卡纸）'),
-      subFault: () => (S().pfJam ? '打印机卡纸' : '打印机出了故障（可能卡纸）'),
+      subFault: () => (S().pfJam ? '机器卡纸' : '机器出了故障'),
       step1: () => ['已出的纸取走收好，不要开机盖、不要拽纸', S().pfJam ? '卡着的纸撕在里面更难取，也可能弄坏机器。' : '可能卡了纸，撕在里面更难取，也可能弄坏机器。'],
       tail: '这次打印不会自己接着打。',
-      report: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。',
+      report: () => (S().pfJam ? '打印机卡纸，当前无法打印。' : '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。'),
       blocked: () => (S().pfJam ? '打印机现在还卡着纸' : '打印机现在还有故障') + '，暂时不能重新提交；机器恢复后，这个按钮会自己亮起。'
     },
     offline: {
@@ -158,9 +159,10 @@
     const retry = s.pfRetry || 'blocked';
     const fault = K.fault();
     const sub = (paid ? '你的订单和已付金额都保留着。' : '你的订单还在。') + K.subFault() + '，我们已经收到提醒，会尽快处理';
+    const lead = K.tail ? K.tail + '<br>' : '';
     const step2 = retry === 'none'
-      ? K.tail + '<br>' + (paid ? '是否补打、费用怎么处理，以订单记录为准；' : '是否补打，以订单记录为准；') + '你可以稍后再来。'
-      : K.tail + '<br>机器恢复后，用下面的「重新提交打印」整份重打' + (paid ? '，不再收费' : '') + '；也可以稍后再来。';
+      ? lead + (paid ? '是否补打、费用怎么处理，以订单记录为准；' : '是否补打，以订单记录为准；') + '你可以稍后再来。'
+      : lead + '机器恢复后，用下面的「重新提交打印」整份重打' + (paid ? '，不再收费' : '') + '；也可以稍后再来。';
     const steps = [
       K.step1(),
       [paid ? '请不要重新下单，那会变成两笔费用' : '请不要重新下单', step2],
@@ -171,7 +173,7 @@
       ['文件', '毕业生就业推荐表（已填写）<span class="d3-ext">.pdf</span>'],
       ['参数', '2 张 · 黑白 · 单面'],
       paid ? ['支付状态', '已付 2.00 元'] : ['办理方式', '免费试运营，本单 0 元'],
-      ['设备上报', K.report]
+      ['设备上报', typeof K.report === 'function' ? K.report() : K.report]
     ];
     let retryBtn = '';
     let why = '';
@@ -180,8 +182,8 @@
       retryBtn = `<button class="btn sec pf-retry" aria-disabled="true" aria-describedby="pfWhy">重新提交打印</button>`;
       why = `<p class="pf-why" id="pfWhy" role="status">${icon('lock', 26, 2.2)}<span>${K.blocked()}</span></p>`;
     }
-    const take = s.pfTake === 'miss'
-      ? '<p class="fine">带走链接没取到。</p>'
+    const take = s.pfTake === 'miss' || s.pfTake === 'expired'
+      ? `<p class="fine">${s.pfTake === 'miss' ? '手机带走链接这次没取到，不影响这笔订单。' : '手机带走链接已过期，不影响这笔订单。'}</p>`
       : `<section class="pf-take" aria-label="文件带走"><div class="q">${UI.qr(11, 160)}</div><div><b>文件带走</b><span class="left">剩余 29 分 41 秒</span><small>请用本人手机扫码保存</small></div></section>`;
     const L = s.fmLayer && s.fmLayer.id === K.id ? s.fmLayer : null;
     const layer = !L ? '' : L.kind === 'order' ? orderLayer(paid) : window.FM.layerFor([K.id]);
@@ -209,12 +211,12 @@
 
   const FAIL_COMMON = '对应运行页 /print/done 的失败态（PrintDoneFailed.tsx，文案在 printDoneFailedModel.ts）。版式照状态样式板「结果未确认」：三步 + 订单摘要 + 出口 +「文件带走」+「查看打印订单」+ 小字；底部「返回首页 / 问小青：取纸或异常怎么办 / 使用帮助」。'
     + '标题、副句、胶囊说同一件事，胶囊只写故障，不再带「免费试运营，本单 0 元 ·」前缀（付款事实在摘要「办理方式 / 支付状态」一行；前缀加上「打印机出了故障（可能卡纸）」会把左上角「职易达」和右上角日期挤成两行）。'
-    + '副句一律是「你的订单还在。{故障}，我们已经收到提醒，会尽快处理」，收费点位换成「你的订单和已付金额都保留着。…」。'
-    + '第 2 步一律「请不要重新下单」：说清这次打印不会自己接着打，机器恢复后用「重新提交打印」整份重打，也可以稍后再来。'
+    + '副句一律是「你的订单还在。{机器怎么了}，我们已经收到提醒，会尽快处理」，不复述标题：缺纸「机器缺纸，加纸后也不会自动续打」、故障「机器出了故障」、确实卡纸「机器卡纸」、离线「打印机没连上」；收费点位换成「你的订单和已付金额都保留着。…」。'
+    + '第 2 步一律「请不要重新下单」：故障、离线先说「这次打印不会自己接着打。」（缺纸在副句说过），再说机器恢复后用「重新提交打印」整份重打，也可以稍后再来。'
     + '第 3 步一律是结果未确认那一屏的第 3 步：「需要帮助？拨打服务电话 …，报这一单的订单号」，服务时间另起一行；服务电话只出现在这里——「设备上报」只写设备那一句，「带走链接没取到」后面不接电话，小字不接电话。'
     + '「我们已经收到提醒，会尽快处理」只在副句说一次，第 3 步不再整句贴标准句 2。附近还有在线终端时（otherOnlineTerminalNearby），第 2 步末尾「也可以稍后再来」改成「也可以换一台机器继续，或稍后再来」。'
     + '「重新提交打印」只在带走链接接口给出 canRetry 时有：打印机还没好时置灰（aria-disabled），原因写在按钮下面一行，句子只说为什么不能点和什么时候会亮，「订单还在，请不要重新下单」第 2 步已经说过，不再重复；机器恢复后按钮自己亮起（演示事件），点了去出纸中。拿不到 canRetry 时不画按钮，第 2 步换成「是否补打，以订单记录为准；你可以稍后再来」（演示事件「这一单不能重新提交」）。'
-    + '「文件带走」：带走链接签发成功才有，二维码不小于 168px，剩余时间按 30 分钟有效期倒数；没取到只写一行「带走链接没取到。」。'
+    + '「文件带走」：带走链接签发成功才有，二维码不小于 168px，剩余时间按 30 分钟有效期倒数；没取到（含接口回 500）写「手机带走链接这次没取到，不影响这笔订单。」，到期写「手机带走链接已过期，不影响这笔订单。」，两句都不接电话。'
     + '「查看打印订单」和结果未确认一样画在这里；运行页只在登录后有这一行，没登录时不画，下面小字接上来。从到机码来的单，小字上面加运行页的同码续打句（SAME_CODE_RESUME_LINE），本帧是现场单不画。'
     + '「查看订单说明」在本屏开弹层（和结果未确认一致）；收费点位叫「查看费用说明」。订单号、文件、参数从这一单读，示例同结果未确认。'
     + '收费点位（?fee=1）只改钱的几处：副句、摘要「支付状态 已付 2.00 元」、出口「查看费用说明」、第 2 步「那会变成两笔费用」「不再收费」。退款句不写：11/13 定的是「能重试的失败同一单免费再试一次，不再试或再不成钱自动退回」，运行页失败页现在写「本机不会自动处理费用」，两边不一致，等收费线（P2e）一起定。'
@@ -234,7 +236,8 @@
       demo: () => [
         { label: '演示：打印机恢复了（「重新提交打印」亮起）', ev: 'pf-ready' },
         { label: '演示：这一单不能重新提交（没有 canRetry）', ev: 'pf-none' },
-        { label: '演示：带走链接没取到', ev: 'pf-miss' }
+        { label: '演示：带走链接没取到', ev: 'pf-miss' },
+        { label: '演示：带走链接到期（30 分钟）', ev: 'pf-expired' }
       ].concat(k === 'fault' ? [{ label: S().pfJam ? '演示：回到「可能卡纸」' : '演示：公开状态确实是卡纸（paper_jam）', ev: 'pf-jam' }] : [])
         .concat([{ label: '演示：恢复默认', ev: 'pf-reset' }]),
       render: () => failRender(k),
@@ -244,6 +247,7 @@
           if (e.detail === 'pf-ready') s.pfRetry = 'ready';
           else if (e.detail === 'pf-none') s.pfRetry = 'none';
           else if (e.detail === 'pf-miss') s.pfTake = 'miss';
+          else if (e.detail === 'pf-expired') s.pfTake = 'expired';
           else if (e.detail === 'pf-jam') s.pfJam = !s.pfJam;
           else if (e.detail === 'pf-reset') { s.pfRetry = 'blocked'; s.pfTake = 'qr'; s.pfJam = false; }
           else return;
@@ -263,8 +267,9 @@
     failDef('fault', {
       does: '运行页 /print/done 的故障失败态：errorCode 为 PRINTER_ERROR（variant paper-jam）。设备只报了故障，不一定是卡纸，所以不说死。',
       keep: () => (S().pfJam
-        ? '这一帧是公开打印机状态确实为卡纸（paper_jam，打印机报 DetectedErrorState=8）时：标题、胶囊、副句都写「打印机卡纸」，第 1 步说明写「卡着的纸撕在里面更难取」。设备上报仍是 PRINTER_ERROR 的原句「打印机可能卡纸或发生设备故障，当前暂时无法继续使用。」，和标题不矛盾（卡纸是其中一种）。'
-        : '标题、胶囊、副句都写「打印机出了故障（可能卡纸）」，和设备上报原句「打印机可能卡纸或发生设备故障，当前暂时无法继续使用。」同一口径；只有公开打印机状态确实是卡纸才改写「打印机卡纸」（演示事件）。还在读状态、离线、缺纸、别的故障都按「可能卡纸」写。')
+        ? '这一帧是公开打印机状态确实为卡纸（paper_jam，打印机报 DetectedErrorState=8）时：标题、胶囊写「打印机卡纸」，副句「你的订单还在。机器卡纸，我们已经收到提醒，会尽快处理」，第 1 步说明写「卡着的纸撕在里面更难取」，设备上报换成「打印机卡纸，当前无法打印。」（和缺纸、离线同一写法），整屏不再出现「可能卡纸」。'
+        : '标题、胶囊写「打印机出了故障（可能卡纸）」，副句「你的订单还在。机器出了故障，我们已经收到提醒，会尽快处理」，和设备上报原句「打印机可能卡纸或发生设备故障，当前暂时无法继续使用。」同一口径；只有公开打印机状态确实是卡纸才改写「打印机卡纸」（演示事件）。还在读状态、离线、缺纸、别的故障都按「可能卡纸」写。')
+        + '确实卡纸只升不降：这一页读到过一次 paper_jam 就一直写「打印机卡纸」，打印机恢复后不改回「可能卡纸」，换一单或离开本页才重置，标题和胶囊不来回跳。'
         + '第 1 步把取纸和「不要开机盖、不要拽纸」并成一步（可能卡了纸，撕在里面更难取，也可能弄坏机器），第 2、3 步和另两态一样。'
     }),
     failDef('offline', {
@@ -401,7 +406,7 @@
       ? `<button type="button" class="fe-seg-b on" disabled>${label}</button>`
       : `<button type="button" class="fe-seg-b" data-fe="filt" data-arg="${id}">${label}</button>`)).join('')}</div>`;
     if (!rows.length) {
-      return seg + `<p class="fe-p">这个筛选下没有订单。</p><div class="fe-stack">${exitCard('data-fe="filt" data-arg="all"', UI.checklist(120), '查看全部', '全部订单都在「全部」里')}${exitCard('data-go="print"', UI.usb(120), '去打印', '打一份新的，会新建一张打印任务')}</div>`;
+      return seg + `<p class="fe-p">这个筛选下没有订单。</p><div class="fe-stack pk-exits">${exitCard('data-fe="filt" data-arg="all"', UI.checklist(120), '查看全部', '全部订单都在「全部」里')}${exitCard('data-go="print"', UI.usb(120), '去打印', '打一份新的，会新建一张打印任务')}</div>`;
     }
     const list = rows.map((r) => {
       const detail = open === r.id ? `<div class="fe-acts">${btnHtml('btn pri sm', 'data-go="my-docs"', '去我的文档再打印')}${r.bucket === 'done' ? btnHtml('btn sec sm', 'data-fe="to-fb"', '反馈问题') : ''}</div>
@@ -412,7 +417,7 @@
       return `<div class="fe-line">${btnHtml('fe-open', `data-fe="open" data-arg="${r.id}"`, `<b>${r.name}</b><small>${r.st} · ${r.when} · ${PAY}${r.code ? ' · 到机码' : ''}</small>`)}${detail}</div>`;
     }).join('');
     const few = rows.length < 5 && !open;
-    const tail = few ? `<div class="fe-stack">${exitCard('data-go="print"', UI.usb(110), '去打印', '打一份新的，会新建一张打印任务')}${exitCard('data-go="my-docs"', UI.stack(110, 3), '去我的文档', '从已保存的文件里再选一份')}</div>` : '';
+    const tail = few ? `<div class="fe-stack pk-exits">${exitCard('data-go="print"', UI.usb(110), '去打印', '打一份新的，会新建一张打印任务')}${exitCard('data-go="my-docs"', UI.stack(110, 3), '去我的文档', '从已保存的文件里再选一份')}</div>` : '';
     return seg + `<div class="fe-rows${few ? ' few' : ''}${open ? ' is-scroll' : ''}">${list}</div>
       <div class="remind">${icon('alert', 34, 2)}<span>进行中的订单会自动刷新。没登录时在这台机器上打的单不会进这个账号。</span></div>${tail}`;
   }
@@ -425,9 +430,8 @@
     const banner = btnHtml('fe-line', 'data-go="pickup"', `<b>手机上下的到店单，到机器上输到机码取件</b>${fail ? '' : '<small>还没取的手机单列在这一条下面。</small>'}`);
     const block = fail ? errBox(hasTasks) : `<div class="pk-list" role="list" aria-label="手机上还没取的单">${pick.join('')}</div>`;
     const main = hasTasks ? taskList()
-      : `<div class="fe-stack pk-exits">${exitCard('data-go="print"', UI.usb(210), '去打印', 'U 盘、手机或扫描都可以')}${exitCard('data-go="pickup"', UI.phone(118), '输到机码取件', '手机上下的到店单，到机器上输入到机码')}</div>`;
-    const sub = hasTasks ? `共 ${TASKS.length} 条已产生打印任务的单`
-      : fail ? '还没有归入账号的打印任务' : `手机上下的单还有 ${pick.length} 笔没取`;
+      : `<div class="fe-stack pk-exits">${exitCard('data-go="print"', UI.usb(200), '去打印', 'U 盘、手机或扫描都可以')}${exitCard('data-go="my-docs"', UI.stack(170, 3), '去我的文档', '从已保存的文件里再选一份')}</div>`;
+    const sub = hasTasks ? `共 ${TASKS.length} 条已产生打印任务的单` : '还没有归入账号的打印任务';
     const tabs = '<div class="fe-seg"><button type="button" class="fe-seg-b" data-go="my-docs">文档</button><button type="button" class="fe-seg-b on" disabled>订单</button></div>';
     return band({ kind: 'compact', eyebrow: '我的 · 打印订单', title: '打印订单', sub, seal: null, status: printerStatus(), back: true })
       + `<main class="body fe-fill pk-page">${tabs}${banner}${block}${main}</main>`
@@ -482,13 +486,13 @@
       return () => { el.removeEventListener('proto-demo', onDemo); el.removeEventListener('click', onClick); if (c0) c0(); };
     };
     const PK_NOTE = {
-      rows: '【11/19 有待取单、还没有打印任务，地址 ?login=1&pk=rows】待取单块下面接「没有打印订单」空态的两张出路卡「去打印」「输到机码取件」（pendingPickupExits.ts；小程序没发布时第二张换成「看看我的文档」）。副题写「手机上下的单还有 N 笔没取」。',
+      rows: '【11/19 有待取单、还没有打印任务，地址 ?login=1&pk=rows】待取单块下面接两张出路卡「去打印」「去我的文档」：第二张不用「输到机码取件」，因为上面横幅和每笔「到这台取件」都已经去到机码页（S15c3 第 2 条；小程序没发布时照旧「看看我的文档」）。副题照空态写「还没有归入账号的打印任务」（S15c3 第 3 条）。',
       elsewhere: '【11/19 走错机器，地址 ?login=1&pk=elsewhere】服务端判定不能在这台领（claimableHere 为假）的单也列出来，不给「到这台取件」，写「去哪台取」和「这笔订单不在这台机器取件，请到{网点的机器}领取」；网点名和机器名都没有时写「这笔订单不在这台机器取件，请到下单时选的网点领取」。「去哪台取」是标题，不是按钮。',
       both: '【11/19 有待取单也有打印任务，地址 ?login=1&pk=both】待取单块在筛选条上面，下面是已产生打印任务的单，照原来的列表；任务少于 5 条时底部接「去打印」「去我的文档」。',
       fail: '【11/19 待取单没读到，地址 ?login=1&pk=fail】只在这一块说真话：「手机上还没取的单这次没读到。下面已产生打印任务的订单不受影响。」，「重新读取」放在同一块右边，不另起一行；下面的打印任务照常显示。横幅不写小字。重新读取后进「正在重新读取…」，结果用演示事件。',
-      'fail-empty': '【11/19 待取单没读到、也没有打印任务，地址 ?login=1&pk=fail-empty】句子只说「手机上还没取的单这次没读到。」（下面没有打印任务，不写「下面…不受影响」），下面接「去打印」「输到机码取件」两张出路卡，不留整屏空白。改程序时要落实：运行页现在这一态只有这一块（pendingPickupExitCards 只在读到待取单时给出路卡）。'
+      'fail-empty': '【11/19 待取单没读到、也没有打印任务，地址 ?login=1&pk=fail-empty】句子只说「手机上还没取的单这次没读到。」（下面没有打印任务，不写「下面…不受影响」），下面接「去打印」「去我的文档」两张出路卡，不留整屏空白。改程序时要落实：运行页现在这一态只有这一块（pendingPickupExitCards 只在读到待取单时给出路卡）。'
     };
-    const PK_COMMON = '待取单块对应运行页 PendingPickupSection.tsx（复用取件时间线 GET /me/print-orders/timeline?status=waiting，只读本人的手机单件和材料包，现场单不进这里）。横幅有待取单时小字改成「还没取的手机单列在这一条下面。」。每笔一张卡：左边文件类型块，中间打码后的文件名（保留首字和扩展名）或「材料包 · N 个文件」，下单时间（北京时间）和页数，能在这台领的右边一个「到这台取件」去到机码页。不显示到机码，不显示原始文件名。没有待取单时这一块不画（原来的 my-orders）。收费点位的订单页另见收费补稿，这几态按 0 元画。';
+    const PK_COMMON = '这一页的出路卡（待取单下面、列表尾、筛选为空）插画列一律 240px 宽、插画居中，两张卡等高，标题左边缘对齐（S15c4 第 5 条）。待取单块对应运行页 PendingPickupSection.tsx（复用取件时间线 GET /me/print-orders/timeline?status=waiting，只读本人的手机单件和材料包，现场单不进这里）。横幅有待取单时小字改成「还没取的手机单列在这一条下面。」。每笔一张卡：左边文件类型块，中间打码后的文件名（保留首字和扩展名）或「材料包 · N 个文件」，下单时间（北京时间）和页数，能在这台领的右边一个「到这台取件」去到机码页。不显示到机码，不显示原始文件名。没有待取单时这一块不画（原来的 my-orders）。收费点位的订单页另见收费补稿，这几态按 0 元画。';
     mo.notes = {
       get does() { return n0.does; },
       get motion() { return n0.motion; },
