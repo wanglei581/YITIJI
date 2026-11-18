@@ -135,10 +135,15 @@ export function outOfPaperMoneyOf(
   }
 }
 
+/** 顶栏胶囊前半截。免费写「免费试运营，本单 0 元」，付过写金额，不知道金额只说订单保留。缺纸、卡纸、离线共用。 */
+export function paidLabelOf(money: OutOfPaperMoney): string {
+  if (money.fact === 'free') return '免费试运营，本单 0 元'
+  if (money.fact === 'paid' && money.amountCents != null) return `已付 ${formatCents(money.amountCents)}`
+  return '订单保留'
+}
+
 export function outOfPaperPill(money: OutOfPaperMoney): string {
-  if (money.fact === 'paid' && money.amountCents != null) return `已付 ${formatCents(money.amountCents)} · 缺纸`
-  if (money.fact === 'free') return '免费试运营 · 缺纸'
-  return '订单保留 · 缺纸'
+  return `${paidLabelOf(money)} · 打印机缺纸`
 }
 
 /**

@@ -165,3 +165,18 @@ test('三态失败页上服务电话只出现一次，设备上报和带走失�
   assert.match(page, /shownFailureReason\(variant, verification\?\.failureReason \?\? '', failureReason\)/)
   assert.match(page, /faultScreenTakeawayMiss\(/)
 })
+
+test('缺纸胶囊和卡纸、离线同一写法，写成前缀加打印机缺纸', () => {
+  const paid = { fact: 'paid', amountCents: 200 }
+  const free = { fact: 'free', amountCents: 0 }
+  const unknown = { fact: 'unknown', amountCents: null }
+  assert.equal(progress.outOfPaperPill(paid), `${progress.paidLabelOf(paid)} · 打印机缺纸`)
+  assert.equal(progress.outOfPaperPill(free), `${progress.paidLabelOf(free)} · 打印机缺纸`)
+  assert.equal(progress.outOfPaperPill(unknown), `${progress.paidLabelOf(unknown)} · 打印机缺纸`)
+  assert.match(progress.outOfPaperPill(paid), / · 打印机缺纸$/)
+  const paper = failedModel.failureCopy({ variant: 'out-of-paper', money: paid, orderNo: 'ORD-PILL', canRetry: false })
+  const offline = failedModel.failureCopy({ variant: 'offline', money: paid, orderNo: 'ORD-PILL', canRetry: false })
+  assert.equal(paper.pill, progress.outOfPaperPill(paid))
+  assert.equal(offline.pill.split(' · ')[0], paper.pill.split(' · ')[0])
+  assert.doesNotMatch(paper.pill, /工作人员/)
+})

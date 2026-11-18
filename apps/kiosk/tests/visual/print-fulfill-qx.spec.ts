@@ -156,7 +156,7 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   // takeaway-url 404：订单号与金额退回进页时带来的真值，不编退款状态。
   await expect(taskCard.locator('.qxt-sum-r').filter({ hasText: '订单号' })).toContainText(W2_ORDER.orderNo)
   await expect(taskCard.locator('.qxt-sum-r').filter({ hasText: '支付状态' })).toContainText('已付 ¥2.00')
-  await expect(page.locator('.qx-pill')).toHaveText('已付 ¥2.00 · 缺纸')
+  await expect(page.locator('.qx-pill')).toHaveText('已付 ¥2.00 · 打印机缺纸')
   const steps = outOfPaper.locator('.qxt-step')
   await expect(steps).toHaveCount(3)
   await expect(steps.nth(0)).toContainText('本机不知道出了几页')
@@ -210,7 +210,7 @@ test('PAPER_EMPTY with server canRetry offers whole-file resubmit and server ord
   const outOfPaper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
   await expect(outOfPaper).toBeVisible()
   // 带走接口回了订单：订单号与金额以服务端为准，不用进页时带来的值。
-  await expect(page.locator('.qx-pill')).toHaveText('已付 ¥3.50 · 缺纸')
+  await expect(page.locator('.qx-pill')).toHaveText('已付 ¥3.50 · 打印机缺纸')
   const summary = outOfPaper.getByTestId('print-fulfill-list')
   await expect(summary.locator('.qxt-sum-r').filter({ hasText: '订单号' })).toContainText('ORD-20260929-SRV777')
   await expect(summary.locator('.qxt-sum-r').filter({ hasText: '支付状态' })).toContainText('已付 ¥3.50')

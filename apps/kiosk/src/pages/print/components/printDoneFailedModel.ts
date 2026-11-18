@@ -14,7 +14,7 @@ import { helpNeededLine, machineCannotPrintLine, printProblemLine } from '../../
 import { MINIAPP_DISPLAY_NAME } from '../../../copy/miniappLinkCopy'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_CARD } from '../../../lib/fileName'
 import { formatCents } from '../cashierStatus'
-import { jamOrderKeptLine, jobSubline, orderKeptFaultLine, outOfPaperPill, sameCodeResumeLine, type OutOfPaperMoney } from '../printProgressModel'
+import { jamOrderKeptLine, jobSubline, orderKeptFaultLine, outOfPaperPill, paidLabelOf, sameCodeResumeLine, type OutOfPaperMoney } from '../printProgressModel'
 
 export type FailureVariant = 'failed' | 'paper-jam' | 'out-of-paper' | 'offline'
 
@@ -50,13 +50,6 @@ const PAPER_HELP_FINE = '卡纸、缺纸、没出全？别硬拉纸。'
 
 function orderRefOf(orderNo: string | null): string {
   return orderNo ? `订单号 ${orderNo}` : '这一单'
-}
-
-/** 顶栏胶囊前半截：免费写「免费试运营，本单 0 元」，付过写金额，不知道金额只说订单保留。 */
-export function paidLabelOf(money: OutOfPaperMoney): string {
-  if (money.fact === 'free') return '免费试运营，本单 0 元'
-  if (money.fact === 'paid' && money.amountCents != null) return `已付 ${formatCents(money.amountCents)}`
-  return '订单保留'
 }
 
 /** 第一步三个失败态一样：先看出纸口。本机不知道出了几页，以手里的实物为准。 */
