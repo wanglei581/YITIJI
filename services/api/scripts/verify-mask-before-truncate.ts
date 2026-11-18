@@ -19,6 +19,7 @@ import { LlmResumeService } from '../src/ai/resume/llm-resume.service'
 import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextsForLlmReversible } from '../src/common/pii/llm-input-mask'
 import { LLM_MASK_LONG_DIGIT_CATEGORY, LLM_MASK_PLACEHOLDER_CATEGORIES, llmMaskPlaceholderPattern } from '../src/common/pii/mask-placeholder'
+import { layoutTokenPattern } from '../src/ai/resume/layout-adjust-digit-cover'
 import { cutMaskedLayoutText, maskLayoutAdjustOutbound } from '../src/ai/resume/layout-adjust-mask'
 import { JobAiLlmService } from '../src/job-ai/job-ai-llm.service'
 import { MockInterviewLlmService } from '../src/mock-interview/mock-interview-llm.service'
@@ -84,7 +85,7 @@ const llmConfig = {
   isReady: () => true,
 } as unknown as LlmConfigService
 
-async function outbound(label: string, run: () => Promise<unknown>): Promise<void> {
+async function outbound(label: string, run: () => Promise<unknown>, layout = false): Promise<void> {
   installFakeLlm()
   try {
     await run()
@@ -92,7 +93,21 @@ async function outbound(label: string, run: () => Promise<unknown>): Promise<voi
     // 假模型回的是空 JSON。断言只看已经发出去的正文。
   }
   if (captured.length === 0) fail(`${label} 没有出站`)
-  for (const body of captured) assertClean(`${label}#${captured.indexOf(body) + 1}`, body)
+  for (const body of captured) {
+    if (layout) assertLayoutMarked(`${label}#${captured.indexOf(body) + 1}`, body)
+    else assertClean(`${label}#${captured.indexOf(body) + 1}`, body)
+  }
+}
+
+/**
+ * 排版出站改用本次请求的标记，不再出现 `[身份证_`。
+ * 号码不在、标记在，这条正向断言保留。
+ */
+function assertLayoutMarked(label: string, text: string): void {
+  if (text.includes(ID)) fail(`${label} 出站或落库含整号`)
+  if (text.includes(PREFIX)) fail(`${label} 出站或落库含证件号前 10 位`)
+  if (!layoutTokenPattern('u').test(text)) fail(`${label} 没有遮盖占位符，跨边界号可能没进窗口`)
+  pass(label)
 }
 
 function emptyResume(): GeneratedResume {
@@ -122,8 +137,8 @@ function assertNoLongDigitRun(label: string): void {
 }
 
 function hasPartialPlaceholder(text: string): boolean {
-  const stripped = text.replace(llmMaskPlaceholderPattern('g'), '')
-  return stripped.includes('[') || stripped.includes(']')
+  const stripped = text.replace(llmMaskPlaceholderPattern('g'), '').replace(layoutTokenPattern('g'), '')
+  return stripped.includes('[') || stripped.includes(']') || stripped.includes('⦃') || stripped.includes('⦄')
 }
 
 const ELEVEN_DIGITS = /\d{11,}/u
@@ -360,7 +375,7 @@ async function main(): Promise<void> {
     currentResume: current,
     originalText: layoutText,
     action: 'reformat',
-  }))
+  }), true)
 
   const id2 = '320102198805156666'
   const prefix2 = '3201021988'
@@ -434,7 +449,9 @@ async function main(): Promise<void> {
   if (captured.length === 0) fail('排版原文手机号紧贴银行卡 没有出站')
   for (const body of captured) {
     if (body.includes(phone) || body.includes(bank)) fail('排版原文手机号紧贴银行卡 出站含号码')
-    if (!body.includes('[手机号_') || !body.includes('[银行卡_')) fail('排版原文手机号紧贴银行卡 没有分开遮盖')
+    // 排版标记不再带类别名。两个不同标记才说明手机号和银行卡没有被收成同一段。
+    const marks = new Set(body.match(layoutTokenPattern('g')) ?? [])
+    if (marks.size < 2) fail('排版原文手机号紧贴银行卡 没有分开遮盖')
   }
   assertNoLongDigitRun('排版原文手机号紧贴银行卡')
   pass('排版原文手机号紧贴银行卡')
@@ -569,7 +586,7 @@ async function outboundClean(label: string, run: () => Promise<unknown>, forbidd
     for (const secret of forbidden) {
       if (body.includes(secret)) fail(`${label} 出站含 ${secret.slice(0, 4)}…`)
     }
-    if (!body.includes(PLACEHOLDER)) fail(`${label} 没有遮盖占位符`)
+    if (!layoutTokenPattern('u').test(body)) fail(`${label} 没有遮盖占位符`)
   }
   pass(label)
 }

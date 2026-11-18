@@ -4,9 +4,10 @@
  * 检测前先把全角数字、全角 X 折成半角，占位符里存的仍是原文，还原才能逐字对上。
  * 数字段之间只隔一个空格、短横、点或零宽字符，且合计达到 11 位的，按一整串遮。
  * 简历 JSON 再按字段对齐：相邻字符串值拼起来够 11 位的，各换成自己的占位符。
+ * 占位符是本次请求的标记，用户原文里写不出同样的一串。
  * 年月日期轴不是号码，原样留下，排版还要看见时间。
  */
-import { LLM_MASK_LONG_DIGIT_CATEGORY } from '../../common/pii/mask-placeholder'
+import { randomBytes } from 'node:crypto'
 
 export interface LayoutDigitBook {
   /** 同一段原文共用一个占位符，三段还原才对得上。 */
@@ -45,20 +46,54 @@ export function foldDigits(text: string): string {
   return out
 }
 
-export function createLongDigitBook(
-  extra: Map<string, string>,
-  byValue: Map<string, string>,
-): LayoutDigitBook {
+const TOKEN_OPEN = '⦃'
+const TOKEN_CLOSE = '⦄'
+
+/** 本次请求的占位符。中间有字母，不会被长数字扫描再吞一遍。 */
+export function layoutTokenPattern(flags = 'g'): RegExp {
+  return new RegExp(`${TOKEN_OPEN}[0-9a-f]+:\\d+${TOKEN_CLOSE}`, flags)
+}
+
+/**
+ * 每次请求换一串标记。同一段原文共用一个占位符。
+ * 标记里夹着字母，检测长数字时不会把占位符自己当成号码。
+ */
+export function createLayoutTokenBook(inputs: readonly string[]): {
+  book: LayoutDigitBook
+  extra: Map<string, string>
+} {
+  const nonce = pickNonce(inputs)
+  const extra = new Map<string, string>()
+  const byValue = new Map<string, string>()
+  let counter = 0
   return {
-    issue(original: string): string {
-      const known = byValue.get(original)
-      if (known) return known
-      const token = `[${LLM_MASK_LONG_DIGIT_CATEGORY}_${extra.size + 1}]`
-      extra.set(token, original)
-      byValue.set(original, token)
-      return token
+    extra,
+    book: {
+      issue(original: string): string {
+        const known = byValue.get(original)
+        if (known) return known
+        counter += 1
+        const token = `${TOKEN_OPEN}${nonce}:${counter}${TOKEN_CLOSE}`
+        extra.set(token, original)
+        byValue.set(original, token)
+        return token
+      },
     },
   }
+}
+
+/**
+ * 六位，且以字母开头。一位序号时整个标记 10 个字，
+ * 贴着 12000 字窗口末尾的证件号换完仍然进得了窗口。
+ * 连续数字最长 5 位，兜底扫描不会误伤占位符。
+ */
+function pickNonce(inputs: readonly string[]): string {
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const nonce = `a${randomBytes(3).toString('hex').slice(0, 5)}`
+    const marker = `${TOKEN_OPEN}${nonce}:`
+    if (inputs.every((text) => !text.includes(marker))) return nonce
+  }
+  return `a${randomBytes(3).toString('hex').slice(0, 5)}`
 }
 
 function isDigit(char: string): boolean {

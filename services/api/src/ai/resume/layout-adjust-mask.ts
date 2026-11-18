@@ -7,12 +7,20 @@
  * 这里若因 strict 为 false 就回 503，没有证件号的简历也会排不了版。
  * 兜底先把全角数字折成半角。数字段之间只隔一个空格、短横、点或零宽字符、
  * 合计达到 11 位的，按一整串遮。简历 JSON 再把相邻的号码片段字段接起来遮。
- * 占位符里存原文，还原仍逐字对上。
+ * 占位符是本次请求才有的标记，用户原文里的形似占位符原样留下。
+ * 还原只换还在出站正文里的标记，截断丢掉的号码不会被旧序号装回来。
  */
+import { randomBytes } from 'node:crypto'
 import { ServiceUnavailableException } from '@nestjs/common'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextsForLlmReversible } from '../../common/pii/llm-input-mask'
 import { llmMaskPlaceholderPattern } from '../../common/pii/mask-placeholder'
-import { coverAdjacentJsonValues, coverRealisticNumbers, createLongDigitBook } from './layout-adjust-digit-cover'
+import {
+  coverAdjacentJsonValues,
+  coverRealisticNumbers,
+  createLayoutTokenBook,
+  layoutTokenPattern,
+  type LayoutDigitBook,
+} from './layout-adjust-digit-cover'
 
 export const AI_LAYOUT_ADJUST_TOO_LONG = 'AI_LAYOUT_ADJUST_TOO_LONG'
 export const AI_LAYOUT_ADJUST_TOO_LONG_MESSAGE =
@@ -36,48 +44,94 @@ export function separateGluedIdNumbers(text: string, breakWith = '\n'): string {
 }
 
 /**
- * 只作遮盖前的边界，出站前会删掉。
+ * 只作遮盖前的边界，出站前会删掉这一串，不删用户正文里的私用区字符。
  * 不用换行：换行写进 JSON 再序列化是反斜杠加字母 n。
  * 实测第二段 18 位号仍会被遮住，但身份证规则的前边界认字母，类别落到银行卡。
  * 这个字符不是数字也不是字母，序列化后还在，两段按各自的号类遮。
  */
-const GLUE_SENTINEL = '\uE000'
+function makeGlue(texts: readonly string[]): string {
+  for (let n = 0; n < 32; n += 1) {
+    const glue = `\uE001g${n.toString(16)}\uE001`
+    if (texts.every((text) => !text.includes(glue))) return glue
+  }
+  return `\uE001g${randomBytes(3).toString('hex')}\uE001`
+}
 
-function separateGluedJsonStrings(json: string): string {
+function separateGluedJsonStrings(json: string, glue: string): string {
   if (!json) return json
   try {
-    return JSON.stringify(mapJsonStrings(JSON.parse(json) as unknown))
+    return JSON.stringify(mapJsonStrings(JSON.parse(json) as unknown, glue))
   } catch {
-    return separateGluedIdNumbers(json, GLUE_SENTINEL)
+    return separateGluedIdNumbers(json, glue)
   }
 }
 
-function mapJsonStrings(value: unknown): unknown {
-  if (typeof value === 'string') return separateGluedIdNumbers(value, GLUE_SENTINEL)
-  if (Array.isArray(value)) return value.map((item) => mapJsonStrings(item))
+function mapJsonStrings(value: unknown, glue: string): unknown {
+  if (typeof value === 'string') return separateGluedIdNumbers(value, glue)
+  if (Array.isArray(value)) return value.map((item) => mapJsonStrings(item, glue))
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
     for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-      out[key] = mapJsonStrings(item)
+      out[key] = mapJsonStrings(item, glue)
     }
     return out
   }
   return value
 }
 
-function stripGlue(text: string): string {
-  return text.split(GLUE_SENTINEL).join('')
+function stripExact(text: string, glue: string): string {
+  return text.split(glue).join('')
 }
 
-function withLongDigits(
+/** 用户原文里已经写着 `[类别_序号]` 的，先换成本次标记，免得和引擎占位符撞车。 */
+function shieldPlaceholderLiterals(text: string, book: LayoutDigitBook): string {
+  if (!text) return text
+  return text.replace(llmMaskPlaceholderPattern('gu'), (token) => book.issue(token))
+}
+
+function isPlaceholderSpelling(value: string): boolean {
+  return new RegExp(`^${llmMaskPlaceholderPattern('u').source}$`, 'u').test(value)
+}
+
+/** 引擎遮完再换回用户原文。还原函数不再认 `[类别_序号]`，这段字就留在正文里。 */
+function unshieldPlaceholderLiterals(text: string, extra: ReadonlyMap<string, string>): string {
+  let out = text
+  for (const [token, original] of extra) {
+    if (!isPlaceholderSpelling(original) || !out.includes(token)) continue
+    out = out.split(token).join(original)
+  }
+  return out
+}
+
+/** 引擎占位符换成同一套标记。还原值不是标记自己，说明这是引擎刚遮上的。 */
+function rewriteEngineTokens(
+  text: string,
   engineRestore: (value: string) => string,
-  extra: ReadonlyMap<string, string>,
-): (value: string) => string {
-  if (extra.size === 0) return engineRestore
+  book: LayoutDigitBook,
+): string {
+  return text.replace(llmMaskPlaceholderPattern('gu'), (token) => {
+    const secret = engineRestore(token)
+    if (secret === token) return token
+    return book.issue(secret)
+  })
+}
+
+function dropAbsentTokens(extra: Map<string, string>, texts: readonly string[]): void {
+  for (const token of [...extra.keys()]) {
+    if (texts.every((text) => !text.includes(token))) extra.delete(token)
+  }
+}
+
+/** 只换还在映射里的本次标记。不跑引擎的 `[类别_序号]` 替换，避免把用户原文换掉。 */
+function restoreTokens(extra: ReadonlyMap<string, string>): (value: string) => string {
   return (value: string): string => {
-    const restored = engineRestore(value)
-    if (typeof restored !== 'string' || restored.length === 0) return restored
-    return restored.replace(llmMaskPlaceholderPattern('gu'), (token) => extra.get(token) ?? token)
+    if (typeof value !== 'string' || value.length === 0 || extra.size === 0) return value
+    let out = value
+    for (const [token, original] of extra) {
+      if (!out.includes(token)) continue
+      out = out.split(token).join(original)
+    }
+    return out
   }
 }
 
@@ -92,7 +146,7 @@ export function cutMaskedLayoutText(text: string, limit: number): string {
   if (limit <= 0) return ''
   if (text.length <= limit) return text
   let cut = limit
-  const re = llmMaskPlaceholderPattern('g')
+  const re = new RegExp(`${llmMaskPlaceholderPattern().source}|${layoutTokenPattern().source}`, 'gu')
   for (const match of text.matchAll(re)) {
     const start = match.index ?? 0
     const end = start + match[0].length
@@ -114,28 +168,35 @@ export function maskLayoutAdjustOutbound(input: {
   maskedResumeJson: string
   restore: (value: string) => string
 } {
-  const originalText = separateGluedIdNumbers(input.originalText, GLUE_SENTINEL)
-  const resumeValues = separateGluedIdNumbers(input.resumeValues, GLUE_SENTINEL)
-  const resumeJson = separateGluedJsonStrings(input.resumeJson)
-  if (
-    originalText.length > LLM_MASK_INPUT_LIMIT
-    || resumeValues.length > LLM_MASK_INPUT_LIMIT
-    || resumeJson.length > LLM_MASK_INPUT_LIMIT
-  ) {
-    tooLong()
-  }
-  const masked = maskUserTextsForLlmReversible(
-    [originalText, resumeValues, resumeJson],
-    'resume_layout_adjust',
+  const sources = [input.originalText, input.resumeValues, input.resumeJson]
+  const { book, extra } = createLayoutTokenBook(sources)
+  const shielded = sources.map((text) => shieldPlaceholderLiterals(text, book))
+  const glue = makeGlue(shielded)
+  const glued = [
+    separateGluedIdNumbers(shielded[0] ?? '', glue),
+    separateGluedIdNumbers(shielded[1] ?? '', glue),
+    separateGluedJsonStrings(shielded[2] ?? '', glue),
+  ]
+  if (glued.some((text) => text.length > LLM_MASK_INPUT_LIMIT)) tooLong()
+  const masked = maskUserTextsForLlmReversible(glued, 'resume_layout_adjust')
+  const cover = (text: string) => coverRealisticNumbers(
+    rewriteEngineTokens(stripExact(text, glue), masked.restore, book),
+    book,
   )
-  const extra = new Map<string, string>()
-  const book = createLongDigitBook(extra, new Map())
-  const cover = (text: string) => coverRealisticNumbers(stripGlue(text), book)
-  const [maskedOriginal = '', maskedResumeValues = '', maskedResumeJson = ''] = masked.texts
+  const [engineOriginal = '', engineValues = '', engineJson = ''] = masked.texts
+  // 原文先领序号。贴着字数上限的证件号要换成 10 字标记，才不会被截出窗口。
+  const coveredOriginal = unshieldPlaceholderLiterals(cover(engineOriginal), extra)
+  const maskedResumeValues = unshieldPlaceholderLiterals(cover(engineValues), extra)
+  const maskedResumeJson = unshieldPlaceholderLiterals(
+    coverAdjacentJsonValues(cover(engineJson), book),
+    extra,
+  )
+  const maskedOriginal = cutMaskedLayoutText(coveredOriginal, input.maxOriginalChars)
+  dropAbsentTokens(extra, [maskedOriginal, maskedResumeValues, maskedResumeJson])
   return {
-    maskedOriginal: cutMaskedLayoutText(cover(maskedOriginal), input.maxOriginalChars),
-    maskedResumeValues: cover(maskedResumeValues),
-    maskedResumeJson: coverAdjacentJsonValues(cover(maskedResumeJson), book),
-    restore: withLongDigits(masked.restore, extra),
+    maskedOriginal,
+    maskedResumeValues,
+    maskedResumeJson,
+    restore: restoreTokens(extra),
   }
 }

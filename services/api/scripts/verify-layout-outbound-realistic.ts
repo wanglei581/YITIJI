@@ -3,6 +3,7 @@
  *
  * 全角数字先折成半角再检测。分段只隔一个空格、短横、点或零宽字符、
  * 合计达到 11 位的，按一整串遮。简历 JSON 里相邻的数字字段拼起来再遮。
+ * 占位符用本次请求才有的标记，用户原文里的形似占位符原样保留。
  * 出站正文去掉这些分隔符、折成半角之后，拼不出原号码。还原与原文逐字一致。
  *
  * 运行：pnpm --filter @ai-job-print/api verify:layout-outbound-realistic
@@ -120,7 +121,86 @@ function main(): void {
   assertJsonKept('点开的年月不拼', '{"from":"2015.09","to":"2019.06"}', '2015.09')
   assertJsonKept('中间夹了文字就断开', '{"mobilePrefix":"138","note":"备注","mobileBody":"00138000"}', '138')
 
+  assertPlaceholderCollision()
+  assertPrivateUseKept()
+  assertTruncationHoleDoesNotCrossWire()
+
   console.log(`verify:layout-outbound-realistic ${passCount} PASS`)
+}
+
+/** 用户原文里已经有形似占位符的字。还原后必须与原文逐字一致，出站拼不出那串长数字。 */
+function assertPlaceholderCollision(): void {
+  const literal = '[长数字_1]'
+  const secret = '9'.repeat(30)
+  const original = `${literal}说明${secret}结束`
+  const out = maskLayoutAdjustOutbound({
+    originalText: original,
+    resumeValues: literal,
+    resumeJson: JSON.stringify({ summary: literal }),
+    maxOriginalChars: original.length + 800,
+  })
+  if (recoverableDigits(out.maskedOriginal).includes(secret)) fail('形似占位符 原文还能拼出长数字')
+  if (!out.maskedOriginal.includes(literal)) fail('形似占位符 用户原文被换掉了')
+  if (out.restore(out.maskedOriginal) !== original) fail('形似占位符 还原后与原文不一致')
+  if (out.restore(out.maskedResumeValues) !== literal) fail('形似占位符 字段值还原后与原文不一致')
+  if (out.restore(literal) !== literal) fail('形似占位符 被当成了真占位符')
+  pass('用户原文里的形似占位符原样保留')
+}
+
+/** 私用区字符是用户正文，不能当粘连分隔符删掉。 */
+function assertPrivateUseKept(): void {
+  const phone = '13800138000'
+  const raw = `前\uE000后${phone}`
+  const original = `说明${raw}结束`
+  const json = JSON.stringify({ summary: raw })
+  const out = maskLayoutAdjustOutbound({
+    originalText: original,
+    resumeValues: raw,
+    resumeJson: json,
+    maxOriginalChars: original.length + 800,
+  })
+  const parts = [
+    ['原文', out.maskedOriginal, original],
+    ['字段值', out.maskedResumeValues, raw],
+    ['简历JSON', out.maskedResumeJson, json],
+  ] as const
+  for (const [part, masked, source] of parts) {
+    if (!masked.includes('\uE000')) fail(`私用区字符 ${part} 被删掉了`)
+    if (recoverableDigits(masked).includes(phone)) fail(`私用区字符 ${part} 还能拼出手机号`)
+    if (out.restore(masked) !== source) fail(`私用区字符 ${part} 还原后与原文不一致`)
+  }
+  pass('私用区字符原样保留')
+}
+
+/**
+ * 原文里两个长数字，截断丢掉后一个。模型若把空洞补成旧序号，不能还原出被丢掉的号码。
+ * 字段值里的第三串完整留下，还原只对上它自己。
+ */
+function assertTruncationHoleDoesNotCrossWire(): void {
+  const kept = '1'.repeat(11)
+  const dropped = '2'.repeat(11)
+  const other = '3'.repeat(11)
+  const original = `${kept}${'乙'.repeat(40)}${dropped}`
+  const json = JSON.stringify({ summary: '说明' })
+  const out = maskLayoutAdjustOutbound({
+    originalText: original,
+    resumeValues: other,
+    resumeJson: json,
+    maxOriginalChars: 30,
+  })
+  const restoredOriginal = out.restore(out.maskedOriginal)
+  if (!restoredOriginal.includes(kept)) fail('截断空洞 留下来的号码没有还原')
+  if (restoredOriginal.includes(dropped)) fail('截断空洞 丢掉的号码又回到原文')
+  if (out.restore(out.maskedResumeValues) !== other) fail('截断空洞 另一段号码串到了字段值')
+  if (out.restore('[长数字_2]').includes(dropped)) fail('截断空洞 旧序号还原出了丢掉的号码')
+  const token = /⦃[0-9a-f]+:\d+⦄/gu
+  for (const text of [out.maskedOriginal, out.maskedResumeValues, out.maskedResumeJson]) {
+    for (const match of text.matchAll(token)) {
+      if (out.restore(match[0]).includes(dropped)) fail('截断空洞 出站标记还能还原出丢掉的号码')
+    }
+  }
+  if (recoverableDigits(out.maskedOriginal).includes(dropped)) fail('截断空洞 出站原文还能拼出丢掉的号码')
+  pass('截断后占位符不串号')
 }
 
 function assertJsonKept(label: string, json: string, visible: string): void {
