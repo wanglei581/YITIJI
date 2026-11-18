@@ -151,7 +151,7 @@ test('点搜索框搜到政策，进详情展开原文翻页后收起并返回 @
   await expect(page.locator('a[href*="hrss.example.gov.cn"]')).toHaveCount(0)
   await page.getByTestId('policy-excerpt-close').click()
   await expect(page.getByTestId('policy-excerpt-page')).toHaveCount(0)
-  await page.getByRole('button', { name: '返回政策首页', exact: true }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回', exact: true }).click()
   await expect(page).toHaveURL(/\/policy-service$/)
 })
 

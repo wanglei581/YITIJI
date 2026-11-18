@@ -50,4 +50,5 @@ test('屏上写成几月几日，日历日按字面，带时刻按北京时间',
   assert.equal(policyPublishedOn({ publishConfirmedAt: '2026-11-04T16:30:00.000Z' }), '2026-11-04')
   assert.match(read('src/pages/renshi/PolicyGuideRow.tsx'), /policyPublishedLabel\(policy\)/)
   assert.match(read('src/pages/renshi/PolicyDetail.tsx'), /policyPublishedLabel\(policy\)/)
+  assert.match(read('src/pages/service-hubs/PolicyTouchHub.tsx'), /policyPublishedLabel\(latest\)/)
 })

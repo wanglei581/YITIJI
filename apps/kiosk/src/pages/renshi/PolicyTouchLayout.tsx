@@ -28,10 +28,10 @@ export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home =
   return (
     <QxTouchScreen page="policy-min" testId={home ? 'policy-touch-hub' : 'renshi-page'} stateId={state}
       className={compact ? 'policy-min-compact' : ''} bodyClassName="qxt-body-scroll"
-      band={<QxTouchBand kind={compact ? 'compact' : 'std'} seal={null} title={title} eyebrow={eyebrow}
+      band={<QxTouchBand kind={compact ? 'compact' : 'std'} seal={home ? 'idle' : null} title={title} eyebrow={eyebrow}
         sub={sub} onBack={() => navigate(home ? '/' : '/policy-service')}
         path={path ?? (home ? ['选类别', '看条件和材料', '打印清单或扫码看原文'] : undefined)} pathLabel={pathLabel ?? '查一条政策'} />}
-      dock={<QxTouchDock onBack={() => navigate(home ? '/' : '/policy-service')} backLabel={home ? '返回首页' : '返回政策首页'}
+      dock={<QxTouchDock onBack={() => navigate(home ? '/' : '/policy-service')} backLabel="返回"
         ask={!ask ? false : winding || capabilities.state('assistant_chat') !== 'available'
           ? { label: '小青暂时不可用 · 查看政策照常', disabled: true }
           : { label: askPrompt.label, draft: askPrompt.draft, voice: import.meta.env.VITE_USE_TRTC_CALL === 'true' }}

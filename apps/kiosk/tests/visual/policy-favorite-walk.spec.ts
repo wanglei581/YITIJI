@@ -596,7 +596,7 @@ test('政策下架自动刷新：正在看的这一条被下架，整页换成�
   await expect(page.getByRole('button', { name: /问小青这条|收藏到「我的」/ })).toHaveCount(0)
   // 出路：底栏与页内各有一个回政策首页；回去后被下架的那条不再算进类别。
   await expect(page.locator('.policy-min-body').getByRole('button', { name: '返回政策首页', exact: true })).toBeVisible()
-  await page.locator('.qxt-dock').getByRole('button', { name: '返回政策首页' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/policy-service')
   await expect(page.getByTestId('policy-category-graduate')).toContainText('还没有机构发布')
   await expect(page.getByTestId('policy-category-flexible')).toContainText('灵活就业社保补贴说明')
@@ -647,7 +647,7 @@ test('政策下架自动刷新：核对期间本人换到别的政策，迟到�
     await page.clock.fastForward(31_000)
     await expect.poll(() => state.detailLog?.length).toBe(reads + 1)
     // 刷新已对 policy-fav 发出按条读取，应答被压住；本人回政策首页，再点开另一条。
-    await page.locator('.qxt-dock').getByRole('button', { name: '返回政策首页' }).click()
+    await page.locator('.qxt-dock').getByRole('button', { name: '返回', exact: true }).click()
     await page.waitForURL((url) => url.pathname === '/policy-service')
     // 旧的那条已从政策首页摘掉。
     await expect(page.getByTestId('policy-category-graduate')).toContainText('还没有机构发布')

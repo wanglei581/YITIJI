@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
-import { PolicyExitCard, PolicyStatusCard } from '../renshi/policyStatus'
+import { PolicyExitCard, PolicyLinkRow, PolicyStatusCard } from '../renshi/policyStatus'
 import { getPublishedPolicies, type PublishedPoliciesResult } from '../../services/api/policies'
 import { useAuth } from '../../auth/useAuth'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
@@ -14,7 +14,7 @@ import { PolicySearchField } from '../renshi/PolicySearchField'
 import { setPolicyKeyword } from '../renshi/policyKeywordSession'
 import { PolicyReadState, PolicyTouchLayout } from '../renshi/PolicyTouchLayout'
 import { POLICY_CATEGORIES, POLICY_GENERAL_QUESTION, policyCategorySummaries, policyRead } from '../renshi/policyModel'
-import { policyPublishedOn } from '../renshi/policyFacts'
+import { policyPublishedLabel } from '../renshi/policyFacts'
 import { SERVICE_HUB_SPECS } from './serviceHubSpecs'
 import './policy-touch.css'
 
@@ -85,12 +85,11 @@ export function PolicyTouchHub() {
           layout="stack" off={winding || category.disabled} index={index} testId={`policy-category-${category.key}`}
           onClick={() => navigate(`/renshi?audience=${category.key}`)} />)}
       </div>
-      {latest && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate(`/renshi?policy=${encodeURIComponent(latest.id)}`)}>
-        最近更新 · {latest.title} · {policyPublishedOn(latest) ?? '日期未提供'}
-      </button>}
-      {data.notices.total > 0 && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate('/renshi?tab=notice')}>
-        机构公告 · {data.notices.total} 条
-      </button>}
+      {latest && <PolicyLinkRow icon="bell" title="最近更新" disabled={winding}
+        detail={`${latest.title} · ${policyPublishedLabel(latest) ?? '日期未提供'}`}
+        onClick={() => navigate(`/renshi?policy=${encodeURIComponent(latest.id)}`)} />}
+      {data.notices.total > 0 && <PolicyLinkRow icon="message" title="机构公告" detail={`${data.notices.total} 条`}
+        disabled={winding} onClick={() => navigate('/renshi?tab=notice')} />}
       {channelsRow}
       {isLoggedIn && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate('/me/favorites?tab=policy')}>政策收藏</button>}
       <p className="policy-min-fine">政策由发布机构自行审核发布，以官方原文为准</p>
