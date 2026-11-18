@@ -1148,8 +1148,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/scan/sessions/:id/device-settings` | ScanDeviceController.deviceSettings | — | ScanDeviceSessionsService | FileObject<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
-| POST | `/api/v1/scan/sessions/:id/switch-to-panel` | ScanDeviceController.switchToPanel | — | ScanDeviceSessionsService | FileObject<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/scan/sessions/:id/device-settings` | ScanDeviceController.deviceSettings | — | ScanDeviceSessionsService | ScanTask<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/scan/sessions/:id/switch-to-panel` | ScanDeviceController.switchToPanel | — | ScanDeviceSessionsService | ScanTask<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/terminals/:terminalId/scan-tasks/:taskId/device-report` | ScanDeviceController.deviceReport | — | ScanDeviceSessionsService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>ServiceDeployment<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalServicePrice<br/>TerminalSmartCampusConfig |
 
 ## `services/api/src/scan-tasks/scan-tasks.controller.ts`

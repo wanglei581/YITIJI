@@ -169,6 +169,31 @@
 - 交互走查：存储扫描连键名一起查；交接存储只在 `fileUrl` 等于本次 `printFileUrl` 时才从值里剔除。去确认页先装上本机终端身份和打印机在线，等主按钮可点后用 Playwright 真点。终端用这次走查 API 的 `POST /auth/terminal/register` 写进走查库，会话票用 `POST /terminals/boot-ticket` 再 `POST /terminals/session-token` 签发，不写库伪造票据。打印来回之后的优化请求仍带 `x-terminal-id` 和 `x-terminal-session-token`，走服务单前置检查。U6d 结束后把 `globalThis.window` 和它的 `sessionStorage` 还原成进来之前的对象。
 - 验证：确认页视觉 26 条、交互走查 `interaction-resume` 7/7。反向：直接字符串、拼接提前返回、模板字符串、变量路径带允许名单之外的键都红；状态对象展开、计算属性、先建 state 变量再传也红。2026-11-18：预览页跳转改成白名单，只留上面两种写法。`useNavigate()(path, 变量)`、`getNav().navigate(path, 变量)`、`(0, navigate)(path, 变量)`、`navigate.call`、`navigate.apply` 都按种类判红。临时加带 `fileUrl` 的跳转，行为用例会红。会员 401、签名地址键名、U6d 还原这三处本轮没改。
 
+## 2026-11-19：扫描完成页「核对到才说已存」补行为用例（未推送）
+
+- 分支 `claude/scan-return-docs-1118`。面板完成页那句小字的判断抽到 `apps/kiosk/src/pages/scan/scanResultDocumentsNote.ts`。登录且核对结果是查到这份 `fileId` 才返回「在「我的文档」查看与管理本次扫描件」；核对中、没查到、请求失败返回当场打印那句；未登录返回游客那句。`ScanResultExitRow.tsx` 只改为调用它，屏上文字、版式、按钮和启用条件不变。
+- 纯函数单测 `apps/kiosk/scripts/tests/scan-result-documents-note.test.mjs` 接进 `.github/workflows/ci.yml` 作业 `build-and-verify` 的「Cross-client deterministic static gates」。浏览器用例 `apps/kiosk/tests/visual/fusion-w2-scan-saved-note.spec.ts` 用 `api-router` 替身，不起真 API：列表含这份 `fileId` 时屏上是已存句；不含或返回 500 时是当场打印句、没有已存句。它由作业 `kiosk-browser-smoke` 的步骤「Run Kiosk browser smoke」经 `pnpm --filter @ai-job-print/kiosk test:browser:w2`（`playwright.w2.config.ts`，project `kiosk-1080x1920`，grep `/@w2/`）跑到。
+- 没改岗位、招聘会、打印、收费、数据库、密钥、小程序和生产配置。
+
+## 2026-11-18：扫描回传文档并入当时的主线，图谱按 683 个门禁重生（未推送）
+
+- 分支 `claude/scan-return-docs-1118`。`git fetch origin && git merge origin/main` 时主线仍是 `d71f1c37c`，没有新提交，没有冲突。
+- `verify-scan-return-documents.ts` 进入已跟踪文件后，门禁从 682 计到 683。`node scripts/generate-project-graph.mjs` 重生 `docs/graph/README.md`、`gates.md`、`graph.json`，`--check` 通过。没有手改图谱。
+
+## 2026-11-18：面板扫描回传后，登录会员能在「我的文档」看到普通文档、简历和证件（未推送）
+
+- 分支 `claude/scan-return-docs-1118`。根因：回传本来就会把扫描任务上的 `endUserId` 写进文件（`services/api/src/scan-tasks/scan-tasks.service.ts` 的 `uploadArgs.endUserId = task.endUserId`，`services/api/src/files/files.service.ts` 落 `endUserId` 并按它定归属）。「我的文档」`memberDocumentWhere`（`services/api/src/member-assets/member-assets.service.ts`）收 `print_doc`、`resume_scan`、`id_scan`。这三类不是没写归属，也不是列表没收。
+- 合同扫描仍不进列表。用途是 `contract_upload`（`scan-task-contracts.ts` 的 `SCAN_TYPE_TO_PURPOSE`），落库时一律锁成 `contract_review_session_only`（`files.service.ts`），列表按用途和这把锁排除（`member-assets.service.ts`、`retention-policy.ts` 的 `MEMBER_DOCUMENT_HIDDEN_LOCK_REASONS`）。合同审查原件不能因此放进「我的文档」。保存期限也不改：普通文档约 24 小时，证件约 1 小时，简历仍是会员默认 90 天，合同仍约 2 小时。
+- 游客建会话时没有会员，`endUserId` 为空，文件归属是系统，不进任何人的「我的文档」，仍走临时取件。回传失败不落文件。过期后 `cleanupExpired('cron')` 软删，删除原因是 `cron cleanup of expired`，本人删除记录里能看到。
+- 一体机面板完成页只在 `GET /me/documents` 第一页核对到这份 `fileId` 之后，才说定稿那句「在「我的文档」查看与管理本次扫描件」。没核对到就用定稿里已有的「当场打印：请在本次操作内完成打印或识别。」三个按钮和版式不动。
+- 用例 `verify:scan-return-documents`（SQLite）和 `verify:scan-return-documents:postgres`。没改小程序、收费、打印页、首页、政策、简历、模拟面试、管理员终端页和生产配置。
+
+## 2026-11-18：扫描任务服务按职责拆开（未推送）
+
+- 分支 `claude/scan-return-docs-1118`。`services/api/src/scan-tasks/scan-tasks.service.ts` 从 1380 行拆到 492 行。建单与重扫授权在 `scan-task-create.ts`（432 行），领取、取消和查询在 `scan-task-query.ts`（284 行），回传落文件在 `scan-task-deliver.ts`（256 行），类型、用途映射和比对在 `scan-task-contracts.ts`（218 行）。对外类名 `ScanTasksService`、方法签名、依赖注入和控制器调用不变。
+- 拆前拆后扫描相关门禁逐条都过，含 `verify:scan-tasks`、屏上扫描、静默期、序列化冲突，以及一体机 `verify:scan-session-truth`。`services/api` 的 `tsc --noEmit` 退出码 0。图谱已重生，`--check` 通过。
+- 这一段只做拆分，扫描回传进「我的文档」的行为还没改。没改岗位、招聘会、打印、收费、数据库和密钥。
+
 ## 2026-11-17：简历「新增事实本人确认」第十一版收货返工（未推送）
 
 - 分支 `claude/resume-r2k-1117`。末段「一位数字加十」不再看到十就截断：十后面紧跟数字，或紧跟万、亿、千、百、十，就把后面并进同一条，读数和停在十的原文不同。两份规则仍逐字节相同。

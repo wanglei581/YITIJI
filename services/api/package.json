@@ -386,6 +386,8 @@
     "verify:wechat-refund-notify": "node -r @swc-node/register scripts/verify-wechat-refund-notify.ts",
     "verify:wechat-refund-regression": "node -r @swc-node/register scripts/verify-wechat-refund-regression.ts",
     "verify:scan-tasks": "node -r @swc-node/register scripts/verify-scan-tasks.ts && node -r @swc-node/register scripts/verify-scan-deliver-filename.ts",
+    "verify:scan-return-documents": "node -r @swc-node/register scripts/verify-scan-return-documents.ts",
+    "verify:scan-return-documents:postgres": "node -r @swc-node/register scripts/verify-scan-return-documents.ts --postgres",
     "verify:scan-quiet-period": "node -r @swc-node/register scripts/verify-scan-quiet-period.ts",
     "verify:scan-device-sessions": "node -r @swc-node/register scripts/verify-scan-device-sessions.ts",
     "verify:scan-device-settings": "node -r @swc-node/register scripts/verify-scan-device-settings.ts",
