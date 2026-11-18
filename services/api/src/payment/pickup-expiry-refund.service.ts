@@ -26,17 +26,38 @@ export const PAID_OUTPUT_ANOMALY_REFUND_REASON = 'paid_output_anomaly'
 
 const STARTED_OR_PRINTED = ['claimed', 'printing', 'completed'] as const
 
-/** 已付、窗口已关、还没挂打印任务。纸已经领走或已经出去的不在这里。 */
+/**
+ * 已付、窗口已关、纸还没领走也没出去。
+ * 到机放行后会挂上打印任务，取件状态变成 used。卡纸、脱机、还没领走都不能因为有任务就被漏掉。
+ */
 export function closedWindowUnprintedWhere(now: Date) {
   return {
     payStatus: 'paid' as const,
     amountCents: { gt: 0 },
-    printTaskId: null,
     taskStatus: { notIn: [...STARTED_OR_PRINTED] },
-    pickupStatus: { in: ['pending', 'expired', 'cancelled'] },
+    // 出纸结果为空时，不能写成「不是 printed」：SQL 里 NULL 比较不是真，整行会被漏掉。
     OR: [
-      { pickupStatus: { in: ['expired', 'cancelled'] } },
-      { pickupCodeExpiresAt: { lte: now } },
+      { printTaskId: null },
+      {
+        printTask: {
+          is: {
+            status: { notIn: [...STARTED_OR_PRINTED] },
+            OR: [
+              { printOutcome: null },
+              { printOutcome: { not: 'printed' } },
+            ],
+          },
+        },
+      },
+    ],
+    AND: [
+      {
+        OR: [
+          { pickupStatus: { in: ['expired', 'cancelled'] } },
+          { pickupStatus: 'pending', pickupCodeExpiresAt: { lte: now } },
+          { pickupStatus: 'used', pickupCodeExpiresAt: { lte: now } },
+        ],
+      },
     ],
   }
 }
@@ -244,7 +265,7 @@ export class PickupExpiryRefundService {
 
   /**
    * 自动退开关关着时仍要给出去向。只对待窗口已关、纸还没出的已付单，
-   * 不调用退款，不改支付状态。
+   * 已经挂上任务但纸还没领走的也算。不调用退款，不改支付状态。
    */
   async parkClosedWindowWhenAutoRefundOff(opts: { now?: Date; limit?: number } = {}): Promise<{ parked: number; skipped: number }> {
     const now = opts.now ?? new Date()
