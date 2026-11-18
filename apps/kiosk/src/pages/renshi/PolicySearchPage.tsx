@@ -134,6 +134,6 @@ export function PolicySearchPage() {
         onClick={() => navigate('/renshi?tab=notice')} />}
     </>}
     {view.status === 'loading' && <PolicyLinkRow icon="landmark" title="不等了，按类别看全部政策" onClick={goHome} />}
-    <p className="policy-min-fine">政策由发布机构自行审核发布，以官方原文为准。</p>
+    <p className="policy-min-fine policy-min-foot">政策由发布机构自行审核发布，以官方原文为准</p>
   </PolicyTouchLayout>
 }

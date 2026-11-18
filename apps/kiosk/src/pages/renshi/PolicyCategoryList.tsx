@@ -40,7 +40,7 @@ export function PolicyCategoryList({ audience, page }: { audience: PolicyAudienc
         <span>第 {paging.page} / {paging.pages} 页</span>
         {paging.next && <button type="button" className="policy-min-button" onClick={() => goPage(paging.page + 1)}>再看 4 条</button>}
       </div>}
-      <p className="policy-min-fine policy-min-foot">政策由发布机构自行审核发布，以官方原文为准。</p>
+      <p className="policy-min-fine policy-min-foot">政策由发布机构自行审核发布，以官方原文为准</p>
     </>}
   </PolicyTouchLayout>
 }

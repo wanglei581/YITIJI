@@ -17,6 +17,6 @@ export function PolicyUnavailable({ copy, onHome, onKiosk }: {
       <PolicyExitCard icon="landmark" title="返回政策首页" desc="看现在发布的政策" onClick={onHome} />
       <PolicyExitCard icon="home" title="回首页办别的事" desc="打印、扫描、改简历、练面试照常" onClick={onKiosk} />
     </div>
-    <p className="policy-min-fine">政策由发布机构自行审核发布，以官方原文为准。</p>
+    <p className="policy-min-fine policy-min-foot">政策由发布机构自行审核发布，以官方原文为准</p>
   </>
 }
