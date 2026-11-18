@@ -167,6 +167,7 @@ export async function runGuestLoginLogoutScenarios(ctx: InflightForgetContext): 
     chatSrc.includes('unusedVisitId') && chatSrc.includes('!this.inflight.has(requestedId)'),
     '服务端只沿用还没被占用的 32 位会话号',
   )
+  check(chatSrc.includes('!this.epoch.wasRetired(requestedId)'), '清场过的会话号在墓碑期内不再沿用')
   check(readKiosk('services/api/advisor.ts').includes('rememberAdvisorSession(sessionId, access)'), '读过的作业会记下作业号和游客令牌')
   check(!readKiosk('services/api/advisor.ts').includes('/ask'), '一体机作业客户端不发起追问')
 
@@ -225,6 +226,30 @@ export async function runGuestLoginLogoutScenarios(ctx: InflightForgetContext): 
     guestOwner,
   ) as { sessionId: string }
   check(legacy.sessionId !== 'session-legacy' && /^[0-9a-f]{32}$/.test(legacy.sessionId), '不是 32 位十六进制的会话号不沿用')
+
+  const retiredId = randomBytes(16).toString('hex')
+  const retiredMark = textMark('清场后不再沿用')
+  const retired = await chat.chat(
+    { message: retiredMark, channel: 'kiosk', sessionId: retiredId } as never,
+    undefined,
+    guestOwner,
+  ) as { sessionId: string }
+  const retiredUser = `verify-switch-retired-${randomUUID()}`
+  await createUser(retiredUser)
+  const retiredCleared = await kioskAssistantForget(controller, retiredId, bearer(retiredUser), kioskIp)
+  const reused = await chat.chat(
+    { message: textMark('下一位的新一句'), channel: 'kiosk', sessionId: retiredId } as never,
+    undefined,
+    guestOwner,
+  ) as { sessionId: string }
+  check(
+    retired.sessionId === retiredId
+      && retiredCleared.anon === 1
+      && reused.sessionId !== retiredId
+      && /^[0-9a-f]{32}$/.test(reused.sessionId)
+      && !transcript(chat, retiredId, guestOwner).includes('下一位的新一句'),
+    '清场之后，墓碑期内不再沿用同一个会话号',
+  )
 
   const victimId = randomBytes(16).toString('hex')
   const victimMark = textMark('受害者小青')

@@ -406,6 +406,49 @@ test('接线：重载前等清场结果，拆页时停下还在睡的重试', ()
   assert.match(hold, /whenAiSessionsForgotten\(\)\.then/)
 })
 
+test('清场时小青页换掉会话号，页面不卸载也不再送上一位的号', () => {
+  const page = readFileSync(join(root, 'src/pages/assistant/AssistantPage.tsx'), 'utf8')
+  const start = page.indexOf('subscribeKioskSensitiveSessionClear')
+  assert.ok(start > 0, '小青页没有订阅清场')
+  const effect = page.slice(start, page.indexOf('}, [])', start))
+  assert.match(effect, /requestTokenRef\.current \+= 1/)
+  assert.match(effect, /sessionIdRef\.current = newSessionId\(\)/)
+  assert.match(effect, /setMessages\(\[WELCOME\]\)/)
+  assert.match(effect, /setInput\(''\)/)
+
+  const effects = []
+  const react = { useEffect: (fn) => effects.push(fn), useState: (initial) => [initial, () => undefined] }
+  const exports = {}
+  const sensitiveSrc = ts.transpileModule(
+    readFileSync(join(root, 'src/auth/kioskSensitiveSession.ts'), 'utf8'),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, fileName: 'kioskSensitiveSession.ts' },
+  ).outputText
+  const requireSensitive = (name) => {
+    if (name === 'react') return react
+    if (name === '../services/assistantDraft') {
+      return { clearAssistantDraft() {}, clearAssistantPolicyContext() {}, ASSISTANT_DRAFT_KEY: 'draft', ASSISTANT_POLICY_KEY: 'policy' }
+    }
+    return new Proxy({}, { get: () => () => undefined })
+  }
+  new Function('exports', 'require', sensitiveSrc)(exports, requireSensitive)
+  const sessionIdRef = { current: 'a'.repeat(32) }
+  const requestTokenRef = { current: 2 }
+  let screen = '旧对话'
+  const stop = exports.subscribeKioskSensitiveSessionClear(() => {
+    requestTokenRef.current += 1
+    sessionIdRef.current = 'b'.repeat(32)
+    screen = '欢迎'
+  })
+  exports.clearKioskSensitiveSession()
+  assert.equal(sessionIdRef.current, 'b'.repeat(32))
+  assert.equal(requestTokenRef.current, 3)
+  assert.equal(screen, '欢迎')
+  const held = sessionIdRef.current
+  stop()
+  exports.clearKioskSensitiveSession()
+  assert.equal(sessionIdRef.current, held, '退订之后不再换号')
+})
+
 test('接线：小青总结回了作业号也登记（aiHttpAdapter 的 summarizeAssistantSession）', () => {
   const src = readFileSync(join(root, 'src/services/api/aiHttpAdapter.ts'), 'utf8')
   const start = src.indexOf('async summarizeAssistantSession(')
