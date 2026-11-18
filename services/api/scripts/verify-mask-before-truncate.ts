@@ -318,6 +318,33 @@ async function main(): Promise<void> {
   }), [ID, id2, PREFIX, prefix2, phone, bank, idEndingX])
   assertNoLongDigitRun('排版原文末位X的身份证紧贴数字')
 
+  installFakeLlm()
+  try {
+    await optimize.adjustLayoutDraft({
+      currentResume: plainResume,
+      originalText: `说明${phone}${bank}结束`,
+      action: 'reformat',
+    })
+  } catch (error) {
+    if (statusOf(error) === 500 || codeOf(error) === 'AI_LAYOUT_ADJUST_TOO_LONG') {
+      fail(`排版原文手机号紧贴银行卡 失败 ${statusOf(error)}/${codeOf(error)}`)
+    }
+  }
+  if (captured.length === 0) fail('排版原文手机号紧贴银行卡 没有出站')
+  for (const body of captured) {
+    if (body.includes(phone) || body.includes(bank)) fail('排版原文手机号紧贴银行卡 出站含号码')
+    if (!body.includes('[手机号_') || !body.includes('[银行卡_')) fail('排版原文手机号紧贴银行卡 没有分开遮盖')
+  }
+  assertNoLongDigitRun('排版原文手机号紧贴银行卡')
+  pass('排版原文手机号紧贴银行卡')
+
+  await outboundClean('排版原文银行卡紧贴身份证', () => optimize.adjustLayoutDraft({
+    currentResume: plainResume,
+    originalText: `说明${bank}${ID}结束`,
+    action: 'reformat',
+  }), [ID, id2, PREFIX, prefix2, phone, bank])
+  assertNoLongDigitRun('排版原文银行卡紧贴身份证')
+
   await outboundClean('排版简历JSON里两张身份证粘在一起', () => optimize.adjustLayoutDraft({
     currentResume: resumeWithDescription(`${ID}${id2}`),
     originalText: '说明里没有号码。',
