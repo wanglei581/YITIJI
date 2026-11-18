@@ -254,7 +254,7 @@ function assertDerivation(): void {
   for (const ok of ['91330100799655058B', '91440300708461136T', '  91330100799655058b  ']) {
     c.check(`信用代码通过：${ok.trim()}`, normalizeCreditCode(ok) === ok.trim().toUpperCase())
   }
-  for (const bad of ['91330100799655058C', '9133010079965505', '91330100799655058BB', '91330100799655O58B', '', null, 12345678901234567, '91330100799655058B ！']) {
+  for (const bad of ['91330100799655058C', '9133010079965505', '91330100799655058BB', '91330100799655O58B', '', null, 9007199254740991, '91330100799655058B ！']) {
     c.check(`信用代码被拒：${String(bad)}`, normalizeCreditCode(bad) === null)
   }
 }
@@ -428,7 +428,7 @@ function assertRouteTable(): void {
   const policiesService = read(join(API_ROOT, 'src/policies/policies.service.ts'))
   const routeBody = (source: string, route: string): string => {
     const rest = source.slice(source.indexOf(route) + route.length)
-    const next = rest.search(/\n  @(Get|Post|Put|Patch|Delete)\(/)
+    const next = rest.search(/\n {2}@(Get|Post|Put|Patch|Delete)\(/)
     return next < 0 ? rest : rest.slice(0, next)
   }
   c.check("PATCH /partner/policies/:id/publish 的处理函数只调下架：不调 publishPolicy、不接发布参数", /unpublishPartnerPolicy\(id, user\)/.test(routeBody(policiesController, "@Patch('partner/policies/:id/publish')")) && !/publishPolicy\(/.test(routeBody(policiesController, "@Patch('partner/policies/:id/publish')")))
@@ -460,7 +460,7 @@ function assertRouteTable(): void {
     const start = source.indexOf(fn)
     if (start < 0) return ''
     const rest = source.slice(start + fn.length)
-    const next = rest.search(/\n  (async |private |public |get |set |[a-zA-Z]+\()/)
+    const next = rest.search(/\n {2}(async |private |public |get |set |[a-zA-Z]+\()/)
     return next < 0 ? rest : rest.slice(0, next)
   }
   for (const w of WITHDRAWALS) {
