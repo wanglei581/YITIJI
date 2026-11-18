@@ -8,7 +8,7 @@ import { paperAlreadyReleased } from './refund-paper-exclusion'
 
 export type PrintReturnResolution = 'confirm_refunded' | 'release_paper' | 'close_order'
 
-const HOLD_STATUSES = ['failed', 'manual_review'] as const
+const HOLD_STATUSES = ['failed', 'manual_review', 'pending'] as const
 const NOT_REFUNDED_NOTE = '这笔钱不会记成已退回'
 
 function deny(code: string, message: string): BadRequestException {
