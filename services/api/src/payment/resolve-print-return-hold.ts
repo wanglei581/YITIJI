@@ -1,7 +1,9 @@
 /**
  * 待人工的三种解开办法。改状态在一个事务里做完，改完只剩一种状态。
  * 确认退成才把钱记成已退。改为出纸和关单都不把钱记成已退。
- * 在途退款改为出纸要先查渠道。已经出纸不能关单。拒绝写在事务外，审计才能留下。
+ * 在途退款改为出纸要先查渠道。已经出纸不能关单。
+ * 确认退成把「还没放行出纸」写进订单的条件更新，和领取抢同一行。
+ * 抢输了整笔回滚，拒绝审计写在事务外，才留得下。
  */
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
@@ -20,8 +22,16 @@ export type PendingRefundChannelQuery = (input: {
 const HOLD_STATUSES = ['failed', 'manual_review', 'pending'] as const
 const NOT_REFUNDED_NOTE = '这笔钱不会记成已退回'
 
+const RELEASED_ORDER_TASK = ['claimed', 'printing', 'completed'] as const
+
 function deny(code: string, message: string): BadRequestException {
   return new BadRequestException({ error: { code, message } })
+}
+
+function exceptionCode(error: unknown): string | null {
+  if (!(error instanceof BadRequestException)) return null
+  const body = error.getResponse() as { error?: { code?: string } }
+  return body?.error?.code ?? null
 }
 
 async function rejectReleasedPaper(
@@ -143,7 +153,8 @@ export async function resolvePrintReturnHold(
   if (action === 'release_paper') {
     await rejectPendingReleaseUntilChannelFailed(db, orderId, operatorId, channelQuery)
   }
-  return db.$transaction(async (tx) => {
+  try {
+    return await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } })
     if (!order) throw new BadRequestException('ORDER_NOT_FOUND')
     const refund = await tx.refund.findFirst({
@@ -289,7 +300,11 @@ export async function resolvePrintReturnHold(
         }, order)
       if (settlement) {
         const marked = await tx.order.updateMany({
-          where: { id: orderId, payStatus: { in: ['paid', 'refunding', 'partial_refunded'] } },
+          where: {
+            id: orderId,
+            payStatus: { in: ['paid', 'refunding', 'partial_refunded'] },
+            taskStatus: { notIn: [...RELEASED_ORDER_TASK] },
+          },
           data: {
             payStatus: settlement.payStatus,
             refundedAmountCents: settlement.refundedAmountCents,
@@ -297,7 +312,28 @@ export async function resolvePrintReturnHold(
             ...(settlement.payStatus === 'refunded' ? { refundedAt: new Date() } : {}),
           },
         })
-        if (marked.count === 0) throw deny('ORDER_INVALID_TRANSITION', '这单现在的支付状态不能记成已退。')
+        if (marked.count === 0) {
+          const current = await tx.order.findUnique({
+            where: { id: orderId },
+            select: { taskStatus: true, printTaskId: true },
+          })
+          const taskNow = current?.printTaskId
+            ? await tx.printTask.findUnique({
+              where: { id: current.printTaskId },
+              select: { status: true, printOutcome: true },
+            })
+            : null
+          const taken = current?.taskStatus === 'claimed'
+            || current?.taskStatus === 'printing'
+            || current?.taskStatus === 'completed'
+            || paperAlreadyReleased({
+              taskStatus: taskNow?.status ?? null,
+              orderTaskStatus: current?.taskStatus ?? null,
+              printOutcome: taskNow?.printOutcome ?? null,
+            })
+          if (taken) throw deny('PAPER_ALREADY_RELEASED', '纸已经出去。确认退成不能用，请走核对后仍退款。')
+          throw deny('ORDER_INVALID_TRANSITION', '这单现在的支付状态不能记成已退。')
+        }
         if (settlement.payStatus === 'refunded' && task && task.status === 'pending' && task.printOutcome !== 'printed') {
           await tx.printTask.updateMany({
             where: { id: task.id, status: 'pending' },
@@ -351,4 +387,24 @@ export async function resolvePrintReturnHold(
       amountCents: freshRefund.amountCents,
     }
   })
+  } catch (error) {
+    if (action === 'confirm_refunded' && exceptionCode(error) === 'PAPER_ALREADY_RELEASED') {
+      await db.auditLog.create({
+        data: {
+          actorId: null,
+          actorRole: 'admin',
+          action: 'refund.hold_rejected',
+          targetType: 'order',
+          targetId: orderId,
+          payloadJson: JSON.stringify({
+            action,
+            operatorId,
+            code: 'PAPER_ALREADY_RELEASED',
+            detail: '纸已经放行或已经出去，确认退成不能用',
+          }),
+        },
+      })
+    }
+    throw error
+  }
 }
