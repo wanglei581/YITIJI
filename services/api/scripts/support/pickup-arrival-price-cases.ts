@@ -42,6 +42,7 @@ import { runP2b5Cases, runP2b5CoveredRefundCases } from './pickup-arrival-p2b5-c
 import { runP2b5RemainderCases } from './pickup-arrival-p2b5-remainder-cases'
 import { runP2b5HoldRaceCases, runP2b5PendingHoldCases, runP2b5PrintedConfirmCases } from './pickup-arrival-p2b5-hold-cases'
 import { runP2b5AgyCases } from './pickup-arrival-p2b5-agy-cases'
+import { runP2b6ClosedWindowSwitchCases } from './pickup-arrival-p2b6-switch-cases'
 import { runP2b5CancelUnclaimedTaskCases } from './pickup-arrival-p2b5-cancel-task-cases'
 import { runP2b5LedgerAmountCases } from './pickup-arrival-p2b5-ledger-cases'
 import {
@@ -545,6 +546,7 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     await runP2b5LedgerAmountCases(db, { tag, orderIds, taskIds })
     await runP2b5CancelUnclaimedTaskCases(db, { tag, orderIds, taskIds })
     await runP2b5AgyCases(db, { tag, orderIds, taskIds })
+    await runP2b6ClosedWindowSwitchCases(db, { tag, orderIds, taskIds })
 
     await db.platformSetting.upsert({
       where: { key: PERSONAL_CHARGE_SETTING_KEY },

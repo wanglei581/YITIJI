@@ -276,7 +276,7 @@ if (
 if (
   service.includes('opsAttention?: boolean') &&
   service.includes('opsAttentionCode?:') &&
-  service.includes("'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'partial_refunded' | 'paper_refund_failed' | null") &&
+  service.includes("'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'partial_refunded' | 'paper_refund_failed' | 'print_return_manual' | null") &&
   service.includes("opsAttention: params.opsAttention ? 'true' : undefined")
 ) {
   pass('admin orders service carries opsAttention/opsAttentionCode fields and query mapping')
@@ -321,11 +321,12 @@ if (
   honestyCopy.includes("return '退款中'") &&
   honestyCopy.includes("return '渠道已受理未确认'") &&
   honestyCopy.includes("return '部分退款'") &&
-  honestyCopy.includes("return '已出纸退款失败'")
+  honestyCopy.includes("return '已出纸退款失败'") &&
+  honestyCopy.includes("return '待人工'")
 ) {
   pass('opsAttentionText covers the server codes with Chinese labels and returns null otherwise')
 } else {
-  fail('opsAttentionText must map refund_required/refunding/channel_accepted_unconfirmed/partial_refunded/paper_refund_failed to Chinese and null for unknown')
+  fail('opsAttentionText must map refund_required/refunding/channel_accepted_unconfirmed/partial_refunded/paper_refund_failed/print_return_manual to Chinese and null for unknown')
 }
 
 // API-20 人工发起退款：待退款信号单必须二次确认后才走 canonical refundOrder。

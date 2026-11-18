@@ -11,7 +11,7 @@ import {
   payableCents,
 } from './pending-refund-signal'
 import { PICKUP_VALIDITY_FROM_PAYMENT_MS } from './pickup-validity'
-import { settleClosedWindowUnprinted } from './closed-window-unprinted'
+import { parkClosedWindowUnprinted, settleClosedWindowUnprinted } from './closed-window-unprinted'
 import { RefundService } from './refund.service'
 
 /** 自动整单退的稳定原因。refundNo 仍是 `RFD-<orderNo>`，重复跑命中同一笔。 */
@@ -25,6 +25,21 @@ export const PICKUP_EXPIRED_UNPICKED_REFUND_REASON = 'pickup_expired_unpicked'
 export const PAID_OUTPUT_ANOMALY_REFUND_REASON = 'paid_output_anomaly'
 
 const STARTED_OR_PRINTED = ['claimed', 'printing', 'completed'] as const
+
+/** 已付、窗口已关、还没挂打印任务。纸已经领走或已经出去的不在这里。 */
+export function closedWindowUnprintedWhere(now: Date) {
+  return {
+    payStatus: 'paid' as const,
+    amountCents: { gt: 0 },
+    printTaskId: null,
+    taskStatus: { notIn: [...STARTED_OR_PRINTED] },
+    pickupStatus: { in: ['pending', 'expired', 'cancelled'] },
+    OR: [
+      { pickupStatus: { in: ['expired', 'cancelled'] } },
+      { pickupCodeExpiresAt: { lte: now } },
+    ],
+  }
+}
 
 export interface PickupExpiryRefundSweepResult {
   scanned: number
@@ -130,17 +145,7 @@ export class PickupExpiryRefundService {
     }
 
     const closedWindowRows = await this.prisma.order.findMany({
-      where: {
-        payStatus: 'paid',
-        amountCents: { gt: 0 },
-        printTaskId: null,
-        taskStatus: { notIn: ['claimed', 'printing', 'completed'] },
-        pickupStatus: { in: ['pending', 'expired', 'cancelled'] },
-        OR: [
-          { pickupStatus: { in: ['expired', 'cancelled'] } },
-          { pickupCodeExpiresAt: { lte: now } },
-        ],
-      },
+      where: closedWindowUnprintedWhere(now),
       orderBy: { paidAt: 'asc' },
       take: limit,
       select: { id: true },
@@ -235,6 +240,28 @@ export class PickupExpiryRefundService {
       }
     }
     return result
+  }
+
+  /**
+   * 自动退开关关着时仍要给出去向。只对待窗口已关、纸还没出的已付单，
+   * 不调用退款，不改支付状态。
+   */
+  async parkClosedWindowWhenAutoRefundOff(opts: { now?: Date; limit?: number } = {}): Promise<{ parked: number; skipped: number }> {
+    const now = opts.now ?? new Date()
+    const rows = await this.prisma.order.findMany({
+      where: closedWindowUnprintedWhere(now),
+      orderBy: { paidAt: 'asc' },
+      take: opts.limit ?? 50,
+      select: { id: true },
+    })
+    let parked = 0
+    let skipped = 0
+    for (const row of rows) {
+      const result = await parkClosedWindowUnprinted(this.prisma, row.id)
+      if (result === 'manual') parked += 1
+      else skipped += 1
+    }
+    return { parked, skipped }
   }
 
   /** 材料包行或关联任务已经开始打印 / 已出纸。 */

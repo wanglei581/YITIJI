@@ -44,11 +44,11 @@ export interface AdminOrderReadonlyItem {
   /** 已付款未出纸、已落待退款信号。不会自动出款。 */
   refundRequired: boolean
   /**
-   * 运营必须看见：待退款、退款中、渠道已受理但本地确认未落地、部分退款、已出纸且退款失败。
+   * 运营必须看见：待退款、退款中、渠道已受理但本地确认未落地、部分退款、已出纸且退款失败、待人工。
    * 只读；不自动出款、不改 payStatus。
    */
   opsAttention: boolean
-  opsAttentionCode: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'copy_result_unconfirmed' | 'partial_refunded' | 'paper_refund_failed' | null
+  opsAttentionCode: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'copy_result_unconfirmed' | 'partial_refunded' | 'paper_refund_failed' | 'print_return_manual' | null
   createdAt: string
   updatedAt: string
 }

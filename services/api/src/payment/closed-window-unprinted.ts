@@ -12,6 +12,56 @@ import type { RefundService } from './refund.service'
 
 export const PICKUP_WINDOW_CLOSED_UNPRINTED_REASON = 'pickup_window_closed_unprinted'
 
+/** 自动退开关关着时的去向：不退钱，留下待人工。已有这笔原因的退款则不另开。 */
+export async function parkClosedWindowUnprinted(
+  db: PrismaService,
+  orderId: string,
+): Promise<'manual' | 'skipped'> {
+  const order = await db.order.findUnique({ where: { id: orderId } })
+  if (!order || order.payStatus !== 'paid') return 'skipped'
+  if (payableCents(order) <= 0) return 'skipped'
+  if (!isPickupWindowClosed(order)) return 'skipped'
+  const task = order.printTaskId
+    ? await db.printTask.findUnique({
+      where: { id: order.printTaskId },
+      select: { status: true, printOutcome: true },
+    })
+    : null
+  if (paperAlreadyReleased({
+    taskStatus: task?.status ?? null,
+    orderTaskStatus: order.taskStatus,
+    printOutcome: task?.printOutcome ?? null,
+  })) return 'skipped'
+  const existing = await db.refund.findFirst({
+    where: {
+      orderId,
+      reason: PICKUP_WINDOW_CLOSED_UNPRINTED_REASON,
+      status: { in: ['manual_review', 'pending', 'failed', 'success'] },
+    },
+  })
+  if (existing?.status === 'success') return 'skipped'
+  if (!existing) {
+    const refundNo = `RFD-WINDOW-${order.orderNo}`
+    const taken = await db.refund.findUnique({ where: { refundNo } })
+    if (!taken) {
+      await db.refund.create({
+        data: {
+          orderId,
+          refundNo,
+          amountCents: payableCents(order),
+          status: 'manual_review',
+          reason: PICKUP_WINDOW_CLOSED_UNPRINTED_REASON,
+          channel: order.paymentSource ?? 'offline',
+        },
+      })
+    } else if (taken.status === 'success') {
+      return 'skipped'
+    }
+  }
+  await notifyPrintReturnHold(db, orderId)
+  return 'manual'
+}
+
 export async function settleClosedWindowUnprinted(
   db: PrismaService,
   refunds: RefundService,

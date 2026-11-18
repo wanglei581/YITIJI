@@ -76,6 +76,7 @@ function deriveAftercare(
   row: OrderRow,
   channelAcceptedUnconfirmed: boolean,
   paperRefundFailed = false,
+  printReturnManual = false,
 ): Pick<
   AdminOrderReadonlyItem,
   | 'aftercareStatus'
@@ -110,7 +111,7 @@ function deriveAftercare(
     // 未确认历史原因仍在时禁止重打，核查后同样禁止。
     retryForbidden: unconfirmedFailure,
     refundRequired: isAdminRefundRequired(row),
-    ...deriveOpsAttention(row, channelAcceptedUnconfirmed, paperRefundFailed),
+    ...deriveOpsAttention(row, channelAcceptedUnconfirmed, paperRefundFailed, printReturnManual),
   }
 }
 
@@ -118,6 +119,7 @@ function deriveOpsAttention(
   row: Pick<OrderRow, 'payStatus' | 'refundReason'>,
   channelAcceptedUnconfirmed: boolean,
   paperRefundFailed: boolean,
+  printReturnManual: boolean,
 ): Pick<AdminOrderReadonlyItem, 'opsAttention' | 'opsAttentionCode'> {
   const refundRequired = isAdminRefundRequired(row)
   let opsAttentionCode: AdminOrderReadonlyItem['opsAttentionCode'] = null
@@ -126,6 +128,7 @@ function deriveOpsAttention(
   else if (row.payStatus === 'refunding') opsAttentionCode = 'refunding'
   else if (row.payStatus === 'partial_refunded') opsAttentionCode = 'partial_refunded'
   else if (paperRefundFailed) opsAttentionCode = 'paper_refund_failed'
+  else if (printReturnManual) opsAttentionCode = 'print_return_manual'
   return {
     opsAttention: opsAttentionCode !== null,
     opsAttentionCode,
@@ -227,6 +230,10 @@ export class AdminOrdersReadonlyService {
           printTask: { is: { printOutcome: 'printed' } },
           refunds: { some: { status: 'failed' } },
         },
+        {
+          payStatus: 'paid',
+          refunds: { some: { status: 'manual_review' } },
+        },
         { type: 'copy', copyJob: { is: { state: 'unconfirmed' } } },
         ...(unconfirmedIds.length > 0 ? [{ id: { in: unconfirmedIds } }] : []),
       ]
@@ -268,8 +275,9 @@ export class AdminOrdersReadonlyService {
     const labels = await this.lookupLabels(orderRows)
     const unconfirmed = await this.unconfirmedOrderIdSet(orderRows.map((row) => row.id))
     const paperFailed = await this.paperRefundFailedIds(orderRows)
+    const manualReview = await this.manualReviewIds(orderRows)
     return {
-      items: orderRows.map((row) => this.toItem(row, labels, unconfirmed.has(row.id), paperFailed.has(row.id))),
+      items: orderRows.map((row) => this.toItem(row, labels, unconfirmed.has(row.id), paperFailed.has(row.id), manualReview.has(row.id))),
       pagination: {
         page: params.page,
         pageSize: params.pageSize,
@@ -291,8 +299,9 @@ export class AdminOrdersReadonlyService {
     const labels = await this.lookupLabels([row])
     const unconfirmed = await this.unconfirmedOrderIdSet([row.id])
     const paperFailed = await this.paperRefundFailedIds([row])
+    const manualReview = await this.manualReviewIds([row])
     const printRefund = await explainPrintRefund(this.prisma, row.id)
-    const item = this.toItem(row, labels, unconfirmed.has(row.id), paperFailed.has(row.id))
+    const item = this.toItem(row, labels, unconfirmed.has(row.id), paperFailed.has(row.id), manualReview.has(row.id))
     const summary = row.type !== 'copy' && row.printTask ? parseSafePrintSummary(row.printTask.paramsJson) : null
     const statusLogs = row.type !== 'copy' && row.printTask
       ? await this.prisma.printTaskStatusLog.findMany({
@@ -379,6 +388,16 @@ export class AdminOrdersReadonlyService {
     return new Set(refunds.map((refund) => refund.orderId))
   }
 
+  private async manualReviewIds(rows: OrderRow[]): Promise<Set<string>> {
+    const candidates = rows.filter((row) => row.payStatus === 'paid').map((row) => row.id)
+    if (candidates.length === 0) return new Set()
+    const refunds = await this.prisma.refund.findMany({
+      where: { orderId: { in: candidates }, status: 'manual_review' },
+      select: { orderId: true },
+    })
+    return new Set(refunds.map((refund) => refund.orderId))
+  }
+
   private async unconfirmedAttemptOrderIds(): Promise<string[]> {
     const rows = await this.prisma.paymentAttempt.findMany({
       where: channelAcceptedUnconfirmedWhere(new Date(), { fuzzyLookbackMs: EMPTY_IDENTIFIER_LOOKBACK_MS }),
@@ -417,6 +436,7 @@ export class AdminOrdersReadonlyService {
     labels: LabelMaps,
     channelAcceptedUnconfirmed = false,
     paperRefundFailed = false,
+    printReturnManual = false,
   ): AdminOrderReadonlyItem {
     // 手机单在到机放行前只有 Order：展示已确认的打印快照，不伪造 PrintTask。
     // 有真实任务时只认任务参数；材料包/历史现场单不套用单文件快照。
@@ -454,7 +474,7 @@ export class AdminOrdersReadonlyService {
       paperSize: printSummary.paperSize,
       errorCode: row.type === 'copy' ? row.copyJob?.resultCode
         ?? (row.copyJob?.state === 'unconfirmed' ? 'COPY_RESULT_UNCONFIRMED' : null) : row.printTask?.errorCode ?? null,
-      ...deriveAftercare(row, channelAcceptedUnconfirmed, paperRefundFailed),
+      ...deriveAftercare(row, channelAcceptedUnconfirmed, paperRefundFailed, printReturnManual),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }
