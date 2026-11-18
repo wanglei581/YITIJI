@@ -404,7 +404,7 @@ function demoServiceOrders(): AdminOrderReadonlyDetail[] {
     createdAt: '2026-11-13T09:10:00+08:00',
     updatedAt: paidAt,
   }
-  return [
+  const rows: Array<Omit<AdminOrderReadonlyDetail, 'payableCents'>> = [
     {
       ...base,
       id: 'svc_demo_used',
@@ -554,7 +554,8 @@ function demoServiceOrders(): AdminOrderReadonlyDetail[] {
       closeReason: null,
       updatedAt: '2026-11-13T12:21:00+08:00',
     },
-  ].map((row) => ({ ...row, payableCents: row.amountCents }))
+  ]
+  return rows.map((row) => ({ ...row, payableCents: row.amountCents }))
 }
 
 let serviceDemoState = demoServiceOrders()
