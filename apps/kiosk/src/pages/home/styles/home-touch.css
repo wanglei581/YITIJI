@@ -274,6 +274,27 @@
   [data-qx-page='home'] .qxt-home-tiles .qxt-tx > small { grid-column: 1 / -1; grid-row: 3; }
 }
 
+/* 问候块右上角「免费使用」。绝对定位，不占问候文字的宽度。样式照 free-1112.js，本身不加动画。 */
+[data-qx-page='home'] .qxt-greet { position: relative; }
+[data-qx-page='home'] .qxt-home-free {
+  position: absolute;
+  right: 0;
+  top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px 12px 20px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--qxt-free-a), var(--qxt-free-b) 55%, var(--qxt-free-c));
+  color: var(--qxt-free-ink);
+  font: 800 32px/1.2 var(--qx-sans);
+  letter-spacing: 0.06em;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28), 0 0 0 6px rgba(46, 230, 168, 0.16);
+  animation: none;
+  white-space: nowrap;
+}
+[data-qx-page='home'] .qxt-home-free svg { flex: none; }
+
 @media (prefers-reduced-motion: reduce) {
   [data-qx-page='home'] .qxt-home-tasks .qxt-task:focus-visible,
   [data-qx-page='home'] .qxt-home-tiles .qxt-tile:focus-visible,

@@ -15163,7 +15163,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 828,
+      "reachableFileCount": 831,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18244,7 +18244,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1019
+      "sourceFileCount": 1020
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21867,6 +21867,9 @@
     "apps/kiosk/src/favorites/localFavorites.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs"
+    ],
+    "apps/kiosk/src/hooks/kioskHomeFreeBadgeReader.ts": [
+      "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
     "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
@@ -33649,6 +33652,7 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/components/qingxu/touch/QxTouchTask.tsx",
+          "apps/kiosk/src/hooks/kioskHomeFreeBadgeReader.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
           "apps/kiosk/src/pages/home/components/HomeTouchView.tsx",
@@ -50859,28 +50863,6 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/hooks/kioskHomeFreeBadgeReader.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/home-free-badge.test.mjs"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/home-free-badge.test.mjs"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/hooks/useKioskHomeFreeBadge.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/home-free-badge.test.mjs"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/home-free-badge.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

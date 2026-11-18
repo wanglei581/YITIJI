@@ -1,10 +1,12 @@
 // 一体机首页「免费使用」的读取与判定。不依赖 React，钩子只负责接线。
 //
-// 价在本机终端配置的 pricing.effective 上，五个键都要读到。
-// 开关为真，并且五个生效价都是 0，才返回 true。
-// 任一价大于 0、价读不齐、配置读不到或没有开关，一律 false。
-// 新一轮先不显示。30 秒没回来按失败，之后才到的成功也不再显示。
-// 终端号变了立刻不显示并重读；不是当前终端的结果丢掉。
+// 价在本机终端配置的 pricing.effective 上。
+// 角标：开关为真，并且五个生效价都读到、且都是 0，才返回 true。
+// 任一价大于 0、价读不齐、配置读不到或没有开关，角标一律 false。
+// 同一轮配置同时给出「是否收费」：读到的有效价里有一个大于 0 就是收费，缺的键不算 0。
+// 读不齐且没有正价，或整段价目读不到，不算收费。角标和收费句都用这一对结果，不各读一次。
+// 新一轮两个都先不显示。30 秒没回来按失败，之后才到的成功也不再采用。
+// 终端号变了立刻两个都撤下并重读；不是当前终端的结果丢掉。
 
 import { TERMINAL_CHARGE_SERVICE_KEYS } from '@ai-job-print/shared'
 import { subscribeTerminalIdentity } from '../services/api/screensaver'
@@ -21,19 +23,29 @@ export interface KioskHomeFreeBadgeInput {
   config: unknown
 }
 
-function readEffectiveCents(config: unknown): number[] | null {
+function readKnownPrices(config: unknown): { known: number[]; complete: boolean } | null {
   if (typeof config !== 'object' || config === null) return null
   const pricing = (config as { pricing?: unknown }).pricing
   if (typeof pricing !== 'object' || pricing === null) return null
   const effective = (pricing as { effective?: unknown }).effective
   if (typeof effective !== 'object' || effective === null) return null
-  const cents: number[] = []
+  const known: number[] = []
+  let complete = true
   for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
     const value = (effective as Record<string, unknown>)[key]
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return null
-    cents.push(value)
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      complete = false
+      continue
+    }
+    known.push(value)
   }
-  return cents
+  return { known, complete }
+}
+
+function readEffectiveCents(config: unknown): number[] | null {
+  const read = readKnownPrices(config)
+  if (!read?.complete) return null
+  return read.known
 }
 
 /** 纯判定。调用方传入已经取好的本机配置（含 pricing）。 */
@@ -43,6 +55,13 @@ export function kioskHomeFreeBadgeVisible(input: KioskHomeFreeBadgeInput): boole
   const cents = readEffectiveCents(input.config)
   if (!cents) return false
   return cents.every((value) => value === 0)
+}
+
+/** 读到的有效价里至少有一个大于 0。缺的键不算 0；一个正价都没有，或价目整体读不到，不当成在收费。 */
+export function kioskEffectivePricesCharged(config: unknown): boolean {
+  const read = readKnownPrices(config)
+  if (!read) return false
+  return read.known.some((value) => value > 0)
 }
 
 export interface KioskHomeFreeBadgePollingOverrides {
@@ -65,7 +84,7 @@ function settle<T>(load: () => Promise<T> | T): Promise<T> {
  * 返回停止函数：清掉定时器，在途结果不再公布。
  */
 export function startKioskHomeFreeBadgePolling(
-  onVisible: (visible: boolean) => void,
+  onVisible: (badge: boolean, charged: boolean) => void,
   overrides: KioskHomeFreeBadgePollingOverrides = {},
 ): () => void {
   const getId = overrides.getTerminalId ?? getTerminalId
@@ -80,9 +99,9 @@ export function startKioskHomeFreeBadgePolling(
   let watchedId = getId()
   let roundTimer: ReturnType<typeof setTimeout> | null = null
 
-  const publish = (visible: boolean) => {
+  const publish = (badge: boolean, charged: boolean) => {
     if (stopped) return
-    onVisible(visible)
+    onVisible(badge, charged)
   }
 
   const clearRoundTimer = () => {
@@ -98,7 +117,7 @@ export function startKioskHomeFreeBadgePolling(
     clearRoundTimer()
     const terminalId = getId()
     watchedId = terminalId
-    publish(false)
+    publish(false, false)
     if (!terminalId) return
 
     const still = () => !stopped && ticket === round && getId() === terminalId
@@ -108,7 +127,7 @@ export function startKioskHomeFreeBadgePolling(
     roundTimer = setTimeout(() => {
       if (!still() || settled) return
       failed = true
-      publish(false)
+      publish(false, false)
     }, HOME_FREE_BADGE_ROUND_TIMEOUT_MS)
 
     void settle(() => loadConfig(terminalId))
@@ -116,14 +135,14 @@ export function startKioskHomeFreeBadgePolling(
         if (!still() || failed) return
         settled = true
         clearRoundTimer()
-        publish(kioskHomeFreeBadgeVisible({ config }))
+        publish(kioskHomeFreeBadgeVisible({ config }), kioskEffectivePricesCharged(config))
       })
       .catch(() => {
         if (!still()) return
         failed = true
         settled = true
         clearRoundTimer()
-        publish(false)
+        publish(false, false)
       })
   }
 
@@ -132,7 +151,7 @@ export function startKioskHomeFreeBadgePolling(
     const next = getId()
     if (next === watchedId) return
     watchedId = next
-    publish(false)
+    publish(false, false)
     load()
   })
 
