@@ -19400,6 +19400,8 @@
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/print-jobs/self-service-reprint.ts",
           "services/api/src/print-sign/print-sign.service.ts",
+          "services/api/src/scan-tasks/scan-task-deliver.ts",
+          "services/api/src/scan-tasks/scan-task-query.ts",
           "services/api/src/terminals/terminals-agent.service.ts",
           "services/api/src/upload-sessions/upload-session-member-bind.ts",
           "services/api/src/upload-sessions/upload-session-object-delete.ts"
@@ -20167,6 +20169,9 @@
           "services/api/src/payment/service-order.scan.ts",
           "services/api/src/payment/service-order.sweep.ts",
           "services/api/src/scan-tasks/scan-device-sessions.service.ts",
+          "services/api/src/scan-tasks/scan-task-create.ts",
+          "services/api/src/scan-tasks/scan-task-deliver.ts",
+          "services/api/src/scan-tasks/scan-task-query.ts",
           "services/api/src/scan-tasks/scan-task-reaper.task.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts"
@@ -20355,6 +20360,7 @@
           "services/api/src/print-jobs/free-print-quota.decide.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/scan-tasks/scan-task-create.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
           "services/api/src/support-contact/support-contact.service.ts",

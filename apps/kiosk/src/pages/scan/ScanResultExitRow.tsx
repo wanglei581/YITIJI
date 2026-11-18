@@ -1,8 +1,14 @@
+import { useEffect, useState } from 'react'
 import { FolderIcon, PrinterIcon, SparklesIcon } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
 import { useSupportContactSnapshot } from '../../hooks/useSupportContact'
+import { getMyDocuments } from '../../services/api/memberAssets'
 import { SCAN_GUEST_WAYS_LEAD, scanGuestWays } from './scanGuestWays'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import type { ScannedFile } from './scanResultModel'
+
+/** 定稿 `fix-scan.js` 登录成功去向的副句。只有「我的文档」列表里真有这份才用。 */
+const PANEL_SAVED_IN_DOCUMENTS = '在「我的文档」查看与管理本次扫描件'
 
 /**
  * 结果页成功分支里的三个去向：AI 简历识别、拿去打印、前往我的文档（游客时是灰着的「本次不进入我的文档」）。
@@ -36,6 +42,32 @@ export function ScanResultExitRow({
 }) {
   // 只读本会话已有的服务联系方式（运行时根负责去读），游客页面自己不新发请求。
   const contact = useSupportContactSnapshot()
+  const { getToken } = useAuth()
+  const fileId = file?.fileId ?? ''
+  const [listed, setListed] = useState(false)
+  useEffect(() => {
+    if (!isLoggedIn || !fileId) {
+      setListed(false)
+      return undefined
+    }
+    let stale = false
+    setListed(false)
+    void getMyDocuments(getToken(), { pageSize: 50 })
+      .then((page) => {
+        if (!stale) setListed(page.items.some((item) => item.id === fileId))
+      })
+      .catch(() => {
+        if (!stale) setListed(false)
+      })
+    return () => {
+      stale = true
+    }
+  }, [fileId, getToken, isLoggedIn])
+  const ways = scanGuestWays(contact)
+  // 没核对到时用定稿里已有的下一步，不说已经存进「我的文档」。
+  const documentsNote = listed
+    ? PANEL_SAVED_IN_DOCUMENTS
+    : (ways.find((way) => way.key === 'print')?.text ?? '')
   return (
     <div className="sw-actrow" data-testid="scan-workbench-exits">
       <button
@@ -44,7 +76,9 @@ export function ScanResultExitRow({
         disabled={!aiEnabled}
         onClick={handleResumeAI}
       >
-        <span className="sw-exit-ic"><SparklesIcon size={20} aria-hidden /></span>
+        <span className="sw-exit-ic">
+          <SparklesIcon size={20} aria-hidden />
+        </span>
         <span className="sw-exit-body">
           <span className="sw-exit-title">
             AI 简历识别
@@ -58,7 +92,9 @@ export function ScanResultExitRow({
         </span>
       </button>
       <button type="button" className="sw-exit" disabled={!printEnabled} onClick={handlePrint}>
-        <span className="sw-exit-ic"><PrinterIcon size={20} aria-hidden /></span>
+        <span className="sw-exit-ic">
+          <PrinterIcon size={20} aria-hidden />
+        </span>
         <span className="sw-exit-body">
           <span className="sw-exit-title">拿去打印</span>
           <small>先检查文件和个人信息，再选打印参数。金额由系统报价决定，本页不给价格。</small>
@@ -70,14 +106,16 @@ export function ScanResultExitRow({
         disabled={!file || !isLoggedIn}
         onClick={handleDocuments}
       >
-        <span className="sw-exit-ic"><FolderIcon size={20} aria-hidden /></span>
+        <span className="sw-exit-ic">
+          <FolderIcon size={20} aria-hidden />
+        </span>
         <span className="sw-exit-body">
           <span className="sw-exit-title">
             {isLoggedIn ? '前往我的文档' : '本次不进入我的文档'}
             {isLoggedIn ? null : <span className="sw-offtag">暂不放行</span>}
           </span>
           {isLoggedIn ? (
-            <small>在「我的文档」查看与管理本次扫描件</small>
+            <small>{documentsNote}</small>
           ) : (
             <>
               <small data-testid="scan-guest-ways">{SCAN_GUEST_WAYS_LEAD}</small>
