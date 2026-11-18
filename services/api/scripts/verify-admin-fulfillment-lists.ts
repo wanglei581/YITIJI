@@ -26,6 +26,8 @@ import { AdminFulfillmentListsController } from '../src/admin-print-scan/admin-f
 import { AdminFulfillmentListsService, type AdminFulfillmentListItem, type AdminFulfillmentListPage } from '../src/admin-print-scan/admin-fulfillment-lists'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
+// 复印任务的到期时间只要求「还没过期」；用远期端点常量，免得写死的日子一过用例自己坏（verify:fixture-time-bombs）。
+const FAR_FUTURE = new Date('2099-12-31T00:00:00.000Z')
 const ITEM_KEYS = ['copies', 'failureReason', 'id', 'lineCount', 'recordNo', 'startedAt', 'status', 'statusLabel', 'terminalCode', 'terminalId']
 
 function pass(label: string): void {
@@ -193,32 +195,32 @@ async function main(): Promise<void> {
     await prisma.printTask.create({ data: { id: unsafeTask, terminalId: termA, fileUrl, fileMd5: 'def', errorCode: 'bad/code', errorMessage: `${errorMessage} ${fileId}`, status: 'failed' } })
     await prisma.copyJob.create({ data: {
       id: `copy-paper-${suffix}`, terminalId: termA, organizationId: orgId, endUserId, state: 'failed', source: 'flatbed',
-      copies: 2, requestKey: `req-paper-${suffix}`, resultCode: 'PAPER_EMPTY', quoteSnapshot: quote, expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+      copies: 2, requestKey: `req-paper-${suffix}`, resultCode: 'PAPER_EMPTY', quoteSnapshot: quote, expiresAt: FAR_FUTURE,
       createdAt: new Date('2026-11-18T02:15:00.000Z'),
     } })
     await prisma.copyJob.create({ data: {
       id: `copy-queue-${suffix}`, terminalId: termA, organizationId: orgId, state: 'ready', source: 'flatbed',
-      copies: 1, requestKey: `req-queue-${suffix}`, expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+      copies: 1, requestKey: `req-queue-${suffix}`, expiresAt: FAR_FUTURE,
       createdAt: new Date('2026-11-18T01:00:00.000Z'),
     } })
     await prisma.copyJob.create({ data: {
       id: `copy-scan-${suffix}`, terminalId: termB, organizationId: orgId, state: 'scanning', source: 'feeder',
-      copies: 3, requestKey: `req-scan-${suffix}`, expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+      copies: 3, requestKey: `req-scan-${suffix}`, expiresAt: FAR_FUTURE,
       createdAt: new Date('2026-11-18T00:30:00.000Z'),
     } })
     await prisma.copyJob.create({ data: {
       id: `copy-unknown-${suffix}`, terminalId: termA, organizationId: orgId, state: 'failed', source: 'flatbed',
-      copies: 1, requestKey: `req-unknown-${suffix}`, resultCode: 'NOT_IN_TABLE', expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+      copies: 1, requestKey: `req-unknown-${suffix}`, resultCode: 'NOT_IN_TABLE', expiresAt: FAR_FUTURE,
       createdAt: new Date('2026-11-17T00:00:00.000Z'),
     } })
     await prisma.copyJob.create({ data: {
       id: `copy-open-${suffix}`, terminalId: termA, organizationId: orgId, state: 'unconfirmed', source: 'flatbed',
-      copies: 1, requestKey: `req-open-${suffix}`, expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+      copies: 1, requestKey: `req-open-${suffix}`, expiresAt: FAR_FUTURE,
       createdAt: new Date('2026-11-16T00:00:00.000Z'),
     } })
     await prisma.copyJob.create({ data: {
       id: `copy-unsafe-${suffix}`, terminalId: termA, organizationId: orgId, state: 'failed', source: 'flatbed',
-      copies: 1, requestKey: `req-unsafe-${suffix}`, resultCode: 'bad/code', quoteSnapshot: quote, expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+      copies: 1, requestKey: `req-unsafe-${suffix}`, resultCode: 'bad/code', quoteSnapshot: quote, expiresAt: FAR_FUTURE,
       createdAt: new Date('2026-11-15T00:00:00.000Z'),
     } })
 
