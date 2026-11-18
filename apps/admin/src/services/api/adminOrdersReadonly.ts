@@ -1,5 +1,6 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
+import { currentHoldDemo, resolveHoldDemo } from './adminOrdersHoldDemo'
 
 export type AdminOrderAftercareStatus = 'manual_check_required' | null
 
@@ -577,7 +578,8 @@ const mockAdapter: AdminOrdersReadonlyService = {
       }
     }
     const refundDetail = demoRefundDetail()
-    const items = [mockDetailState, MOCK_UNRECORDED_DETAIL, ...(refundDetail ? [refundDetail] : [])]
+    const holdDetail = currentHoldDemo()
+    const items = [mockDetailState, MOCK_UNRECORDED_DETAIL, ...(refundDetail ? [refundDetail] : []), ...(holdDetail ? [holdDetail] : [])]
     return {
       items,
       pagination: { page: params.page, pageSize: params.pageSize, total: items.length, totalPages: 1 },
@@ -588,6 +590,8 @@ const mockAdapter: AdminOrdersReadonlyService = {
     if (service) return service
     const refundDetail = demoRefundDetail()
     if (refundDetail?.id === id) return refundDetail
+    const holdDetail = currentHoldDemo()
+    if (holdDetail?.id === id) return holdDetail
     return id === MOCK_UNRECORDED_DETAIL.id ? MOCK_UNRECORDED_DETAIL : mockDetailState
   },
   async retryServiceRefund(id) {
@@ -680,6 +684,8 @@ const mockAdapter: AdminOrdersReadonlyService = {
     }
   },
   async resolvePrintReturnHold(id, action) {
+    const held = resolveHoldDemo(id, action)
+    if (held) return held
     if (!mockDetailState.refundLedgerNo) {
       throw new ApiHttpError('REFUND_HOLD_NOT_FOUND', '没有待人工处理的退款，不能做这一步。', 400)
     }
