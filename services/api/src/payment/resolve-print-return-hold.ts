@@ -39,6 +39,15 @@ export async function resolvePrintReturnHold(
       if (order.payStatus === 'partial_refunded') {
         throw deny('REFUND_REMAINDER_REQUIRED', '这单只退了一部分。请退还剩余金额，不能用这三步把已经成功的退款再记一次。')
       }
+      const settled = await tx.refund.findFirst({
+        where: {
+          orderId,
+          status: { in: ['success', 'withdrawn', 'closed'] },
+          updatedAt: { gte: new Date(Date.now() - 60_000) },
+        },
+        select: { id: true },
+      })
+      if (settled) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
       throw deny('REFUND_HOLD_NOT_FOUND', '没有待人工处理的退款，不能做这一步。')
     }
     const task = order.printTaskId
@@ -60,14 +69,16 @@ export async function resolvePrintReturnHold(
       if (order.payStatus !== 'paid' && order.payStatus !== 'refunding') {
         throw deny('ORDER_NOT_REFUNDABLE', '这单不是已付款，不能改成出纸。')
       }
-      await tx.refund.updateMany({
+      const withdrawn = await tx.refund.updateMany({
         where: { id: refund.id, status: { in: [...HOLD_STATUSES] } },
         data: { status: 'withdrawn' },
       })
-      await tx.order.updateMany({
+      if (withdrawn.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
+      const reopened = await tx.order.updateMany({
         where: { id: orderId, payStatus: { in: ['paid', 'refunding'] } },
         data: { payStatus: 'paid', taskStatus: 'pending' },
       })
+      if (reopened.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
       if (task && task.printOutcome !== 'printed' && (task.status === 'failed' || task.status === 'cancelled' || task.status === 'pending')) {
         await tx.printTask.updateMany({
           where: { id: task.id, status: { in: ['failed', 'cancelled', 'pending'] } },
@@ -96,14 +107,16 @@ export async function resolvePrintReturnHold(
         },
       })
     } else if (action === 'close_order') {
-      await tx.refund.updateMany({
+      const closedRefund = await tx.refund.updateMany({
         where: { id: refund.id, status: { in: [...HOLD_STATUSES] } },
         data: { status: 'closed' },
       })
-      await tx.order.updateMany({
-        where: { id: orderId },
+      if (closedRefund.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
+      const closedOrder = await tx.order.updateMany({
+        where: { id: orderId, payStatus: order.payStatus },
         data: { payStatus: 'closed', taskStatus: task && task.status === 'pending' ? 'cancelled' : order.taskStatus },
       })
+      if (closedOrder.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
       if (task && task.printOutcome !== 'printed' && (task.status === 'pending' || task.status === 'failed')) {
         await tx.printTask.updateMany({
           where: { id: task.id, status: { in: ['pending', 'failed'] } },
@@ -137,10 +150,11 @@ export async function resolvePrintReturnHold(
       // 未付、支付中、已关闭：只把退款行记成成功，不改订单支付状态。
       // 已关闭的单不能再改成已退，否则和关单「钱不记成已退、纸不再出」打架。
       const leaveOrder = order.payStatus === 'unpaid' || order.payStatus === 'paying' || order.payStatus === 'closed'
-      await tx.refund.updateMany({
+      const confirmed = await tx.refund.updateMany({
         where: { id: refund.id, status: { in: [...HOLD_STATUSES] } },
         data: { status: 'success' },
       })
+      if (confirmed.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
       if (!leaveOrder) {
         const marked = await tx.order.updateMany({
           where: { id: orderId, payStatus: { in: ['paid', 'refunding'] } },
