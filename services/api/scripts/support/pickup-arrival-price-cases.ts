@@ -49,6 +49,7 @@ import { runP2b6PartialSettlementCases } from './pickup-arrival-p2b6-partial-cas
 import { runP2b6HoldChannelCases } from './pickup-arrival-p2b6-hold-cases'
 import { runP2b6PartialHoldCases } from './pickup-arrival-p2b6-partial-hold-cases'
 import { runP2b6PaperRaceCases } from './pickup-arrival-p2b6-paper-race-cases'
+import { runP2b6AttentionCases } from './pickup-arrival-p2b6-attention-cases'
 import { runP2b5CancelUnclaimedTaskCases } from './pickup-arrival-p2b5-cancel-task-cases'
 import { runP2b5LedgerAmountCases } from './pickup-arrival-p2b5-ledger-cases'
 import {
@@ -559,6 +560,7 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     await runP2b6HoldChannelCases(db, { tag, orderIds, taskIds })
     await runP2b6PartialHoldCases(db, { tag, orderIds, taskIds })
     await runP2b6PaperRaceCases(db, { tag, orderIds, taskIds })
+    await runP2b6AttentionCases(db, { tag, orderIds, taskIds })
 
     await db.platformSetting.upsert({
       where: { key: PERSONAL_CHARGE_SETTING_KEY },

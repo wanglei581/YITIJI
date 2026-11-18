@@ -14,6 +14,7 @@ import {
   payableCents,
 } from '../payment/pending-refund-signal'
 import { explainPrintRefund } from '../payment/print-return-disposition'
+import { staleSuccessUnprintedAttentionWhere } from '../payment/stale-success-unprinted-attention'
 import { remainderAmountCents } from '../payment/refund-remainder'
 import type {
   AdminOrderReadonlyDetail,
@@ -234,6 +235,7 @@ export class AdminOrdersReadonlyService {
           payStatus: 'paid',
           refunds: { some: { status: 'manual_review' } },
         },
+        staleSuccessUnprintedAttentionWhere(),
         { type: 'copy', copyJob: { is: { state: 'unconfirmed' } } },
         ...(unconfirmedIds.length > 0 ? [{ id: { in: unconfirmedIds } }] : []),
       ]
@@ -276,8 +278,15 @@ export class AdminOrdersReadonlyService {
     const unconfirmed = await this.unconfirmedOrderIdSet(orderRows.map((row) => row.id))
     const paperFailed = await this.paperRefundFailedIds(orderRows)
     const manualReview = await this.manualReviewIds(orderRows)
+    const stalePaidFailed = await this.staleSuccessUnprintedIds(orderRows)
     return {
-      items: orderRows.map((row) => this.toItem(row, labels, unconfirmed.has(row.id), paperFailed.has(row.id), manualReview.has(row.id))),
+      items: orderRows.map((row) => this.toItem(
+        row,
+        labels,
+        unconfirmed.has(row.id),
+        paperFailed.has(row.id),
+        manualReview.has(row.id) || stalePaidFailed.has(row.id),
+      )),
       pagination: {
         page: params.page,
         pageSize: params.pageSize,
@@ -300,8 +309,15 @@ export class AdminOrdersReadonlyService {
     const unconfirmed = await this.unconfirmedOrderIdSet([row.id])
     const paperFailed = await this.paperRefundFailedIds([row])
     const manualReview = await this.manualReviewIds([row])
+    const stalePaidFailed = await this.staleSuccessUnprintedIds([row])
     const printRefund = await explainPrintRefund(this.prisma, row.id)
-    const item = this.toItem(row, labels, unconfirmed.has(row.id), paperFailed.has(row.id), manualReview.has(row.id))
+    const item = this.toItem(
+      row,
+      labels,
+      unconfirmed.has(row.id),
+      paperFailed.has(row.id),
+      manualReview.has(row.id) || stalePaidFailed.has(row.id),
+    )
     const summary = row.type !== 'copy' && row.printTask ? parseSafePrintSummary(row.printTask.paramsJson) : null
     const statusLogs = row.type !== 'copy' && row.printTask
       ? await this.prisma.printTaskStatusLog.findMany({
@@ -386,6 +402,18 @@ export class AdminOrdersReadonlyService {
       select: { orderId: true },
     })
     return new Set(refunds.map((refund) => refund.orderId))
+  }
+
+  private async staleSuccessUnprintedIds(rows: OrderRow[]): Promise<Set<string>> {
+    const candidates = rows
+      .filter((row) => row.payStatus === 'paid' && row.taskStatus === 'failed' && row.amountCents > 0 && row.printTask?.printOutcome !== 'printed')
+      .map((row) => row.id)
+    if (candidates.length === 0) return new Set()
+    const matched = await this.prisma.order.findMany({
+      where: { id: { in: candidates }, ...staleSuccessUnprintedAttentionWhere() },
+      select: { id: true },
+    })
+    return new Set(matched.map((row) => row.id))
   }
 
   private async manualReviewIds(rows: OrderRow[]): Promise<Set<string>> {
