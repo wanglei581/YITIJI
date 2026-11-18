@@ -120,7 +120,7 @@ export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: str
       title={copy.title}
       subtitle={copy.subtitle}
       status={{ tone: 'bad', label: copy.pill }}
-      statusClassName={variant === 'out-of-paper' ? 'qx-pill' : undefined}
+      statusClassName={variant === 'out-of-paper' ? 'qx-pill pft-fail-status' : 'pft-fail-status'}
       terminalLabel="就业服务大厅"
       back={{ label: '返回首页', onBack: props.onHome }}
       ask={printAsk(ASK_LABEL, ASK_DRAFT)}

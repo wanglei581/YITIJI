@@ -189,3 +189,49 @@
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-unc-row {
   min-height: 80px;
 }
+
+/* 失败页顶栏：品牌名和时钟永不折行、不收缩。胶囊放不下时自己换行并缩小字号，措辞不动。
+   选择器挂在失败胶囊上，避免误伤同一页的「无法确认」。缺纸仍带 qx-pill。 */
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-hdr {
+  height: auto;
+  min-height: 76px;
+  align-items: center;
+}
+
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-brand {
+  flex: none;
+  min-width: max-content;
+}
+
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-brand b,
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-clock,
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-clock b,
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-clock small {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-hdr-right {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-clock {
+  flex: none;
+}
+
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-status.pft-fail-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  font-size: 18px;
+  line-height: 1.25;
+  padding: 8px 14px;
+}
+
+[data-qx-page='print-done']:has(.pft-fail-status) .qxt-status.pft-fail-status .qxt-dot {
+  flex: none;
+}
