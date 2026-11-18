@@ -9,6 +9,7 @@
  *
  * 不塞进 visual/，不走默认 playwright.config.ts（那会起 4177 preview 并 mock API）。
  */
+import { randomBytes } from 'node:crypto'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QRCodeSVG } from 'qrcode.react'
@@ -58,7 +59,8 @@ async function assertNotProduction(collectors: ReturnType<typeof attachCollector
   expect(collectors.productionHits, '禁止访问生产 zyidai.cn / 120.48.13.190').toEqual([])
 }
 
-type ExportedFile = { fileId: string; filename: string; signedUrl: string }
+type ExportedFile = { fileId: string; filename: string; signedUrl: string; printFileUrl: string }
+type ExportedReport = ExportedFile & { taskId: string }
 
 function asExportFile(body: unknown): ExportedFile {
   const record = body && typeof body === 'object' ? body as Record<string, unknown> : {}
@@ -66,11 +68,13 @@ function asExportFile(body: unknown): ExportedFile {
   const fileId = typeof nested.fileId === 'string' ? nested.fileId : ''
   const filename = typeof nested.filename === 'string' ? nested.filename : ''
   const signedUrl = typeof nested.signedUrl === 'string' ? nested.signedUrl : ''
+  const printFileUrl = typeof nested.printFileUrl === 'string' ? nested.printFileUrl : ''
   expect(fileId, '导出响应应带本次文件编号').not.toBe('')
   expect(filename, '导出响应应带本次文件名').not.toBe('')
   expect(signedUrl, '导出响应应带本次取回链接').not.toBe('')
   expect(signedUrl, '取回链接应指向本次文件').toContain(fileId)
-  return { fileId, filename, signedUrl }
+  expect(printFileUrl, '导出响应应带本次打印链接').not.toBe('')
+  return { fileId, filename, signedUrl, printFileUrl }
 }
 
 function localRetrievalUrl(signedUrl: string): string {
@@ -114,9 +118,11 @@ async function assertDownloaded(page: Page, signedUrl: string, mime: RegExp, pdf
 /**
  * 回执只许留在这次跳转的内存里。会话在、任务对得上时写进任一浏览器存储，这里都要红。
  * 不查文件名：打印交接本来就会记下 file.name。
- * 打印交接的 fileUrl 是打印链接，会员这次可能和取回链接同一串，只把这一处拿开再查。
+ * 交接里的 fileUrl 只有和这次的 printFileUrl 相同，才从这一处的值里拿开再查取回链接。
+ * 对不上就不拿开：这次的签名地址不该出现在别的交接里。
+ * 键名一律原样查。取回链接只写进键名也要红。
  */
-async function assertTakeawayNotStored(page: Page, signedUrl: string, where: string): Promise<void> {
+async function assertTakeawayNotStored(page: Page, signedUrl: string, where: string, printFileUrl: string): Promise<void> {
   const entries = await page.evaluate(() => {
     const dump: Array<{ key: string; value: string }> = []
     for (const store of [sessionStorage, localStorage]) {
@@ -130,16 +136,20 @@ async function assertTakeawayNotStored(page: Page, signedUrl: string, where: str
   const stored = entries.map((entry) => `${entry.key}=${entry.value}`).join('\n')
   expect(stored, `${where}：回执不得进任何浏览器存储`).not.toContain('reportTakeaway')
   const withoutPrintFileUrl = entries.map((entry) => {
-    if (entry.key !== 'ai-job-print:current-print-material-check') return entry.value
-    try {
-      const parsed = JSON.parse(entry.value) as { file?: { fileUrl?: unknown } }
-      const fileUrl = parsed.file && typeof parsed.file.fileUrl === 'string' ? parsed.file.fileUrl : ''
-      const at = fileUrl ? entry.value.indexOf(fileUrl) : -1
-      if (at < 0) return entry.value
-      return `${entry.value.slice(0, at)}${entry.value.slice(at + fileUrl.length)}`
-    } catch {
-      return entry.value
+    let value = entry.value
+    if (entry.key === 'ai-job-print:current-print-material-check') {
+      try {
+        const parsed = JSON.parse(entry.value) as { file?: { fileUrl?: unknown } }
+        const fileUrl = parsed.file && typeof parsed.file.fileUrl === 'string' ? parsed.file.fileUrl : ''
+        if (printFileUrl && fileUrl === printFileUrl) {
+          const at = entry.value.indexOf(fileUrl)
+          if (at >= 0) value = `${entry.value.slice(0, at)}${entry.value.slice(at + fileUrl.length)}`
+        }
+      } catch {
+        value = entry.value
+      }
     }
+    return `${entry.key}=${value}`
   }).join('\n')
   expect(withoutPrintFileUrl, `${where}：取回链接不得进任何浏览器存储`).not.toContain(signedUrl)
 }
@@ -148,6 +158,123 @@ async function readEditorValues(page: Page): Promise<string[]> {
   const paper = page.locator('.qxt-paperbox textarea, .qxt-paperbox input')
   const locator = (await paper.count()) > 0 ? paper : page.locator('textarea')
   return locator.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value))
+}
+
+/**
+ * 走查库里的终端和会话票。
+ * 终端走真实注册接口（`POST /auth/terminal/register`，走查 API 开着遗留注册）。
+ * 会话票走真实签发：`POST /terminals/boot-ticket` 再 `POST /terminals/session-token`。
+ * 不写库伪造票据，也不放宽后端验票。票只放进页面本来就读的 sessionStorage。
+ */
+const TERMINAL_SESSION_STORAGE_KEY = 'terminal_session_token_v1'
+let walkthroughTerminal: { terminalId: string } | null = null
+
+function stringField(body: Record<string, unknown>, key: string, label: string): string {
+  const value = body[key]
+  if (typeof value !== 'string' || value === '') throw new Error(`${label}缺少 ${key}`)
+  return value
+}
+
+async function issueWalkthroughTerminalSession(): Promise<{ terminalId: string; terminalCode: string; sessionToken: string }> {
+  const adminSecret = process.env.INTERACTION_TERMINAL_ADMIN_SECRET
+  if (!adminSecret) throw new Error('走查没有终端注册密钥 INTERACTION_TERMINAL_ADMIN_SECRET')
+  const terminalCode = `KSK-WALK-${randomBytes(4).toString('hex')}`
+  const registeredResponse = await fetch(`${API_ORIGIN}/api/v1/auth/terminal/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      terminalCode,
+      deviceFingerprint: `fp-${terminalCode}`,
+      displayName: '走查终端',
+      adminSecret,
+    }),
+  })
+  const registered = await registeredResponse.json() as Record<string, unknown>
+  if (!registeredResponse.ok) throw new Error(`注册走查终端失败 ${registeredResponse.status} ${JSON.stringify(registered)}`)
+  const terminalId = stringField(registered, 'terminalId', '注册响应')
+  const terminalToken = stringField(registered, 'terminalToken', '注册响应')
+  const bootResponse = await fetch(`${API_ORIGIN}/api/v1/terminals/boot-ticket`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${terminalToken}`,
+      'x-terminal-id': terminalId,
+    },
+  })
+  const boot = await bootResponse.json() as Record<string, unknown>
+  if (!bootResponse.ok) throw new Error(`签发引导票失败 ${bootResponse.status} ${JSON.stringify(boot)}`)
+  const bootTicket = stringField(boot, 'bootTicket', '引导票响应')
+  const sessionResponse = await fetch(`${API_ORIGIN}/api/v1/terminals/session-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ bootTicket }),
+  })
+  const session = await sessionResponse.json() as Record<string, unknown>
+  if (!sessionResponse.ok) throw new Error(`换会话票失败 ${sessionResponse.status} ${JSON.stringify(session)}`)
+  return { terminalId, terminalCode, sessionToken: stringField(session, 'sessionToken', '会话票响应') }
+}
+
+/**
+ * 走查默认没有本机终端身份，预览主按钮会停在「打印机不可用」。
+ * 简历已经上传之后才装上身份和在线打印机，再等按钮自己变成可点。
+ * 身份装得太早会把本机文件选择藏掉，诊断那一步就传不了简历。
+ * 会话票在身份被本机轮询读到之前写入，页面随后走真实续期，不清打印交接。
+ */
+async function armPreviewPrinter(page: Page): Promise<void> {
+  const issued = await issueWalkthroughTerminalSession()
+  walkthroughTerminal = { terminalId: issued.terminalId }
+  await page.evaluate(({ key, token }) => {
+    window.sessionStorage.setItem(key, token)
+  }, { key: TERMINAL_SESSION_STORAGE_KEY, token: issued.sessionToken })
+  const cors = { 'Access-Control-Allow-Origin': '*' }
+  await page.route('http://127.0.0.1:9527/local/terminal-identity', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.fulfill({ status: 204, headers: { ...cors, 'Access-Control-Allow-Methods': 'GET, OPTIONS' } })
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: cors,
+      body: JSON.stringify({
+        success: true,
+        data: { terminalId: issued.terminalId, terminalCode: issued.terminalCode },
+      }),
+    })
+  })
+  await page.route('**/api/v1/terminals/*/printer-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: cors,
+      body: JSON.stringify({ printerStatus: 'ready', isOnline: true, paperLevel: 'sufficient' }),
+    })
+  })
+}
+
+/** 等预览正文出现、主按钮可点后，用 Playwright 真点「下一步」。 */
+async function clickPreviewNext(page: Page): Promise<void> {
+  await armPreviewPrinter(page)
+  await expect(page.locator('[data-w2-page="print-preview"]'), '应先进入预览页再去确认').toBeVisible({ timeout: 15_000 })
+  const next = page.locator('footer.qxt-dock button.qxt-btn-pri')
+  await expect(next, '预览页应有去确认页的主按钮').toBeVisible({ timeout: 15_000 })
+  await expect(next, '打印机在线后，去确认页的主按钮应可点').toBeEnabled({ timeout: 20_000 })
+  await next.click()
+}
+
+/** 确认页回到预览，再进确认，再回预览，再回报告。验回执在来回一趟之后还在。 */
+async function walkPreviewConfirmRoundTrip(page: Page): Promise<void> {
+  const backToPreview = page.getByRole('button', { name: '返回修改', exact: true })
+  await expect(backToPreview, '确认页应能返回预览').toBeVisible({ timeout: 15_000 })
+  await backToPreview.click()
+  await page.waitForURL((url) => url.pathname === '/print/desk' && url.searchParams.get('step') === 'preview', { timeout: 15_000 })
+  await clickPreviewNext(page)
+  await page.waitForURL((url) => url.pathname === '/print/confirm', { timeout: 15_000 })
+  await page.getByRole('button', { name: '返回修改', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/print/desk' && url.searchParams.get('step') === 'preview', { timeout: 15_000 })
+  await page.getByRole('button', { name: '上一步', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/resume/report', { timeout: 15_000 })
+  await waitReady(page)
 }
 
 async function returnFromPrintToReport(page: Page): Promise<void> {
@@ -290,8 +417,8 @@ async function exportReport(
   collectors: ReturnType<typeof attachCollectors>,
   label: string,
   name: RegExp,
-): Promise<ExportedFile> {
-  const held: { file: ExportedFile | null } = { file: null }
+): Promise<ExportedReport> {
+  const held: { file: ExportedReport | null } = { file: null }
   await recordStep({
     page, journey, step: `report-${label}`, control: label,
     selectorHint: `button:${label}`, kind: 'click', collectors,
@@ -304,7 +431,9 @@ async function exportReport(
       await confirmFactsIfOpen(page, journey, collectors)
       const response = await pending
       expect(response.ok(), `${label}应返回成功`).toBeTruthy()
-      held.file = asExportFile(await response.json())
+      const taskId = new URL(response.url()).pathname.match(/\/resume\/records\/([^/]+)\/export/)?.[1] ?? ''
+      expect(taskId, `${label}的地址应带本次任务编号`).not.toBe('')
+      held.file = { ...asExportFile(await response.json()), taskId }
       await expect(page.getByTestId('resume-report-export-result')).toContainText(held.file.filename)
     },
   })
@@ -336,11 +465,27 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
     await page.getByRole('button', { name: '生成二维码带走' }).click()
     await assertQrEncodes(page, reportPdf.signedUrl, reportPdf.filename)
     await closePreviewIfOpen(page)
-    await clickReportButton(page, journey, collectors, /打印这份报告/, '打印这份报告')
+    await recordStep({
+      page, journey, step: 'report-打印这份报告', control: '打印这份报告',
+      selectorHint: 'button:打印这份报告', kind: 'click', collectors,
+      act: async () => {
+        await page.getByRole('button', { name: /打印这份报告/ }).first().click()
+        await confirmFactsIfOpen(page, journey, collectors)
+        await page.waitForURL((url) => url.pathname === '/print/confirm', { timeout: 12_000 })
+        await shot(page, journey, 'report-print-landed')
+        await walkPreviewConfirmRoundTrip(page)
+        await closePreviewIfOpen(page)
+      },
+    })
     await expect(page).toHaveURL(/\/resume\/report/)
+    const carriedTaskId = await page.evaluate(() => {
+      const usr = (window.history.state as { usr?: { taskId?: unknown } } | null)?.usr
+      return typeof usr?.taskId === 'string' ? usr.taskId : ''
+    })
+    expect(carriedTaskId, '预览 → 确认 → 回预览 → 回报告，本次 taskId 还在').toBe(reportPdf.taskId)
     await expect(reportResult, '从打印页回来，这份报告的导出结果还在').toContainText(reportPdf.filename)
     await expect(page.getByRole('button', { name: '生成二维码带走' })).toBeVisible()
-    await assertTakeawayNotStored(page, reportPdf.signedUrl, '从打印页回来')
+    await assertTakeawayNotStored(page, reportPdf.signedUrl, '从打印页回来', reportPdf.printFileUrl)
     await recordStep({
       page, journey, step: 'report-生成二维码带走', control: '生成二维码带走',
       selectorHint: 'button:生成二维码带走', kind: 'click', collectors,
@@ -365,6 +510,7 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
     await expect(page.getByRole('button', { name: '打印修改清单' }), '应能打印这次的修改清单').toBeVisible()
     await clickReportButton(page, journey, collectors, /打印修改清单/, '打印修改清单')
     await expect(reportResult, '修改清单打印回来，这次的结果还在').toContainText(changeList.filename)
+    await assertTakeawayNotStored(page, changeList.signedUrl, '修改清单打印回来', changeList.printFileUrl)
     await page.getByRole('button', { name: '生成二维码带走' }).click()
     await assertQrEncodes(page, changeList.signedUrl, changeList.filename)
     await closePreviewIfOpen(page)
@@ -376,7 +522,15 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
     await expect(page.getByRole('link', { name: '简历对照', exact: true })).toHaveCount(0)
     await expect(page.getByRole('link', { name: '自我探索', exact: true })).toHaveCount(0)
 
+    const optimizeRequest = page.waitForRequest((request) => {
+      if (request.method() !== 'GET') return false
+      const url = new URL(request.url())
+      return /\/resume\/records\/[^/]+\/optimize$/.test(url.pathname) && url.searchParams.get('existingOnly') !== '1'
+    })
     await openOptimize(page, journey, collectors, 'report-optimize')
+    const sentOptimize = await optimizeRequest
+    expect(sentOptimize.headers()['x-terminal-id'], '打印来回之后的优化请求应带这台走查终端').toBe(walkthroughTerminal?.terminalId)
+    expect(sentOptimize.headers()['x-terminal-session-token'] ?? '', '打印来回之后的优化请求应带会话票').not.toBe('')
     await shot(page, journey, 'after-optimize-cta')
     await assertNotProduction(collectors)
   } finally {
@@ -1024,7 +1178,7 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
         expect(sessionText, '回执不得写进简历会话').not.toContain('reportTakeaway')
         expect(sessionText, '带姓名的文件名不得进会话').not.toContain(historyPdf.filename)
         expect(sessionText, '取回链接不得进会话').not.toContain(historyPdf.signedUrl)
-        await assertTakeawayNotStored(page, historyPdf.signedUrl, '从我的简历打开的报告')
+        await assertTakeawayNotStored(page, historyPdf.signedUrl, '从我的简历打开的报告', historyPdf.printFileUrl)
         await returnToMemberResumes(page)
       } else {
         await expect(page.getByText(optimizeFile.filename, { exact: true }), '我的文档应有这次优化导出的文件').toBeVisible()

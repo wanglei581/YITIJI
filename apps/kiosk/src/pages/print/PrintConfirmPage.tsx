@@ -23,7 +23,8 @@ import {
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
-import { appendSelfAssessmentToResume, SelfAssessmentApiError } from '../../services/api/selfAssessment'
+import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
+import { appendSelfAssessmentFailure, readSelfAssessmentSnapshot } from './appendSelfAssessmentFailure'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
@@ -58,27 +59,6 @@ interface LocationState {
   contractReport?: {
     fileId: string
     abandonToken: string
-  }
-}
-
-interface SelfAssessmentSessionSnapshot {
-  taskId?: string
-  accessToken?: string
-  result?: { expiresAt?: string }
-}
-
-const SELF_ASSESSMENT_SESSION_KEY = 'self_assessment_session_v1'
-
-function readSelfAssessmentSnapshot(): SelfAssessmentSessionSnapshot | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.sessionStorage.getItem(SELF_ASSESSMENT_SESSION_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as SelfAssessmentSessionSnapshot
-    if (!parsed || typeof parsed !== 'object' || !parsed.taskId) return null
-    return parsed
-  } catch {
-    return null
   }
 }
 
@@ -417,23 +397,25 @@ export function PrintConfirmPage() {
         if (appendEligible && selfAssessmentSnapshot?.taskId && file.fileId) {
           if (!mergedMaterial) {
             let merged: Awaited<ReturnType<typeof appendSelfAssessmentToResume>>
+            // 401 清场发生在抛错之前，这里先记下这次有没有会员令牌。
+            const memberToken = getToken()
             try {
               merged = await appendSelfAssessmentToResume(
                 selfAssessmentSnapshot.taskId,
                 file.fileId,
                 file.fileUrl,
-                { token: getToken(), accessToken: selfAssessmentSnapshot.accessToken ?? null },
+                { token: memberToken, accessToken: selfAssessmentSnapshot.accessToken ?? null },
               )
             } catch (err) {
-              // 附录接口还没建单。附不上就停用勾选；其它失败保持勾选，允许再试。
-              if (err instanceof SelfAssessmentApiError && (err.code === 'RESUME_FILE_NOT_FOUND' || err.status === 404)) {
+              // 附录接口还没建单。文件附不上就停用勾选；记录过期、游客登录过期、太频繁只取消勾选；其它失败保持勾选。
+              // 会员令牌失效由全站过期出口离开本页，不在这里写「再点一次确认」。
+              const failure = appendSelfAssessmentFailure(err, { memberTokenUsed: Boolean(memberToken) })
+              if (failure.uncheck) {
                 setAppendSelfAssessment(false)
                 setMergedMaterial(null)
-                setAppendBlocked(true)
-                setSubmitError('这份文件不能附加自我探索，已帮你取消勾选。本次没有建单；再点一次确认，就按原文件打印。')
-              } else {
-                setSubmitError('合并版没有生成，本次没有建单。可以再点一次确认重试，或取消勾选「附加自我探索」直接打印原文件。')
               }
+              if (failure.block) setAppendBlocked(true)
+              if (!failure.silent) setSubmitError(failure.message)
               return
             }
             if (!merged.printFileUrl) {
