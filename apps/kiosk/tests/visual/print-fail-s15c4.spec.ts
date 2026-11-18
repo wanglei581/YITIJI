@@ -6,6 +6,16 @@ import { setReactRouterState, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtu
 
 const PRINTER_STATUS_PATH = '/api/v1/terminals/KSK-001/printer-status'
 
+/** 拍图目录。S15c5 起写到新目录；旧变量仍可用。 */
+function shotDir(): string | undefined {
+  return process.env.S15C5_SBS || process.env.S15C4_SBS
+}
+
+/** 相对此刻的 ISO 时间。屏上倒计时和待取单时间都按它算，不写死 2099。 */
+function isoMinutesFromNow(minutes: number): string {
+  return new Date(Date.now() + minutes * 60 * 1000).toISOString()
+}
+
 function registerShell(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
     status: 200,
@@ -35,7 +45,7 @@ function registerFailedJam(api: ApiRouter): void {
     status: 200,
     json: {
       signedUrl: '/api/v1/files/signed/takeaway-demo',
-      expiresAt: '2099-01-01T00:00:00.000Z',
+      expiresAt: '2026-11-19T08:25:00+08:00',
       filename: W2_FILE.name,
       mimeType: 'application/pdf',
       sizeBytes: 128,
@@ -56,7 +66,7 @@ function registerPrinterStatus(api: ApiRouter, current: { value: string }): void
 }
 
 async function shot(page: Page, name: string): Promise<void> {
-  const dir = process.env.S15C4_SBS
+  const dir = shotDir()
   if (!dir) return
   mkdirSync(dir, { recursive: true })
   await page.screenshot({ path: `${dir}/${name}.png` })
@@ -220,7 +230,7 @@ const PENDING_ROW = {
   title: '简历.pdf',
   itemCount: 1,
   claimableHere: true,
-  createdAt: '2026-11-19T06:20:00.000Z',
+  createdAt: isoMinutesFromNow(-40),
   billablePages: 2,
   terminal: { displayName: 'KSK-001', locationLabel: '就业服务大厅' },
 }
@@ -268,7 +278,7 @@ async function exitCardGeometry(page: Page): Promise<Array<{ x: number; h: numbe
 function expectCardsAligned(boxes: Array<{ x: number; h: number }>, name: string): void {
   expect(Math.abs(boxes[0].x - boxes[1].x)).toBeLessThanOrEqual(4)
   expect(Math.abs(boxes[0].h - boxes[1].h)).toBeLessThanOrEqual(4)
-  const dir = process.env.S15C4_SBS
+  const dir = shotDir()
   if (!dir) return
   mkdirSync(dir, { recursive: true })
   const notePath = `${dir}/geometry.json`
@@ -302,6 +312,8 @@ test('print order exit cards share title inset and height across the four states
   api.respond('GET', '/api/v1/me/print-orders', ordersOf([]))
   api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([PENDING_ROW]))
 
+  expect(Date.parse(PENDING_ROW.createdAt)).toBeLessThan(Date.now() - 5 * 60 * 1000)
+
   await loginThroughVisibleUi(page, '/me/print-orders')
   await expect(page.getByTestId('pending-pickup-exits')).toBeVisible()
   await expect(page.getByText('去我的文档', { exact: true })).toBeVisible()
@@ -312,10 +324,13 @@ test('print order exit cards share title inset and height across the four states
   api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([{
     ...PENDING_ROW,
     claimableHere: false,
-    terminal: { displayName: 'KSK-001', locationLabel: '就业服务大厅' },
+    terminal: { displayName: 'KSK-014', locationLabel: '就业服务大厅' },
   }]))
   await remountPrintOrders(page)
   await expect(page.getByText('去哪台取')).toBeVisible()
+  const elsewhere = page.getByTestId('pending-pickup-elsewhere')
+  await expect(elsewhere).toContainText('KSK-014')
+  await expect(elsewhere).not.toContainText('KSK-001')
   expectCardsAligned(await exitCardGeometry(page), '走错机器')
   await shot(page, '走错机器')
 
@@ -325,6 +340,15 @@ test('print order exit cards share title inset and height across the four states
   await expect(page.getByText('求职简历.pdf')).toBeVisible()
   expectCardsAligned(await exitCardGeometry(page), '有任务')
   await shot(page, '有任务')
+
+  api.respond('GET', '/api/v1/me/print-orders', ordersOf([oneOrder('order-1', '求职简历.pdf')]))
+  api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([PENDING_ROW]))
+  await remountPrintOrders(page)
+  await expect(page.getByTestId('pending-pickup-list')).toBeVisible()
+  await expect(page.getByRole('button', { name: '到这台取件' })).toBeVisible()
+  await expect(page.getByText('求职简历.pdf')).toBeVisible()
+  expectCardsAligned(await exitCardGeometry(page), '有待取单-有任务')
+  await shot(page, '有待取单-有任务')
 
   api.respond('GET', '/api/v1/me/print-orders', ordersOf([
     oneOrder('order-1', '求职简历.pdf'),
@@ -375,7 +399,7 @@ test('failure screens keep one service phone and can be shot for the blank-band 
       status: 200,
       json: {
         signedUrl: '/api/v1/files/signed/takeaway-demo',
-        expiresAt: '2099-01-01T00:00:00.000Z',
+        expiresAt: isoMinutesFromNow(25),
         filename: W2_FILE.name,
         mimeType: 'application/pdf',
         sizeBytes: 128,
@@ -391,6 +415,10 @@ test('failure screens keep one service phone and can be shot for the blank-band 
     const root = page.locator(`[data-testid="${scene.testId}"]`)
     await expect(root).toBeVisible()
     await expect(root.getByText('文件带走')).toBeVisible()
+    const remainText = await root.getByText(/剩余 \d+ 分/).innerText()
+    const remainMinutes = Number(/剩余 (\d+) 分/.exec(remainText)?.[1])
+    expect(remainMinutes).toBeGreaterThanOrEqual(20)
+    expect(remainMinutes).toBeLessThanOrEqual(30)
     const phones = await root.evaluate((el) => (el.innerText.match(/服务电话/g) ?? []).length)
     expect(phones).toBe(1)
     const step3 = root.locator('ol li').nth(2)
