@@ -24,6 +24,7 @@ import {
   PAPER_ALREADY_RELEASED_CODE,
   REFUND_ALREADY_OPEN_CODE,
 } from '../../src/payment/refund-paper-exclusion'
+import { convergeNotifiedRefundSuccess } from '../../src/payment/refund-notify-paper-guard'
 import { resolvePrintReturnHold } from '../../src/payment/resolve-print-return-hold'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 import { expireQueuedPrintTasks } from '../../src/print-jobs/print-queue-timeout'
@@ -294,6 +295,47 @@ export async function runP2b4Cases(
   })
   await once(hidden.orderId, 'auto_failed', '退款渠道返回失败（REFUND_CHANNEL_FAILED），没有退成')
 
+  const printedPending = await seed('printedpending', {
+    payStatus: 'refunding',
+    paymentSource: 'wechat',
+    printStatus: 'completed',
+    taskStatus: 'completed',
+    printOutcome: 'printed',
+    refund: { status: 'pending', amountCents: 200, reason: PAID_NO_PAPER_AUTO_REASON, channel: 'wechat' },
+  })
+  const printedRefund = await db.refund.findUniqueOrThrow({ where: { refundNo: printedPending.refundNo ?? '' } })
+  const printedOutcome = await db.$transaction((tx) => convergeNotifiedRefundSuccess(tx, {
+    refundId: printedRefund.id,
+    orderId: printedPending.orderId,
+    priorStatus: 'pending',
+    channelRefundNo: 'ch-printed-pending',
+    amountCents: 200,
+    reason: printedRefund.reason,
+  }))
+  assert.equal(printedOutcome, 'blocked', '退款还在处理时纸已经出去，不能再记成退款成功')
+  assert.equal((await db.refund.findUnique({ where: { id: printedRefund.id } }))?.status, 'manual_review')
+  assert.equal((await db.order.findUnique({ where: { id: printedPending.orderId } }))?.payStatus, 'paid')
+  assert.equal((await db.printTask.findUnique({ where: { id: printedPending.taskId } }))?.printOutcome, 'printed')
+
+  const pendingClear = await seed('pendingclear', {
+    payStatus: 'refunding',
+    paymentSource: 'wechat',
+    printStatus: 'failed',
+    printOutcome: 'not_printed',
+    refund: { status: 'pending', amountCents: 200, reason: PAID_NO_PAPER_AUTO_REASON, channel: 'wechat' },
+  })
+  const clearRefund = await db.refund.findUniqueOrThrow({ where: { refundNo: pendingClear.refundNo ?? '' } })
+  const clearOutcome = await db.$transaction((tx) => convergeNotifiedRefundSuccess(tx, {
+    refundId: clearRefund.id,
+    orderId: pendingClear.orderId,
+    priorStatus: 'pending',
+    channelRefundNo: 'ch-pending-clear',
+    amountCents: 200,
+    reason: clearRefund.reason,
+  }))
+  assert.equal(clearOutcome, 'completed', '纸还没出去时，处理中的退款仍可以记成成功')
+  assert.equal((await db.order.findUnique({ where: { id: pendingClear.orderId } }))?.payStatus, 'refunded')
+
   const waiting = await seed('waiting', {
     printStatus: 'pending',
     taskStatus: 'pending',
@@ -454,6 +496,78 @@ export async function runP2b4Cases(
   assert.equal(dupRefund?.status, 'success')
   assert.equal(dupRefund?.amountCents, 200)
 
+  const shutId = `ord_${tag}_p2b4_shut`
+  await db.order.create({
+    data: {
+      id: shutId,
+      orderNo: `P4${tag}shut`.slice(0, 32),
+      type: 'print',
+      terminalId: null,
+      amountCents: 200,
+      discountCents: 0,
+      payStatus: 'closed',
+      pickupStatus: 'expired',
+      pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+      taskStatus: 'awaiting_payment',
+      billablePages: 2,
+      printParamsJson: PAGES,
+      itemsJson: '[]',
+      channel: 'miniapp_cloud',
+    },
+  })
+  input.orderIds.push(shutId)
+  await db.paymentAttempt.create({
+    data: {
+      id: `pa_${shutId}`,
+      orderId: shutId,
+      channel: 'sandbox',
+      amountCents: 200,
+      status: 'expired',
+      expiresAt: new Date(Date.now() - 60_000),
+    },
+  })
+  await payment.simulateSandboxCallback({ attemptId: `pa_${shutId}`, result: 'success' })
+  const shutRow = await db.order.findUniqueOrThrow({ where: { id: shutId } })
+  assert.equal(shutRow.payStatus, 'closed', '窗口已关的同额迟到款不入账')
+  const shutRefund = await db.refund.findUnique({ where: { refundNo: staleAttemptRefundNo(`pa_${shutId}`) } })
+  assert.equal(shutRefund?.status, 'success')
+  assert.equal(shutRefund?.amountCents, 200)
+
+  const lateOpenId = `ord_${tag}_p2b4_lateopen`
+  await db.order.create({
+    data: {
+      id: lateOpenId,
+      orderNo: `P4${tag}late`.slice(0, 32),
+      type: 'print',
+      terminalId: null,
+      amountCents: 200,
+      discountCents: 0,
+      payStatus: 'closed',
+      pickupStatus: 'pending',
+      pickupCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      taskStatus: 'awaiting_payment',
+      billablePages: 2,
+      printParamsJson: PAGES,
+      itemsJson: '[]',
+      channel: 'miniapp_cloud',
+    },
+  })
+  input.orderIds.push(lateOpenId)
+  await db.paymentAttempt.create({
+    data: {
+      id: `pa_${lateOpenId}`,
+      orderId: lateOpenId,
+      channel: 'sandbox',
+      amountCents: 200,
+      status: 'expired',
+      expiresAt: new Date(Date.now() - 60_000),
+    },
+  })
+  await payment.simulateSandboxCallback({ attemptId: `pa_${lateOpenId}`, result: 'success' })
+  const lateOpenRow = await db.order.findUniqueOrThrow({ where: { id: lateOpenId } })
+  assert.equal(lateOpenRow.payStatus, 'paid', '订单已关闭但取件窗口还开着，同额迟到款入账，可以出纸')
+  assert.equal(await db.refund.count({ where: { orderId: lateOpenId } }), 0)
+
   const abandonId = `ord_${tag}_p2b4_abandon`
   await db.order.create({
     data: {
@@ -489,7 +603,7 @@ export async function runP2b4Cases(
   assert.equal(abandonedAttempt.status, 'expired')
   assert.equal(abandonedAttempt.failReason, '用户返回，这次付款已取消')
   const freed = await settlePickupArrival(db, { orderId: abandonId, terminalId: input.publicTerminalId })
-  assert.equal(freed.kind, 'release')
+  assert.equal(freed.kind, 'release', '公共就业点位放弃后仍免费放行')
   await payment.simulateSandboxCallback({ attemptId: `pa_${abandonId}`, result: 'success' })
   const freedRow = await db.order.findUniqueOrThrow({ where: { id: abandonId } })
   assert.equal(freedRow.payStatus, 'paid')
