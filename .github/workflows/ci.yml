@@ -759,6 +759,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:conversion-queue-bound
           pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
+          # 管理员复印与材料包只读列表：有任务、没任务、非管理员 403。脚本自建临时 SQLite。
+          pnpm --filter @ai-job-print/api verify:admin-fulfillment-lists
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
           # 给人看的时间按北京时间（W-78）。不连库。

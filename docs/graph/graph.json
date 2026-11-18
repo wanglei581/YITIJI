@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 671,
+    "endpointCount": 673,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -4471,6 +4471,48 @@
         ],
         "serviceFiles": [],
         "services": []
+      },
+      {
+        "controller": "services/api/src/admin-print-scan/admin-fulfillment-lists.controller.ts",
+        "handler": "AdminFulfillmentListsController.listCopyJobs",
+        "method": "GET",
+        "models": [
+          "CopyJob",
+          "Order",
+          "PrintTask",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/print-scan/copy-jobs",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-print-scan/admin-fulfillment-lists.ts"
+        ],
+        "services": [
+          "AdminFulfillmentListsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-print-scan/admin-fulfillment-lists.controller.ts",
+        "handler": "AdminFulfillmentListsController.listMaterialPackOrders",
+        "method": "GET",
+        "models": [
+          "CopyJob",
+          "Order",
+          "PrintTask",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/print-scan/material-pack-orders",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-print-scan/admin-fulfillment-lists.ts"
+        ],
+        "services": [
+          "AdminFulfillmentListsService"
+        ]
       },
       {
         "controller": "services/api/src/admin-print-scan/admin-print-scan.controller.ts",
@@ -14484,7 +14526,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 299,
+      "reachableFileCount": 300,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -15271,7 +15313,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 329
+      "sourceFileCount": 330
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -19265,6 +19307,7 @@
           "Order"
         ],
         "usedBy": [
+          "services/api/src/admin-print-scan/admin-fulfillment-lists.ts",
           "services/api/src/copy-jobs/copy-agent.service.ts",
           "services/api/src/copy-jobs/copy-authorization.ts",
           "services/api/src/copy-jobs/copy-job-store.service.ts",
@@ -19949,6 +19992,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
+          "services/api/src/admin-print-scan/admin-fulfillment-lists.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
@@ -20191,6 +20235,7 @@
         "usedBy": [
           "services/api/src/admin-ops/admin-ops.service.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-print-scan/admin-fulfillment-lists.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/console-screen/console-screen.fleet.ts",
@@ -20495,6 +20540,7 @@
           "services/api/src/admin-ops/derived-print-quota-alerts.ts",
           "services/api/src/admin-ops/derived-scan-device-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
+          "services/api/src/admin-print-scan/admin-fulfillment-lists.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
           "services/api/src/ai/usage/ai-usage-summary.ts",
@@ -21325,6 +21371,9 @@
     ],
     "apps/admin/src/routes/print-scan/FreePrintQuotaCard.tsx": [
       "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "apps/admin/src/routes/print-scan/FulfillmentJobList.tsx": [
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/PrintRetryButton.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
@@ -26857,6 +26906,7 @@
       "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/scripts/support/isolated-verification-database.ts": [
+      "services/api/scripts/verify-admin-fulfillment-lists.ts",
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-admin-printer-output.ts",
@@ -27431,8 +27481,17 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-payment-flow.ts"
     ],
+    "services/api/src/admin-print-scan/admin-fulfillment-lists.controller.ts": [
+      "services/api/scripts/verify-admin-fulfillment-lists.ts"
+    ],
+    "services/api/src/admin-print-scan/admin-fulfillment-lists.ts": [
+      "services/api/scripts/verify-admin-fulfillment-lists.ts"
+    ],
     "services/api/src/admin-print-scan/admin-print-scan.controller.ts": [
       "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/src/admin-print-scan/admin-print-scan.module.ts": [
+      "services/api/scripts/verify-admin-fulfillment-lists.ts"
     ],
     "services/api/src/admin-print-scan/admin-print-scan.service.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
@@ -28814,6 +28873,7 @@
       "services/api/scripts/verify-member-benefits-admin.ts"
     ],
     "services/api/src/common/filters/http-exception.filter.ts": [
+      "services/api/scripts/verify-admin-fulfillment-lists.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-platform-degradation.ts",
@@ -28886,6 +28946,7 @@
       "services/api/scripts/verify-upload-sessions-member-file.ts"
     ],
     "services/api/src/common/guards/jwt-auth.guard.ts": [
+      "services/api/scripts/verify-admin-fulfillment-lists.ts",
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
@@ -28920,6 +28981,7 @@
       "services/api/scripts/verify-member-auth.ts"
     ],
     "services/api/src/common/guards/roles.guard.ts": [
+      "services/api/scripts/verify-admin-fulfillment-lists.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
@@ -29053,6 +29115,7 @@
     ],
     "services/api/src/common/redis/redis.service.ts": [
       "services/api/scripts/verify-activity-logs.ts",
+      "services/api/scripts/verify-admin-fulfillment-lists.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-printer-output.ts",
@@ -31274,6 +31337,7 @@
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-admin-fairs.ts",
+      "services/api/scripts/verify-admin-fulfillment-lists.ts",
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
@@ -32697,6 +32761,7 @@
           "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
           "apps/admin/src/routes/print-scan/CapabilityRows.tsx",
           "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx",
+          "apps/admin/src/routes/print-scan/FulfillmentJobList.tsx",
           "apps/admin/src/routes/print-scan/PrintRetryButton.tsx",
           "apps/admin/src/routes/print-scan/index.tsx",
           "apps/admin/src/services/api/printScan.ts"
@@ -40269,6 +40334,32 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:admin-fairs"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-print-scan/admin-fulfillment-lists.controller.ts",
+          "services/api/src/admin-print-scan/admin-fulfillment-lists.ts",
+          "services/api/src/admin-print-scan/admin-print-scan.module.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-admin-fulfillment-lists.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:admin-fulfillment-lists"
       ],
       "wired": true
     },
