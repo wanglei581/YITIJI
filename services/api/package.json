@@ -134,6 +134,8 @@
     "verify:terminal-credentials": "node -r @swc-node/register scripts/verify-terminal-credentials.ts",
     "verify:terminal-identity": "node -r @swc-node/register scripts/verify-terminal-identity.ts",
     "verify:terminal-provisioning": "node -r @swc-node/register scripts/verify-terminal-provisioning.ts",
+    "verify:terminal-batch-activation": "node -r @swc-node/register scripts/verify-terminal-batch-activation.ts",
+    "verify:terminal-batch-activation:postgres": "node -r @swc-node/register scripts/verify-terminal-batch-activation.ts --postgres",
     "verify:terminal-status-idempotency": "node -r @swc-node/register scripts/verify-terminal-status-idempotency.ts",
     "verify:terminal-network-diagnostics": "node -r @swc-node/register scripts/verify-terminal-network-diagnostics.ts && pnpm run verify:scan-input-lockout-telemetry && pnpm run verify:terminal-printer-queue",
     "verify:terminal-printer-queue": "node -r @swc-node/register scripts/verify-terminal-printer-queue.ts",

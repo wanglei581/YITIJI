@@ -710,6 +710,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-identity
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
+          pnpm --filter @ai-job-print/api verify:terminal-batch-activation
           pnpm --filter @ai-job-print/api verify:terminal-network-diagnostics
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           # SQLite 专用(拷 dev.db + sqlite3 CLI),不进 postgres-readiness job
@@ -1322,6 +1323,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-credentials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
+          pnpm --filter @ai-job-print/api verify:terminal-batch-activation:postgres
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:scan-quiet-period
