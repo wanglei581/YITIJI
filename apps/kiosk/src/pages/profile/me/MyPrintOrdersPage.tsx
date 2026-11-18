@@ -416,7 +416,11 @@ export function MyPrintOrdersPage() {
       screen="member-list"
       screenState={`orders-${uiState}`}
       eyebrow="我的 · 打印订单"
-      sub={items.length > 0 ? `共 ${total} 条已产生打印任务的单` : uiState === 'empty' ? '还没有归入账号的打印任务' : undefined}
+      sub={items.length > 0
+        ? `共 ${total} 条已产生打印任务的单`
+        : uiState === 'empty' || (items.length === 0 && pendingPickup.presence === 'rows')
+          ? '还没有归入账号的打印任务'
+          : undefined}
       fine={allLoadedFree ? '只显示当前登录账号的打印订单；状态与到机码一律由系统返回。' : undefined}
       ctabar={ctabar}
       live={false}

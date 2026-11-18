@@ -187,6 +187,8 @@ test('pending pickup without a print task opens my documents instead of a second
 
   await loginThroughVisibleUi(page, '/me/print-orders')
   await expect(page.getByTestId('pending-pickup-list')).toBeVisible()
+  await expect(page.getByText('还没有归入账号的打印任务')).toBeVisible()
+  await expect(page.getByText('进度和到机码')).toHaveCount(0)
   await expect(page.getByText('手机上下的到店单，到机器上输到机码取件')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '输到机码取件' })).toHaveCount(0)
   const docs = page.getByRole('button', { name: '去我的文档，从已保存的文件里再选一份' })
