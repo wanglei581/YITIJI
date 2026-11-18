@@ -35,7 +35,12 @@ export async function resolvePrintReturnHold(
       where: { orderId, status: { in: [...HOLD_STATUSES] } },
       orderBy: { createdAt: 'desc' },
     })
-    if (!refund) throw deny('REFUND_HOLD_NOT_FOUND', '没有待人工处理的退款，不能做这一步。')
+    if (!refund) {
+      if (order.payStatus === 'partial_refunded') {
+        throw deny('REFUND_REMAINDER_REQUIRED', '这单只退了一部分。请退还剩余金额，不能用这三步把已经成功的退款再记一次。')
+      }
+      throw deny('REFUND_HOLD_NOT_FOUND', '没有待人工处理的退款，不能做这一步。')
+    }
     const task = order.printTaskId
       ? await tx.printTask.findUnique({
         where: { id: order.printTaskId },

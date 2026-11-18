@@ -32,16 +32,16 @@ export interface AdminOrderReadonlyItem {
   retryForbidden: boolean
   refundRequired: boolean
   /**
-   * 运营必须看见的三类单：待退款、退款中、渠道已受理但本地确认未落地。
+   * 运营必须看见的单：待退款、退款中、渠道已受理但本地确认未落地、部分退款、已出纸且退款失败。
    * 只读信号，不自动出款、不改 payStatus。字段与取值照抄后端
    * `services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts`，
-   * 前端不新增第四类取值、不自行推导。
+   * 前端不自行推导。
    *
    * 两个字段刻意可选：存量后端（未部署本次只读视图）不返回它们，此时页面
    * 必须什么都不显示，而不是把 `undefined` 当成 false 去编一个「一切正常」。
    */
   opsAttention?: boolean
-  opsAttentionCode?: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | null
+  opsAttentionCode?: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'partial_refunded' | 'paper_refund_failed' | null
   createdAt: string
   updatedAt: string
   /** 服务单才有。缺省表示打印订单，列表默认不出现。 */
@@ -90,6 +90,8 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   refundLedgerCents: number | null
   /** 应付额（分）。服务端按退款公式算好，按钮只展示这个数。 */
   payableCents: number
+  /** 部分退款还没退完的金额（分）。不是部分退款时为 null。 */
+  refundRemainderCents?: number | null
 }
 
 export interface AdminOrderReadonlyPage {

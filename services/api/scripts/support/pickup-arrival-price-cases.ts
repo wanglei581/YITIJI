@@ -39,6 +39,7 @@ import { runQueueSweepRefundCases } from './pickup-arrival-queue-sweep-cases'
 import { runRefundPaperGuardCases } from './pickup-arrival-refund-guard-cases'
 import { runP2b4Cases } from './pickup-arrival-p2b4-cases'
 import { runP2b5Cases, runP2b5CoveredRefundCases } from './pickup-arrival-p2b5-cases'
+import { runP2b5RemainderCases } from './pickup-arrival-p2b5-remainder-cases'
 import {
   restoreTerminalChargeFixture,
   setTerminalUserPrintPrices,
@@ -533,6 +534,7 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     })
     await runP2b5Cases(db, { tag, orderIds, taskIds })
     await runP2b5CoveredRefundCases(db, { tag, orderIds, taskIds })
+    await runP2b5RemainderCases(db, { tag, orderIds, taskIds })
 
     await db.platformSetting.upsert({
       where: { key: PERSONAL_CHARGE_SETTING_KEY },

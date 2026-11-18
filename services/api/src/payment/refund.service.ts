@@ -26,7 +26,7 @@
  *     （discountCents 非 0 拒绝——线上入账单当前不可能有抵扣，防御性断言）；
  *   · `offline` / `manual_confirmed` / `free` / `voucher` → 不调 provider（只记状态 + 审计），
  *     且 voucher/free 退款**不恢复 BenefitGrant 额度**。
- * - 只做整单退款。没有部分退款入口；`partial_refunded` 不写入。
+ * - 默认整单退款。已经成功退掉一部分时，只再退剩余，退完才写成已退。
  *   渠道通知或查证金额不等于整单实付时，Refund 进入 manual_review，订单停在
  *   refunding 并记 refund.notify_amount_mismatch，不自动再打一笔，也不无限抛错重试。
  */
@@ -42,6 +42,7 @@ import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput
 import { notifyPrintReturnHold } from './print-return-alert'
 import { assertCanOpenRefund } from './refund-paper-exclusion'
 import { convergeNotifiedRefundSuccess } from './refund-notify-paper-guard'
+import { nonStaleSuccessCents, payStatusAfterRefundFailure, remainderAmountCents, settlementAfterSuccess } from './refund-remainder'
 import { stageNewRefund } from './stage-order-refund'
 import {
   holdMismatchedChannelRefund,
@@ -261,7 +262,9 @@ export class RefundService {
     if (!reason) throw new BadRequestException('REFUND_REASON_REQUIRED')
 
     const order = await this.requireOrder(orderId)
-    const refundNo = opts.refundNo?.trim() || `RFD-${order.orderNo}`
+    const remainder = await remainderAmountCents(this.prisma, order)
+    if (remainder != null && remainder <= 0) throw new BadRequestException('ORDER_ALREADY_REFUNDED')
+    const refundNo = opts.refundNo?.trim() || (remainder != null ? `RFD-REST-${order.orderNo}` : `RFD-${order.orderNo}`)
 
     // ① 幂等门：同 refundNo 已存在。
     const existing = await this.prisma.refund.findUnique({ where: { refundNo } })
@@ -312,16 +315,15 @@ export class RefundService {
       channel = src.channel
       amountCents = src.amountCents
     } else {
-      // ② 状态门：普通路径只有 paid 可发起。
-      if (order.payStatus !== 'paid') {
+      // 普通路径只有 paid 可发起。部分退款只退还剩余，不再把整单重退一次。
+      if (remainder == null && order.payStatus !== 'paid') {
         if (ALREADY_REFUND_STATES.has(order.payStatus)) throw new BadRequestException('ORDER_ALREADY_REFUNDED')
         throw new BadRequestException('ORDER_NOT_REFUNDABLE') // unpaid / paying / closed / failed
       }
       const paymentSource = order.paymentSource ?? ''
       if (!REFUNDABLE_SOURCES.has(paymentSource)) throw new BadRequestException('REFUND_CHANNEL_UNSUPPORTED')
       channel = paymentSource
-      // 退款额 = 实付资金 = 应付额。与后台按钮上的 payableCents 是同一个函数。
-      amountCents = payableCents(order)
+      amountCents = remainder ?? payableCents(order)
     }
 
     // 同一事务里先看有没有在办的退款、纸有没有放行，再改成退款中。
@@ -335,6 +337,7 @@ export class RefundService {
       collected,
       unreleasedOnly: opts.unreleasedOnly === true,
       verifiedAfterPaper: opts.verifiedAfterPaper === true,
+      fromPartial: remainder != null,
     })
     if (staged.idempotent) return this.toView(staged.record, await this.requireOrder(orderId), true)
     const refund = staged.record
@@ -393,7 +396,10 @@ export class RefundService {
       const src = successAttempts[0] as NonNullable<(typeof successAttempts)[0]>
       // 金额口径（审查 M2）：真实渠道退款额必须 = 渠道实收 = 尝试快照 = 订单应付；
       // 线上入账单当前不可能有抵扣（voucher 全额核销不经渠道），discount 非 0 即异常。
-      if (order.discountCents !== 0 || refund.amountCents !== order.amountCents || src.amountCents !== refund.amountCents) {
+      const priorSuccess = await nonStaleSuccessCents(this.prisma, order.id, refund.id)
+      const whole = refund.amountCents === order.amountCents && priorSuccess === 0
+      const remainderOk = priorSuccess > 0 && priorSuccess + refund.amountCents === order.amountCents
+      if (order.discountCents !== 0 || src.amountCents !== order.amountCents || (!whole && !remainderOk)) {
         return this.blockRefund(refund, 'REFUND_AMOUNT_BASIS_UNSUPPORTED', operatorId)
       }
       providerInput.orderAmountCents = order.amountCents
@@ -480,18 +486,23 @@ export class RefundService {
         if (!o) throw new NotFoundException('ORDER_NOT_FOUND')
         return { completed: false, order: o }
       }
+      const orderBefore = await tx.order.findUnique({ where: { id: refund.orderId } })
+      if (!orderBefore) throw new NotFoundException('ORDER_NOT_FOUND')
+      const settlement = await settlementAfterSuccess(tx, refund, orderBefore)
       await tx.order.updateMany({
         where: { id: refund.orderId, payStatus: 'refunding' },
         data: {
-          payStatus: 'refunded',
+          payStatus: settlement.payStatus,
           refundedAt: new Date(),
-          refundReason: refund.reason,
-          refundedAmountCents: refund.amountCents,
+          refundReason: settlement.refundReason,
+          refundedAmountCents: settlement.refundedAmountCents,
         },
       })
       const o = await tx.order.findUnique({ where: { id: refund.orderId } })
       if (!o) throw new NotFoundException('ORDER_NOT_FOUND')
-      if (o.payStatus !== 'refunded') throw new BadRequestException('ORDER_INVALID_TRANSITION')
+      if (o.payStatus !== 'refunded' && o.payStatus !== 'partial_refunded') {
+        throw new BadRequestException('ORDER_INVALID_TRANSITION')
+      }
       return { completed: true, order: o }
     })
 
@@ -554,7 +565,8 @@ export class RefundService {
         })
         return
       }
-      await tx.order.updateMany({ where: { id: orderId, payStatus: 'refunding' }, data: { payStatus: 'paid' } })
+      const restored = await payStatusAfterRefundFailure(tx, orderId)
+      await tx.order.updateMany({ where: { id: orderId, payStatus: 'refunding' }, data: restored })
     })
   }
 

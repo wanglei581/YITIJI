@@ -204,10 +204,12 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[13px] font-bold text-neutral-800">
-                        {detail.refundRequired ? '发起退款' : '发起全额退款'}
+                        {detail.payStatus === 'partial_refunded' ? '退还剩余' : detail.refundRequired ? '发起退款' : '发起全额退款'}
                       </p>
                       <p className="mt-0.5 text-xs text-neutral-500">
-                        {detail.refundRequired
+                        {detail.payStatus === 'partial_refunded'
+                          ? `退还剩余 ${amountText(detail.refundRemainderCents ?? 0, detail.currency)}。只退还没退完的部分，不会把已经退成的再退一次。`
+                          : detail.refundRequired
                           ? `${detail.refundReason === 'ONLINE_PAID_PENDING_REFUND' ? '渠道已收款但订单未转已支付' : '已付款未出纸'}。系统不会自动出款；只有管理员点确认后才会向支付渠道发起。金额以本页服务端金额为准。`
                           : `退款 ${amountText(detail.payableCents, detail.currency)}，操作不可撤销，仅管理员可执行`}
                       </p>
@@ -217,13 +219,15 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
                       onClick={() => { setRefundOpen(true); setRefundError(null) }}
                       className="ml-4 inline-flex h-9 shrink-0 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white transition-colors hover:bg-warning/90"
                     >
-                      {detail.refundRequired ? '发起退款' : '退款'}
+                      {detail.payStatus === 'partial_refunded' ? '退还剩余' : detail.refundRequired ? '发起退款' : '退款'}
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-2.5">
                     <p className="text-[13px] font-bold text-neutral-800">
-                      {detail.refundRequired
+                      {detail.payStatus === 'partial_refunded'
+                        ? `确认退还剩余 ${amountText(detail.refundRemainderCents ?? 0, detail.currency)}`
+                        : detail.refundRequired
                         ? '确认向支付渠道发起退款？这是对外资金动作，点确认后才会出款。'
                         : '确认全额退款'}
                     </p>
@@ -247,7 +251,9 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
                       >
                         {refundSubmitting
                           ? '处理中…'
-                          : detail.refundRequired ? '确认发起退款' : '确认退款'}
+                          : detail.payStatus === 'partial_refunded'
+                            ? '确认退还剩余'
+                            : detail.refundRequired ? '确认发起退款' : '确认退款'}
                       </button>
                       <button
                         type="button"

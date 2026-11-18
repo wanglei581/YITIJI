@@ -32,6 +32,7 @@ export async function stageNewRefund(
     collected: boolean
     unreleasedOnly: boolean
     verifiedAfterPaper: boolean
+    fromPartial?: boolean
   },
 ): Promise<{ record: RefundRow; idempotent: boolean }> {
   try {
@@ -57,7 +58,7 @@ export async function stageNewRefund(
         : await tx.order.updateMany({
           where: {
             id: input.orderId,
-            payStatus: 'paid',
+            payStatus: input.fromPartial ? 'partial_refunded' : 'paid',
             ...taskGate,
             ...(input.unreleasedOnly ? { printTaskId: null, pickupStatus: { in: ['pending', 'expired'] } } : {}),
           },
