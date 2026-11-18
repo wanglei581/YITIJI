@@ -66,6 +66,7 @@ import { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dt
 import { CreateDataSourceDto, RotateDataSourceCredentialDto } from './dto/data-source.dto'
 import { JobsPartnerService } from './jobs-partner.service'
 import { JobQualityService } from '../job-ai/job-quality.service'
+import { partnerJobQualitySummary } from '../job-ai/partner-quality-summary'
 import { FairCompanyPrintService } from './fair-company-print.service'
 import { JobRequirementStatsService } from './job-requirement-stats.service'
 import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from './excel-template'
@@ -513,7 +514,7 @@ export class JobsController {
   @PaidAiThrottle(30)
   getPartnerJobQualitySummary(@CurrentUser() user: AuthedUser) {
     if (!user.orgId) throw new BadRequestException({ error: { code: 'ORG_REQUIRED', message: '合作机构账号未绑定机构' } })
-    return this.jobQuality.getSourceQualitySummary({ sourceOrgId: user.orgId })
+    return partnerJobQualitySummary(this.jobQuality, user.orgId)
   }
 
   /**

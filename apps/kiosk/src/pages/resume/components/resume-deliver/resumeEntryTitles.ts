@@ -1,6 +1,15 @@
 import type { GeneratedResume } from '@ai-job-print/shared'
 
 /**
+ * 编辑区简介、描述的输入上限，与导出稿 `RESUME_DOC_LIMITS.summary` / `.description` 相同。
+ * 输入框用 maxLength 挡住新打的字，onChange 不再截已经在稿里的内容。
+ */
+export const RESUME_EDIT_LIMITS = {
+  summary: 24000,
+  description: 24000,
+} as const
+
+/**
  * 优化页经历 / 教育标题的就地校验。
  * 字数对齐服务端简历稿 DTO（公司、学校 100，职务、专业 60），超长才拦：服务端会拒，提前在本页说。
  * 公司、学校、职务、专业都可以空，和服务端 ResumeDocExperienceDto / ResumeDocEducationDto 一致：
@@ -49,4 +58,120 @@ export function focusResumeTitleIssue(id: string): void {
   if (!(el instanceof HTMLElement)) return
   el.scrollIntoView({ block: 'center', behavior: 'smooth' })
   el.focus()
+}
+
+export type ResumeOriginalHit = { fieldId: string; start: number }
+
+/** 与编辑区从上到下的栏顺序一致。同一句出现多处时停在第一处。 */
+function resumeOriginalFields(resume: GeneratedResume): Array<{ id: string; text: string }> {
+  const fields: Array<{ id: string; text: string }> = [{ id: 'summary', text: resume.summary ?? '' }]
+  resume.education.forEach((item, index) => {
+    fields.push({ id: `education-${index}-school`, text: item.school ?? '' })
+    fields.push({ id: `education-${index}-major`, text: item.major ?? '' })
+    fields.push({ id: `education-${index}-description`, text: item.description ?? '' })
+  })
+  resume.experience.forEach((item, index) => {
+    fields.push({ id: `experience-${index}-company`, text: item.company ?? '' })
+    fields.push({ id: `experience-${index}-role`, text: item.role ?? '' })
+    fields.push({ id: `experience-${index}-description`, text: item.description ?? '' })
+  })
+  resume.projects.forEach((item, index) => {
+    fields.push({ id: `projects-${index}-name`, text: item.name ?? '' })
+    fields.push({ id: `projects-${index}-role`, text: item.role ?? '' })
+    fields.push({ id: `projects-${index}-description`, text: item.description ?? '' })
+  })
+  resume.skills.forEach((skill, index) => {
+    fields.push({ id: `skill-${index}`, text: skill ?? '' })
+  })
+  resume.certificates.forEach((certificate, index) => {
+    fields.push({ id: `certificate-${index}`, text: certificate ?? '' })
+  })
+  return fields
+}
+
+/** 在编辑区当前内容里找这句原文。没有（原文为空或已被改掉）返回 null。 */
+export function findResumeOriginalField(resume: GeneratedResume, original: string): ResumeOriginalHit | null {
+  const needle = original.trim()
+  if (!needle) return null
+  for (const field of resumeOriginalFields(resume)) {
+    const start = field.text.indexOf(needle)
+    if (start >= 0) return { fieldId: field.id, start }
+  }
+  return null
+}
+
+function scrollResumeEditorToTop(): void {
+  const page = document.querySelector('[data-qx-page="resume-edit"]')
+  const scroller = page?.parentElement
+  if (scroller instanceof HTMLElement) scroller.scrollTo({ top: 0 })
+  if (page instanceof HTMLElement) page.scrollTo({ top: 0 })
+}
+
+/**
+ * 滚到这句原文所在的那一栏，聚焦并选中。
+ * 没有 document，或编辑区根节点 `[data-resume-editor]` 还没挂上时返回 false，调用方保留定位请求。
+ * 根节点已经挂上之后：对上的节点是输入框且里面有这句，就聚焦并选中；否则滚到顶部。两种都返回 true。
+ */
+export function focusResumeOriginalField(resume: GeneratedResume, original: string): boolean {
+  if (typeof document === 'undefined') return false
+  const editor = document.querySelector('[data-resume-editor]')
+  if (!(editor instanceof HTMLElement)) return false
+  const hit = findResumeOriginalField(resume, original)
+  const el = hit ? editor.querySelector(`[data-entry-field="${hit.fieldId}"]`) : null
+  const needle = original.trim()
+  if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && needle) {
+    const start = el.value.indexOf(needle)
+    if (start >= 0) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.focus()
+      el.setSelectionRange(start, start + needle.length)
+      return true
+    }
+  }
+  if (el instanceof HTMLElement && needle && selectElementText(el, needle)) {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    el.focus()
+    return true
+  }
+  scrollResumeEditorToTop()
+  return true
+}
+
+/** 只读栏不是输入框。按原文在文本节点里的位置选中，调用方读 getSelection。 */
+function selectElementText(el: HTMLElement, needle: string): boolean {
+  const full = el.textContent ?? ''
+  const start = full.indexOf(needle)
+  if (start < 0 || typeof document === 'undefined') return false
+  const stop = start + needle.length
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  let seen = 0
+  let startNode: Text | null = null
+  let startOffset = 0
+  let endNode: Text | null = null
+  let endOffset = 0
+  let current = walker.nextNode()
+  while (current) {
+    const text = current as Text
+    const next = seen + text.data.length
+    if (!startNode && start < next) {
+      startNode = text
+      startOffset = start - seen
+    }
+    if (startNode && stop <= next) {
+      endNode = text
+      endOffset = stop - seen
+      break
+    }
+    seen = next
+    current = walker.nextNode()
+  }
+  if (!startNode || !endNode) return false
+  const range = document.createRange()
+  range.setStart(startNode, startOffset)
+  range.setEnd(endNode, endOffset)
+  const selection = window.getSelection()
+  if (!selection) return false
+  selection.removeAllRanges()
+  selection.addRange(range)
+  return true
 }

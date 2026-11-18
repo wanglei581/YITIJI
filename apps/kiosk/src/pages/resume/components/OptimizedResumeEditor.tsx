@@ -4,9 +4,10 @@ import { PencilLineIcon, ShieldCheckIcon } from 'lucide-react'
 import { Card } from '@ai-job-print/ui'
 import type { GeneratedResume, ResumeLayoutSettings } from '@ai-job-print/shared'
 import { MaskedContactLine } from '../../../components/MaskedContactLine'
+import { ProjectTitleFields, ResumeTagList } from './resume-deliver/ResumeEntryFields'
 import { DeleteEntryButton, EntryDeleteDialog } from './resume-deliver/ResumeFactConfirmDialog'
 import { editStampedEntry } from './resume-deliver/generatedEntryIndex'
-import { resumeTitleIssues } from './resume-deliver/resumeEntryTitles'
+import { RESUME_EDIT_LIMITS, resumeTitleIssues } from './resume-deliver/resumeEntryTitles'
 
 type OptimizedResumeEditorProps = {
   resume: GeneratedResume
@@ -106,15 +107,19 @@ export function OptimizedResumeEditor({
         <div
           className={`mt-4 space-y-5 text-[calc(1rem*var(--resume-font-scale,1))] leading-[var(--resume-line-height,1.62)] ${previewClassName}`}
           data-layout-columns={layout.columns ?? 1}
+          data-resume-editor=""
         >
           <div>
             <SectionTitle title="个人简介" />
             <textarea
               className={`${taCls} min-h-24 resize-y`}
+              aria-label="个人简介"
+              data-entry-field="summary"
+              maxLength={RESUME_EDIT_LIMITS.summary}
               value={resume.summary}
               placeholder="(空)"
               onFocus={scrollFieldIntoView}
-              onChange={(e) => onChange({ ...resume, summary: e.target.value.slice(0, 600) })}
+              onChange={(e) => onChange({ ...resume, summary: e.target.value })}
             />
           </div>
 
@@ -155,12 +160,14 @@ export function OptimizedResumeEditor({
                       <textarea
                         className={`${taCls} mt-1.5 min-h-20 resize-y`}
                         aria-label={`第 ${i + 1} 条教育的描述`}
+                        data-entry-field={`education-${i}-description`}
+                        maxLength={RESUME_EDIT_LIMITS.description}
                         value={e.description ?? ''}
                         placeholder="(无描述)"
                         onFocus={scrollFieldIntoView}
                         onChange={(ev) => onChange({
                           ...resume,
-                          education: resume.education.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value.slice(0, 1000) }) : row),
+                          education: resume.education.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value }) : row),
                         })}
                       />
                       <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条教育`} onClick={() => setPendingDelete({ section: 'education', index: i })} />
@@ -206,11 +213,13 @@ export function OptimizedResumeEditor({
                       <textarea
                         className={`${taCls} mt-1.5 min-h-24 resize-y`}
                         aria-label={`第 ${i + 1} 条经历的描述`}
+                        data-entry-field={`experience-${i}-description`}
+                        maxLength={RESUME_EDIT_LIMITS.description}
                         value={e.description}
                         onFocus={scrollFieldIntoView}
                         onChange={(ev) => onChange({
                           ...resume,
-                          experience: resume.experience.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value.slice(0, 1000) }) : row),
+                          experience: resume.experience.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value }) : row),
                         })}
                       />
                       <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条经历`} onClick={() => setPendingDelete({ section: 'experience', index: i })} />
@@ -227,15 +236,22 @@ export function OptimizedResumeEditor({
               <div className="space-y-3">
                 {resume.projects.map((p, i) => (
                   <div key={i} className="break-inside-avoid">
-                    <p className="text-sm font-semibold text-gray-800">{p.role ? `${p.name} · ${p.role}` : p.name}</p>
+                    <ProjectTitleFields
+                      index={i}
+                      name={p.name}
+                      role={p.role ?? ''}
+                      className={`${taCls} mt-1 min-h-12`}
+                    />
                     <textarea
                       className={`${taCls} mt-1.5 min-h-24 resize-y`}
                       aria-label={`第 ${i + 1} 条项目的描述`}
+                      data-entry-field={`projects-${i}-description`}
+                      maxLength={RESUME_EDIT_LIMITS.description}
                       value={p.description}
                       onFocus={scrollFieldIntoView}
                       onChange={(ev) => onChange({
                         ...resume,
-                        projects: resume.projects.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value.slice(0, 1000) }) : row),
+                        projects: resume.projects.map((row, idx) => idx === i ? editStampedEntry(row, { description: ev.target.value }) : row),
                       })}
                     />
                   </div>
@@ -244,23 +260,26 @@ export function OptimizedResumeEditor({
             </div>
           )}
 
-          {resume.skills.length > 0 && (
-            <div>
-              <SectionTitle title="技能" />
-              <div className="flex flex-wrap gap-2">
-                {resume.skills.map((s, i) => (
-                  <span key={i} className="rounded-lg bg-primary-50 px-2.5 py-1 text-sm text-primary-700">{s}</span>
-                ))}
-              </div>
-            </div>
-          )}
+          <div>
+            <SectionTitle title="技能" />
+            <ResumeTagList
+              items={resume.skills}
+              field="skill"
+              appearance="chip"
+              onChange={(skills) => onChange({ ...resume, skills })}
+            />
+          </div>
 
-          {resume.certificates.length > 0 && (
-            <div>
-              <SectionTitle title="证书 / 资质" />
-              <p className="text-sm text-gray-700">{resume.certificates.join(' · ')}</p>
-            </div>
-          )}
+          <div>
+            <SectionTitle title="证书 / 资质" />
+            <ResumeTagList
+              items={resume.certificates}
+              field="certificate"
+              appearance="chip"
+              readOnly
+              onChange={() => undefined}
+            />
+          </div>
         </div>
       </Card>
 

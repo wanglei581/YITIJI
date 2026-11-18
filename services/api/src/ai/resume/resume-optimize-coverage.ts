@@ -1,7 +1,12 @@
 import type { GeneratedResume, ResumeReport } from '../interfaces/ai-provider.interface'
 import type { OptimizeResult } from './llm-resume-optimize.service'
-import { fitResumeToDocLimits } from './resume-doc-limits'
+import { RESUME_DOC_LIMITS, fitResumeToDocLimits } from './resume-doc-limits'
+import { alignOriginalList } from './resume-optimize-list-align'
+import { ensureProjectOriginalLines } from './resume-optimize-project-align'
+import { BULLET_RE, RESTORED_ROLE_MAX, RESTORED_TITLE_MAX, isTitleLike } from './resume-restored-text'
 import { detectResumeName, extractResumeExperienceCandidates, normalizeResumeStructureText, splitResumeDateRange } from './resume-structure'
+
+export { alignOriginalList }
 
 type RestoreFn = (value: string) => string
 
@@ -90,7 +95,6 @@ const UNKNOWN_HEADING_RE = /^[一-鿿]{2,8}$/u
 const UNKNOWN_HEADING_WORD_RE = /(经历|经验|背景|信息|资料|意向|评价|简介|总结|技能|证书|荣誉|奖项|爱好|特长|培训|语言|作品|其他|附加)$/u
 /** 联系方式、住址这类行属于基本信息，不是任何一条经历的描述。 */
 const CONTACT_LINE_RE = /(?<!\d)1[3-9]\d{9}(?!\d)|[\w.+-]+@[\w-]+\.[\w.-]+|^(手机|电话|联系电话|联系方式|邮箱|电子邮箱|微信|地址|住址|现住址|现居|通讯地址)/u
-const BULLET_RE = /^[\s·•●▪■◆*\-–—]+/u
 
 function headingOf(line: string): [RegExp, ListKey | null] | undefined {
   const known = HEADINGS.find(([pattern]) => pattern.test(line))
@@ -179,13 +183,6 @@ export function buildOriginalCoverage(
   return entries
 }
 
-/** 补回时单位 / 项目名称、职务能当标题的最大字数；超过或带句读就整句放进描述。 */
-const RESTORED_TITLE_MAX = 40
-const RESTORED_ROLE_MAX = 20
-function isTitleLike(text: string, max: number): boolean {
-  return text.length > 0 && text.length <= max && !/[，。；,;!！?？\n]/u.test(text)
-}
-
 /** 回配主事实；主字段缺失时才允许用其他原文事实定位。 */
 function matchesOriginal(item: string | object, entry: OriginalResumeEntry): boolean {
   const norm = normalizeResumeStructureText
@@ -197,27 +194,38 @@ function matchesOriginal(item: string | object, entry: OriginalResumeEntry): boo
 }
 
 /**
- * 经历一对一回配；技能/证书整段非空即覆盖，允许模型改写技能措辞。
- * 个人简介允许模型改写，所以只看「有没有写」；求职意向看岗位有没有填。
+ * 经历一对一回配。技能、证书整段空了才整段算漏（会触发重试）；
+ * 少交的单行不在这里列，末尾按原稿位置逐项补回。个人简介只看「有没有写」。
  */
 export function missingOriginalEntries(resume: GeneratedResume, baseline: OriginalResumeEntry[]): OriginalResumeEntry[] {
   const norm = normalizeResumeStructureText
   const used = new Map<ListKey, Set<number>>()
-  return baseline.filter((entry) => {
-    if (entry.overflow) return false
-    if (entry.key === 'summary') return !resume.summary.trim()
+  const missing: OriginalResumeEntry[] = []
+  for (const entry of baseline) {
+    if (entry.overflow) continue
+    if (entry.key === 'summary') {
+      if (!resume.summary.trim()) missing.push(entry)
+      continue
+    }
     if (entry.key === 'intention') {
-      return !resume.intention.position.trim() && !norm(resume.summary).includes(norm(intentionText(entry)))
+      if (!resume.intention.position.trim() && !norm(resume.summary).includes(norm(intentionText(entry)))) missing.push(entry)
+      continue
+    }
+    if (entry.key === 'skills' || entry.key === 'certificates') {
+      // 整段没交才算漏，触发重试。少交的单行不进重试提示，由末尾 alignOriginalList 按原稿位置补回。
+      if (resume[entry.key].length === 0) missing.push(entry)
+      continue
     }
     const list: Array<string | object> = resume[entry.key]
-    if (entry.key === 'skills' || entry.key === 'certificates') return !list.length
     const taken = used.get(entry.key) ?? new Set<number>()
     const index = list.findIndex((item, i) => !taken.has(i) && matchesOriginal(item, entry))
-    if (index < 0) return true
-    taken.add(index)
-    used.set(entry.key, taken)
-    return false
-  })
+    if (index < 0) missing.push(entry)
+    else {
+      taken.add(index)
+      used.set(entry.key, taken)
+    }
+  }
+  return missing
 }
 
 function intentionText(entry: OriginalResumeEntry): string {
@@ -316,6 +324,21 @@ export function preserveOriginalEntries(
   if (entries.some((entry) => entry.overflow)) {
     result.optimizedResume.summary += '\n简历过长，未送 AI 优化的内容已保持原文。'
   }
+  const skillLines = baseline.filter((entry) => entry.key === 'skills' && !entry.overflow).flatMap((entry) => entry.lines)
+  const certificateLines = baseline.filter((entry) => entry.key === 'certificates' && !entry.overflow).flatMap((entry) => entry.lines)
+  if (certificateLines.length > 0) {
+    result.optimizedResume.certificates = alignOriginalList(
+      certificateLines, result.optimizedResume.certificates, RESUME_DOC_LIMITS.certificates,
+      { modules: result.modules },
+    ).list
+  }
+  if (skillLines.length > 0) {
+    result.optimizedResume.skills = alignOriginalList(
+      skillLines, result.optimizedResume.skills, RESUME_DOC_LIMITS.skills,
+      { modules: result.modules, coveredElsewhere: result.optimizedResume.certificates },
+    ).list
+  }
+  ensureProjectOriginalLines(result.optimizedResume, baseline, result.modules)
   // 出口收口：优化接口吐出来的任何结果，原样交给导出 / 排版调整 / 存草稿都必须过校验。
   result.optimizedResume = fitResumeToDocLimits(result.optimizedResume)
   return result
