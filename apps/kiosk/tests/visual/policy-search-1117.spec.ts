@@ -310,3 +310,37 @@ test('搜索框焦点只靠外框绿边，输入框自己不再描边 @kiosk', a
   await expect(page.locator('.policy-search-field')).toHaveClass(/is-on/)
   await expect(input).toHaveCSS('outline-style', 'none')
 })
+
+function graduateGuide(index: number): typeof HIT {
+  return {
+    ...HIT,
+    id: `policy-grad-${index}`,
+    title: `应届补贴 ${index}`,
+    summary: '一句摘要。',
+    audience: 'graduate',
+    content: '短正文。',
+    requiredMaterials: '',
+    externalUrlVerified: false,
+  }
+}
+
+test('政策列表只有一页时不显示页码，卡片约 252，页脚居中 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  const extra: Array<typeof HIT> = []
+  await routePolicies(page, { extra })
+  for (let index = 1; index <= 4; index += 1) extra.push(graduateGuide(index))
+  await page.goto('/renshi?audience=graduate')
+  await expect(page.getByRole('heading', { level: 1, name: '4 条政策' })).toBeVisible()
+  await expect(page.getByText('第 1 / 1 页')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '再看 4 条' })).toHaveCount(0)
+  const box = await page.locator('.policy-min-card').first().boundingBox()
+  expect(box).toBeTruthy()
+  expect(box!.height).toBeGreaterThanOrEqual(252)
+  expect(box!.height).toBeLessThan(280)
+  await expect(page.locator('.policy-min-foot')).toHaveCSS('text-align', 'center')
+  extra.push(graduateGuide(5))
+  await page.goto('/renshi?audience=graduate')
+  await expect(page.getByRole('heading', { level: 1, name: '5 条政策' })).toBeVisible()
+  await expect(page.getByText('第 1 / 2 页')).toBeVisible()
+  await expect(page.getByRole('button', { name: '再看 4 条' })).toBeVisible()
+})

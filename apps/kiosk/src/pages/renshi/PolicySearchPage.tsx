@@ -111,7 +111,7 @@ export function PolicySearchPage() {
           categoryLabel={categoryLabel(policy.audience)} deadlineLabel={policyDeadlineLabel(policy.validThrough)}
           onOpen={() => navigate(`/renshi?policy=${encodeURIComponent(policy.id)}`)} />)}
       </div>
-      {paging && <div className="policy-min-pagination">
+      {paging && (paging.previous || paging.next) && <div className="policy-min-pagination">
         {paging.previous && <button type="button" className="policy-min-button" onClick={() => goPage(paging.page - 1)}>上一页</button>}
         <span>第 {paging.page} / {paging.pages} 页</span>
         {paging.next && <button type="button" className="policy-min-button" onClick={() => goPage(paging.page + 1)}>再看 4 条</button>}

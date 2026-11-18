@@ -35,12 +35,12 @@ export function PolicyCategoryList({ audience, page }: { audience: PolicyAudienc
       </div>
       {result.items.length === 0 && <p role="status">{result.total === 0 ? '这个类别还没有机构发布政策。' : '这一页没有政策，请返回上一页。'}</p>}
       {result.items.length < 3 && <PolicyChecklistSample />}
-      {paging && <div className="policy-min-pagination">
+      {paging && (paging.previous || paging.next) && <div className="policy-min-pagination">
         {paging.previous && <button type="button" className="policy-min-button" onClick={() => goPage(paging.page - 1)}>上一页</button>}
         <span>第 {paging.page} / {paging.pages} 页</span>
         {paging.next && <button type="button" className="policy-min-button" onClick={() => goPage(paging.page + 1)}>再看 4 条</button>}
       </div>}
-      <p className="policy-min-fine">政策由发布机构自行审核发布，以官方原文为准。</p>
+      <p className="policy-min-fine policy-min-foot">政策由发布机构自行审核发布，以官方原文为准。</p>
     </>}
   </PolicyTouchLayout>
 }
