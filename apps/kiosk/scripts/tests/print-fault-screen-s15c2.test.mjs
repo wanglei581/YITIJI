@@ -343,6 +343,7 @@ test('已付离线页副句和三步里订单在只说一次，缺纸第 2 步�
     const withRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-PAPER', canRetry: true })
     assert.doesNotMatch(noRetry.steps[1].detail, /只有本页的「重新提交打印」能整份重打/, `${fact} 不能重提时第 2 步不该指向不存在的按钮`)
     assert.match(noRetry.steps[1].detail, /本页没有「重新提交打印」/)
+    assert.doesNotMatch(noRetry.steps[1].detail, /续打|接着打/)
     assert.match(withRetry.steps[1].detail, /只有本页的「重新提交打印」能整份重打/)
   }
 })
