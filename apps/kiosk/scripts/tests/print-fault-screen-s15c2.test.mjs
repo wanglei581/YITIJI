@@ -161,7 +161,7 @@ test('三态失败页上服务电话只出现一次，设备上报和带走失�
     assert.equal((text.match(/服务电话/g) ?? []).length, 1, `${variant} 服务电话应只出现一次`)
     assert.match(copy.steps[2].detail, /服务电话/)
     assert.doesNotMatch(reason, /服务电话|这台机器暂时打不了|打印有问题/)
-    assert.equal(miss, '带走链接没取到。')
+    assert.equal(miss, '手机带走链接这次没取到，不影响这笔订单')
     assert.doesNotMatch(text, /工作人员/)
   }
   const retryCopy = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-PHONE', canRetry: true })

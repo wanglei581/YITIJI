@@ -196,3 +196,32 @@ test('pending pickup without a print task opens my documents instead of a second
   await docs.click()
   await page.waitForURL('**/me/documents')
 })
+
+test('paper-jam takeaway HTTP 500 keeps the order line and does not ask to retry later @w2', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      errorCode: 'PRINTER_ERROR',
+      failureReasonForUser: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 500,
+    json: { error: { code: 'INTERNAL', message: 'boom' } },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, amountCents: 0 })
+  const jam = page.locator('[data-testid="print-fulfill-state-paper-jam"]')
+  await expect(jam).toBeVisible()
+  const status = jam.getByRole('status')
+  await expect(status).toContainText('手机带走链接这次没取到，不影响这笔订单')
+  await expect(jam).not.toContainText('请稍后重试')
+  await expect(jam).not.toContainText('服务暂时不可用')
+  await expect(jam).toContainText('服务电话')
+  const phoneHits = await jam.evaluate((el) => (el.innerText.match(/服务电话/g) ?? []).length)
+  expect(phoneHits).toBe(1)
+})

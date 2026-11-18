@@ -7,6 +7,7 @@ import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { useRemainingSeconds } from '../../hooks/useCountdown'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { ApiHttpError } from '../../services/api/httpAdapter'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import {
   getPrintJobStatus,
@@ -341,10 +342,15 @@ export function PrintDonePage() {
         if (!cancelled) setTakeaway(result)
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          const fallback = faultScreenTakeawayMiss(resultState === 'failed' ? failVisual(verification?.errorCode) : 'failed')
-          setTakeawayError(preferUnattended(userMessageOf(err, fallback), fallback))
+        if (cancelled) return
+        const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : 'failed'
+        const fallback = faultScreenTakeawayMiss(visual)
+        const faultScreen = visual === 'paper-jam' || visual === 'out-of-paper' || visual === 'offline'
+        if (faultScreen && err instanceof ApiHttpError && err.status >= 500) {
+          setTakeawayError(fallback)
+          return
         }
+        setTakeawayError(preferUnattended(userMessageOf(err, fallback), fallback))
       })
     return () => { cancelled = true }
   }, [getToken, resultState, state.paymentSessionToken, taskId, verification?.errorCode])

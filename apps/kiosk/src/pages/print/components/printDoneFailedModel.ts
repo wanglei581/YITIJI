@@ -304,9 +304,11 @@ export function shownFailureReason(variant: FailureVariant, deviceReason: string
   return presentedReason
 }
 
-/** 带走链接取不到。三态里不再接「打印有问题？拨打服务电话」，服务电话只留在第 3 步。 */
+/** 带走链接取不到。三态写明不影响这笔订单，不再接服务电话。普通失败仍接「打印有问题」。 */
 export function faultScreenTakeawayMiss(visual: string): string {
-  if (visual === 'paper-jam' || visual === 'out-of-paper' || visual === 'offline') return '带走链接没取到。'
+  if (visual === 'paper-jam' || visual === 'out-of-paper' || visual === 'offline') {
+    return '手机带走链接这次没取到，不影响这笔订单'
+  }
   return `带走链接没取到。${printProblemLine()}`
 }
 
