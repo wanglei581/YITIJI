@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-11-19：排版出站补齐现实分隔、数值字段和逐处还原（分支 `claude/move-1434-1113`，未推送、未部署）
+
+- 来由：任务包 M1434j。M1434i 收货通过后，Grok 与 agy 还列出几种现实写法能拼出号码，以及截断缺号、同号两种写法、提前返回钉住。无标签 8–10 位证件号仍按通用遮盖口径，记后续。逐位夹字母不追。
+- 分隔符补到制表符（正文 U+0009，以及 JSON 里的反斜杠加 t）、连续空格、空格包住的短横、短横 `- – — ‐ ‑ － ﹣`、点 `. · • ． ・`、括号包住的段（半角与全角）。出站正文拼不出原号码，还原逐字一致。日期轴仍不遮。
+- 简历 JSON 的数值字段按相邻号码遮。紧凑写法还原逐字。带无意义空白的数值 JSON 在粘连拆分时会重新序列化，新用例对重新序列化后的正文要求拼不出原号码、还原与那一版逐字一致。这是新用例的比较口径，已有用例的期望值没有改。
+- 同一号码的两种写法按出现顺序各还原成自己的原文。单个占位符还原仍是第一次出现的原文。合同链路仍不带 restoreMap。
+- `AdvisorQaMemory.end` 提前返回这条路径是绿的，生产代码不改。用例是 `verify-conversation-epoch-ttl.ts` 的 `assertEarlyReturnReturnsToBaseline`：同一次作业进来两次、两次都结束，再结束一次，并结束一个从没进来过的号。钉和活表槽位与一次成对结束相同；容量降到 2 再灌四次别的会话，钉是 0，这条会话能被挤掉。出处：`advisor-qa-memory.ts` 的 `end`（没有登记就返回）；公开路径是 `advisor.service.ts` 的 `ask`，进来就 `begin`，`finally` 里 `end`。`begin` 把在途次数加一，不会用后一次覆盖前一次。
+- 截断缺号：官方用例只查还留在出站正文里的标记。新用例按可见序号补出缺的 `⦃nonce:2⦄` 再还原，不得带回被截掉的号码。摘掉 `dropAbsentTokens` 时这条红。已还原。
+- `verify-resume-layout-adjust.ts` 从 531 行拆到 423 行。授权 11、11g、12、13 进 `verify-resume-layout-adjust-consent.ts`（152 行）。`package.json` 与 CI 的 SQLite、PostgreSQL 两处都挂上。原脚本其余断言留在原地。
+- 反向：去掉 JSON 制表符分隔，制表符分段手机号的简历 JSON 变红。去掉短破折号，短破折号分段手机号变红。数值字段不参加拼接，拆成两个数值字段的手机号变红。同号只留第一次原文，两种写法还原变红。摘掉 `dropAbsentTokens`，缺号标记还原出丢掉的号码。都已还原。
+- 门禁：`verify:layout-outbound-realistic` 51，`verify:layout-mask-truncate` 21，`verify:resume-layout-adjust` 全过，`verify:resume-layout-adjust-consent` 全过，`verify:llm-input-pii-mask` 145，`verify:advisor-qa-history-mask` 34，`verify:conversation-memory-forget` 149，`verify:conversation-epoch-ttl` 42，`verify:mask-before-truncate` 25。`services/api` 的 `tsc --noEmit` 通过。改动文件 eslint 通过。全仓 `pnpm lint` 0 errors。`verify:ci-gate-coverage`、`verify:repository-integrity` 通过。asr、trtc 不用这套遮盖函数。
+- 图谱：门禁脚本 691 变为 692，有脚本名 615 变为 616，CI 闭包 599 变为 600，辅助库仍 163，被断言文件仍 2243，`--check` 通过。没起 API 3333，没起 Redis 6633，没跑浏览器。未推送、未部署。
+
 ## 2026-11-19：排版出站按现实写法遮号码；占位符不撞用户原文（分支 `claude/move-1434-1113`，未推送、未部署）
 
 - 来由：任务包 M1434i。M1434h 收货又找出兜底绕过。必须遮住的是现实中人会写出来的号码。故意逐位夹字母不追。11 位及以上的学号、证书号、专利号一并遮掉，还原后用户看到原文。

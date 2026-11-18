@@ -27578,6 +27578,7 @@
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
+      "services/api/scripts/verify-resume-layout-adjust-consent.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
@@ -27767,7 +27768,7 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-resume-ai-consent-wiring.ts",
-      "services/api/scripts/verify-resume-layout-adjust.ts"
+      "services/api/scripts/verify-resume-layout-adjust-consent.ts"
     ],
     "services/api/src/ai/resume-parse-intent-runner.service.ts": [
       "services/api/scripts/verify-guest-file-proof.ts",
@@ -30318,7 +30319,7 @@
       "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-resume-ai-consent-wiring.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
-      "services/api/scripts/verify-resume-layout-adjust.ts",
+      "services/api/scripts/verify-resume-layout-adjust-consent.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -48760,15 +48761,33 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume-layout-adjust.controller.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-layout-adjust-consent.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-layout-adjust-consent"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/dto/resume-generate.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
-          "services/api/src/ai/resume-layout-adjust.controller.ts",
           "services/api/src/ai/resume/layout-adjust-digit-cover.ts",
           "services/api/src/ai/resume/llm-resume-optimize.service.ts",
           "services/api/src/ai/resume/resume-pdf.service.ts",
-          "services/api/src/common/pdf/pdfjs-document.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
+          "services/api/src/common/pdf/pdfjs-document.ts"
         ],
         "missing": []
       },
