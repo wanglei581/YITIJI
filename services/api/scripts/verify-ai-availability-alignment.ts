@@ -23,6 +23,7 @@ import { LlmConfigService } from '../src/ai/llm/llm-config.service'
 import { MockInterviewAvailability } from '../src/mock-interview/mock-interview-availability.service'
 import { MockInterviewController } from '../src/mock-interview/mock-interview.controller'
 import { TrtcController } from '../src/trtc/trtc.controller'
+import { runQ22bManualInterviewHttp } from './verify-q22b-manual-interview-http'
 
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'q22-avail-'))
 const SAVED_ENV = {
@@ -346,6 +347,13 @@ async function main(): Promise<void> {
   await interviewPair('当天预算到顶', 'AI_BUDGET_EXHAUSTED')
   budgetExhausted = false
   await interviewPair('mock_interview 配好且未暂停、未到顶', null)
+
+  await runQ22bManualInterviewHttp({
+    access,
+    llm,
+    store,
+    setBudgetExhausted: (value) => { budgetExhausted = value },
+  })
 
   console.log('\n=== ALL PASS ===')
 }

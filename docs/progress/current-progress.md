@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-18：模拟面试题目单手动退路不再被 AI 可用性闸门拦住（分支 `claude/ai-availability-1117`，未推送）
+
+- `POST /mock-interviews` 与 `POST /mock-interviews/:id/practice-sheet` 改为豁免 AI 可用性闸门，只留全机维护。建配置和通用题目单不调模型。全站暂停、当天预算、平台未开通、登录档和声明不再把这两条一起拦掉。开场、答题、结束仍要调模型，标记不变。
+- 一体机声明表这两条改为 exempt，与服务端一致。
+- 门禁穿过真实全局守卫：模型没配、全站暂停、预算耗尽、平台没开通时建配置和题目单都成功，开场仍拒绝。供应商替身下开场返回替身题目，且只打一次。
+- 没推送，没上线。没改岗位、招聘会、打印硬件、收费、数据库和密钥。
+
 ## 2026-11-17：小青、数字人、模拟面试「能不能用」与真实调用对齐（分支 `claude/ai-availability-1117`，未推送）
 
 - 小青文字对话新增只读 `GET /api/v1/assistant/availability`，与 `POST /assistant/chat` 共用 `assistant_chat` 判断。顾问探针仍看 `advisor_work`。一体机 `/assistant` 只有探针明确不能用才锁输入。
