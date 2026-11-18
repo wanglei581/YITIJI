@@ -42419,7 +42419,9 @@
     },
     {
       "asserts": {
-        "absent": [],
+        "absent": [
+          "services/api/advisor.ts"
+        ],
         "dirs": [
           "apps/kiosk/src"
         ],
@@ -42433,7 +42435,6 @@
           "services/api/src/ai/llm/llm-chat.service.ts"
         ],
         "missing": [
-          "services/api/advisor.ts",
           "services/api/aiSessionForget.ts"
         ]
       },
