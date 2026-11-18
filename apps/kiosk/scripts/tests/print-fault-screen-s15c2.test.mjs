@@ -297,6 +297,32 @@ test('缺纸、卡纸、离线不论能否重提，服务电话都只在第 3 �
   }
 })
 
+test('缺纸、卡纸、离线能重提时，整屏「订单还在」恰好一次', () => {
+  const deviceOf = {
+    'out-of-paper': { loading: false, printerReady: false, kind: 'error', printer: { errorCode: 'paperEmpty' } },
+    'paper-jam': { loading: false, printerReady: false, kind: 'error', printer: { errorCode: 'paperJam' } },
+    offline: { loading: false, printerReady: false, kind: 'offline', printer: {} },
+  }
+  for (const variant of ['out-of-paper', 'paper-jam', 'offline']) {
+    const copy = failedModel.failureCopy({
+      variant,
+      confirmedJam: variant === 'paper-jam',
+      money: { fact: 'free', amountCents: 0 },
+      orderNo: 'ORD-RETRY-ONCE',
+      canRetry: true,
+    })
+    const blocked = failedModel.retryBlockedReason(deviceOf[variant])
+    assert.equal(typeof blocked, 'string', `${variant} 打印机还没恢复，按钮下应有原因`)
+    const text = [
+      screenText(copy),
+      blocked,
+    ].join('\n')
+    assert.equal((text.match(/订单还在/g) ?? []).length, 1, `${variant} 整屏「订单还在」应恰好一次`)
+    assert.match(blocked, /机器恢复后，这个按钮会自己亮起。$/)
+    assert.doesNotMatch(blocked, /订单还在/)
+  }
+})
+
 test('三态失败页里订单还在和已收到提醒各只说一次', () => {
   for (const variant of ['paper-jam', 'offline', 'out-of-paper']) {
     for (const fact of ['free', 'paid']) {

@@ -654,7 +654,10 @@ test('I-11 重新提交打印：打印机现在不能出纸就给出原因，能
   assert.match(failedModel.retryBlockedReason(dev({ kind: 'unknown' })), /读不到打印机状态/)
   assert.equal(failedModel.retryBlockedReason(dev({ kind: 'error', printerNotice: '这台机器暂时不能用，请稍后再来' })), '这台机器暂时不能用，请稍后再来')
   for (const kind of ['offline', 'error', 'unknown']) {
-    assert.match(failedModel.retryBlockedReason(dev({ kind })), /订单还在/)
+    const reason = failedModel.retryBlockedReason(dev({ kind }))
+    assert.match(reason, /机器恢复后，这个按钮会自己亮起。$/)
+    assert.doesNotMatch(reason, /订单还在/)
+    assert.doesNotMatch(reason, /请不要重新下单/)
   }
 })
 

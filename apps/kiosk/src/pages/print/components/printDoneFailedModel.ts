@@ -352,7 +352,7 @@ export function retryBlockedReason(device: {
   if (device.printerReady) return null
   if (device.loading) return '正在确认这台机器的打印机状态…'
   if (device.printerNotice) return device.printerNotice
-  const tail = '机器恢复后，这个按钮会自己亮起；订单还在，请不要重新下单。'
+  const tail = '机器恢复后，这个按钮会自己亮起。'
   if (device.kind === 'offline') return `这台机器的打印机现在离线，暂时不能重新提交。${tail}`
   if (device.kind === 'error') {
     if (device.printer.errorCode === 'paperEmpty') {
