@@ -51,20 +51,26 @@ function yuanFields(view: TerminalChargeSettingsView): Record<TerminalChargeServ
 
 const KIOSK_GAP_KEYS = ['resume_optimize', 'mock_interview', 'scan'] as const
 
-function showsKioskPayGap(yuan: Record<TerminalChargeServiceKey, string>): boolean {
+/** 输入框旁的编辑提示。只看正在填的数，不代表已经在收。 */
+function showsDraftKioskPayGap(yuan: Record<TerminalChargeServiceKey, string>): boolean {
   return KIOSK_GAP_KEYS.some((key) => {
     const cents = parseYuan(yuan[key])
     return cents !== null && cents > 0
   })
 }
 
-function effectiveLine(view: TerminalChargeSettingsView, gap: boolean): string {
+/** 实际收费行上的警告。只看这次读到的生效价，保存成功并重新读到之后才变。 */
+function showsSavedKioskPayGap(view: TerminalChargeSettingsView): boolean {
+  return KIOSK_GAP_KEYS.some((key) => view.prices[key].effectiveCents > 0)
+}
+
+function effectiveLine(view: TerminalChargeSettingsView): string {
   const parts = TERMINAL_CHARGE_SERVICE_KEYS.map((key) => {
     const row = view.prices[key]
     return `${TERMINAL_CHARGE_SERVICE_LABELS[key]} ¥${yuanText(row.effectiveCents)}（${REASON_TEXT[row.reason]}）`
   })
   const base = `现在实际向用户收：${parts.join('；')}`
-  return gap ? `${base} ${KIOSK_PAY_SCREEN_NOTE}` : base
+  return showsSavedKioskPayGap(view) ? `${base} ${KIOSK_PAY_SCREEN_NOTE}` : base
 }
 
 export function TerminalChargeSettingsSection({
@@ -220,9 +226,9 @@ export function TerminalChargeSettingsSection({
                 />
               </label>
             ))}
-            {showsKioskPayGap(yuan) ? <p className="text-xs leading-relaxed text-warning-fg">{KIOSK_PAY_SCREEN_NOTE}</p> : null}
+            {showsDraftKioskPayGap(yuan) ? <p className="text-xs leading-relaxed text-warning-fg">{KIOSK_PAY_SCREEN_NOTE}</p> : null}
           </div>
-          <p className="text-xs leading-relaxed text-neutral-600">{effectiveLine(view, showsKioskPayGap(yuan))}</p>
+          <p className="text-xs leading-relaxed text-neutral-600">{effectiveLine(view)}</p>
           {locked ? null : (
             <button
               type="button"
