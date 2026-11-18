@@ -172,6 +172,7 @@ test('我的打印订单复用取件时间线，不另造接口', () => {
   assert.match(page, /<PendingPickupSection/)
   assert.match(section, /listPickupHereOrders/)
   assert.match(section, /手机上还没取的单这次没读到/)
+  assert.match(section, /className="me-stack me-pin"[^>]*data-testid="pending-pickup-error"/)
   assert.match(section, /到这台取件/)
   assert.match(section, /去哪台取/)
   assert.match(api, /\/me\/print-orders\/timeline/)

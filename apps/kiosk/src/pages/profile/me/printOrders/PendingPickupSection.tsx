@@ -75,7 +75,7 @@ export function PendingPickupSection({
   const navigate = useNavigate()
   if (presence === 'error') {
     return (
-      <div className="me-stack" data-testid="pending-pickup-error" role="status">
+      <div className="me-stack me-pin" data-testid="pending-pickup-error" role="status">
         <p className="me-reason">手机上还没取的单这次没读到。下面已产生打印任务的订单不受影响。</p>
         <MeBtn v="sec" onClick={onReload}>重新读取</MeBtn>
       </div>
