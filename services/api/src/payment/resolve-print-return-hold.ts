@@ -8,16 +8,17 @@
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
+import { parkChannelQueryFault, type ChannelQueryFault } from './refund-channel-query'
 import { markOrderIfPaperUnreleased, paperAlreadyReleased } from './refund-paper-exclusion'
 import { settlementAfterSuccess } from './refund-remainder'
 
 export type PrintReturnResolution = 'confirm_refunded' | 'release_paper' | 'close_order'
-export type RefundChannelVerdict = 'success' | 'processing' | 'failed' | 'unknown' | 'unsupported'
+export type RefundChannelVerdict = 'success' | 'processing' | 'failed' | 'unknown' | 'unsupported' | 'fault'
 export type PendingRefundChannelQuery = (input: {
   channel: string
   refundNo: string
   orderId: string
-}) => Promise<RefundChannelVerdict>
+}) => Promise<RefundChannelVerdict | ChannelQueryFault>
 
 const HOLD_STATUSES = ['failed', 'manual_review', 'pending'] as const
 const NOT_REFUNDED_NOTE = '这笔钱不会记成已退回'
@@ -107,14 +108,25 @@ async function rejectPendingReleaseUntilChannelFailed(
   })
   if (!refund) return
   let verdict: RefundChannelVerdict = 'unsupported'
+  let faultError: unknown = null
   if (channelQuery) {
     try {
-      verdict = await channelQuery({ channel: refund.channel, refundNo: refund.refundNo, orderId })
-    } catch {
-      verdict = 'unknown'
+      const raw = await channelQuery({ channel: refund.channel, refundNo: refund.refundNo, orderId })
+      if (typeof raw === 'object') {
+        verdict = raw.verdict
+        faultError = raw.error
+      } else {
+        verdict = raw
+      }
+    } catch (error) {
+      verdict = 'fault'
+      faultError = error
     }
   }
   if (verdict === 'failed') return
+  if (verdict === 'fault') {
+    await parkChannelQueryFault(db, orderId, refund.refundNo, faultError)
+  }
   await db.auditLog.create({
     data: {
       actorId: null,
