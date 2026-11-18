@@ -88,7 +88,7 @@ export function OptimizeEditView(props: {
         {pending > 0 ? <p className="qxt-warn">还有 {pending} 处事实待你确认，确认后才能导出<span>{UNCONFIRMED_WHY}</span></p> : null}
         <div className="qxt-block">
           <div className="qxt-lab">模板</div>
-          {props.templatesError ? <p className="qxt-note">模板列表这次没读取到，不是没有模板。导出仍可进行，会使用默认版式；排版调整照常可用。</p> : null}
+          {props.templatesError ? <p className="qxt-note">模板列表这次没读取到。导出仍可进行，会使用默认版式；排版调整照常可用。</p> : null}
           {props.templates.map((tpl) => (
             <button key={tpl.id} type="button" className="qxt-tpl" aria-pressed={props.selectedTemplateId === tpl.id} disabled={exporting} onClick={() => props.onTemplateChange(tpl.id)}>
               {tpl.title}
