@@ -95,10 +95,44 @@ function main(): void {
   assertCovered('三十位号码每十位夹一个零宽连字', '1234567890\u200D1234567890\u200D1234567890', longDigits)
   assertCovered('三十位号码每十位夹一个字节顺序标记', '1234567890\uFEFF1234567890\uFEFF1234567890', longDigits)
 
+  assertCovered(
+    '手机号拆在两个相邻字段',
+    '字段说明',
+    phone,
+    '{"mobilePrefix":"138","mobileBody":"00138000"}',
+  )
+  assertCovered(
+    '银行卡拆在两个相邻字段',
+    '字段说明',
+    '6222021234567890',
+    '{"cardBin":"622202","cardTail":"1234567890"}',
+  )
+  assertCovered(
+    '分段手机号再拆进两个字段',
+    '字段说明',
+    phone,
+    '{"head":"138-0013","tail":"8000"}',
+  )
+
   assertUntouched('年月日期轴', '2015.09-2019.06')
   assertUntouched('破折号日期轴', '2020.07—2024.06')
+  assertJsonKept('纯数字年月不拼', '{"start":"201509","end":"201906"}', '201509')
+  assertJsonKept('点开的年月不拼', '{"from":"2015.09","to":"2019.06"}', '2015.09')
+  assertJsonKept('中间夹了文字就断开', '{"mobilePrefix":"138","note":"备注","mobileBody":"00138000"}', '138')
 
   console.log(`verify:layout-outbound-realistic ${passCount} PASS`)
+}
+
+function assertJsonKept(label: string, json: string, visible: string): void {
+  const out = maskLayoutAdjustOutbound({
+    originalText: '说明结束',
+    resumeValues: '说明',
+    resumeJson: json,
+    maxOriginalChars: 800,
+  })
+  if (!out.maskedResumeJson.includes(visible)) fail(`${label} 被收成占位符`)
+  if (out.restore(out.maskedResumeJson) !== json) fail(`${label} 还原后与原文不一致`)
+  pass(label)
 }
 
 function assertUntouched(label: string, raw: string): void {

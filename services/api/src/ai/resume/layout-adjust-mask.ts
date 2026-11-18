@@ -6,12 +6,13 @@
  * 残留的长数字走兜底遮盖，不走失败关闭。合同断言会把简历里的日期轴误判成残留，
  * 这里若因 strict 为 false 就回 503，没有证件号的简历也会排不了版。
  * 兜底先把全角数字折成半角。数字段之间只隔一个空格、短横、点或零宽字符、
- * 合计达到 11 位的，按一整串遮。占位符里存原文，还原仍逐字对上。
+ * 合计达到 11 位的，按一整串遮。简历 JSON 再把相邻的号码片段字段接起来遮。
+ * 占位符里存原文，还原仍逐字对上。
  */
 import { ServiceUnavailableException } from '@nestjs/common'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextsForLlmReversible } from '../../common/pii/llm-input-mask'
 import { llmMaskPlaceholderPattern } from '../../common/pii/mask-placeholder'
-import { coverRealisticNumbers, createLongDigitBook } from './layout-adjust-digit-cover'
+import { coverAdjacentJsonValues, coverRealisticNumbers, createLongDigitBook } from './layout-adjust-digit-cover'
 
 export const AI_LAYOUT_ADJUST_TOO_LONG = 'AI_LAYOUT_ADJUST_TOO_LONG'
 export const AI_LAYOUT_ADJUST_TOO_LONG_MESSAGE =
@@ -134,7 +135,7 @@ export function maskLayoutAdjustOutbound(input: {
   return {
     maskedOriginal: cutMaskedLayoutText(cover(maskedOriginal), input.maxOriginalChars),
     maskedResumeValues: cover(maskedResumeValues),
-    maskedResumeJson: cover(maskedResumeJson),
+    maskedResumeJson: coverAdjacentJsonValues(cover(maskedResumeJson), book),
     restore: withLongDigits(masked.restore, extra),
   }
 }
