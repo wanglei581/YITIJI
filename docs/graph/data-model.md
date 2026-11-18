@@ -103,7 +103,7 @@ flowchart TD
 | **FeedbackReply** | 8 | FeedbackTicket、User | 2 个文件<br/>`member-feedback/member-feedback.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **FeedbackTicket** | 17 | EndUser、FeedbackReply | 5 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`member-feedback/kiosk-feedback.service.ts`<br/>`member-feedback/member-feedback.service.ts`<br/>… |
 | **FieldMappingRule** | 9 | JobSource | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
-| **FileObject** | 50 | DocumentProcessTask、EndUser、FairMaterialPrintBridge、OnlinePlatformDirectory、PlatformQualification、PrintTask、QualificationRecord、User | 44 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>… |
+| **FileObject** | 50 | DocumentProcessTask、EndUser、FairMaterialPrintBridge、OnlinePlatformDirectory、PlatformQualification、PrintTask、QualificationRecord、User | 45 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>… |
 | **HelpItem** | 8 | — | **无代码读写** |
 | **ImportBatch** | 17 | ImportRecord、JobSource | 2 个文件<br/>`jobs/jobs-admin.service.ts`<br/>`jobs/jobs-excel.service.ts` |
 | **ImportRecord** | 10 | ImportBatch | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
@@ -151,7 +151,7 @@ flowchart TD
 | **RedemptionRecord** | 11 | — | 5 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>… |
 | **Refund** | 12 | Order | 4 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/reconciliation.service.ts`<br/>`payment/refund-amount-hold.ts`<br/>… |
 | **ReviewDecision** | 18 | User | **无代码读写** |
-| **ScanTask** | 31 | EndUser、Terminal | 15 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.fleet.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
+| **ScanTask** | 31 | EndUser、Terminal | 18 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.fleet.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **ScreensaverContent** | 9 | — | **无代码读写** |
 | **ServiceDeployment** | 12 | ServiceIncident、ServiceProject、Terminal | 4 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>… |
 | **ServiceIncident** | 19 | ServiceDeployment、ServiceIncidentEvent、ServiceProject | 2 个文件<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-report-builder.ts` |
@@ -162,7 +162,7 @@ flowchart TD
 | **StorageDeletion** | 6 | — | 2 个文件<br/>`files/closure-file-deletion.ts`<br/>`member-privacy/member-closure-redis.service.ts` |
 | **SyncLog** | 15 | JobSource | 6 个文件<br/>`console-screen/console-screen.queries.ts`<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 3 个文件<br/>`assistant/daily-brief.service.ts`<br/>`community/community.service.ts`<br/>`member-notifications/member-notifications.service.ts` |
-| **Terminal** | 37 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、ServiceDeployment、ServiceOrder、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit、TerminalServicePrice | 55 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-ops/derived-print-quota-alerts.ts`<br/>… |
+| **Terminal** | 37 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、ServiceDeployment、ServiceOrder、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit、TerminalServicePrice | 56 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-ops/derived-print-quota-alerts.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 3 个文件<br/>`terminals/terminal-batch.service.ts`<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 5 个文件<br/>`admin-ops/derived-scan-device-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>`copy-jobs/copy-job-store.service.ts`<br/>… |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |

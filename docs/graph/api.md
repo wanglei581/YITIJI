@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`673` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`675` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -104,6 +104,7 @@
 | GET | `/api/v1/advisor/sessions/:sessionId` | CreateAdvisorSessionDto.get | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
 | POST | `/api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print` | CreateAdvisorSessionDto.print | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
 | POST | `/api/v1/advisor/sessions/:sessionId/ask` | CreateAdvisorSessionDto.ask | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
+| POST | `/api/v1/advisor/sessions/:sessionId/forget` | CreateAdvisorSessionDto.forget | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
 | POST | `/api/v1/advisor/sessions/:sessionId/pins` | CreateAdvisorSessionDto.pin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
 | DELETE | `/api/v1/advisor/sessions/:sessionId/pins/:pinId` | CreateAdvisorSessionDto.unpin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
 | POST | `/api/v1/advisor/sessions/:sessionId/run` | CreateAdvisorSessionDto.run | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>RedemptionRecord |
@@ -144,6 +145,12 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/assistant/availability` | AssistantAvailabilityController.availabilityProbe | — | — | — |
+
+## `services/api/src/ai/assistant-session-forget.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/assistant/sessions/forget` | AssistantSessionForgetController.forget | — | — | — |
 
 ## `services/api/src/ai/career-plan.controller.ts`
 
@@ -720,12 +727,12 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/me/ai-records` | MemberAssetsController.aiRecords | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/ai-records` | MemberAssetsController.aiRecords | — | MemberAssetsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | DELETE | `/api/v1/me/ai-records/:id` | MemberAssetsController.deleteAiRecord | — | — | — |
-| GET | `/api/v1/me/documents` | MemberAssetsController.documents | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
-| GET | `/api/v1/me/documents/deleted` | MemberAssetsController.deletedDocuments | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/documents` | MemberAssetsController.documents | — | MemberAssetsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/documents/deleted` | MemberAssetsController.deletedDocuments | — | MemberAssetsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | DELETE | `/api/v1/me/qa-records/:id` | MemberAssetsController.deleteQaRecord | — | — | — |
-| GET | `/api/v1/me/resumes` | MemberAssetsController.resumes | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/resumes` | MemberAssetsController.resumes | — | MemberAssetsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | DELETE | `/api/v1/me/resumes/:id` | MemberAssetsController.deleteResume | — | — | — |
 
 ## `services/api/src/member-auth/member-auth.controller.ts`
@@ -1306,10 +1313,10 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/upload-sessions` | UploadSessionsController.create | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
-| DELETE | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.cancel | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
-| GET | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.status | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/:sessionId/confirm` | UploadSessionsController.confirm | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/:sessionId/files` | UploadSessionsController.upload | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/:sessionId/member-file` | UploadSessionsController.uploadMemberFile | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/scene/resolve` | UploadSessionsController.resolveScene | — | UploadSessionsService | AdvisorArtifact<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions` | UploadSessionsController.create | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| DELETE | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.cancel | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| GET | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.status | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/confirm` | UploadSessionsController.confirm | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/files` | UploadSessionsController.upload | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/member-file` | UploadSessionsController.uploadMemberFile | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/scene/resolve` | UploadSessionsController.resolveScene | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
