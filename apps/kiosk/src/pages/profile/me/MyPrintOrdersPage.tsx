@@ -253,9 +253,10 @@ export function MyPrintOrdersPage() {
   const pickupNote = pendingPickupBannerNote(pendingPickup.presence)
   const miniOn = whenMiniapp(useSupportContact(isLoggedIn), 'on') !== ''
   const allLoadedFree = items.length > 0 && items.every(isFreeMemberOrder)
+  const hideClaimShortcut = items.length === 0 && pendingPickup.presence === 'rows'
   const pickupBlock = (
     <>
-      {miniOn ? (
+      {miniOn && !hideClaimShortcut ? (
         <button type="button" className="me-line" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/print/pickup-claim')}>
           <b>手机上下的到店单，到机器上输到机码取件</b>
           {pickupNote ? <small>{pickupNote}</small> : null}

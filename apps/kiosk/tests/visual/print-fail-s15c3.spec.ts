@@ -103,3 +103,94 @@ test('free paper-jam header keeps brand and clock on one line while the long pil
   expect(pillFit.scrollWidth).toBeLessThanOrEqual(pillFit.clientWidth + 1)
   expect(pillFit.scrollHeight).toBeLessThanOrEqual(pillFit.clientHeight + 1)
 })
+
+function registerMemberLogin(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: {
+      success: true,
+      data: { token: 's15c3-member-token', user: { id: 'member-s15c3', phoneMasked: '138****8000', nickname: '打印会员' } },
+    },
+  })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+}
+
+async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === returnTo)
+}
+
+test('pending pickup without a print task opens my documents instead of a second claim entry @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone: '18369161921',
+        serviceHours: '工作日 9:00–18:00',
+        otherOnlineTerminalNearby: false,
+        miniappPublished: true,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/print-orders', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  api.respond('GET', '/api/v1/me/print-orders/timeline', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [{
+          kind: 'cloud_single',
+          orderId: 'ord-pending-1',
+          title: '简历.pdf',
+          itemCount: 1,
+          claimableHere: true,
+          createdAt: '2026-11-19T06:20:00.000Z',
+          billablePages: 2,
+          terminal: { displayName: 'KSK-001', locationLabel: '就业服务大厅' },
+        }],
+        nextCursor: null,
+        total: 1,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/documents', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  api.respond('GET', '/api/v1/me/documents/deleted', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  await expect(page.getByTestId('pending-pickup-list')).toBeVisible()
+  await expect(page.getByText('手机上下的到店单，到机器上输到机码取件')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '输到机码取件' })).toHaveCount(0)
+  const docs = page.getByRole('button', { name: '去我的文档，从已保存的文件里再选一份' })
+  await expect(docs).toBeVisible()
+  await docs.click()
+  await page.waitForURL('**/me/documents')
+})

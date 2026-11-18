@@ -1,6 +1,7 @@
 /**
- * 有待取单、还没有打印任务时，待取单块下面接「没有打印订单」空态的两张出路卡。
- * 小程序已发布才给「输到机码取件」；没发布时第二张与空态一样，去「我的文档」。
+ * 有待取单、还没有打印任务时，待取单块下面接两张出路卡。
+ * 第二张与「已有打印任务」时一样，去「我的文档」，不再和上面那行重复「输到机码取件」。
+ * 小程序未发布时第二张仍是「看看我的文档」。
  */
 
 export interface PendingPickupExitCard {
@@ -9,7 +10,7 @@ export interface PendingPickupExitCard {
   to: '/print-scan' | '/print/pickup-claim' | '/me/documents'
   art: 'usb' | 'phone' | 'stack'
   artWidth: number
-  /** 与空态一致：去打印、输到机码取件受执照收口；看看我的文档不受。 */
+  /** 去打印受执照收口。去我的文档、看看我的文档不受。 */
   locked: boolean
 }
 
@@ -29,12 +30,12 @@ export function pendingPickupExitCards(input: {
   }
   const second: PendingPickupExitCard = input.miniOn
     ? {
-        title: '输到机码取件',
-        desc: '手机上下的到店单，到机器上输入到机码',
-        to: '/print/pickup-claim',
-        art: 'phone',
-        artWidth: 96,
-        locked: true,
+        title: '去我的文档',
+        desc: '从已保存的文件里再选一份',
+        to: '/me/documents',
+        art: 'stack',
+        artWidth: 110,
+        locked: false,
       }
     : {
         title: '看看我的文档',

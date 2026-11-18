@@ -180,11 +180,14 @@ test('我的打印订单复用取件时间线，不另造接口', () => {
   assert.doesNotMatch(`${page}\n${section}`, /工作人员/)
 })
 
-test('有待取单、没有打印任务时，待取单块下面接去打印和输到机码取件', async () => {
+test('有待取单、没有打印任务时，待取单块下面接去打印和去我的文档', async () => {
   const exits = await import(transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/pendingPickupExits.ts')))
   const cards = exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'rows', miniOn: true })
-  assert.deepEqual(cards.map((card) => card.title), ['去打印', '输到机码取件'])
-  assert.deepEqual(cards.map((card) => card.to), ['/print-scan', '/print/pickup-claim'])
+  assert.deepEqual(cards.map((card) => card.title), ['去打印', '去我的文档'])
+  assert.deepEqual(cards.map((card) => card.to), ['/print-scan', '/me/documents'])
+  assert.equal(cards[1].desc, '从已保存的文件里再选一份')
+  assert.equal(cards[1].locked, false)
+  assert.equal(cards[1].art, 'stack')
   assert.equal(exits.pendingPickupExitCards({ printTaskCount: 2, presence: 'rows', miniOn: true }).length, 0, '已有打印任务不再接空态出路卡')
   assert.equal(exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'hidden', miniOn: true }).length, 0)
   assert.equal(exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'error', miniOn: true }).length, 0)
