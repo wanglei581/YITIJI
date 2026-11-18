@@ -53,9 +53,12 @@ export interface ContractMaskResult {
    * 为什么需要它：简历优化 / 排版调整的产物是**用户要打印的那份简历**，
    * 里面的姓名 / 手机 / 邮箱必须是真值。只遮盖不还原，等于把
    * `[手机号_1]` 印到用户简历上 —— 那是拿功能损坏换合规，不可接受。
-   * 占位符按 `[类别_序号]` 全局去重编号，因此还原是无歧义的 1:1 映射。
+   * 占位符按 `[类别_序号]` 全局去重编号。同一个号码的不同写法共用一个占位符，
+   * restoreMap 只留第一次出现的原文，给「单个占位符还原成哪一版」用。
+   * restoreOccurrences 按出现顺序记下每一处自己的原文。
    */
   readonly restoreMap?: ReadonlyMap<string, string>
+  readonly restoreOccurrences?: ReadonlyMap<string, readonly string[]>
 }
 
 type MaskCategory = LlmMaskPlaceholderCategory
@@ -326,15 +329,18 @@ export function maskContractPages(pages: readonly ContractMaskPage[], options?: 
   })
   // 占位符 → 原文串。仅在内存内用于还原（见 ContractMaskResult.restoreMap 的红线注释）。
   const restoreMap = new Map<string, string>()
+  const restoreOccurrences = new Map<string, string[]>()
   const maskedPages = pagePlans.map(({ page, replacements, projectedLength }) => {
     const chunks: string[] = []
     let cursor = 0
     for (const replacement of replacements) {
       chunks.push(page.text.slice(cursor, replacement.start), replacement.placeholder)
-      // 同一占位符可能命中多处（不同书写形式归一到同一 key）；只记首次出现的原文串。
-      if (!restoreMap.has(replacement.placeholder)) {
-        restoreMap.set(replacement.placeholder, page.text.slice(replacement.start, replacement.end))
-      }
+      // 同一占位符会命中多处。每一处都记下自己的原文；对照表仍只留第一次，单个占位符的还原不变。
+      const slice = page.text.slice(replacement.start, replacement.end)
+      const seen = restoreOccurrences.get(replacement.placeholder)
+      if (seen) seen.push(slice)
+      else restoreOccurrences.set(replacement.placeholder, [slice])
+      if (!restoreMap.has(replacement.placeholder)) restoreMap.set(replacement.placeholder, slice)
       cursor = replacement.end
     }
     chunks.push(page.text.slice(cursor))
@@ -345,7 +351,7 @@ export function maskContractPages(pages: readonly ContractMaskPage[], options?: 
   if (options?.assertComplete !== false) assertNoHighConfidencePii(maskedPages)
   // 默认不带 restoreMap：键集保持 ['pages','partyFacts']，合同链路行为逐字不变。
   return options?.collectRestoreMap === true
-    ? Object.freeze({ pages: Object.freeze(maskedPages), partyFacts, restoreMap })
+    ? Object.freeze({ pages: Object.freeze(maskedPages), partyFacts, restoreMap, restoreOccurrences })
     : Object.freeze({ pages: Object.freeze(maskedPages), partyFacts })
 }
 

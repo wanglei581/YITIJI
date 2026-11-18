@@ -108,9 +108,12 @@ function rewriteEngineTokens(
   text: string,
   engineRestore: (value: string) => string,
   book: LayoutDigitBook,
+  occurrences: Map<string, string[]>,
 ): string {
   return text.replace(llmMaskPlaceholderPattern('gu'), (token) => {
-    const secret = engineRestore(token)
+    const queue = occurrences.get(token)
+    const queued = queue && queue.length > 0 ? queue.shift() : undefined
+    const secret = queued ?? engineRestore(token)
     if (secret === token) return token
     return book.issue(secret)
   })
@@ -179,8 +182,10 @@ export function maskLayoutAdjustOutbound(input: {
   ]
   if (glued.some((text) => text.length > LLM_MASK_INPUT_LIMIT)) tooLong()
   const masked = maskUserTextsForLlmReversible(glued, 'resume_layout_adjust')
+  const occurrences = new Map<string, string[]>()
+  for (const [token, list] of masked.occurrences) occurrences.set(token, [...list])
   const cover = (text: string) => coverRealisticNumbers(
-    rewriteEngineTokens(stripExact(text, glue), masked.restore, book),
+    rewriteEngineTokens(stripExact(text, glue), masked.restore, book, occurrences),
     book,
   )
   const [engineOriginal = '', engineValues = '', engineJson = ''] = masked.texts

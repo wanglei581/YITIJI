@@ -113,6 +113,7 @@ function main(): void {
   assertCovered('全角句点分段的手机号', '138\uFF0E0013\uFF0E8000', phone)
   assertCovered('括号包住区号的固话', '(010) 88888888', '01088888888')
   assertCovered('括号包住手机号前三段', '(138) 0013-8000', phone)
+  assertCovered('同号两种写法各自还原', '先138-0013-8000再138 0013 8000', phone)
   assertCovered('全角括号包住区号的固话', '（010）88888888', '01088888888')
 
   assertCovered(
