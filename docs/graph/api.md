@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`662` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`665` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -176,6 +176,14 @@
 | PUT | `/api/v1/admin/ai-config/:featureKey` | AiConfigController.updateOne | admin | LlmConfigService | — |
 | POST | `/api/v1/admin/ai-config/:featureKey/test` | AiConfigController.testOne | admin | LlmChatService<br/>LlmConfigService | AiServiceLog<br/>PolicyPost |
 | POST | `/api/v1/admin/ai-config/test` | AiConfigController.test | admin | LlmChatService<br/>LlmConfigService | AiServiceLog<br/>PolicyPost |
+
+## `services/api/src/ai/quota/admin-ai-quota-limit.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/ai/quota-limits` | AdminAiQuotaLimitController.get | admin | AiQuotaLimitService | AuditLog |
+| PUT | `/api/v1/admin/ai/quota-limits` | AdminAiQuotaLimitController.update | admin | AiQuotaLimitService | AuditLog |
+| POST | `/api/v1/admin/ai/quota-limits/reset` | AdminAiQuotaLimitController.reset | admin | AiQuotaLimitService | AuditLog |
 
 ## `services/api/src/ai/quota/ai-quota.controller.ts`
 
