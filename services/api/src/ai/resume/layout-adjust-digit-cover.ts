@@ -4,7 +4,7 @@
  * 检测前先把全角数字、全角 X 折成半角，占位符里存的仍是原文，还原才能逐字对上。
  * 数字段之间可以隔空格、制表符、各种短横和点、零宽字符，也可以把一段用括号包住。
  * 连续多个空格、空格包住的短横，同样把两边接成一串。合计达到 11 位的按一整串遮。
- * 简历 JSON 再按字段对齐：相邻字符串值拼起来够 11 位的，各换成自己的占位符。
+ * 简历 JSON 再按字段对齐：相邻字符串值或数值拼起来够 11 位的，各换成自己的占位符。
  * 占位符是本次请求的标记，用户原文里写不出同样的一串。
  * 年月日期轴不是号码，原样留下，排版还要看见时间。
  */
@@ -159,11 +159,12 @@ export function coverRealisticNumbers(text: string, book: LayoutDigitBook): stri
  * 取舍：顺着原文扫字符串值，不把整段 JSON 去掉标点再拼。
  * 去掉标点会把键名和不相邻的数字也接上，还原做不到逐字。
  * 键名跳过。带反斜杠转义的值、普通文字、日期轴都断开，不参与拼接。
+ * 数值字段按它写在 JSON 里的数字参加拼接，不重新序列化。
  * 每一段都是纯数字的年、年月或年月日时不接。
  * 命中的每个字段换成自己的占位符，里面存该字段原文。
  */
 export function coverAdjacentJsonValues(json: string, book: LayoutDigitBook): string {
-  const literals = scanJsonStringLiterals(json)
+  const literals = scanJsonAtoms(json)
   const spans: Array<[number, number]> = []
   let run: Array<(typeof literals)[number]> = []
   const flush = (): void => {
@@ -181,6 +182,10 @@ export function coverAdjacentJsonValues(json: string, book: LayoutDigitBook): st
   }
   for (const literal of literals) {
     if (literal.isKey) continue
+    if (literal.breaksRun) {
+      flush()
+      continue
+    }
     const inner = json.slice(literal.innerStart, literal.innerEnd)
     if (literal.hasEscape || !isJoinableNumber(inner)) {
       flush()
@@ -192,44 +197,98 @@ export function coverAdjacentJsonValues(json: string, book: LayoutDigitBook): st
   return replaceSpans(json, spans, book)
 }
 
-function scanJsonStringLiterals(json: string): Array<{
+function scanJsonAtoms(json: string): Array<{
   innerStart: number
   innerEnd: number
   hasEscape: boolean
   isKey: boolean
+  breaksRun: boolean
 }> {
-  const literals: Array<{ innerStart: number; innerEnd: number; hasEscape: boolean; isKey: boolean }> = []
+  const literals: Array<{
+    innerStart: number
+    innerEnd: number
+    hasEscape: boolean
+    isKey: boolean
+    breaksRun: boolean
+  }> = []
   let index = 0
   while (index < json.length) {
-    if (json[index] !== '"') {
-      index += 1
+    const char = json[index] ?? ''
+    if (char === '⦃') {
+      const close = json.indexOf('⦄', index + 1)
+      index = close < 0 ? json.length : close + 1
       continue
     }
-    const innerStart = index + 1
-    index += 1
-    let hasEscape = false
-    let closed = false
-    while (index < json.length) {
-      const char = json[index] ?? ''
-      if (char === '\\') {
-        hasEscape = true
-        index += 2
+    if (char === '"') {
+      const innerStart = index + 1
+      index += 1
+      let hasEscape = false
+      let closed = false
+      while (index < json.length) {
+        const inner = json[index] ?? ''
+        if (inner === '\\') {
+          hasEscape = true
+          index += 2
+          continue
+        }
+        if (inner === '"') {
+          closed = true
+          break
+        }
+        index += 1
+      }
+      if (!closed) break
+      const innerEnd = index
+      index += 1
+      let look = index
+      while (look < json.length && isJsonWhitespace(json[look] ?? '')) look += 1
+      literals.push({ innerStart, innerEnd, hasEscape, isKey: json[look] === ':', breaksRun: false })
+      continue
+    }
+    if (char === '-' && isJsonNumberStart(json, index) && isDigit(json[index + 1] ?? '')) {
+      index = skipJsonNumber(json, index + 1)
+      literals.push({ innerStart: index, innerEnd: index, hasEscape: false, isKey: false, breaksRun: true })
+      continue
+    }
+    if (isDigit(char) && isJsonNumberStart(json, index)) {
+      const innerStart = index
+      while (index < json.length && isDigit(json[index] ?? '')) index += 1
+      const next = json[index] ?? ''
+      if (next === '.' || next === 'e' || next === 'E') {
+        index = skipJsonNumber(json, innerStart)
+        literals.push({ innerStart, innerEnd: innerStart, hasEscape: false, isKey: false, breaksRun: true })
         continue
       }
-      if (char === '"') {
-        closed = true
-        break
-      }
-      index += 1
+      literals.push({ innerStart, innerEnd: index, hasEscape: false, isKey: false, breaksRun: false })
+      continue
     }
-    if (!closed) break
-    const innerEnd = index
     index += 1
-    let look = index
-    while (look < json.length && isJsonWhitespace(json[look] ?? '')) look += 1
-    literals.push({ innerStart, innerEnd, hasEscape, isKey: json[look] === ':' })
   }
   return literals
+}
+
+/** 数值只认写在值位置上的。占位符和键名里的数字不参加拼接。 */
+function isJsonNumberStart(json: string, index: number): boolean {
+  let look = index - 1
+  while (look >= 0 && isJsonWhitespace(json[look] ?? '')) look -= 1
+  if (look < 0) return true
+  const prev = json[look] ?? ''
+  return prev === ':' || prev === ',' || prev === '['
+}
+
+function skipJsonNumber(json: string, index: number): number {
+  if (json[index] === '-') index += 1
+  while (index < json.length && isDigit(json[index] ?? '')) index += 1
+  if (json[index] === '.') {
+    index += 1
+    while (index < json.length && isDigit(json[index] ?? '')) index += 1
+  }
+  if (json[index] === 'e' || json[index] === 'E') {
+    index += 1
+    if (json[index] === '+' || json[index] === '-') index += 1
+    while (index < json.length && isDigit(json[index] ?? '')) index += 1
+  }
+  return index
 }
 
 function isJsonWhitespace(char: string): boolean {

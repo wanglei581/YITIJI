@@ -133,10 +133,34 @@ function main(): void {
     phone,
     '{"head":"138-0013","tail":"8000"}',
   )
+  assertCovered(
+    '手机号拆成两个数值字段',
+    '字段说明',
+    '13888888888',
+    '{"mobilePrefix":138,"mobileSuffix":88888888}',
+  )
+  assertCovered(
+    '银行卡拆成两个数值字段',
+    '字段说明',
+    '6222021234567890',
+    '{"cardBin":622202,"cardTail":1234567890}',
+  )
+  assertCanonicalJsonCovered(
+    '数值字段带空格',
+    '{"mobilePrefix": 138, "mobileSuffix": 88888888}',
+    '13888888888',
+  )
+  assertCovered(
+    '嵌套对象里的数值字段',
+    '字段说明',
+    '13888888888',
+    '{"contact":{"mobilePrefix":138,"mobileSuffix":88888888}}',
+  )
 
   assertUntouched('年月日期轴', '2015.09-2019.06')
   assertUntouched('破折号日期轴', '2020.07—2024.06')
   assertJsonKept('纯数字年月不拼', '{"start":"201509","end":"201906"}', '201509')
+  assertJsonKept('纯数字年月数值不拼', '{"start":201509,"end":201906}', '201509')
   assertJsonKept('点开的年月不拼', '{"from":"2015.09","to":"2019.06"}', '2015.09')
   assertJsonKept('中间夹了文字就断开', '{"mobilePrefix":"138","note":"备注","mobileBody":"00138000"}', '138')
 
@@ -220,6 +244,23 @@ function assertTruncationHoleDoesNotCrossWire(): void {
   }
   if (recoverableDigits(out.maskedOriginal).includes(dropped)) fail('截断空洞 出站原文还能拼出丢掉的号码')
   pass('截断后占位符不串号')
+}
+
+/**
+ * 粘连拆分会把简历 JSON 重新序列化，无意义空白本来就不保留。
+ * 这里对重新序列化之后的正文要求：拼不出原号码，还原与那一版逐字一致。
+ */
+function assertCanonicalJsonCovered(label: string, json: string, secretDigits: string): void {
+  const canonical = JSON.stringify(JSON.parse(json))
+  const out = maskLayoutAdjustOutbound({
+    originalText: '说明结束',
+    resumeValues: '说明',
+    resumeJson: json,
+    maxOriginalChars: 800,
+  })
+  if (recoverableDigits(out.maskedResumeJson).includes(secretDigits)) fail(`${label} 简历JSON 还能拼出原号码`)
+  if (out.restore(out.maskedResumeJson) !== canonical) fail(`${label} 简历JSON 还原后与重新序列化的原文不一致`)
+  pass(label)
 }
 
 function assertJsonKept(label: string, json: string, visible: string): void {
