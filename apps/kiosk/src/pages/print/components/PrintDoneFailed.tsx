@@ -104,6 +104,7 @@ const TESTID_BY_VARIANT: Record<FailureVariant, string> = {
   failed: 'print-fulfill-state-failed',
   'paper-jam': 'print-fulfill-state-paper-jam',
   'out-of-paper': 'print-fulfill-state-out-of-paper',
+  offline: 'print-fulfill-state-offline',
 }
 
 /** 带走链接过期时的一句话（标准求助句由调用方拼进 expiredLine）。 */

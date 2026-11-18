@@ -19,7 +19,7 @@
 // ============================================================
 
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
-import { printProblemLine } from '../../copy/unattendedCopy'
+import { machineCannotPrintLine, preferUnattended, printProblemLine, type PublicSupportContact } from '../../copy/unattendedCopy'
 import type { BackendJobStatus } from '../../services/print/printJobsApi'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
@@ -233,9 +233,9 @@ export const FAIL_REASONS = [
 const ERROR_CODE_MESSAGES: Record<string, string> = {
   DOWNLOAD_HASH_MISMATCH: '文件校验未通过（上传可能中断或文件已变化），请返回重新上传后再打印',
   PRINTER_NOT_FOUND: `未找到打印机。${printProblemLine()}`,
-  PRINTER_OFFLINE: `打印机离线，请稍后重试。${printProblemLine()}`,
-  PAPER_EMPTY: `打印机缺纸，当前无法打印。${printProblemLine()}`,
-  PRINTER_ERROR: `打印机可能卡纸或发生设备故障，当前暂时无法继续使用。${printProblemLine()}`,
+  PRINTER_OFFLINE: '打印机离线，请稍后重试。',
+  PAPER_EMPTY: '打印机缺纸，当前无法打印。',
+  PRINTER_ERROR: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。',
   PRINT_JOB_UNCONFIRMED: `打印作业已提交到打印队列，但未确认完成。请先看纸张、卡纸和出纸口。${printProblemLine()}`,
   PRINT_TIMEOUT: '打印超时，请稍后重试',
   PRINT_QUEUE_TIMEOUT: '这单等了太久没有打印，没有出纸，可以重新提交打印。',
@@ -250,11 +250,12 @@ export function errorCodeToMessage(code?: string): string | undefined {
 
 /**
  * 进度页和失败页要显示对照表里的句子。
- * 排队超时、离线、缺纸、卡纸优先用对照表（具体原因加下一步），不用接口带回的 failureReasonForUser。
- * 接口那三句若仍写着找人，无人值守会整句换成下一步，屏幕上看不出是哪一种故障。
+ * 排队超时、离线、缺纸、卡纸优先用对照表，不用接口带回的 failureReasonForUser。
+ * 接口那三句若仍写着找人，整句换成笼统下一步就看不出是哪一种故障。
  * 其它错误码仍先用接口文案，对照表只在接口没给句子时补上。
  */
 const SCREEN_REASON_CODES = new Set(['PRINT_QUEUE_TIMEOUT', 'PRINTER_OFFLINE', 'PAPER_EMPTY', 'PRINTER_ERROR'])
+const FAULT_SCREEN_CODES = new Set(['PRINTER_OFFLINE', 'PAPER_EMPTY', 'PRINTER_ERROR'])
 
 export function screenFailureReason(input: {
   errorCode?: string | null
@@ -266,6 +267,27 @@ export function screenFailureReason(input: {
   const fromApi = input.failureReasonForUser?.trim()
   if (fromApi) return fromApi
   return input.errorCode ? ERROR_CODE_MESSAGES[input.errorCode] : undefined
+}
+
+/**
+ * 失败页实际念的那句。
+ * 缺纸、卡纸、离线：对照表的原因加上「这台机器暂时打不了」的下一步（换一台或稍后再来；小程序已发布才补手机上能看到）。
+ * 不把这三句整段换成「打印有问题」。
+ * 其它错误码仍走无人值守兜底：原话叫人去现场才换成「打印有问题」，否则留下原话。
+ */
+export function presentScreenFailure(
+  input: {
+    errorCode?: string | null
+    failureReasonForUser?: string | null
+  },
+  contact?: PublicSupportContact | null,
+): string {
+  const code = input.errorCode ?? ''
+  if (FAULT_SCREEN_CODES.has(code)) {
+    const base = ERROR_CODE_MESSAGES[code] ?? ''
+    return `${base}${machineCannotPrintLine(contact, { orderKept: true })}`
+  }
+  return preferUnattended((input.failureReasonForUser ?? '').trim(), printProblemLine(contact))
 }
 
 export const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)

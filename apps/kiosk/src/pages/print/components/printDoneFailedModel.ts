@@ -16,7 +16,7 @@ import { truncateFileNameMiddle, FILE_NAME_BUDGET_CARD } from '../../../lib/file
 import { formatCents } from '../cashierStatus'
 import { jamOrderKeptLine, jobSubline, outOfPaperPill, sameCodeResumeLine, type OutOfPaperMoney } from '../printProgressModel'
 
-export type FailureVariant = 'failed' | 'paper-jam' | 'out-of-paper'
+export type FailureVariant = 'failed' | 'paper-jam' | 'out-of-paper' | 'offline'
 
 export interface FailureStep {
   title: string
@@ -114,6 +114,27 @@ export function failureCopy(input: {
         { title: `记下${orderRef}`, detail: machineCannotPrintLine(undefined, { orderKept: true }) },
       ],
       fine: PAPER_HELP_FINE,
+      resumeLine,
+    }
+  }
+
+  if (variant === 'offline') {
+    const machine = machineCannotPrintLine(undefined, { orderKept: true })
+    return {
+      title: '打印机离线',
+      subtitle: '打印机离线，请稍后重试。',
+      pill: `${paidLabelOf(money)} · 打印机离线`,
+      stepsLabel: STEPS_LABEL,
+      steps: [
+        LOOK_AT_TRAY,
+        paid
+          ? { title: '订单和支付记录都在', detail: '是否处理费用、处理多少，以订单记录为准；本机不会自动处理费用。' }
+          : { title: '你的订单还在', detail: '是否补打，以订单记录为准。' },
+        canRetry
+          ? retryStep(money)
+          : { title: `记下${orderRef}`, detail: machine },
+      ],
+      fine: `${paid ? '订单和支付记录保留着' : '订单记录保留着'}，不会因为这次失败消失。`,
       resumeLine,
     }
   }
@@ -271,9 +292,13 @@ export function retryBlockedReason(device: {
   const tail = '机器恢复后，这个按钮会自己亮起；订单还在，请不要重新下单。'
   if (device.kind === 'offline') return `这台机器的打印机现在离线，暂时不能重新提交。${tail}`
   if (device.kind === 'error') {
-    return device.printer.errorCode === 'paperEmpty'
-      ? `打印机现在还缺纸，暂时不能重新提交。${tail}`
-      : `打印机现在还有故障，暂时不能重新提交。${tail}`
+    if (device.printer.errorCode === 'paperEmpty') {
+      return `打印机现在还缺纸，暂时不能重新提交。${tail}`
+    }
+    if (device.printer.errorCode === 'paperJam') {
+      return `打印机现在还卡着纸，暂时不能重新提交。${tail}`
+    }
+    return `打印机现在还有故障，暂时不能重新提交。${tail}`
   }
   return `暂时读不到打印机状态，先不能重新提交。${tail}`
 }

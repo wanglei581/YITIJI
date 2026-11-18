@@ -31,7 +31,7 @@ import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, retryBlockedR
 import { CONTACT_ENTRY_LABEL, PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintDoneRecordSection } from './components/PrintDoneSections'
-import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, publicOrderNo, reprintHint, screenFailureReason, type OutOfPaperMoney } from './printProgressModel'
+import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, presentScreenFailure, publicOrderNo, reprintHint, screenFailureReason, type OutOfPaperMoney } from './printProgressModel'
 import './styles/print-fulfill-qx.css'
 import './styles/print-done-touch.css'
 
@@ -131,10 +131,11 @@ function interpretStatus(taskId: string, result: PrintJobStatusResult): { kind: 
   return { kind: 'settled', value: { taskId, result: 'unknown' } }
 }
 
-function failVisual(errorCode?: string): 'paper-jam' | 'out-of-paper' | 'result-unconfirmed' | 'failed' {
+function failVisual(errorCode?: string): 'paper-jam' | 'out-of-paper' | 'offline' | 'result-unconfirmed' | 'failed' {
   if (errorCode === PRINT_JOB_UNCONFIRMED) return 'result-unconfirmed'
   if (errorCode === 'PAPER_EMPTY') return 'out-of-paper'
   if (errorCode === 'PRINTER_ERROR') return 'paper-jam'
+  if (errorCode === 'PRINTER_OFFLINE') return 'offline'
   return 'failed'
 }
 
@@ -166,7 +167,10 @@ export function PrintDonePage() {
       ? verification.result
       : 'loading'
   const failureReason = verification?.taskId === taskId
-    ? preferUnattended(verification.failureReason ?? '', problem)
+    ? presentScreenFailure({
+      errorCode: verification.errorCode,
+      failureReasonForUser: verification.failureReason,
+    }, support)
     : problem
   const isUnconfirmed =
     verification?.taskId === taskId && verification.errorCode === PRINT_JOB_UNCONFIRMED
@@ -528,7 +532,7 @@ export function PrintDonePage() {
     }
 
     // 普通失败、卡纸、缺纸三态共用一块版式（PrintDoneFailed）。收款事实：缺纸页优先用服务端回执，其余按进页时带来的金额。
-    const variant: FailureVariant = visual === 'out-of-paper' ? 'out-of-paper' : visual === 'paper-jam' ? 'paper-jam' : 'failed'
+    const variant: FailureVariant = visual === 'out-of-paper' ? 'out-of-paper' : visual === 'paper-jam' ? 'paper-jam' : visual === 'offline' ? 'offline' : 'failed'
     const money: OutOfPaperMoney = variant === 'out-of-paper'
       ? outOfPaperMoneyOf(takeaway, amountCents)
       : { fact: paymentFactOf(amountCents), amountCents }

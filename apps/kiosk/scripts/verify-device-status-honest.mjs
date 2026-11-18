@@ -98,6 +98,10 @@ if (defaultIdx < 0) {
 expectMatches(hookSrc, /tonerKnown:\s*false/, 'hook 声明 tonerKnown=false（Agent 未上报耗材）')
 expectMatches(hookSrc, /网络正常/, 'hook 含「网络正常」文案（仅 API 可达时）')
 expectMatches(hookSrc, /状态未知/, 'hook 含「状态未知」文案')
+expectMatches(hookSrc, /case 'paper_jam':/, '卡纸单独成一档，不并进打印机异常')
+expectMatches(hookSrc, /printerLabel: '打印机卡纸'/, '卡纸状态行写「打印机卡纸」')
+expectMatches(hookSrc, /errorCode: 'paperJam'/, '卡纸错误码是 paperJam')
+expectMatches(hookSrc, /printerLabel: '打印机异常'/, '没有卡纸证据时仍写「打印机异常」')
 
 // 打印闸门合上：两个心跳值各走自己的 case，不掉进 default（default 是「状态未知」，入口不会停）。
 // 说明用无人值守标准句 3（copy/unattendedCopy.ts 的 machineUnusableLine，覆盖「暂停接单」），不写死，也不把人引向现场。

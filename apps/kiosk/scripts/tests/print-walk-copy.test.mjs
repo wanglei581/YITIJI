@@ -555,6 +555,45 @@ test('普通失败三步：免费与金额未知不提已付，收费单保留�
 // ── 走查 I-11（2026-10-29）：缺纸 / 卡纸 / 结果未确认三屏，现场没人加纸、没人处理 ──
 const contactEntry = await import(transpile(join(kioskRoot, 'src/pages/print/components/printContactEntry.ts')))
 
+test('离线失败屏用离线标题和稍后再来，不叫人找工作人员', () => {
+  const copy = failedModel.failureCopy({ variant: 'offline', money: { fact: 'free', amountCents: 0 }, orderNo: 'ORD-20261118-OFF', canRetry: false })
+  assert.equal(copy.title, '打印机离线')
+  assert.match(copy.subtitle, /打印机离线，请稍后重试/)
+  assert.match(copy.steps[2].detail, /请稍后再来/)
+  assert.match(copy.steps[2].detail, /这台机器暂时打不了/)
+  assert.doesNotMatch(copyText(copy), /工作人员/)
+  assert.doesNotMatch(copyText(copy), /打印有问题/)
+})
+
+test('缺纸、卡纸、离线的失败句保留各自原因，并带下一步，不整句换成打印有问题', () => {
+  for (const [code, base] of [
+    ['PAPER_EMPTY', '打印机缺纸，当前无法打印。'],
+    ['PRINTER_ERROR', '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。'],
+    ['PRINTER_OFFLINE', '打印机离线，请稍后重试。'],
+  ]) {
+    const shown = progress.presentScreenFailure({
+      errorCode: code,
+      failureReasonForUser: `${base}请联系工作人员`,
+    })
+    assert.match(shown, new RegExp(base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    assert.match(shown, /请稍后再来/)
+    assert.match(shown, /这台机器暂时打不了/)
+    assert.doesNotMatch(shown, /工作人员/)
+    assert.doesNotMatch(shown, /打印有问题/)
+  }
+  const other = progress.presentScreenFailure({
+    errorCode: 'PRINT_COMMAND_FAILED',
+    failureReasonForUser: '请联系工作人员处理',
+  })
+  assert.match(other, /打印有问题/)
+  assert.doesNotMatch(other, /工作人员/)
+  const kept = progress.presentScreenFailure({
+    errorCode: 'PRINT_COMMAND_FAILED',
+    failureReasonForUser: '打印执行失败，请稍后重试。',
+  })
+  assert.equal(kept, '打印执行失败，请稍后重试。')
+})
+
 test('I-11 缺纸、卡纸的下一步不等人「加完纸」「处理好」，说清我们已收到提醒、请稍后再来', () => {
   const money = { fact: 'free', amountCents: 0 }
   const jam = failedModel.failureCopy({ variant: 'paper-jam', money, orderNo: 'ORD-20261029-JAM', canRetry: false })
@@ -608,6 +647,8 @@ test('I-11 重新提交打印：打印机现在不能出纸就给出原因，能
   assert.match(failedModel.retryBlockedReason(dev({ loading: true })), /正在确认/)
   assert.match(failedModel.retryBlockedReason(dev({ kind: 'offline' })), /离线/)
   assert.match(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'paperEmpty' } })), /缺纸/)
+  assert.match(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'paperJam' } })), /卡着纸/)
+  assert.doesNotMatch(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'paperJam' } })), /工作人员/)
   assert.match(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'hardwareError' } })), /故障/)
   assert.match(failedModel.retryBlockedReason(dev({ kind: 'unknown' })), /读不到打印机状态/)
   assert.equal(failedModel.retryBlockedReason(dev({ kind: 'error', printerNotice: '这台机器暂时不能用，请稍后再来' })), '这台机器暂时不能用，请稍后再来')

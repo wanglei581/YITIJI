@@ -158,7 +158,9 @@ test('paper-out, jam, and offline each show that reason plus the next step @kios
     const summary = page.getByTestId('print-fulfill-list')
     await expect(summary.getByText('设备上报', { exact: true })).toBeVisible()
     await expect(summary).toContainText(item.reason)
-    await expect(summary).toContainText('打印有问题？')
+    await expect(summary).toContainText('这台机器暂时打不了')
+    await expect(summary).toContainText('请稍后再来')
+    await expect(summary).not.toContainText('打印有问题？')
     await expect(summary).not.toContainText('工作人员')
     await expect(page.getByText(item.staff, { exact: true })).toHaveCount(0)
   }
