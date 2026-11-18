@@ -137,7 +137,10 @@ export function policyExcerptAbout(content: string): string {
 /** 阅读框大约能放 23 行，留一行，避免末行被裁。 */
 export const POLICY_READ_VISUAL_LINES = 22
 
-/** 按屏高翻。一行放不下就换页；比一整页还长的一行按字切开，不插入换行。 */
+/**
+ * 按屏高翻。一行放不下就换页；比一整页还长的一行按字切开，不插入换行。
+ * 同一页里的换行原样保留，包括开头空行和连续空行。空页字符串是假的，不能拿它判断前面有没有换行。
+ */
 export function policyExcerptPages(
   content: string,
   visualLinesPerPage = POLICY_READ_VISUAL_LINES,
@@ -148,10 +151,12 @@ export function policyExcerptPages(
   const pages: string[] = []
   let page = ''
   let used = 0
+  let started = false
   const flush = () => {
     pages.push(page)
     page = ''
     used = 0
+    started = false
   }
   for (const line of content.split('\n')) {
     const chars = Array.from(line)
@@ -162,9 +167,10 @@ export function policyExcerptPages(
     do {
       if (used >= budget) flush()
       const piece = chars.slice(index, index + (budget - used) * width).join('')
-      page += (page && first ? '\n' : '') + piece
+      page += (started && first ? '\n' : '') + piece
       used += Math.max(1, Math.ceil(Array.from(piece).length / width))
       index += Array.from(piece).length
+      started = true
       first = false
     } while (index < chars.length)
   }
