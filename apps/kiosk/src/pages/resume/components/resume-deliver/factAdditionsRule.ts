@@ -17,9 +17,10 @@
  * 中文数字和阿拉伯数字混在同一条单位链里（1万两千、3千五百万、2亿三千万、一万2千、一万2千5百、2亿三千五百万）。
  * 混写链的后一段中文必须以一到九或两开头，不收十开头。「3万十分」「1万十五」在万处断开，各自读。
  * 后段看开头单位，再看段内后面有没有万：亿后面要千开头且段内还有万（三千万、三千五百万、2千5百万），
- * 万后面要千开头且段内不再有万（两千、2千5百），千后面要百开头（五百、五百万、5百）。
- * 阿拉伯后段把后面每一段「一个数字加更小的单位」都吃完，末尾还可以再补一个万。
- * 「1000万一百」低了两级，不是一条链。逗号、顿号、句号（全角和半角）一律断开，不把标点从整串里拿掉。
+ * 万后面要千开头且段内不再有万（两千、2千5百），千后面要百开头（五百、五百万、5百），百后面要十开头（五十、5十）。
+ * 阿拉伯后段把后面每一段「一个数字加更小的单位」都吃完，十也算一级，末尾还可以再补一个万。
+ * 链收住之后，末段若是「一位一到九或两、再加十」，并且十后面没有紧跟数字或万、亿、千、百、十，仍算同一条；中间只隔着一段本来不接的数、最后仍落到这个十位，也算同一条。十后面紧跟这些字时并进同一条，读数和停在十的原文不同。
+ * 「1000万一百」「3千五十万」低了不止一级，不是一条链。逗号、顿号、句号（全角和半角）一律断开，不把标点从整串里拿掉。
  * 字段在空格或「多、余、来、几、左右」处结束、后面没有百千万亿时，仍按数值读。单字「十」后面隔着这些字或空格再接单位，同样整串读。
  * 职责词长的先占住区间，「独立负责」不再另报里面的「负责」。
  */
@@ -355,6 +356,12 @@ function readArabicUnitPlaces(text: string, index: number): number {
   return arabicUnitPlaces(text.charAt(index))
 }
 
+/** 混写链里的阿拉伯单位。十只在链内算一级，单独的「3十」仍不合成 30。 */
+function chainArabicUnitPlaces(text: string, index: number): number {
+  if (text.charAt(index) === '十' && !isNotUnitPhrase(text, index)) return 1
+  return readArabicUnitPlaces(text, index)
+}
+
 const HEDGE_WORDS = ['左右', '多', '余', '来', '几']
 
 function skipSpaces(text: string, index: number): number {
@@ -436,10 +443,6 @@ function consumeUncertainChain(text: string, from: number): number {
   return cursor
 }
 
-function isChainPunct(ch: string): boolean {
-  return ch === '，' || ch === ',' || ch === '、' || ch === '。' || ch === '.'
-}
-
 function unitCharPlaces(ch: string): number {
   if (ch === '十') return 1
   return arabicUnitPlaces(ch)
@@ -456,12 +459,13 @@ function trailingUnitPlaces(raw: string): number {
 
 /**
  * 后段是不是接得上前段末尾。first 是后段开头的单位，laterWan 表示段内后面还补了一个万。
- * 亿后面只接千万：千开头，而且段内后面有万。万后面只接千，段内不能再补万。千后面只接百。
+ * 亿后面只接千万：千开头，而且段内后面有万。万后面只接千，段内不能再补万。千后面只接百。百后面只接十，段内不能再补万。
  */
 function linkStepOk(first: number, laterWan: boolean, prevPlaces: number): boolean {
   if (prevPlaces === 8) return first === 3 && laterWan
   if (prevPlaces === 4) return first === 3 && !laterWan
   if (prevPlaces === 3) return first === 2
+  if (prevPlaces === 2) return first === 1 && !laterWan
   return false
 }
 
@@ -476,7 +480,7 @@ function chineseLinkShape(raw: string): { first: number; laterWan: boolean } | n
   if (index >= raw.length) return null
   const first = unitCharPlaces(raw.charAt(index))
   if (first <= 0) return null
-  return { first, laterWan: first < 4 && raw.indexOf('万', index + 1) !== -1 }
+  return { first, laterWan: raw.indexOf('万', index + 1) !== -1 }
 }
 
 /** 后段只收一到九或两开头。十开头的「十分」「十五」、零开头都不是混写链的后段。 */
@@ -502,7 +506,7 @@ function takeChineseLink(
   if (!hasUnit) return null
   if (lead === '十') return null
   const shape = chineseLinkShape(run.raw)
-  if (lead !== '十' && (!shape || !linkStepOk(shape.first, shape.laterWan, prevPlaces))) return null
+  if (!shape || !linkStepOk(shape.first, shape.laterWan, prevPlaces)) return null
   return { end: run.end, trailing: trailingUnitPlaces(run.raw) }
 }
 
@@ -516,20 +520,20 @@ function takeArabicLink(
   if (!matched) return null
   if (/[,，.．]/.test(matched[0])) return null
   let end = from + matched[0].length
-  const first = readArabicUnitPlaces(text, end)
+  const first = chainArabicUnitPlaces(text, end)
   if (first <= 0) return null
   end += 1
   let trailing = first
   let last = first
   while (isDigitChar(text.charAt(end)) && !isDigitChar(text.charAt(end + 1))) {
-    const smaller = readArabicUnitPlaces(text, end + 1)
+    const smaller = chainArabicUnitPlaces(text, end + 1)
     if (!(smaller > 0 && smaller < last)) break
     end += 2
     last = smaller
     trailing = smaller
   }
   let laterWan = false
-  if (first < 4 && readArabicUnitPlaces(text, end) === 4) {
+  if (chainArabicUnitPlaces(text, end) === 4) {
     laterWan = true
     trailing = 4
     end += 1
@@ -538,10 +542,63 @@ function takeArabicLink(
   return { end, trailing }
 }
 
+/** 「两十」「五十」这种末段十位。十开头的「十五」、段内再带万的「五十万」不是。 */
+function pureChineseTensEnd(text: string, from: number): number | null {
+  if (!mixedChineseLead(text.charAt(from))) return null
+  const run = readCnRun(text, from)
+  if (!run || run.raw.length !== 2 || run.raw.charAt(1) !== '十') return null
+  return run.end
+}
+
+/** 十后面紧跟的数字或单位。空字符串不是。这些字不能留在末段截断的外面。 */
+function tensTailContinues(text: string, index: number): boolean {
+  const ch = text.charAt(index)
+  if (ch === '') return false
+  if (isDigitChar(ch) || cnDigit(ch) !== null) return true
+  return '万亿千百十'.indexOf(ch) !== -1
+}
+
+/** 读数停在「十」且后面还紧着数字或单位时，把后面并进同一条。停在别的字上不动。 */
+function extendPastTensTail(text: string, cursor: number): number {
+  if (text.charAt(cursor - 1) !== '十') return cursor
+  let end = cursor
+  if (!tensTailContinues(text, end)) return end
+  while (tensTailContinues(text, end)) end += 1
+  return end
+}
+
+function pureArabicTensEnd(text: string, from: number): number | null {
+  if (!isDigitChar(text.charAt(from)) || isDigitChar(text.charAt(from + 1))) return null
+  if (text.charAt(from + 1) !== '十') return null
+  // 十后面紧跟数字或万、亿、千、百、十：不能在十这里截断。并进同一条，才和停在十的原文不同。
+  return extendPastTensTail(text, from + 2)
+}
+
+/** 不顾级差，只读一段。纯十位不算这段，留给末段规则。阿拉伯数字只吃「数字 + 一个单位」。 */
+function looseSegmentEnd(text: string, from: number, cn: boolean): number | null {
+  if (cn) {
+    if (!mixedChineseLead(text.charAt(from))) return null
+    const run = readCnRun(text, from)
+    if (!run || (run.raw.length === 2 && run.raw.charAt(1) === '十')) return null
+    for (let i = 0; i < run.raw.length; i += 1) {
+      if (cnSmall(run.raw.charAt(i)) !== null || cnBig(run.raw.charAt(i)) !== null) return run.end
+    }
+    return null
+  }
+  if (!isDigitChar(text.charAt(from))) return null
+  const matched = ARABIC_NUMBER.exec(text.slice(from))
+  if (!matched || /[,，.．]/.test(matched[0])) return null
+  const end = from + matched[0].length
+  if (chainArabicUnitPlaces(text, end) <= 0) return null
+  return end + 1
+}
+
 /**
  * 中文数字和阿拉伯数字混在同一条单位链里。
  * firstCn 表示下一段是中文数字。prevPlaces 是上一段末尾的单位。
  * 逗号、顿号、句号先断开，标点不进整串。
+ * 级差对不上时，末段仍可以是「一位数字加十」；也可以先隔一段本来不接的数，再落到这个十位。
+ * 十后面紧跟数字或万、亿、千、百、十时，这一段接着读进去，不在十这里截断。
  */
 function mixedUnitChainEnd(text: string, from: number, firstCn: boolean, prevPlaces: number): number | null {
   let cursor = from
@@ -549,13 +606,30 @@ function mixedUnitChainEnd(text: string, from: number, firstCn: boolean, prevPla
   let consumed = false
   let places = prevPlaces
   while (cursor < text.length) {
-    if (isChainPunct(text.charAt(cursor))) break
     const link = expectCn ? takeChineseLink(text, cursor, places) : takeArabicLink(text, cursor, places)
-    if (link === null) break
-    cursor = link.end
-    places = link.trailing
+    if (link !== null) {
+      cursor = extendPastTensTail(text, link.end)
+      places = link.trailing
+      consumed = true
+      expectCn = !expectCn
+      continue
+    }
+    if (expectCn) {
+      const tens = pureChineseTensEnd(text, cursor)
+      if (tens !== null) {
+        cursor = extendPastTensTail(text, tens)
+        places = 1
+        consumed = true
+        expectCn = !expectCn
+        continue
+      }
+    }
+    const loose = looseSegmentEnd(text, cursor, expectCn)
+    const tensAt = loose === null ? null : expectCn ? pureArabicTensEnd(text, loose) : pureChineseTensEnd(text, loose)
+    if (loose === null || tensAt === null) break
+    cursor = extendPastTensTail(text, tensAt)
+    places = 1
     consumed = true
-    expectCn = !expectCn
   }
   return consumed ? cursor : null
 }

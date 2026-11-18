@@ -65,6 +65,31 @@ function stripComments(text: string): string {
     .join('\n')
 }
 
+/** 包住 Prisma 模型方法，数托管关时有没有去查这些表。用完立刻还原。 */
+function instrumentModelReads(
+  prisma: PrismaService,
+  counts: Record<string, number>,
+): () => void {
+  const restores: Array<() => void> = []
+  for (const modelName of Object.keys(counts)) {
+    const model = (prisma as unknown as Record<string, Record<string, unknown>>)[modelName]
+    for (const method of ['count', 'findMany', 'findFirst', 'findUnique', 'aggregate', 'groupBy']) {
+      const original = model?.[method]
+      if (typeof original !== 'function') continue
+      model[method] = (...args: unknown[]) => {
+        counts[modelName] = (counts[modelName] ?? 0) + 1
+        return (original as (...inner: unknown[]) => unknown).apply(model, args)
+      }
+      restores.push(() => {
+        model[method] = original
+      })
+    }
+  }
+  return () => {
+    for (const restore of restores.reverse()) restore()
+  }
+}
+
 function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
   if (Array.isArray(value)) {
     for (const item of value) collectKeys(item, keys)
@@ -276,6 +301,8 @@ async function main(): Promise<void> {
       ],
     })
 
+    // 托管开：下面 3a–3p 是原来的全部断言，岗位、同步、企业和招聘会都有数。
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
     const a = await stats.getStats(orgA, 'week')
     const e = await stats.getStats(orgEmpty, 'week')
 
@@ -386,6 +413,79 @@ async function main(): Promise<void> {
       '3p. 数据模式标记为 live（真实库数据）',
       a.dataMode === 'live',
     )
+
+    // 托管关：同一份种子。岗位、招聘会、企业、数据源、同步日志清零；政策照常；字段名与开时一致。
+    // 桩计数证明这些表没被查（查了再把结果改成 0 也算红），政策两项照常查。
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+    const recruitmentReads = { job: 0, jobFair: 0, companyProfile: 0, jobSource: 0, syncLog: 0, policyPost: 0 }
+    const restoreReads = instrumentModelReads(prisma, recruitmentReads)
+    let closed: Awaited<ReturnType<PartnerStatsService['getStats']>>
+    try {
+      closed = await stats.getStats(orgA, 'week')
+    } finally {
+      restoreReads()
+    }
+    assert(
+      '3q0. 托管关：不查岗位、招聘会、企业、数据源、同步日志（桩计数为 0），政策查了 2 次',
+      recruitmentReads.job === 0
+        && recruitmentReads.jobFair === 0
+        && recruitmentReads.companyProfile === 0
+        && recruitmentReads.jobSource === 0
+        && recruitmentReads.syncLog === 0
+        && recruitmentReads.policyPost === 2,
+      JSON.stringify(recruitmentReads),
+    )
+    const openKeys = [...collectKeys(a)].sort()
+    const closedKeys = [...collectKeys(closed)].sort()
+    assert(
+      '3q. 托管关与托管开的响应字段名一致',
+      openKeys.join('\n') === closedKeys.join('\n'),
+      `开 ${openKeys.filter((key) => !closedKeys.includes(key)).join(',')} / 关 ${closedKeys.filter((key) => !openKeys.includes(key)).join(',')}`,
+    )
+    assert(
+      '3r. 托管关：在架岗位、招聘会、企业与启用数据源为 0',
+      closed.snapshot.publishedJobs === 0
+        && closed.snapshot.publishedFairs === 0
+        && closed.snapshot.publishedCompanies === 0
+        && closed.snapshot.activeSources === 0,
+      `jobs=${closed.snapshot.publishedJobs} fairs=${closed.snapshot.publishedFairs} companies=${closed.snapshot.publishedCompanies} sources=${closed.snapshot.activeSources}`,
+    )
+    assert(
+      '3s. 托管关：待审岗位、招聘会、企业为 0',
+      closed.snapshot.pendingReviewJobs === 0
+        && closed.snapshot.pendingReviewFairs === 0
+        && closed.snapshot.pendingReviewCompanies === 0,
+      `jobs=${closed.snapshot.pendingReviewJobs} fairs=${closed.snapshot.pendingReviewFairs} companies=${closed.snapshot.pendingReviewCompanies}`,
+    )
+    assert(
+      '3t. 托管关：同步批次、新增、失败、成功率的当期为 0，上期与环比为 null',
+      closed.sync.totalBatches.current === 0
+        && closed.sync.totalAdded.current === 0
+        && closed.sync.totalFailed.current === 0
+        && closed.sync.successRate.current === 0
+        && closed.sync.totalBatches.previous === null
+        && closed.sync.totalAdded.previous === null
+        && closed.sync.totalFailed.previous === null
+        && closed.sync.successRate.previous === null
+        && closed.sync.totalBatches.deltaPercent === null
+        && closed.statusDist.success === 0
+        && closed.statusDist.partial === 0
+        && closed.statusDist.failed === 0,
+      `batches=${closed.sync.totalBatches.current} added=${closed.sync.totalAdded.current}`,
+    )
+    assert(
+      '3u. 托管关：趋势仍是 7 个全 0 的桶，不是空数组',
+      closed.trend.length === 7 && closed.trend.every((bucket) => bucket.added === 0 && bucket.updated === 0 && bucket.failed === 0),
+      `长度 ${closed.trend.length}`,
+    )
+    assert(
+      '3v. 托管关：政策照常（在架与待审和托管开相同，待审政策为 1，待审总数只剩政策）',
+      closed.snapshot.publishedPolicies === a.snapshot.publishedPolicies
+        && closed.snapshot.pendingReviewPolicies === a.snapshot.pendingReviewPolicies
+        && a.snapshot.pendingReviewPolicies === 1
+        && closed.snapshot.pendingReview === 1,
+      `openPolicies=${a.snapshot.publishedPolicies}/${a.snapshot.pendingReviewPolicies} closedPolicies=${closed.snapshot.publishedPolicies}/${closed.snapshot.pendingReviewPolicies} pending=${closed.snapshot.pendingReview}`,
+    )
     // 3j/3k 的禁用键同样约束终端数据端点，另加机构、终端内部与单据字段
     await verifyTerminalOperations(assert, prisma, [
       ...fabricated, ...personal, 'orgId', 'terminalId', 'taskId', 'orderId', 'errorCode', 'printOutcome', 'id',
@@ -405,8 +505,7 @@ async function main(): Promise<void> {
   console.log('\n✅ verify:partner-stats-contract PASSED')
 }
 
-// 本机构统计与终端数据门禁固定验证托管 a；不启用招聘内容。
-process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+// 开、关两段都在 main 里显式赋值 RECRUITMENT_CONTENT_HOSTING_ENABLED。
 main().catch((error) => {
   console.error('\n❌ verify:partner-stats-contract 执行异常')
   console.error(error)

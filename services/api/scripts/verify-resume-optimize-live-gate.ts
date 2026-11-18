@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import ts from 'typescript'
+import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
 import { LIVE_SAMPLES, MAX_LLM_CALLS, PRIVATE_SENTENCE, createCallBudget, main } from './check-resume-optimize-live'
 
 export async function verifyResumeOptimizeLiveGate(): Promise<void> {
@@ -79,11 +80,46 @@ export async function verifyResumeOptimizeLiveGate(): Promise<void> {
         skills: ['整理数据'], certificates: [],
       }, modules: [] }) } }], usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
     }), { status: 200 })
-    assert.equal(await main({ config, fetch: nonemptySkill, write: (line) => lossLines.push(line) }), 1)
-    assert(lossLines[1]!.endsWith('结果:丢内容'), '某段条数少于原件必须丢内容并退出 1')
-    assert(lossLines[4]!.endsWith('结论:有丢失'))
+    // 模型只交回「整理数据」、其余段落是空的。经历和项目仍整段补回；技能少交的单行按原稿补回，不再算丢。
+    // 样例 2 因此技能条数不少于原件（多出来的是模型那一条），探针结论改为全部保留。
+    assert.equal(await main({ config, fetch: nonemptySkill, write: (line) => lossLines.push(line) }), 0)
+    assert(lossLines[1]!.endsWith('结果:通过'), '技能少交后按原稿补回，条数不得少于原件')
+    assert(lossLines[4]!.endsWith('结论:全部保留'))
   } finally {
     LIVE_SAMPLES[1]!.text = saved
+  }
+  const skillSaved = LIVE_SAMPLES[1]!.text
+  try {
+    const extraSkills = Array.from({ length: 60 }, (_, index) => `技能补项${String(index + 1).padStart(2, '0')}`)
+    const droppedSkill = extraSkills[59]!
+    LIVE_SAMPLES[1]!.text += `\n${extraSkills.join('\n')}`
+    const droppedLines: string[] = []
+    const emptyResume: typeof fetch = async () => new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({ resume: {
+        basic: {}, intention: {}, summary: '', education: [], experience: [], projects: [], skills: [], certificates: [],
+      }, modules: [] }) } }], usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
+    }), { status: 200 })
+    // 原有 1 项技能再加 60 项，共 61 项。对齐只留前 60 项，第 61 项从成品消失，必须判丢内容。
+    assert.equal(await main({ config, fetch: emptyResume, write: (line) => droppedLines.push(line) }), 1)
+    assert(droppedLines[1]!.endsWith('结果:丢内容'), '技能超过 60 项时必须判丢内容')
+    assert(droppedLines[4]!.endsWith('结论:有丢失'))
+    const previousFetch = globalThis.fetch
+    globalThis.fetch = emptyResume
+    try {
+      const inspected = await new LlmResumeOptimizeService(config).optimize(
+        LIVE_SAMPLES[1]!.text,
+        { sections: [], suggestions: [] } as never,
+      )
+      const blob = JSON.stringify(inspected.optimizedResume)
+      assert(blob.includes('Excel 资料整理'), '上限内的技能必须留下')
+      assert(!blob.includes(droppedSkill), '第 61 项技能必须从成品里消失')
+      assert(inspected.optimizedResume.skills.includes('Excel 资料整理'))
+      assert(!inspected.optimizedResume.skills.includes(droppedSkill))
+    } finally {
+      globalThis.fetch = previousFetch
+    }
+  } finally {
+    LIVE_SAMPLES[1]!.text = skillSaved
   }
   const faultLines: string[] = []
   assert.equal(await main({ config, fetch: async () => { throw new Error(PRIVATE_SENTENCE + marker) }, write: (line) => faultLines.push(line) }), 1)
