@@ -5,11 +5,12 @@
  *
  * 残留的长数字走兜底遮盖，不走失败关闭。合同断言会把简历里的日期轴误判成残留，
  * 这里若因 strict 为 false 就回 503，没有证件号的简历也会排不了版。
- * 兜底只认连续数字，占位符仍走同一套还原。
+ * 兜底先把全角数字折成半角，再认连续数字。占位符里存原文，还原仍逐字对上。
  */
 import { ServiceUnavailableException } from '@nestjs/common'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextsForLlmReversible } from '../../common/pii/llm-input-mask'
-import { LLM_MASK_LONG_DIGIT_CATEGORY, llmMaskPlaceholderPattern } from '../../common/pii/mask-placeholder'
+import { llmMaskPlaceholderPattern } from '../../common/pii/mask-placeholder'
+import { coverRealisticNumbers, createLongDigitBook } from './layout-adjust-digit-cover'
 
 export const AI_LAYOUT_ADJUST_TOO_LONG = 'AI_LAYOUT_ADJUST_TOO_LONG'
 export const AI_LAYOUT_ADJUST_TOO_LONG_MESSAGE =
@@ -39,7 +40,6 @@ export function separateGluedIdNumbers(text: string, breakWith = '\n'): string {
  * 这个字符不是数字也不是字母，序列化后还在，两段按各自的号类遮。
  */
 const GLUE_SENTINEL = '\uE000'
-const LONG_DIGIT_RUN = /\d{11,}[Xx]?/gu
 
 function separateGluedJsonStrings(json: string): string {
   if (!json) return json
@@ -65,18 +65,6 @@ function mapJsonStrings(value: unknown): unknown {
 
 function stripGlue(text: string): string {
   return text.split(GLUE_SENTINEL).join('')
-}
-
-/** 拆分没覆盖到的长数字。同一串在三段里共用一个占位符，还原才对得上。 */
-function maskLongDigitRuns(text: string, extra: Map<string, string>, byValue: Map<string, string>): string {
-  return text.replace(LONG_DIGIT_RUN, (hit) => {
-    const known = byValue.get(hit)
-    if (known) return known
-    const token = `[${LLM_MASK_LONG_DIGIT_CATEGORY}_${extra.size + 1}]`
-    extra.set(token, hit)
-    byValue.set(hit, token)
-    return token
-  })
 }
 
 function withLongDigits(
@@ -139,8 +127,8 @@ export function maskLayoutAdjustOutbound(input: {
     'resume_layout_adjust',
   )
   const extra = new Map<string, string>()
-  const byValue = new Map<string, string>()
-  const cover = (text: string) => maskLongDigitRuns(stripGlue(text), extra, byValue)
+  const book = createLongDigitBook(extra, new Map())
+  const cover = (text: string) => coverRealisticNumbers(stripGlue(text), book)
   const [maskedOriginal = '', maskedResumeValues = '', maskedResumeJson = ''] = masked.texts
   return {
     maskedOriginal: cutMaskedLayoutText(cover(maskedOriginal), input.maxOriginalChars),

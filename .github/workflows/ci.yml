@@ -546,6 +546,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:assistant-device-fault
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
           pnpm --filter @ai-job-print/api verify:mask-before-truncate
+          pnpm --filter @ai-job-print/api verify:layout-outbound-realistic
           pnpm --filter @ai-job-print/api verify:ai-feature-keys
           # 2026-09-03 新增：断言 shared 与 API 两侧 AI 类型契约一致，
           # 并钉住 ApiKeyChange 的封闭字段集（apiKey 审计铁律的第二道防线）。
@@ -1239,6 +1240,7 @@ jobs:
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
           pnpm --filter @ai-job-print/api verify:mask-before-truncate
+          pnpm --filter @ai-job-print/api verify:layout-outbound-realistic
           # 文件呈现真值门禁（页数识别 / A4 DPI 估算 / 上限文案）：计费页数走
           # PrintPageCountService，两个 job 都必须跑——PDF 解析回归会直接影响收费页数。
           pnpm --filter @ai-job-print/api verify:file-display-truth
