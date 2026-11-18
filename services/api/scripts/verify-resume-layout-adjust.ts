@@ -33,6 +33,7 @@ import { join } from 'path'
 import { validateSync } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
 import { Logger, ValidationPipe } from '@nestjs/common'
+import { layoutTokenPattern } from '../src/ai/resume/layout-adjust-digit-cover'
 import { LAYOUT_ADJUST_SYSTEM_PROMPT, LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
 import { ResumeLayoutAdjustController } from '../src/ai/resume-layout-adjust.controller'
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
@@ -347,7 +348,9 @@ async function main(): Promise<void> {
     // 9/10 守 #646：去程只出占位符、回程必须换回真值。任何一侧被摘掉都必须红。
     if (lastUserPrompt.includes(baseResume.basic.phone!)) fail('9. 出站 prompt 泄漏简历原始手机号')
     if (lastUserPrompt.includes(baseResume.basic.email!)) fail('9. 出站 prompt 泄漏简历原始邮箱')
-    if (!/\[手机号_\d+\]/u.test(lastUserPrompt) || !/\[邮箱_\d+\]/u.test(lastUserPrompt)) {
+    // 排版出站把引擎的 [手机号_N]、[邮箱_N] 换成这次请求的标记。号码仍不在，标记仍在。
+    const layoutTokens = new Set(lastUserPrompt.match(layoutTokenPattern('g')) ?? [])
+    if (layoutTokens.size < 2) {
       fail('9. 出站 prompt 未按可还原占位符形态遮盖联系方式')
     }
     pass('9. 去程：简历原始联系方式不出境，prompt 只含可还原占位符')
@@ -358,7 +361,9 @@ async function main(): Promise<void> {
     if (!result.warnings.some((w) => w.includes(baseResume.basic.phone!))) {
       fail('10. 模型文本中的占位符未被还原为真值')
     }
-    if (PLACEHOLDER_TOKEN.test(responseText)) fail('10. 产物残留遮盖占位符，用户会看到 [手机号_1] 这类文本')
+    if (PLACEHOLDER_TOKEN.test(responseText) || layoutTokenPattern().test(responseText)) {
+      fail('10. 产物残留遮盖占位符，用户会看到 [手机号_1] 这类文本')
+    }
     pass('10. 回程：占位符在服务端还原为真值，产物无占位符残留')
 
     // 2026-11-12：简介、描述、技能、证书不再先截再查。完整文字留下；单字段超过 24000 才截并写明。
