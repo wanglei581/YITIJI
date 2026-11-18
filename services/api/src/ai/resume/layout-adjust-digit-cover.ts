@@ -2,7 +2,8 @@
  * 排版出站兜底：引擎没认出的长数字，按现实写法再遮一层。
  *
  * 检测前先把全角数字、全角 X 折成半角，占位符里存的仍是原文，还原才能逐字对上。
- * 折完之后只认连续数字。分段、跨字段在后面的步骤里加，这里先不把分隔符吃进去。
+ * 数字段之间只隔一个空格、短横、点或零宽字符，且合计达到 11 位的，按一整串遮。
+ * 年月日期轴不是号码，原样留下，排版还要看见时间。
  */
 import { LLM_MASK_LONG_DIGIT_CATEGORY } from '../../common/pii/mask-placeholder'
 
@@ -11,7 +12,23 @@ export interface LayoutDigitBook {
   issue(original: string): string
 }
 
-const CONTINUOUS_DIGITS = /\d{11,}[Xx]?/gu
+/** 段与段之间只认这一个字符。两个空格、空格加短横，都不把两边接成一串。 */
+const SINGLE_SEPARATORS = new Set<string>([
+  ' ',
+  '\u00A0',
+  '\u3000',
+  '-',
+  '\uFF0D',
+  '.',
+  '\uFF0E',
+  '\u200B',
+  '\u200C',
+  '\u200D',
+  '\uFEFF',
+  '\u2060',
+])
+
+const DATE_AXIS = /^(?:19|20)\d{2}[.-](?:0[1-9]|1[0-2])(?:[.-](?:0[1-9]|[12]\d|3[01]))?(?:-(?:19|20)\d{2}[.-](?:0[1-9]|1[0-2])(?:[.-](?:0[1-9]|[12]\d|3[01]))?)*$/u
 
 export function foldDigits(text: string): string {
   let out = ''
@@ -41,13 +58,53 @@ export function createLongDigitBook(
   }
 }
 
-/** 把仍然露在外面的长数字换成可还原占位符。索引按折半角后的字符串，长度不变。 */
+function isDigit(char: string): boolean {
+  return char >= '0' && char <= '9'
+}
+
+/** 年月用点或短横连起来的日期轴。破折号不在分隔符里，到不了这里。 */
+function isDateAxis(foldedSpan: string): boolean {
+  const normalized = foldedSpan.replace(/．/gu, '.').replace(/－/gu, '-')
+  return DATE_AXIS.test(normalized)
+}
+
+/**
+ * 把仍然露在外面的长数字换成可还原占位符。
+ * 先折半角，长度不变，所以命中区间可以直接切回原文。
+ */
 export function coverRealisticNumbers(text: string, book: LayoutDigitBook): string {
   const folded = foldDigits(text)
   const spans: Array<[number, number]> = []
-  for (const match of folded.matchAll(CONTINUOUS_DIGITS)) {
-    const start = match.index ?? 0
-    spans.push([start, start + match[0].length])
+  let index = 0
+  while (index < folded.length) {
+    if (!isDigit(folded[index] ?? '')) {
+      index += 1
+      continue
+    }
+    const runStart = index
+    let digits = 0
+    while (index < folded.length && isDigit(folded[index] ?? '')) {
+      while (index < folded.length && isDigit(folded[index] ?? '')) {
+        digits += 1
+        index += 1
+      }
+      const separator = folded[index]
+      const next = folded[index + 1]
+      if (separator && next && SINGLE_SEPARATORS.has(separator) && isDigit(next)) {
+        index += 1
+        continue
+      }
+      break
+    }
+    let end = index
+    const tail = folded[end]
+    if ((tail === 'X' || tail === 'x') && end > runStart && isDigit(folded[end - 1] ?? '')) end += 1
+    let start = runStart
+    const before = text[runStart - 1]
+    const digitRun = folded.slice(runStart, end).replace(/\D/gu, '')
+    if ((before === '+' || before === '＋') && digitRun.startsWith('86')) start -= 1
+    if (digits >= 11 && !isDateAxis(folded.slice(runStart, end))) spans.push([start, end])
+    index = Math.max(index, end)
   }
   return replaceSpans(text, spans, book)
 }

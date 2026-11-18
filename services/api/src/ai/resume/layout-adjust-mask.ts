@@ -5,7 +5,8 @@
  *
  * 残留的长数字走兜底遮盖，不走失败关闭。合同断言会把简历里的日期轴误判成残留，
  * 这里若因 strict 为 false 就回 503，没有证件号的简历也会排不了版。
- * 兜底先把全角数字折成半角，再认连续数字。占位符里存原文，还原仍逐字对上。
+ * 兜底先把全角数字折成半角。数字段之间只隔一个空格、短横、点或零宽字符、
+ * 合计达到 11 位的，按一整串遮。占位符里存原文，还原仍逐字对上。
  */
 import { ServiceUnavailableException } from '@nestjs/common'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextsForLlmReversible } from '../../common/pii/llm-input-mask'

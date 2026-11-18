@@ -84,7 +84,34 @@ function main(): void {
   const mixed = `${longDigits.slice(0, 10)}０${longDigits.slice(11, 20)}２${longDigits.slice(21)}`
   assertCovered('三十位号码每十位夹一个全角数字', mixed, longDigits)
 
+  assertCovered('三段四段手机号', '138-0013-8000', phone)
+  assertCovered('加八六前缀的手机号', '+86 138 0013 8000', '8613800138000')
+  assertCovered('六八四身份证', '110101-19900307-2315', idCard)
+  assertCovered('四位一组的银行卡', '6222 0212 3456 7890', '6222021234567890')
+  assertCovered('三十位号码每十位夹一个空格', '1234567890 1234567890 1234567890', longDigits)
+  assertCovered('点分隔的手机号', '138.0013.8000', phone)
+  assertCovered('点分隔的银行卡', '6222.0212.3456.7890', '6222021234567890')
+  assertCovered('三十位号码每十位夹一个零宽空格', '1234567890\u200B1234567890\u200B1234567890', longDigits)
+  assertCovered('三十位号码每十位夹一个零宽连字', '1234567890\u200D1234567890\u200D1234567890', longDigits)
+  assertCovered('三十位号码每十位夹一个字节顺序标记', '1234567890\uFEFF1234567890\uFEFF1234567890', longDigits)
+
+  assertUntouched('年月日期轴', '2015.09-2019.06')
+  assertUntouched('破折号日期轴', '2020.07—2024.06')
+
   console.log(`verify:layout-outbound-realistic ${passCount} PASS`)
+}
+
+function assertUntouched(label: string, raw: string): void {
+  const original = `说明${raw}结束`
+  const out = maskLayoutAdjustOutbound({
+    originalText: original,
+    resumeValues: raw,
+    resumeJson: JSON.stringify({ summary: raw }),
+    maxOriginalChars: original.length + 800,
+  })
+  if (!out.maskedOriginal.includes(raw)) fail(`${label} 被收成占位符`)
+  if (out.restore(out.maskedOriginal) !== original) fail(`${label} 还原后与原文不一致`)
+  pass(label)
 }
 
 main()
