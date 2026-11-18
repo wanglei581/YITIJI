@@ -13,7 +13,7 @@ const NOT_STALE = {
     { reason: null },
     { reason: { not: STALE_ATTEMPT_REFUND_REASON } },
   ],
-} as const
+}
 
 export async function nonStaleSuccessCents(
   db: RefundDb,
@@ -29,7 +29,7 @@ export async function nonStaleSuccessCents(
     },
     _sum: { amountCents: true },
   })
-  return sum._sum.amountCents ?? 0
+  return sum._sum?.amountCents ?? 0
 }
 
 /** 只有部分退款的单才有剩余。返回 null 表示这不是部分退款。 */

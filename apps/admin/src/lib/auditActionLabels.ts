@@ -231,6 +231,7 @@ const ACTION_LABELS: Record<string, string> = {
   'refund.channel_ambiguous': '退款渠道结果待确认',
   'refund.channel_error': '退款渠道异常',
   'refund.created': '创建退款申请',
+  'refund.hold_rejected': '已出纸，拒绝再改成出纸',
   'refund.hold_resolved': '处置没出纸的退款待办',
   'refund.notify_amount_mismatch': '退款通知金额不符',
   'refund.notify_paper_already_released': '退款通知时已经出纸，不能记成成功',
