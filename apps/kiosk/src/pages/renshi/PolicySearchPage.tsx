@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { QxTouchArtChecklist } from '../../components/qingxu/touch/QxTouchArt'
-import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
 import { getPublishedPolicies } from '../../services/api/policies'
 import { PolicyGuideRow } from './PolicyGuideRow'
 import { PolicySearchField } from './PolicySearchField'
 import { PolicyTouchLayout } from './PolicyTouchLayout'
+import { PolicyExitCard, PolicyLinkRow, PolicyStatusCard } from './policyStatus'
 import { POLICY_ASK_HOME, POLICY_CATEGORIES, POLICY_PAGE_SIZE, policyPage, policyPagination, policyRead } from './policyModel'
 import { clearPolicyKeyword, getPolicyKeyword, setPolicyKeyword, subscribePolicyKeywordClear } from './policyKeywordSession'
 import { policyDeadlineLabel, policyTooLongCopy, resolvePolicySearch, type PolicySearchOutcome } from './policySearchModel'
@@ -86,24 +85,20 @@ export function PolicySearchPage() {
     askPrompt={POLICY_ASK_HOME} state={state}>
     <PolicySearchField inputRef={inputRef} initial={keyword} showGo={!keyword.trim()} clearLabel="清空，回到政策首页"
       onSearch={submit} onClear={goHome} />
-    {view.status === 'loading' && <section className="policy-min-section policy-search-status" role="status">
-      <div><h2>正在按标题和摘要找</h2>
-        <ul><li>只找发布机构在后台发布、还没过截止日期的政策</li><li>打印、扫描照常</li></ul></div>
-      <QxTouchArtChecklist width={280} />
-    </section>}
+    {view.status === 'loading' && <PolicyStatusCard icon="clock" title="正在按标题和摘要找" chip="找到后可以打印这样一页" artWidth={300}>
+      <ul><li>只找发布机构在后台发布、还没过截止日期的政策</li><li>打印、扫描照常</li></ul>
+    </PolicyStatusCard>}
     {view.status === 'failed' && <>
-      <section className="policy-min-section policy-search-status" role="status">
-        <div><h2>这次没连上</h2>
-          <ul>
-            <li>关键词「{word}」还留在框里</li>
-            <li>可以再搜一次，或者先按类别看</li>
-            <li>打印、扫描照常</li>
-          </ul></div>
-        <QxTouchArtChecklist width={260} />
-      </section>
-      <div className="policy-min-grid">
-        <QxTouchTile icon="refresh" title="再搜一次" desc={`还是搜「${word}」`} onClick={() => setAttempt((value) => value + 1)} />
-        <QxTouchTile icon="landmark" title="按类别看全部政策" desc="六类都在政策首页" onClick={goHome} />
+      <PolicyStatusCard icon="wifi" title="这次没连上" chip="找到后可以打印这样一页">
+        <ul>
+          <li>关键词「{word}」还留在框里</li>
+          <li>可以再搜一次，或者先按类别看</li>
+          <li>打印、扫描照常</li>
+        </ul>
+      </PolicyStatusCard>
+      <div className="policy-exit-grid">
+        <PolicyExitCard icon="refresh" title="再搜一次" desc={`还是搜「${word}」`} onClick={() => setAttempt((value) => value + 1)} />
+        <PolicyExitCard icon="landmark" title="按类别看全部政策" desc="六类都在政策首页" onClick={goHome} />
       </div>
     </>}
     {tooLong && <section className="policy-min-section" role="status">
@@ -123,24 +118,21 @@ export function PolicySearchPage() {
       </div>}
     </>}
     {none && <>
-      <section className="policy-min-section policy-search-status" role="status">
-        <div><h2>可以这样再找</h2>
-          <ul>
-            <li>换一个更短的词，比如「失业」「补贴」</li>
-            <li>按类别看全部政策</li>
-            <li>这里只有发布机构在本机发布的政策，没在这里发布的，以发布机构的官方渠道为准</li>
-          </ul></div>
-        <QxTouchArtChecklist width={260} />
-      </section>
-      <div className="policy-min-grid">
-        <QxTouchTile icon="pen" title="换个词再搜" desc="点这里后改框里的词" onClick={() => inputRef.current?.focus()} />
-        <QxTouchTile icon="landmark" title="按类别看全部政策" desc="六类都在政策首页" onClick={goHome} />
+      <PolicyStatusCard icon="help" title="可以这样再找" chip="找到政策后可以打印这样一页" artWidth={260}>
+        <ul>
+          <li>换一个更短的词，比如「失业」「补贴」</li>
+          <li>按类别看全部政策</li>
+          <li>这里只有发布机构在本机发布的政策，没在这里发布的，以发布机构的官方渠道为准</li>
+        </ul>
+      </PolicyStatusCard>
+      <div className="policy-exit-grid">
+        <PolicyExitCard icon="keyboard" title="换个词再搜" desc="点这里后改框里的词" onClick={() => inputRef.current?.focus()} />
+        <PolicyExitCard icon="landmark" title="按类别看全部政策" desc="六类都在政策首页" onClick={goHome} />
       </div>
-      {noticeTotal > 0 && <button type="button" className="policy-min-row" onClick={() => navigate('/renshi?tab=notice')}>
-        机构公告 · {noticeTotal} 条 · 公告不在搜索范围里
-      </button>}
+      {noticeTotal > 0 && <PolicyLinkRow icon="message" title="机构公告" detail={`${noticeTotal} 条 · 公告不在搜索范围里`}
+        onClick={() => navigate('/renshi?tab=notice')} />}
     </>}
-    {view.status === 'loading' && <button type="button" className="policy-min-row" onClick={goHome}>不等了，按类别看全部政策</button>}
+    {view.status === 'loading' && <PolicyLinkRow icon="landmark" title="不等了，按类别看全部政策" onClick={goHome} />}
     <p className="policy-min-fine">政策由发布机构自行审核发布，以官方原文为准。</p>
   </PolicyTouchLayout>
 }

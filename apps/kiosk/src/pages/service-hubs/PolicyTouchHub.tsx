@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
+import { PolicyExitCard, PolicyStatusCard } from '../renshi/policyStatus'
 import { getPublishedPolicies, type PublishedPoliciesResult } from '../../services/api/policies'
 import { useAuth } from '../../auth/useAuth'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
@@ -11,7 +12,7 @@ import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { useInterviewAiCapabilities } from '../interview/useInterviewAiCapabilities'
 import { PolicySearchField } from '../renshi/PolicySearchField'
 import { setPolicyKeyword } from '../renshi/policyKeywordSession'
-import { PolicyChecklistSample, PolicyReadState, PolicyTouchLayout } from '../renshi/PolicyTouchLayout'
+import { PolicyReadState, PolicyTouchLayout } from '../renshi/PolicyTouchLayout'
 import { POLICY_CATEGORIES, POLICY_GENERAL_QUESTION, policyCategorySummaries, policyRead } from '../renshi/policyModel'
 import { policyPublishedOn } from '../renshi/policyFacts'
 import { SERVICE_HUB_SPECS } from './serviceHubSpecs'
@@ -63,18 +64,16 @@ export function PolicyTouchHub() {
       <PolicyReadState failed={failed} retry={() => setAttempt((value) => value + 1)} />
       {failed && channelsRow}
     </> : empty ? <>
-      <section className="policy-min-section">
-        <h2>政策由谁发布</h2>
+      <PolicyStatusCard icon="landmark" title="政策由谁发布" chip="有政策后可打印这样一页" artWidth={300}>
         <ul><li>政策由发布机构在机构后台自己审核、发布，并对内容负责</li>
           <li>本机不自己编写政策，也不拿别处的内容顶替</li>
           <li>有了政策，可以在这里打印一页办事清单带走，或扫码看原文</li></ul>
-      </section>
-      <PolicyChecklistSample empty />
-      <div className="policy-min-grid">
-        <QxTouchTile icon="sparkle" title={ai.state('assistant_chat') === 'available' ? '问小青' : '小青暂时不可用'}
+      </PolicyStatusCard>
+      <div className="policy-exit-grid">
+        <PolicyExitCard icon="sparkle" title={ai.state('assistant_chat') === 'available' ? '问小青' : '小青暂时不可用'}
           desc="问通用问题；不解释具体政策，不判断能不能领" off={winding || ai.state('assistant_chat') !== 'available'}
           onClick={() => { rememberAssistantDraft(POLICY_GENERAL_QUESTION); navigate('/assistant') }} />
-        <QxTouchTile icon="home" title="回首页办别的事" desc="打印、扫描、改简历、练面试照常" onClick={() => navigate('/')} />
+        <PolicyExitCard icon="home" title="回首页办别的事" desc="打印、扫描、改简历、练面试照常" onClick={() => navigate('/')} />
       </div>
       {channelsRow}
       <p className="policy-min-fine">政策由发布机构自行审核发布，以官方原文为准</p>

@@ -54,12 +54,6 @@ const sessionUrl = toDataUrl(retarget(
 const factsUrl = toDataUrl(transpile('src/pages/renshi/policyFacts.ts'))
 const iconUrl = toDataUrl(withReact(transpile('src/components/qingxu/touch/QxTouchIcon.tsx')))
 const artUrl = toDataUrl(withReact(transpile('src/components/qingxu/touch/QxTouchArt.tsx')))
-const checklistUrl = toDataUrl(`
-import { createElement } from '${import.meta.resolve('react')}'
-export function PolicyChecklistSample() {
-  return createElement('section', { 'data-testid': 'policy-checklist-sample' }, '清单示意')
-}
-`)
 const fieldUrl = toDataUrl(withReact(retarget(retarget(
   transpile('src/pages/renshi/PolicySearchField.tsx'),
   './policySearchModel', searchModelUrl,
@@ -72,10 +66,14 @@ const excerptUrl = toDataUrl(withReact(retarget(retarget(
   transpile('src/pages/renshi/PolicyExcerpt.tsx'),
   '../../components/qingxu/touch/QxTouchIcon', iconUrl,
 ), './policySearchModel', searchModelUrl)))
-const goneUrl = toDataUrl(withReact(retarget(retarget(
+const statusUrl = toDataUrl(withReact(retarget(retarget(
+  transpile('src/pages/renshi/policyStatus.tsx'),
+  '../../components/qingxu/touch/QxTouchIcon', iconUrl,
+), '../../components/qingxu/touch/QxTouchArt', artUrl)))
+const goneUrl = toDataUrl(withReact(retarget(
   transpile('src/pages/renshi/PolicyUnavailable.tsx'),
-  '../../components/qingxu/touch/QxTouchArt', artUrl,
-), './PolicyTouchLayout', checklistUrl)))
+  './policyStatus', statusUrl,
+)))
 
 const model = await import(searchModelUrl)
 const session = await import(sessionUrl)
@@ -553,6 +551,7 @@ const pageUrl = toDataUrl([
   ['./policyModel', modelCoreUrl],
   ['./policyKeywordSession', sessionUrl],
   ['./policySearchModel', searchModelUrl],
+  ['./policyStatus', statusUrl],
 ].reduce((code, [from, to]) => retarget(code, from, to), pageCode))
 
 async function mountSearchPage(keyword) {
