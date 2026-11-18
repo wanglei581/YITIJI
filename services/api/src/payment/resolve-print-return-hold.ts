@@ -200,7 +200,11 @@ export async function resolvePrintReturnHold(
       })
       if (withdrawn.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
       const reopened = await tx.order.updateMany({
-        where: { id: orderId, payStatus: { in: ['paid', 'refunding'] } },
+        where: {
+          id: orderId,
+          payStatus: { in: ['paid', 'refunding'] },
+          taskStatus: { notIn: ['claimed', 'printing', 'completed'] },
+        },
         data: {
           payStatus: 'paid',
           taskStatus: 'pending',
@@ -208,10 +212,35 @@ export async function resolvePrintReturnHold(
           ...(order.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON ? { refundReason: null } : {}),
         },
       })
-      if (reopened.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
-      if (task && task.printOutcome !== 'printed' && (task.status === 'failed' || task.status === 'cancelled' || task.status === 'pending')) {
-        await tx.printTask.updateMany({
-          where: { id: task.id, status: { in: ['failed', 'cancelled', 'pending'] } },
+      if (reopened.count !== 1) {
+        const current = await tx.order.findUnique({
+          where: { id: orderId },
+          select: { taskStatus: true, printTaskId: true },
+        })
+        const taskNow = current?.printTaskId
+          ? await tx.printTask.findUnique({
+            where: { id: current.printTaskId },
+            select: { status: true, printOutcome: true },
+          })
+          : null
+        const taken = paperAlreadyReleased({
+          taskStatus: taskNow?.status ?? null,
+          orderTaskStatus: current?.taskStatus ?? null,
+          printOutcome: taskNow?.printOutcome ?? null,
+        }) || current?.taskStatus === 'completed'
+        if (taken) throw deny('PAPER_ALREADY_RELEASED', '纸已经放行或已经出去，不能再改成出纸。')
+        throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
+      }
+      if (task) {
+        const reset = await tx.printTask.updateMany({
+          where: {
+            id: task.id,
+            status: { in: ['failed', 'cancelled', 'pending'] },
+            OR: [
+              { printOutcome: null },
+              { printOutcome: { not: 'printed' } },
+            ],
+          },
           data: {
             status: 'pending',
             errorCode: null,
@@ -220,6 +249,7 @@ export async function resolvePrintReturnHold(
             completedAt: null,
           },
         })
+        if (reset.count !== 1) throw deny('PAPER_ALREADY_RELEASED', '纸已经放行或已经出去，不能再改成出纸。')
       }
       await tx.auditLog.create({
         data: {
@@ -390,8 +420,10 @@ export async function resolvePrintReturnHold(
   })
   } catch (error) {
     const rejectedCode = exceptionCode(error)
-    const rejectedDetail = action === 'confirm_refunded' && rejectedCode === 'PAPER_ALREADY_RELEASED'
-      ? '纸已经放行或已经出去，确认退成不能用'
+    const rejectedDetail = (action === 'confirm_refunded' || action === 'release_paper') && rejectedCode === 'PAPER_ALREADY_RELEASED'
+      ? (action === 'confirm_refunded'
+        ? '纸已经放行或已经出去，确认退成不能用'
+        : '纸已经放行或已经出去，不能再改成出纸')
       : action === 'close_order' && rejectedCode === 'PARTIAL_REFUND_CANNOT_CLOSE'
         ? PARTIAL_CLOSE_MESSAGE
         : null
