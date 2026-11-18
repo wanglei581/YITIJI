@@ -241,7 +241,82 @@ async function main(): Promise<void> {
     action: 'reformat',
   }))
 
+  const id2 = '320102198805156666'
+  const prefix2 = '3201021988'
+  const phone = '13800138000'
+  const earlier = `${ID}。${ID}。${ID}。`
+  const gluedAtBoundary = `${'乙'.repeat(11990 - earlier.length)}${earlier}${ID}${id2}`
+  await outboundClean('排版跨边界紧跟两个号', () => optimize.adjustLayoutDraft({
+    currentResume: current,
+    originalText: gluedAtBoundary,
+    action: 'reformat',
+  }), [ID, id2, PREFIX, prefix2, phone])
+
+  const unit = `姓名张三丰手机${phone}证件${ID}住址北京市东城区景山前街4号`
+  let dense = ''
+  while (dense.length + unit.length + ID.length + id2.length < 19_000) dense += unit
+  dense += `${ID}${id2}`
+  await outboundClean('排版接近上限的高密度个人信息', () => optimize.adjustLayoutDraft({
+    currentResume: current,
+    originalText: dense,
+    action: 'reformat',
+  }), [ID, id2, PREFIX, prefix2, phone])
+
+  installFakeLlm()
+  let tooLongCode = ''
+  let tooLongStatus = 0
+  try {
+    await optimize.adjustLayoutDraft({
+      currentResume: current,
+      originalText: `${ID}${id2}${'乙'.repeat(20_001)}`,
+      action: 'reformat',
+    })
+  } catch (error) {
+    tooLongStatus = statusOf(error)
+    tooLongCode = codeOf(error)
+  }
+  if (captured.length !== 0) fail('排版超过遮盖入口仍出站')
+  if (tooLongStatus === 500 || tooLongCode !== 'AI_LAYOUT_ADJUST_TOO_LONG') {
+    fail(`排版超过遮盖入口应明确失败，实际 ${tooLongStatus}/${tooLongCode}`)
+  }
+  pass('排版超过遮盖入口不送半截')
+
   console.log(`verify:mask-before-truncate ${passCount} PASS`)
+}
+
+function statusOf(error: unknown): number {
+  if (!error || typeof error !== 'object' || !('getStatus' in error)) return 0
+  const getStatus = (error as { getStatus?: () => number }).getStatus
+  return typeof getStatus === 'function' ? getStatus.call(error) : 0
+}
+
+function codeOf(error: unknown): string {
+  if (!error || typeof error !== 'object' || !('getResponse' in error)) return ''
+  const getResponse = (error as { getResponse?: () => unknown }).getResponse
+  if (typeof getResponse !== 'function') return ''
+  const body = getResponse.call(error) as { error?: { code?: string } }
+  return typeof body?.error?.code === 'string' ? body.error.code : ''
+}
+
+async function outboundClean(label: string, run: () => Promise<unknown>, forbidden: string[]): Promise<void> {
+  installFakeLlm()
+  let thrown: unknown
+  try {
+    await run()
+  } catch (error) {
+    thrown = error
+  }
+  if (statusOf(thrown) === 500 || codeOf(thrown) === 'AI_LAYOUT_ADJUST_TOO_LONG') {
+    fail(`${label} 失败 ${statusOf(thrown)}/${codeOf(thrown)}`)
+  }
+  if (captured.length === 0) fail(`${label} 没有出站`)
+  for (const body of captured) {
+    for (const secret of forbidden) {
+      if (body.includes(secret)) fail(`${label} 出站含 ${secret.slice(0, 4)}…`)
+    }
+    if (!body.includes(PLACEHOLDER)) fail(`${label} 没有遮盖占位符`)
+  }
+  pass(label)
 }
 
 main()
