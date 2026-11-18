@@ -82,7 +82,7 @@ export function PolicyTouchHub() {
       <div className="policy-min-grid policy-min-categories" data-testid="policy-categories">
         {policyCategorySummaries(data.categories).map((category, index) => <QxTouchTile key={category.key} icon={category.icon}
           title={category.label} desc={category.disabled ? '还没有机构发布' : `${category.total} 条 · 最近：${category.latest?.title ?? '标题未提供'}`}
-          layout="stack" off={winding || category.disabled} index={index} testId={`policy-category-${category.key}`}
+          tone="slate" layout="stack" off={winding || category.disabled} index={index} testId={`policy-category-${category.key}`}
           onClick={() => navigate(`/renshi?audience=${category.key}`)} />)}
       </div>
       {latest && <PolicyLinkRow icon="bell" title="最近更新" disabled={winding}
