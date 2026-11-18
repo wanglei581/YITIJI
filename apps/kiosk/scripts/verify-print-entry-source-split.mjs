@@ -81,80 +81,6 @@ function staticNavigatePath(node) {
   return left + right
 }
 
-/**
- * 这些名字的调用不是跳转：语言内建、本文件的 import、本文件声明的函数。
- * 它们的第二个参数经常是变量，读不出里面有没有 state，不能据此把预览页判红。
- * 名叫 navigate 的导入或函数声明不放进这张表，避免把跳转函数本身放行。
- */
-const NON_ROUTE_INTRINSICS = new Set([
-  'Math', 'Object', 'Array', 'JSON', 'Number', 'String', 'Boolean', 'Date', 'Promise',
-  'console', 'window', 'document', 'globalThis', 'Intl', 'RegExp', 'Error', 'Map', 'Set',
-  'Reflect', 'Symbol', 'BigInt', 'parseInt', 'parseFloat', 'isNaN', 'isFinite',
-  'encodeURIComponent', 'decodeURIComponent', 'setTimeout', 'clearTimeout', 'queueMicrotask',
-  'structuredClone', 'AbortController', 'URL', 'URLSearchParams', 'TextEncoder', 'TextDecoder',
-  'fetch', 'localStorage', 'sessionStorage',
-])
-
-function nonRouteCalleeNames(source) {
-  const names = new Set(NON_ROUTE_INTRINSICS)
-  const visit = (node) => {
-    if (ts.isImportDeclaration(node) && node.importClause) {
-      const clause = node.importClause
-      if (clause.name && clause.name.text !== 'navigate') names.add(clause.name.text)
-      const bindings = clause.namedBindings
-      if (bindings && ts.isNamespaceImport(bindings)) {
-        if (bindings.name.text !== 'navigate') names.add(bindings.name.text)
-      } else if (bindings) {
-        for (const spec of bindings.elements) {
-          const imported = spec.propertyName ? spec.propertyName.text : spec.name.text
-          if (imported !== 'navigate' && spec.name.text !== 'navigate') names.add(spec.name.text)
-        }
-      }
-      return
-    }
-    if (ts.isFunctionDeclaration(node) && node.name && node.name.text !== 'navigate') {
-      names.add(node.name.text)
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(source)
-  return names
-}
-
-/** 跳转函数、别名、对象上的属性调用要查清状态。import 进来的普通函数和语言内建不是。 */
-function calleeClass(node, nonRouteNames) {
-  const expr = unwrapExpression(node)
-  if (!expr) return 'route'
-  if (ts.isIdentifier(expr)) return nonRouteNames.has(expr.text) ? 'other' : 'route'
-  if (ts.isPropertyAccessExpression(expr) || ts.isElementAccessExpression(expr)) {
-    return calleeClass(expr.expression, nonRouteNames) === 'other' ? 'other' : 'route'
-  }
-  if (ts.isCallExpression(expr) || ts.isNewExpression(expr)) {
-    const callee = unwrapExpression(expr.expression)
-    if (callee && ts.isIdentifier(callee) && callee.text === 'useRef') return 'route'
-    return 'other'
-  }
-  if (ts.isConditionalExpression(expr)) {
-    const whenTrue = calleeClass(expr.whenTrue, nonRouteNames)
-    const whenFalse = calleeClass(expr.whenFalse, nonRouteNames)
-    return whenTrue === 'other' && whenFalse === 'other' ? 'other' : 'route'
-  }
-  if (ts.isBinaryExpression(expr)) {
-    const kind = expr.operatorToken.kind
-    if (
-      kind === ts.SyntaxKind.AmpersandAmpersandToken ||
-      kind === ts.SyntaxKind.BarBarToken ||
-      kind === ts.SyntaxKind.QuestionQuestionToken
-    ) {
-      const left = calleeClass(expr.left, nonRouteNames)
-      const right = calleeClass(expr.right, nonRouteNames)
-      return left === 'other' && right === 'other' ? 'other' : 'route'
-    }
-    return 'other'
-  }
-  return 'other'
-}
-
 function isClearlyNotRouteOptions(expr) {
   return (
     ts.isStringLiteralLike(expr) ||
@@ -211,14 +137,6 @@ function routeOptionsState(node) {
   }
   if (isClearlyNotRouteOptions(expr)) return { kind: 'none' }
   return { kind: 'unknown', reason: '参数不是对象字面量，认不出带没带路由状态' }
-}
-
-function isRouteObjectLike(node) {
-  const expr = unwrapExpression(node)
-  if (!expr) return false
-  if (ts.isObjectLiteralExpression(expr)) return true
-  if (!ts.isConditionalExpression(expr)) return false
-  return isRouteObjectLike(expr.whenTrue) || isRouteObjectLike(expr.whenFalse)
 }
 
 function propertyAccess(node) {
@@ -287,74 +205,268 @@ function allowStateKeys(stateInit) {
   return { ok: true, reason: '' }
 }
 
-function collectRouteState(node, kind, stateInits) {
-  const status = routeOptionsState(node)
-  if (status.kind === 'unknown' && kind === 'route') return status
-  if (status.kind === 'present') stateInits.push(...status.inits)
+/**
+ * 预览页只承认一种跳转函数：`const 名字 = useNavigate()` 直接赋上的那个名字。
+ * 只承认两种调用：`名字(路径)`，以及 `名字(路径, { state: { 允许名单里的键 } })`。
+ * 别的任何引用（别名、传参、成员调用、call/apply/bind、逗号或赋值表达式当被调用者、
+ * useNavigate()() 连调、展开参数、第二个参数不是对象字面量）一律判红，并写明是哪一种。
+ * 回执原样交还的那一次除外。参数里已经写成对象字面量的 state，不论调用者是谁，仍按名单查键。
+ */
+function isUseNavigateCall(node) {
+  const expr = unwrapExpression(node)
+  if (!expr || !ts.isCallExpression(expr) || expr.arguments.length !== 0) return false
+  const callee = unwrapExpression(expr.expression)
+  return Boolean(callee && ts.isIdentifier(callee) && callee.text === 'useNavigate')
+}
+
+function collectNavigateBindings(source) {
+  const names = new Set()
+  const declNames = new Set()
+  const initCallees = new Set()
+  const visit = (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      isUseNavigateCall(node.initializer)
+    ) {
+      names.add(node.name.text)
+      declNames.add(node.name)
+      initCallees.add(unwrapExpression(node.initializer).expression)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return { names, declNames, initCallees }
+}
+
+function isInImport(node) {
+  let current = node
+  while (current) {
+    if (ts.isImportDeclaration(current)) return true
+    current = current.parent
+  }
+  return false
+}
+
+function isDeclarationName(node) {
+  const parent = node.parent
+  if (!parent) return false
+  if ((ts.isVariableDeclaration(parent) || ts.isFunctionDeclaration(parent) || ts.isParameter(parent)) && parent.name === node) {
+    return true
+  }
+  return ts.isBindingElement(parent) && parent.name === node
+}
+
+function isPropertyNameOnly(node) {
+  const parent = node.parent
+  if (!parent) return false
+  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return true
+  if (ts.isPropertyAssignment(parent) && parent.name === node) return true
+  if (ts.isMethodDeclaration(parent) && parent.name === node) return true
+  return ts.isBindingElement(parent) && parent.propertyName === node
+}
+
+function isArgumentOfCall(node) {
+  const parent = node.parent
+  if (!parent) return false
+  if ((ts.isCallExpression(parent) || ts.isNewExpression(parent)) && parent.arguments && [...parent.arguments].includes(node)) {
+    return true
+  }
+  return ts.isSpreadElement(parent) && parent.expression === node
+}
+
+/** 顺着括号、逗号、赋值往上走。这个标识符若处在一次调用的被调用者位置，返回是哪一种。 */
+function calleeCarrier(start) {
+  let current = start
+  let sawComma = false
+  let sawAssign = false
+  while (current.parent) {
+    const parent = current.parent
+    if (ts.isParenthesizedExpression(parent) && parent.expression === current) {
+      current = parent
+      continue
+    }
+    if (ts.isBinaryExpression(parent) && (parent.left === current || parent.right === current)) {
+      const kind = parent.operatorToken.kind
+      if (kind === ts.SyntaxKind.CommaToken) {
+        sawComma = true
+        current = parent
+        continue
+      }
+      if (kind === ts.SyntaxKind.EqualsToken) {
+        sawAssign = true
+        current = parent
+        continue
+      }
+      return null
+    }
+    if (ts.isCallExpression(parent) && unwrapExpression(parent.expression) === unwrapExpression(current)) {
+      if (sawComma) return 'comma'
+      if (sawAssign) return 'assign'
+      return null
+    }
+    return null
+  }
   return null
 }
 
-/**
- * 预览页里每一次调用都看第二个参数。写了 state 的，不论函数叫什么名字，都按允许名单查键。
- * 参数是展开，一律判红。别名和属性调用（router.navigate、nav.current）认不出带没带状态，也判红。
- * 静态路径认得出是确认页的，仍然只能有一处。路径写成拼接、模板或变量时，只要状态看得见，同样查。
- * 回执原样交还的那一次除外：它不在这里新写键。
- */
+function isAliasAssignment(node) {
+  const parent = node.parent
+  if (!parent) return false
+  if (ts.isVariableDeclaration(parent) && parent.initializer && unwrapExpression(parent.initializer) === node) return true
+  if (
+    ts.isBinaryExpression(parent) &&
+    parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    unwrapExpression(parent.right) === node
+  ) {
+    return true
+  }
+  if (ts.isPropertyAssignment(parent) && unwrapExpression(parent.initializer) === node) return true
+  return ts.isShorthandPropertyAssignment(parent) && parent.name === node
+}
+
+function classifyUseNavigate(node) {
+  const parent = node.parent
+  if (parent && ts.isCallExpression(parent) && parent.expression === node) {
+    let outer = parent.parent
+    while (outer && ts.isParenthesizedExpression(outer)) outer = outer.parent
+    if (outer && ts.isCallExpression(outer) && unwrapExpression(outer.expression) === parent) {
+      return 'useNavigate()(…) 连调'
+    }
+    if (isArgumentOfCall(parent)) return '当参数传出去'
+    return 'useNavigate() 没有直接赋给变量'
+  }
+  const carrier = calleeCarrier(node)
+  if (carrier === 'comma') return '逗号表达式当被调用者'
+  if (carrier === 'assign') return '赋值表达式当被调用者'
+  if (isArgumentOfCall(node) || isAliasAssignment(node)) return isAliasAssignment(node) ? '别名赋值' : '当参数传出去'
+  return 'useNavigate 出现在不允许的位置'
+}
+
+function classifyBoundName(node) {
+  const parent = node.parent
+  if (parent && ts.isPropertyAccessExpression(parent) && parent.expression === node) {
+    const prop = parent.name.text
+    if (prop === 'call' || prop === 'apply' || prop === 'bind') return { type: 'forbidden', reason: `.${prop}` }
+    return { type: 'forbidden', reason: '成员调用' }
+  }
+  if (parent && ts.isElementAccessExpression(parent) && parent.expression === node) {
+    return { type: 'forbidden', reason: '成员调用' }
+  }
+  if (parent && ts.isCallExpression(parent) && parent.expression === node) {
+    return { type: 'allowed-call', call: parent }
+  }
+  const carrier = calleeCarrier(node)
+  if (carrier === 'comma') return { type: 'forbidden', reason: '逗号表达式当被调用者' }
+  if (carrier === 'assign') return { type: 'forbidden', reason: '赋值表达式当被调用者' }
+  if (isAliasAssignment(node)) return { type: 'forbidden', reason: '别名赋值' }
+  if (isArgumentOfCall(node)) return { type: 'forbidden', reason: '当参数传出去' }
+  return { type: 'forbidden', reason: '引用了 navigate，但不是允许的两种跳转写法' }
+}
+
+function memberCallReason(call) {
+  const expr = unwrapExpression(call.expression)
+  if (!expr) return null
+  if (ts.isPropertyAccessExpression(expr) && expr.name.text === 'navigate') return '成员调用'
+  if (ts.isElementAccessExpression(expr)) {
+    const arg = unwrapExpression(expr.argumentExpression)
+    if (arg && ts.isStringLiteralLike(arg) && arg.text === 'navigate') return '成员调用'
+  }
+  return null
+}
+
+function visibleStateReasons(call, source) {
+  if (isReturnCarryForward(call, source)) return []
+  const reasons = []
+  for (const arg of call.arguments) {
+    if (ts.isSpreadElement(arg)) {
+      reasons.push('调用参数是展开，认不出带没带路由状态')
+      continue
+    }
+    const status = routeOptionsState(arg)
+    if (status.kind !== 'present') continue
+    for (const init of status.inits) {
+      const allowed = allowStateKeys(init)
+      if (!allowed.ok) reasons.push(allowed.reason)
+    }
+  }
+  return reasons
+}
+
+function checkDirectCall(call, source) {
+  for (const arg of call.arguments) {
+    if (ts.isSpreadElement(arg)) return { reason: '展开参数', isConfirm: false }
+  }
+  if (isReturnCarryForward(call, source)) return { reason: null, isConfirm: false }
+  if (call.arguments.length === 1) {
+    const status = routeOptionsState(call.arguments[0])
+    if (status.kind === 'present') {
+      for (const init of status.inits) {
+        const allowed = allowStateKeys(init)
+        if (!allowed.ok) return { reason: allowed.reason, isConfirm: false }
+      }
+    }
+    if (staticNavigatePath(call.arguments[0]) === CONFIRM_PATH) return { reason: 'navigate 没有 state', isConfirm: false }
+    return { reason: null, isConfirm: false }
+  }
+  if (call.arguments.length === 2) {
+    const second = unwrapExpression(call.arguments[1])
+    if (!second || !ts.isObjectLiteralExpression(second)) {
+      return { reason: '第二个参数不是对象字面量', isConfirm: false }
+    }
+    let stateInit = null
+    for (const prop of second.properties) {
+      if (ts.isSpreadAssignment(prop) || !ts.isPropertyAssignment(prop) || ts.isComputedPropertyName(prop.name)) {
+        return { reason: '第二个参数不是对象字面量', isConfirm: false }
+      }
+      const name = propertyName(prop.name)
+      if (name !== 'state' || stateInit) return { reason: '第二个参数不是只带 state 的对象字面量', isConfirm: false }
+      stateInit = prop.initializer
+    }
+    if (!stateInit) return { reason: 'navigate 没有 state', isConfirm: false }
+    const allowed = allowStateKeys(stateInit)
+    if (!allowed.ok) return { reason: allowed.reason, isConfirm: false }
+    return { reason: null, isConfirm: staticNavigatePath(call.arguments[0]) === CONFIRM_PATH }
+  }
+  return { reason: '不是允许的两种跳转写法', isConfirm: false }
+}
+
 function confirmRouteStateAllowed(sourceText) {
   const source = ts.createSourceFile('PrintPreviewPage.tsx', sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-  const nonRouteNames = nonRouteCalleeNames(source)
+  const bindings = collectNavigateBindings(source)
+  const reasons = []
   let confirmCalls = 0
-  let failure = null
   const visit = (node) => {
-    if (failure || !ts.isCallExpression(node)) {
-      if (!failure) ts.forEachChild(node, visit)
-      return
+    if (ts.isCallExpression(node)) {
+      const expr = unwrapExpression(node.expression)
+      const direct = Boolean(expr && ts.isIdentifier(expr) && bindings.names.has(expr.text))
+      if (direct) {
+        const result = checkDirectCall(node, source)
+        if (result.reason) reasons.push(result.reason)
+        if (result.isConfirm) confirmCalls += 1
+      } else {
+        const member = memberCallReason(node)
+        if (member) reasons.push(member)
+        reasons.push(...visibleStateReasons(node, source))
+      }
     }
-    for (const arg of node.arguments) {
-      if (ts.isSpreadElement(arg)) {
-        failure = { ok: false, reason: '调用参数是展开，认不出带没带路由状态' }
+    if (ts.isIdentifier(node) && !isInImport(node) && !isDeclarationName(node) && !isPropertyNameOnly(node)) {
+      if (bindings.initCallees.has(node) || bindings.declNames.has(node)) {
+        ts.forEachChild(node, visit)
         return
       }
-    }
-    const kind = calleeClass(node.expression, nonRouteNames)
-    const destination = node.arguments.length > 0 ? staticNavigatePath(node.arguments[0]) : null
-    const isConfirm = destination === CONFIRM_PATH
-    if (isReturnCarryForward(node, source)) {
-      if (isConfirm && kind === 'route') confirmCalls += 1
-      ts.forEachChild(node, visit)
-      return
-    }
-    const stateInits = []
-    if (node.arguments.length > 1) {
-      const blocked = collectRouteState(node.arguments[1], kind, stateInits)
-      if (blocked) {
-        failure = blocked
-        return
+      if (node.text === 'useNavigate') reasons.push(classifyUseNavigate(node))
+      else if (bindings.names.has(node.text)) {
+        const issue = classifyBoundName(node)
+        if (issue.type === 'forbidden') reasons.push(issue.reason)
       }
     }
-    if (node.arguments[0] && isRouteObjectLike(node.arguments[0])) {
-      const blocked = collectRouteState(node.arguments[0], kind, stateInits)
-      if (blocked) {
-        failure = blocked
-        return
-      }
-    }
-    if (stateInits.length === 0) {
-      if (isConfirm && kind === 'route') failure = { ok: false, reason: 'navigate 没有 state' }
-    } else {
-      for (const stateInit of stateInits) {
-        const allowed = allowStateKeys(stateInit)
-        if (!allowed.ok) {
-          failure = allowed
-          break
-        }
-      }
-    }
-    if (!failure && isConfirm && kind === 'route') confirmCalls += 1
-    if (!failure) ts.forEachChild(node, visit)
+    ts.forEachChild(node, visit)
   }
   visit(source)
-  if (failure) return failure
+  const unique = [...new Set(reasons)]
+  if (unique.length > 0) return { ok: false, reason: unique.join('；') }
   if (confirmCalls !== 1) {
     return { ok: false, reason: `预览页去确认页的 navigate 应只有一处，实际 ${confirmCalls} 处` }
   }
@@ -501,18 +613,30 @@ function assertRouteAllowed(body, label) {
 
 const leaked = "{ state: { printContextId: 'ctx', fileUrl: 'https://recv.test/leaked' } }"
 const allowedState = "{ state: { printContextId: 'ctx' } }"
+const variableOptions = `  const recvOptions = { state: { printContextId: 'ctx', fileUrl: 'https://recv.test/leaked' } }\n`
 
 assertRouteAllowed(
+  `  navigate('/print/desk')\n  navigate(-1)\n  navigate('/print/confirm', ${allowedState})`,
+  '直接调用：单参数路径，以及只带交接编号',
+)
+assertRouteAllowed(
+  `  const carried = null\n  navigate('/print/confirm', { state: carried ? { printContextId: 'ctx', printReturnState: carried } : { printContextId: 'ctx' } })`,
+  '直接调用，state 是三元，键都在允许名单里',
+)
+assertRouteRejected(
   `  const go = navigate\n  go('/print/confirm', ${allowedState})`,
-  '别名只带交接编号',
+  '别名赋值',
+  '别名即使只带交接编号',
 )
-assertRouteAllowed(
+assertRouteRejected(
   `  const router = { navigate }\n  router.navigate('/print/confirm', ${allowedState})`,
-  '属性调用 router.navigate 只带交接编号',
+  '成员调用',
+  '属性调用 router.navigate 即使只带交接编号',
 )
-assertRouteAllowed(
+assertRouteRejected(
   `  const nav = { current: navigate }\n  nav.current('/print/confirm', ${allowedState})`,
-  '属性调用 nav.current 只带交接编号',
+  '别名赋值',
+  '把 navigate 放进对象再调用，即使只带交接编号',
 )
 assertRouteRejected(
   `  const go = navigate\n  go('/print/confirm', ${leaked})`,
@@ -546,13 +670,58 @@ assertRouteRejected(
 )
 assertRouteRejected(
   `  const go = navigate\n  const options = ${leaked}\n  go('/print/confirm', options)`,
-  '认不出',
-  '别名的第二个参数是变量，认不出带没带状态',
+  '别名赋值',
+  '别名赋值，即使第二个参数是变量',
 )
 assertRouteRejected(
   `  const router = { navigate }\n  const options = ${allowedState}\n  router.navigate('/print/confirm', options)`,
-  '认不出',
-  '属性调用的第二个参数是变量，认不出带没带状态',
+  '成员调用',
+  '成员调用，即使第二个参数是变量',
+)
+assertRouteRejected(
+  `  const options = ${leaked}\n  navigate('/print/confirm', options)`,
+  '第二个参数不是对象字面量',
+  '直接调用的第二个参数是变量',
+)
+assertRouteRejected(
+  `${variableOptions}  useNavigate()('/print/confirm', recvOptions)`,
+  '连调',
+  'useNavigate()(path, 变量) 连调',
+)
+assertRouteRejected(
+  `${variableOptions}  const getNav = () => ({ navigate })\n  getNav().navigate('/print/confirm', recvOptions)`,
+  '成员调用',
+  'getNav().navigate(path, 变量)',
+)
+assertRouteRejected(
+  `${variableOptions}  ;(0, navigate)('/print/confirm', recvOptions)`,
+  '逗号表达式当被调用者',
+  '(0, navigate)(path, 变量)',
+)
+assertRouteRejected(
+  `  navigate.call(null, '/print/confirm', { state: { printContextId: 'ctx', fileUrl: 'https://recv.test/leaked' } })`,
+  '.call',
+  'navigate.call',
+)
+assertRouteRejected(
+  `  const path = '/print/confirm'\n  const state = { printContextId: 'ctx', fileUrl: 'https://recv.test/leaked' }\n  navigate.apply(null, [path, { state }])`,
+  '.apply',
+  'navigate.apply',
+)
+assertRouteRejected(
+  `${variableOptions}  navigate.bind(null)('/print/confirm', recvOptions)`,
+  '.bind',
+  'navigate.bind 再调用',
+)
+assertRouteRejected(
+  `${variableOptions}  ;(go = navigate)('/print/confirm', recvOptions)`,
+  '赋值表达式当被调用者',
+  '赋值表达式当被调用者',
+)
+assertRouteRejected(
+  `  foo(navigate)\n  navigate('/print/confirm', ${allowedState})`,
+  '当参数传出去',
+  '把 navigate 当参数传出去',
 )
 assertRouteRejected(
   `  const path = '/print/confirm'\n  navigate(path, ${leaked})`,
