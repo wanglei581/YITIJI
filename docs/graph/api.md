@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`663` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`667` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -980,7 +980,11 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/admin/orders/:id/mark-paid` | AdminOrderActionsController.markPaid | admin | OrderStatusService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem |
+| POST | `/api/v1/admin/orders/:id/print-return/close` | AdminOrderActionsController.closeHeldOrder | admin | — | — |
+| POST | `/api/v1/admin/orders/:id/print-return/confirm-refunded` | AdminOrderActionsController.confirmRefunded | admin | — | — |
+| POST | `/api/v1/admin/orders/:id/print-return/release-paper` | AdminOrderActionsController.releasePaper | admin | — | — |
 | POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/admin/orders/:id/refund-after-paper-check` | AdminOrderActionsController.refundAfterPaperCheck | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/payment/order-quote.controller.ts`
 

@@ -34,12 +34,12 @@ node scripts/project-graph-query.mjs model PrintTask
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
 | kiosk | `apps/kiosk` | 86 | 1019 | 828 |
-| admin | `apps/admin` | 38 | 320 | 292 |
+| admin | `apps/admin` | 38 | 321 | 293 |
 | partner | `apps/partner` | 15 | 105 | 102 |
 
 | 维度 | 数量 |
 | --- | --- |
-| HTTP 端点（services/api） | 663 |
+| HTTP 端点（services/api） | 667 |
 | Prisma 模型 | 124 |
 | 门禁脚本文件 | 684 |
 | ├ 其中辅助库（被别的门禁 import） | 160 |
@@ -70,7 +70,7 @@ flowchart LR
   kiosk["apps/kiosk<br/>一体机前台<br/>86 路由"]
   admin["apps/admin<br/>管理员后台<br/>38 路由"]
   partner["apps/partner<br/>合作机构后台<br/>15 路由"]
-  api["services/api<br/>NestJS<br/>663 端点"]
+  api["services/api<br/>NestJS<br/>667 端点"]
   db[("Prisma<br/>124 模型")]
   gates{{"verify 门禁<br/>684 个脚本"}}
 
