@@ -28,9 +28,11 @@ import { claimTransactionTimeoutMs, resolvePgSessionTimeouts } from '../prisma/p
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
-import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../payment/pending-refund-signal'
-import { STALE_ATTEMPT_REFUND_REASON } from '../payment/print-no-paper-refund.constants'
-import { recordBlockedClaimReason, rejectClaimForRefund } from '../payment/refund-paper-exclusion'
+import {
+  claimOrderNotBlockedByRefundWhere,
+  recordBlockedClaimReason,
+  rejectClaimForRefund,
+} from '../payment/refund-paper-exclusion'
 import { settleExplicitNoPaperFromReportedFailure, settleReportedTaskFailures } from '../payment/print-no-paper-refund'
 import {
   claimableFreshnessFilter,
@@ -481,27 +483,7 @@ export class TerminalAgentService implements OnModuleInit {
       order: {
         is: {
           payStatus: 'paid', taskStatus: 'pending',
-          // null 必须单独写：SQL 里 `<>` 不匹配 NULL，否则未标记的已付款单会领不走。
-          OR: [
-            { refundReason: null },
-            { refundReason: { not: PAID_UNFULFILLED_PENDING_REFUND_REASON } },
-          ],
-          NOT: {
-            refunds: {
-              some: {
-                OR: [
-                  {
-                    status: { in: ['pending', 'failed', 'manual_review'] },
-                    OR: [
-                      { reason: null },
-                      { reason: { not: STALE_ATTEMPT_REFUND_REASON } },
-                    ],
-                  },
-                  { status: 'success', reason: { not: STALE_ATTEMPT_REFUND_REASON } },
-                ],
-              },
-            },
-          },
+          ...claimOrderNotBlockedByRefundWhere(),
         },
       },
       // 已知不可用的现代文件不应卡住后面的合法任务；事务内仍会再次读取

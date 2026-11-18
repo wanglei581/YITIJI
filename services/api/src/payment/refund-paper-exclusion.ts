@@ -4,6 +4,7 @@
  */
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
+import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { STALE_ATTEMPT_REFUND_REASON } from './print-no-paper-refund.constants'
 import { wholeOrderPayableCents } from './refund-amount-hold'
 
@@ -11,6 +12,36 @@ type HoldDb = PrismaService | PrismaTransactionClient
 
 const RELEASED_TASK_STATUSES = new Set(['claimed', 'printing', 'completed'])
 const OPEN_REFUND_ROW_STATUSES = ['pending', 'failed', 'manual_review'] as const
+
+/**
+ * 领取查询里订单这一侧的退款条件。
+ * null 必须单独写：SQL 里不等号不匹配 NULL，否则没写原因的已付款单会领不走。
+ * 过期付款的退款，不论在办、失败还是已退成，都不挡住后来的新付款。
+ */
+export function claimOrderNotBlockedByRefundWhere() {
+  return {
+    OR: [
+      { refundReason: null },
+      { refundReason: { not: PAID_UNFULFILLED_PENDING_REFUND_REASON } },
+    ],
+    NOT: {
+      refunds: {
+        some: {
+          OR: [
+            {
+              status: { in: [...OPEN_REFUND_ROW_STATUSES] },
+              OR: [
+                { reason: null },
+                { reason: { not: STALE_ATTEMPT_REFUND_REASON } },
+              ],
+            },
+            { status: 'success', reason: { not: STALE_ATTEMPT_REFUND_REASON } },
+          ],
+        },
+      },
+    },
+  }
+}
 
 export const PAPER_ALREADY_RELEASED_CODE = 'PAPER_ALREADY_RELEASED'
 export const REFUND_ALREADY_OPEN_CODE = 'REFUND_ALREADY_OPEN'
