@@ -42,9 +42,10 @@ type CleanupRow = {
 }
 
 /**
- * 管理员手动删除：墓碑和审计在同一事务里。
- * 事务提交之后才删存储对象。审计写不进则整笔回滚，对象不动。
- * 已经是墓碑的重试不再写第二条审计，只重试删对象。
+ * 管理员手动删除。
+ * 这一次动作的必达审计和墓碑在同一事务里：没有墓碑就先落墓碑再写审计，
+ * 已经有墓碑也要为这一次管理员动作写审计。审计写不进则整笔回滚，已有墓碑保持原样，对象不动。
+ * 事务提交并且这一次审计已写下之后，才删存储对象。
  */
 export async function commitAdminFileDelete(args: {
   prisma: PrismaService
@@ -56,34 +57,42 @@ export async function commitAdminFileDelete(args: {
   markStorageDeletePending: (fileId: string, errorType: string) => Promise<void>
   markStorageDeleted: (fileId: string) => Promise<void>
 }): Promise<FileMetadata> {
-  if (!args.record.deletedAt) {
-    try {
-      await args.prisma.$transaction(async (tx) => {
-        const tombstoned = await tx.fileObject.updateMany({
-          where: { id: args.record.id, deletedAt: null },
-          data: {
-            deletedAt: new Date(),
-            deletedBy: args.deletedBy,
-            deleteReason: args.reason,
-            status: 'deleted',
-          },
-        })
-        if (tombstoned.count > 0) {
-          await args.writeAudit(tx, {
-            filename: args.record.filename,
-            sensitiveLevel: args.record.sensitiveLevel,
-          })
-        }
+  let audited = false
+  try {
+    audited = await args.prisma.$transaction(async (tx) => {
+      await tx.fileObject.updateMany({
+        where: { id: args.record.id, deletedAt: null },
+        data: {
+          deletedAt: new Date(),
+          deletedBy: args.deletedBy,
+          deleteReason: args.reason,
+          status: 'deleted',
+        },
       })
-    } catch (error) {
-      throw auditFailure(error, DELETE_AUDIT_MESSAGE)
-    }
+      const current = await tx.fileObject.findUnique({
+        where: { id: args.record.id },
+        select: { deletedAt: true, status: true },
+      })
+      if (!current?.deletedAt || current.status !== 'deleted') return false
+      await args.writeAudit(tx, {
+        filename: args.record.filename,
+        sensitiveLevel: args.record.sensitiveLevel,
+      })
+      return true
+    })
+  } catch (error) {
+    throw auditFailure(error, DELETE_AUDIT_MESSAGE)
   }
 
   const tombstone = await args.prisma.fileObject.findUnique({ where: { id: args.record.id } })
   if (!tombstone || !tombstone.deletedAt || tombstone.status !== 'deleted') {
     throw new NotFoundException({
       error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
+    })
+  }
+  if (!audited) {
+    throw new ServiceUnavailableException({
+      error: { code: ADMIN_AUDIT_UNAVAILABLE_CODE, message: DELETE_AUDIT_MESSAGE },
     })
   }
 

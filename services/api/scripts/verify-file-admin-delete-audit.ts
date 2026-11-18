@@ -43,6 +43,9 @@ let controller: FilesController
 let storage: StorageService
 let admin: AuthedUser
 let token = ''
+let partnerToken = ''
+let partnerUserId = ''
+let orgId = ''
 
 function prepareDb(): void {
   assertIsolatedVerificationDatabase()
@@ -72,13 +75,13 @@ async function setAuditInsertFailure(enabled: boolean): Promise<void> {
   if (enabled) await execSql(AUDIT_FAIL_TRIGGER)
 }
 
-function req(): {
+function req(authToken = token): {
   headers: Record<string, string>
   ip: string
   requestId: string
 } {
   return {
-    headers: { authorization: `Bearer ${token}` },
+    headers: { authorization: `Bearer ${authToken}` },
     ip: '127.0.0.1',
     requestId: 'o1-file-audit',
   }
@@ -94,7 +97,11 @@ function errorOf(err: unknown): { code: string; message: string } {
   return { code: error.code, message: error.message }
 }
 
-async function seedFile(name: string, expiresAt: Date): Promise<{ id: string; storageKey: string }> {
+async function seedFile(
+  name: string,
+  expiresAt: Date,
+  owner?: { uploaderId: string; ownerId: string },
+): Promise<{ id: string; storageKey: string }> {
   const id = `o1-${name}-${randomUUID().slice(0, 8)}`
   const storageKey = `resume_upload/o1/${id}.pdf`
   await storage.putObject(storageKey, Buffer.from(`o1-${name}`), 'application/pdf', LOCAL_BUCKET_SENTINEL)
@@ -115,9 +122,42 @@ async function seedFile(name: string, expiresAt: Date): Promise<{ id: string; st
       assetCategory: 'original',
       retentionPolicy: 'system_short',
       retentionSetBy: 'system',
+      ...(owner
+        ? {
+            uploaderId: owner.uploaderId,
+            ownerType: 'partner',
+            ownerId: owner.ownerId,
+          }
+        : {}),
     },
   })
   return { id, storageKey }
+}
+
+/** 机构删自己的文件时存储删除失败：留下墓碑和对象，控制器到不了后面的普通审计。 */
+async function leaveUnauditedOrgTombstone(name: string): Promise<{ id: string; storageKey: string }> {
+  const file = await seedFile(name, new Date(Date.now() + 86_400_000), {
+    uploaderId: partnerUserId,
+    ownerId: orgId,
+  })
+  const originalDelete = storage.deleteObject.bind(storage)
+  storage.deleteObject = () => Promise.reject(new Error('injected storage delete failure'))
+  try {
+    const err = await controller.remove(file.id, 'org delete', req(partnerToken)).then(
+      () => assert.fail('机构删除在存储失败时不该成功'),
+      (error: unknown) => error,
+    )
+    assert.ok(err instanceof Error)
+    assert.match(err.message, /injected storage delete failure/)
+  } finally {
+    storage.deleteObject = originalDelete
+  }
+  const row = await prisma.fileObject.findUnique({ where: { id: file.id } })
+  assert.ok(row?.deletedAt)
+  assert.equal(row?.status, 'deleted')
+  assert.equal(await objectExists(file.storageKey), true)
+  assert.equal(await auditCount('file.delete', file.id), 0)
+  return file
 }
 
 async function objectExists(storageKey: string): Promise<boolean> {
@@ -153,6 +193,22 @@ describe('管理员删除与手动清理的审计必达', { concurrency: 1 }, ()
     })
     admin = { userId, role: 'admin', orgId: null }
     token = jwt.sign({ sub: userId, ver: 0 })
+    orgId = `o1-org-${randomUUID().slice(0, 8)}`
+    await prisma.organization.create({
+      data: { id: orgId, name: '审计机构', type: 'partner' },
+    })
+    partnerUserId = `o1-partner-${randomUUID().slice(0, 8)}`
+    await prisma.user.create({
+      data: {
+        id: partnerUserId,
+        username: partnerUserId,
+        passwordHash: 'x',
+        name: '机构账号',
+        role: 'partner',
+        orgId,
+      },
+    })
+    partnerToken = jwt.sign({ sub: partnerUserId, ver: 0 })
   }, { timeout: 180_000 })
 
   after(async () => {
@@ -242,5 +298,42 @@ describe('管理员删除与手动清理的审计必达', { concurrency: 1 }, ()
     const row = await prisma.fileObject.findUnique({ where: { id: file.id } })
     assert.equal(row?.deletedAt, null)
     assert.equal(await objectExists(file.storageKey), true)
+  })
+
+  test('已有无审计墓碑时，管理员重试若审计写不进则报错且对象还在', async () => {
+    const file = await leaveUnauditedOrgTombstone('tombstone-audit-fail')
+    await setAuditInsertFailure(true)
+    try {
+      const err = await controller.remove(file.id, 'manual delete', req()).then(
+        () => assert.fail('墓碑重试在审计失败时不该删掉对象'),
+        (error: unknown) => error,
+      )
+      const body = errorOf(err)
+      assert.equal(body.code, 'ADMIN_USER_AUDIT_UNAVAILABLE')
+      assert.match(body.message, /未删除/)
+      const row = await prisma.fileObject.findUnique({ where: { id: file.id } })
+      assert.ok(row?.deletedAt)
+      assert.equal(row?.status, 'deleted')
+      assert.equal(await objectExists(file.storageKey), true)
+      assert.equal(await auditCount('file.delete', file.id), 0)
+    } finally {
+      await setAuditInsertFailure(false)
+    }
+  })
+
+  test('已有无审计墓碑时，管理员重试审计成功就删掉对象并留下恰好一条管理员审计', async () => {
+    const file = await leaveUnauditedOrgTombstone('tombstone-audit-ok')
+    await setAuditInsertFailure(false)
+    const result = await controller.remove(file.id, 'manual delete', req())
+    assert.equal(result.data.id, file.id)
+    assert.equal(result.data.status, 'deleted')
+    assert.equal(await objectExists(file.storageKey), false)
+    const audits = await prisma.auditLog.findMany({
+      where: { action: 'file.delete', targetId: file.id },
+      select: { actorRole: true, actorId: true },
+    })
+    assert.equal(audits.length, 1)
+    assert.equal(audits[0]?.actorRole, 'admin')
+    assert.equal(audits[0]?.actorId, admin.userId)
   })
 })
