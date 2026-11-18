@@ -1,7 +1,7 @@
 /**
  * 每天免费 AI 次数可由管理员改。
  * 没设过后台值时等于环境变量，环境变量没设就是简历 20、小青 80、面试 5。
- * 同进程改完立刻生效；另一实例最迟 30 秒读到 Redis。越界 400 且原值不动。
+ * 同进程改完立刻生效。另一进程有自己的缓存，最迟 30 秒读到 Redis。越界 400 且原值不动。
  * Redis 读失败回落环境变量，不当成 0。改小后已用够的下一次是 AI_QUOTA_EXHAUSTED。
  * 用量查询跨过缓存有效期后，面板上限仍是后台值，并且和下一次扣次一致。
  * 非管理员 401/403。审计有改前改后，不带姓名和手机号。
@@ -34,6 +34,7 @@ import { AiQuotaService } from '../src/ai/quota/ai-quota.service'
 import {
   AI_QUOTA_BUCKETS,
   AI_QUOTA_LIMIT_CACHE_MS,
+  DailyLimitCache,
   aiQuotaDailyLimitKey,
   clearDailyLimitCache,
   dailyLimit,
@@ -210,27 +211,32 @@ async function main() {
       assert.equal(guest.dailyLimit, 0)
     })
 
-    await check('另一实例最迟 30 秒读到 Redis 里的新上限', async () => {
+    await check('写成功的进程立刻生效，另一进程最迟 30 秒读到新上限', async () => {
       await clearKeys()
       const originalNow = Date.now
       let clock = originalNow()
       Date.now = () => clock
+      const readerCache = new DailyLimitCache()
+      const reader = new AiQuotaLimitService(redis, audit, prisma, readerCache)
       try {
         await limits.ensureFresh()
+        await reader.ensureFresh()
         assert.equal(dailyLimit('ai_resume'), 20)
-        await client.set(aiQuotaDailyLimitKey('ai_resume'), '15', 'EX', 60 * 60)
-        await client.set(aiQuotaDailyLimitKey('ai_assistant'), '16', 'EX', 60 * 60)
-        await client.set(aiQuotaDailyLimitKey('ai_interview'), '17', 'EX', 60 * 60)
-        clock += CROSS_PROCESS_REFRESH_MS - 1
-        assert.equal(dailyLimit('ai_resume'), 20)
-        await limits.ensureFresh()
-        assert.equal(dailyLimit('ai_resume'), 20)
-        clock += 1
-        const other = new AiQuotaLimitService(redis, audit, prisma)
-        await other.ensureFresh()
+        assert.equal(dailyLimit('ai_resume', readerCache), 20)
+        await limits.update(input(15, 16, 17), adminId, null)
         assert.equal(dailyLimit('ai_resume'), 15)
         assert.equal(dailyLimit('ai_assistant'), 16)
         assert.equal(dailyLimit('ai_interview'), 17)
+        assert.equal(dailyLimit('ai_resume', readerCache), 20)
+        clock += CROSS_PROCESS_REFRESH_MS - 1
+        assert.equal(dailyLimit('ai_resume', readerCache), 20)
+        await reader.ensureFresh()
+        assert.equal(dailyLimit('ai_resume', readerCache), 20)
+        clock += 1
+        await reader.ensureFresh()
+        assert.equal(dailyLimit('ai_resume', readerCache), 15)
+        assert.equal(dailyLimit('ai_assistant', readerCache), 16)
+        assert.equal(dailyLimit('ai_interview', readerCache), 17)
       } finally {
         Date.now = originalNow
       }
