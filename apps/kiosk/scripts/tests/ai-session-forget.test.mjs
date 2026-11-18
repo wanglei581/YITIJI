@@ -4,6 +4,8 @@
  * 锁住：只收 32 位小写十六进制、去重、只留最近 10 个；取走即清空；
  * 非 http 不发；小青有令牌发两次、没令牌发一次；作业凭据三种；
  * fetch 抛错不往外抛；503 会退避重试，最终失败不抛错、不卡住离场；每次都带 keepalive。
+ * 页面还在时，离场要等这次清场（含重试）有结果；16 毫秒拆掉页面就只发出第一发，并记诊断。
+ * 这是编译后的真模块加上模拟的页面生命周期，不是浏览器里点出来的。
  * 接线：读作业成功才登记、读失败不登记（编译 advisor.ts 真跑）；小青总结回了作业号也登记。
  */
 import assert from 'node:assert/strict'
@@ -260,6 +262,100 @@ test('503 时退避重试，最终失败不抛错、不卡住离场', async () =
   }
 })
 
+test('页面还在时等清场有结果再离场；页面先拆掉就停掉后续重试', async () => {
+  const kept = await loadForget()
+  const warnings = []
+  const originalWarn = console.warn
+  console.warn = (...args) => { warnings.push(args.map(String).join(' ')) }
+  const secret = '离场原话不许进诊断'
+  const sessionId = HEX(22)
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    return { ok: false, status: 503, json: async () => ({ message: secret }) }
+  }
+  try {
+    kept.mod.rememberAssistantSession(sessionId)
+    const started = Date.now()
+    kept.mod.forgetAiSessions(null)
+    assert.ok(Date.now() - started < 100, '清场调用本身不能等回执')
+    assert.equal(kept.mod.aiSessionForgetPending(), true, '重试还没跑完，离场不该当成已经结束')
+    let left = false
+    const leave = () => {
+      assert.equal(kept.mod.aiSessionForgetPending(), false)
+      left = true
+      kept.mod.noteAiForgetPageGone()
+    }
+    await kept.mod.whenAiSessionsForgotten()
+    leave()
+    assert.equal(left, true)
+    assert.equal(calls, 3, '页面留着时，三次请求都要发出去')
+    const failed = warnings.filter((line) => line.includes('forget_failed'))
+    assert.equal(failed.length, 1)
+    assert.match(failed[0], /\[kiosk-clear\] forget_failed kind=assistant status=503 attempts=3/)
+    assert.equal(warnings.some((line) => line.includes('已清') || line.includes(secret) || line.includes(sessionId)), false)
+    assert.equal(warnings.some((line) => line.includes('forget_aborted')), false, '等完再拆页面，不算中途截断')
+  } finally {
+    console.warn = originalWarn
+    kept.restore()
+  }
+
+  const torn = await loadForget()
+  const tornWarnings = []
+  console.warn = (...args) => { tornWarnings.push(args.map(String).join(' ')) }
+  let tornCalls = 0
+  globalThis.fetch = async () => {
+    tornCalls += 1
+    return { ok: false, status: 503, json: async () => ({}) }
+  }
+  try {
+    torn.mod.rememberAssistantSession(HEX(23))
+    torn.mod.forgetAiSessions(null)
+    await new Promise((resolve) => setTimeout(resolve, 16))
+    torn.mod.noteAiForgetPageGone()
+    await torn.mod.whenAiSessionsForgotten()
+    assert.equal(tornCalls, 1, '16 毫秒拆掉页面时，只来得及发出第一次请求')
+    assert.equal(torn.mod.aiSessionForgetPending(), false)
+    const aborted = tornWarnings.filter((line) => line.includes('forget_aborted'))
+    assert.equal(aborted.length, 1)
+    assert.match(aborted[0], /\[kiosk-clear\] forget_aborted reason=page_gone/)
+    assert.equal(tornWarnings.some((line) => line.includes('已清') || line.includes('forget_failed')), false)
+  } finally {
+    console.warn = originalWarn
+    torn.restore()
+  }
+})
+
+test('请求一直不回来时，8 秒到点记诊断并放行，不说已清', { timeout: 15_000 }, async () => {
+  const { mod, restore } = await loadForget()
+  const warnings = []
+  const originalWarn = console.warn
+  console.warn = (...args) => { warnings.push(args.map(String).join(' ')) }
+  let calls = 0
+  globalThis.fetch = () => {
+    calls += 1
+    return new Promise(() => undefined)
+  }
+  try {
+    mod.rememberAssistantSession(HEX(24))
+    const started = Date.now()
+    mod.forgetAiSessions(null)
+    await mod.whenAiSessionsForgotten()
+    const elapsed = Date.now() - started
+    assert.ok(elapsed >= 7_500 && elapsed < 12_000, `到点应当接近 8 秒，实际 ${elapsed}`)
+    assert.equal(calls, 1)
+    const deadline = warnings.filter((line) => line.includes('forget_deadline'))
+    assert.equal(deadline.length, 1)
+    assert.match(deadline[0], /\[kiosk-clear\] forget_deadline kind=assistant attempts=/)
+    assert.equal(warnings.some((line) => line.includes('已清')), false)
+    assert.equal(mod.aiSessionForgetPending(), false)
+  } finally {
+    console.warn = originalWarn
+    mod.noteAiForgetPageGone()
+    restore()
+  }
+})
+
 /**
  * 接线：读作业成功才登记（号 + 这次的凭据），读失败不登记。编译 advisor.ts 真跑，
  * 删掉 getAdvisorSession 里那一行登记、或挪到「读失败就抛」之前，这条就红。
@@ -296,6 +392,18 @@ test('读作业成功才登记作业号和这次的凭据；读失败不登记',
   } finally {
     bad.restore()
   }
+})
+
+test('接线：重载前等清场结果，拆页时停下还在睡的重试', () => {
+  const guard = readFileSync(join(root, 'src/auth/KioskPrivacyGuard.tsx'), 'utf8')
+  const hold = readFileSync(join(root, 'src/auth/useKioskClearHold.ts'), 'utf8')
+  const pushStart = guard.indexOf('function pushSanitizedDestination')
+  const pushEnd = guard.indexOf('function scheduleSanitizedDestination')
+  const push = guard.slice(pushStart, pushEnd)
+  assert.match(push, /noteAiForgetPageGone\(\)[\s\S]*?window\.location\.reload\(\)/)
+  assert.match(push, /noteAiForgetPageGone\(\)[\s\S]*?window\.location\.replace\(destination\.path\)/)
+  assert.match(hold, /if \(!aiSessionForgetPending\(\)\) \{\s*run\(\)/)
+  assert.match(hold, /whenAiSessionsForgotten\(\)\.then/)
 })
 
 test('接线：小青总结回了作业号也登记（aiHttpAdapter 的 summarizeAssistantSession）', () => {
