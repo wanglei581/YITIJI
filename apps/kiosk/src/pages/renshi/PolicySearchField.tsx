@@ -52,6 +52,8 @@ export function PolicySearchFieldView({
   const canSearch = !disabled && count > 0 && !over
   const showHint = active || over
   const showClear = !idle && value.length > 0
+  // 结果页静态态用 showGo 关掉「搜索」。一点进输入态（active）就要把「搜索」和 × 一起放出来。
+  const showSearch = !idle && (showGo || active)
   let hint: ReactNode = null
   if (showHint && over) {
     hint = <div className="policy-search-hint is-bad">
@@ -100,8 +102,11 @@ export function PolicySearchFieldView({
           </svg>
         </button>}
       </div>
-      {!idle && showGo && <button type="button" className="policy-search-go" data-testid="policy-search-go"
-        disabled={!canSearch} onClick={onSearch}>
+      {showSearch && <button type="button" className="policy-search-go" data-testid="policy-search-go"
+        disabled={!canSearch}
+        // 按下时别抢走输入框焦点，否则结果页会先退出输入态，按钮被卸掉，点不中。
+        onPointerDown={(event) => event.preventDefault()}
+        onClick={onSearch}>
         <Magnifier size={30} />搜索
       </button>}
     </div>
