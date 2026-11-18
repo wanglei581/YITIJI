@@ -42,6 +42,7 @@ import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput
 import { notifyPrintReturnHold } from './print-return-alert'
 import { assertCanOpenRefund } from './refund-paper-exclusion'
 import { convergeNotifiedRefundSuccess } from './refund-notify-paper-guard'
+import { cancelUnclaimedPrintTasks } from './cancel-unclaimed-print-task'
 import { nonStaleSuccessCents, payStatusAfterRefundFailure, remainderAmountCents, settlementAfterSuccess } from './refund-remainder'
 import { stageNewRefund } from './stage-order-refund'
 import {
@@ -503,6 +504,7 @@ export class RefundService {
       if (o.payStatus !== 'refunded' && o.payStatus !== 'partial_refunded') {
         throw new BadRequestException('ORDER_INVALID_TRANSITION')
       }
+      if (o.payStatus === 'refunded') await cancelUnclaimedPrintTasks(tx, o.id)
       return { completed: true, order: o }
     })
 
