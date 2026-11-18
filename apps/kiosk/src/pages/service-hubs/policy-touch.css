@@ -36,6 +36,7 @@
 .policy-min-pagination { display: flex; align-items: center; justify-content: center; gap: 20px; font-size: 22px; }
 .policy-min-source { display: flex; align-items: center; gap: 26px; }
 .policy-min-source > div:first-child { flex: 1; min-width: 0; }
+.policy-min-body .policy-source-note { margin: 6px 0 0; font-size: 21px; line-height: 28px; color: var(--qxt-ink-2); white-space: nowrap; }
 .policy-min-qr { width: 250px; flex: none; display: flex; align-items: center; flex-direction: column; gap: 6px; }
 .policy-min-qr > div { padding: 0; border: 0; background: transparent; }
 .policy-min-qr p,

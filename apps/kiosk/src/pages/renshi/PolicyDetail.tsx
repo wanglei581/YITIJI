@@ -170,7 +170,11 @@ export function PolicyDetail({ id }: { id: string }) {
       <HandlingSection title="谁可以申请" value={policy.whoCanApply} icon="user" />
       <HandlingSection title="要准备的材料" value={policy.requiredMaterials} icon="clipboard" check />
       <section className="policy-min-section policy-min-source">
-        <div><h2><QxTouchIcon name="landmark" size={30} />去哪办、看原文</h2><ul>{policyLines(policy.whereToApply).map((line, index) => <li key={index}>{line}</li>)}</ul></div>
+        <div>
+          <h2><QxTouchIcon name="landmark" size={30} />去哪办、看原文</h2>
+          <ul>{policyLines(policy.whereToApply).map((line, index) => <li key={index}>{line}</li>)}</ul>
+          {source?.kind === 'verified' && <p className="policy-source-note">链接发布时已核对属于发布机构登记的官方网站</p>}
+        </div>
         <div className="policy-min-qr">
           {source?.kind === 'verified' ? <><SourceUrlQr value={source.url} size={200} />
             <span className="policy-info-chip">{source.host}</span></>

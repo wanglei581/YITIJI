@@ -89,8 +89,21 @@ const NOTICE_LATE: PolicyFixture = {
 const GUIDE_LIST = [OTHER, FAV, DATED]
 const NOTICE_FEED = [NOTICE_LIST, NOTICE_NEXT]
 
-/** 核对过的原文链接：二维码下只留这一枚域名小签。没核对过或撤下后不再出现。 */
-const QR_NOTE = 'hrss.example.gov.cn'
+/** 系统核对句。核对过才出现，并且只占一行；没核对过或撤下后整页不再有。域名小签另测。 */
+const QR_NOTE = '链接发布时已核对属于发布机构登记的官方网站'
+
+async function expectVerifiedNote(page: Page): Promise<void> {
+  const note = page.getByText(QR_NOTE, { exact: true })
+  await expect(note).toBeVisible()
+  const line = await note.evaluate((el) => {
+    const box = el.getBoundingClientRect()
+    const style = getComputedStyle(el)
+    return { height: box.height, lineHeight: Number.parseFloat(style.lineHeight), whiteSpace: style.whiteSpace }
+  })
+  expect(line.whiteSpace).toBe('nowrap')
+  expect(line.lineHeight).toBeGreaterThan(0)
+  expect(line.height).toBeLessThanOrEqual(line.lineHeight + 1)
+}
 
 function shot(page: Page, name: string) {
   const dir = process.env.WALK_FIX_DIR
@@ -468,7 +481,8 @@ test('政策被撤下后点打印办事清单：不生成、不进打印，整�
   await routePolicies(page, state)
   await page.goto('/renshi?policy=policy-fav', { waitUntil: 'domcontentloaded' })
   await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'ready')
-  await expect(page.getByText(QR_NOTE)).toBeVisible()
+  await expectVerifiedNote(page)
+  await expect(page.locator('.policy-min-qr .policy-info-chip')).toHaveText('hrss.example.gov.cn')
   const print = page.getByTestId('policy-checklist-print')
   await expect(print).toContainText('打印办事清单（1 页）')
   await expect(print).toBeEnabled()
@@ -502,7 +516,7 @@ test('这次没生成清单时不说已经撤下，也不进打印，原文码�
   await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'ready')
   await expect(page.getByText(/撤下|下架/)).toHaveCount(0)
   await expect(policyHeading(page, '高校毕业生求职创业补贴')).toBeVisible()
-  await expect(page.getByText(QR_NOTE)).toBeVisible()
+  await expectVerifiedNote(page)
   await expect(page).toHaveURL(/\/renshi\?policy=policy-fav$/)
 })
 
@@ -578,7 +592,7 @@ test('政策下架自动刷新：正在看的这一条被下架，整页换成�
   await expect(policyScreen(page)).toHaveAttribute('data-qxt-state', 'ready')
   await expect(page.getByRole('heading', { name: '谁可以申请', exact: true })).toBeVisible()
   await expect(page.getByText('毕业年度内有就业创业意愿的高校毕业生', { exact: true })).toBeVisible()
-  await expect(page.getByText(QR_NOTE)).toBeVisible()
+  await expectVerifiedNote(page)
   state.withdrawn?.add('policy-fav')
   await page.clock.fastForward(31_000)
 
@@ -622,7 +636,7 @@ test('政策下架自动刷新：核对时这次没读到，不说已下架，�
   }
   await expect(page.getByText(/撤下|下架/)).toHaveCount(0)
   await expect(policyHeading(page, '高校毕业生求职创业补贴')).toBeVisible()
-  await expect(page.getByText(QR_NOTE)).toBeVisible()
+  await expectVerifiedNote(page)
   // 阳性对照：读取恢复、这条真被下架时，下一轮照样换成已下架——上面没说已下架，不是因为不再核对。
   state.failDetail?.delete('policy-fav')
   state.withdrawn?.add('policy-fav')

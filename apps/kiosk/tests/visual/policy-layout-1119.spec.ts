@@ -129,4 +129,7 @@ test('有原文摘录时详情收紧，去哪办压到一枚域名小签，两�
   await expect(page.locator('.policy-detail-excerpt')).toHaveCount(0)
   await expect(page.locator('.policy-min-actions .qxt-tile').first()).toHaveCSS('min-height', '132px')
   await expect(page.locator('.policy-min-qr .policy-info-chip')).toHaveText('hrss.example.gov.cn')
+  await page.goto('/renshi?policy=policy-startup')
+  await expect(page.getByRole('heading', { level: 1, name: '高校毕业生创业补贴' })).toBeVisible()
+  await expect(page.getByText('链接发布时已核对属于发布机构登记的官方网站')).toHaveCount(0)
 })
