@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-18：扫描任务服务按职责拆开（未推送）
+
+- 分支 `claude/scan-return-docs-1118`。`services/api/src/scan-tasks/scan-tasks.service.ts` 从 1380 行拆到 492 行。建单与重扫授权在 `scan-task-create.ts`（432 行），领取、取消和查询在 `scan-task-query.ts`（284 行），回传落文件在 `scan-task-deliver.ts`（256 行），类型、用途映射和比对在 `scan-task-contracts.ts`（218 行）。对外类名 `ScanTasksService`、方法签名、依赖注入和控制器调用不变。
+- 拆前拆后扫描相关门禁逐条都过，含 `verify:scan-tasks`、屏上扫描、静默期、序列化冲突，以及一体机 `verify:scan-session-truth`。`services/api` 的 `tsc --noEmit` 退出码 0。图谱已重生，`--check` 通过。
+- 这一段只做拆分，扫描回传进「我的文档」的行为还没改。没改岗位、招聘会、打印、收费、数据库和密钥。
+
 ## 2026-11-17：简历「新增事实本人确认」第十一版收货返工（未推送）
 
 - 分支 `claude/resume-r2k-1117`。末段「一位数字加十」不再看到十就截断：十后面紧跟数字，或紧跟万、亿、千、百、十，就把后面并进同一条，读数和停在十的原文不同。两份规则仍逐字节相同。

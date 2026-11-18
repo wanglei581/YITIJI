@@ -13489,7 +13489,6 @@
         "handler": "ScanDeviceController.deviceSettings",
         "method": "POST",
         "models": [
-          "FileObject",
           "ScanTask",
           "Terminal",
           "TerminalCapability"
@@ -13508,7 +13507,6 @@
         "handler": "ScanDeviceController.switchToPanel",
         "method": "POST",
         "models": [
-          "FileObject",
           "ScanTask",
           "Terminal",
           "TerminalCapability"
@@ -19402,7 +19400,6 @@
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/print-jobs/self-service-reprint.ts",
           "services/api/src/print-sign/print-sign.service.ts",
-          "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts",
           "services/api/src/upload-sessions/upload-session-member-bind.ts",
           "services/api/src/upload-sessions/upload-session-object-delete.ts"
