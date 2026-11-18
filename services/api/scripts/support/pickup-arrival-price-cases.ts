@@ -30,6 +30,7 @@ import {
   PRINT_JOB_UNCONFIRMED_ERROR_CODE,
   PRINTING_REPORT_LOST_ERROR_CODE,
 } from '../../src/print-jobs/paid-anomaly-disposition'
+import { runArrivalHoldCases } from './pickup-arrival-hold-cases'
 import { runArrivalMoneyCases } from './pickup-arrival-money-cases'
 import { runNoPaperAllowlistCases } from './pickup-arrival-no-paper-allowlist-cases'
 import {
@@ -299,6 +300,11 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     const explicitRefunds = await db.refund.findMany({ where: { orderId: explicitId, reason: PAID_NO_PAPER_AUTO_REASON } })
     assert.equal(explicitRefunds.length, 1)
     assert.equal(explicitRefunds[0]?.status, 'success')
+    const explicitReturnAudit = JSON.parse(
+      (await db.auditLog.findFirstOrThrow({ where: { targetId: explicitId, action: 'print_order.auto_return' } })).payloadJson ?? '{}',
+    ) as { refundNo?: string; amountCents?: number }
+    assert.equal(explicitReturnAudit.refundNo, explicitRefunds[0]?.refundNo)
+    assert.equal(explicitReturnAudit.amountCents, 200)
     const explicitAgain = await settleExplicitNoPaperFromReportedFailure(db, explicitTask)
     assert.notEqual(explicitAgain, 'refunded')
     assert.equal(await db.refund.count({ where: { orderId: explicitId } }), 1)
@@ -450,6 +456,13 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     assert.equal(failedOrder.payStatus, 'paid', '渠道退款失败后订单回到已付款')
     const failedRow = await db.refund.findFirst({ where: { orderId: failedId, reason: PAID_NO_PAPER_AUTO_REASON } })
     assert.equal(failedRow?.status, 'failed')
+    const failedAudit = JSON.parse(
+      (await db.auditLog.findFirstOrThrow({
+        where: { targetId: failedId, action: 'print_order.auto_return_failed' },
+      })).payloadJson ?? '{}',
+    ) as { code?: string; refundNo?: string }
+    assert.equal(failedAudit.code, 'REFUND_CHANNEL_FAILED')
+    assert.equal(failedAudit.refundNo, failedRow?.refundNo)
     const channelFailedReason = '退款渠道返回失败（REFUND_CHANNEL_FAILED），没有退成'
     const alerts = await collectPrintReturnAlerts(db)
     assert.ok(alerts.some((alert) => alert.type === 'print_return_manual' && alert.subjectId === failedId && alert.detail === channelFailedReason))
@@ -465,6 +478,14 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
       terminalId: pricedTerminalId,
       orderIds,
       taskIds,
+    })
+    await runArrivalHoldCases(db, {
+      tag,
+      pricedTerminalId,
+      zeroTerminalId,
+      publicTerminalId,
+      otherTerminalId,
+      orderIds,
     })
 
     await db.platformSetting.upsert({

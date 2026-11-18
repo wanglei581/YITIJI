@@ -205,16 +205,37 @@ export async function settleExplicitNoPaper(
       reason: PAID_NO_PAPER_AUTO_REASON,
     })
     if (view.refund.status === 'failed') {
-      await rememberOnce(db, order.id, PRINT_NO_PAPER_AUTO_FAILED_AUDIT, { code: 'REFUND_CHANNEL_FAILED' })
+      await rememberOnce(db, order.id, PRINT_NO_PAPER_AUTO_FAILED_AUDIT, {
+        code: 'REFUND_CHANNEL_FAILED',
+        refundNo: view.refund.refundNo,
+        channel: view.refund.channel,
+        channelReason: view.refund.status,
+      })
       await pushPrintReturnAlert(db, order.id)
       return 'failed'
     }
+    await rememberOnce(db, order.id, 'print_order.auto_return', {
+      refundNo: view.refund.refundNo,
+      channel: view.refund.channel,
+      channelRefundNo: view.refund.channelRefundNo,
+      channelReason: view.refund.status,
+      amountCents: view.refund.amountCents,
+    })
     return view.idempotent ? 'idempotent' : 'refunded'
   } catch (error) {
     const code = exceptionCode(error)
     if (code === 'ORDER_ALREADY_REFUNDED' || code === 'ORDER_TASK_IN_PROGRESS') return 'signaled'
     if (code) {
-      await rememberOnce(db, order.id, PRINT_NO_PAPER_AUTO_FAILED_AUDIT, { code })
+      const refundRow = await db.refund.findFirst({
+        where: { orderId: order.id, reason: PAID_NO_PAPER_AUTO_REASON },
+        select: { refundNo: true, channel: true },
+      })
+      await rememberOnce(db, order.id, PRINT_NO_PAPER_AUTO_FAILED_AUDIT, {
+        code,
+        refundNo: refundRow?.refundNo ?? null,
+        channel: refundRow?.channel ?? null,
+        channelReason: code,
+      })
       await pushPrintReturnAlert(db, order.id)
       return 'failed'
     }

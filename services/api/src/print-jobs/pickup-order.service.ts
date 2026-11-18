@@ -27,6 +27,7 @@ import { maskPickupFileName } from './pickup-file-mask'
 import { isPickupClaimWindowClosed } from './pickup-claim-window'
 import { resumeReleasedFailure } from './pickup-code-resume'
 import { settlePickupArrival } from './pickup-arrival-price'
+import { releaseStaleArrivalHold } from './pickup-arrival-hold'
 
 export { isPickupClaimWindowClosed }
 
@@ -113,13 +114,17 @@ export class PickupOrderService {
       await this.noteClaimFailure(terminal.id, 'code_not_found', null)
       throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     }
-    if (order.terminalId && order.terminalId !== terminal.id) {
+    await releaseStaleArrivalHold(this.prisma, order.id)
+    const heldOrder = await this.prisma.order.findUnique({ where: { id: order.id } })
+    if (!heldOrder) throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
+    if (heldOrder.terminalId && heldOrder.terminalId !== terminal.id) {
       // 码真实存在但绑在别的终端：这是运营真正需要区分的场景（用户走错机器），
       // 也是攻击者「猜中了一枚真码」的场景 —— 两者都值得留痕，且发生率天然很低。
-      await this.noteClaimFailure(terminal.id, 'terminal_mismatch', order.id)
+      // 看价不写终端号。付款进行中才会占住；过期且渠道还没受理的占用已在上面放开。
+      await this.noteClaimFailure(terminal.id, 'terminal_mismatch', heldOrder.id)
       throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     }
-    return this.settleClaim(order, terminal, 'pickup_code')
+    return this.settleClaim(heldOrder, terminal, 'pickup_code')
   }
 
   /**
@@ -133,6 +138,10 @@ export class PickupOrderService {
    * 否则登录用户可以拿自己的单反复抵扣、给枚举续命）；审计 payload 记下入口。
    */
   async settleClaim(order: OrderRecord, terminal: { id: string }, via: PickupClaimVia) {
+    await releaseStaleArrivalHold(this.prisma, order.id)
+    const currentOrder = await this.prisma.order.findUnique({ where: { id: order.id } })
+    if (!currentOrder) throw new NotFoundException('ORDER_NOT_FOUND')
+    order = currentOrder
     if (order.terminalId && order.terminalId !== terminal.id) throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     // 退款态必须先于关窗判断：claimed + refunding 不再算活租约，否则会先被写成
     // PICKUP_CODE_EXPIRED，把「钱已退」说成「码过期」。
@@ -297,7 +306,7 @@ export class PickupOrderService {
       billablePages: fresh.billablePages,
       ...this.printSummary(fresh),
       fileName: fresh.sourceFileName ?? (firstItem ? `材料包第${firstItem.seq + 1}份` : null),
-      paymentSessionToken: this.paymentToken(fresh),
+      paymentSessionToken: this.paymentToken(fresh, terminal.id),
       ...(arrival.notice ? { arrivalChargeNotice: true as const } : {}),
     }
   }
@@ -527,11 +536,11 @@ export class PickupOrderService {
     throw new UnauthorizedException(result.code)
   }
 
-  private paymentToken(order: OrderRecord): string {
+  private paymentToken(order: OrderRecord, terminalId?: string | null): string {
     return createPaymentSessionToken({
       orderId: order.id,
       orderNo: order.orderNo,
-      terminalId: order.terminalId,
+      terminalId: terminalId ?? order.terminalId,
       amountCents: order.amountCents,
       printTaskId: order.printTaskId,
     })

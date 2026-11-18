@@ -16,6 +16,8 @@
 // 出码/轮询/查单必须携带打印建单返回的 x-payment-session-token。回调端点靠签名鉴权，不走登录态。
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Req, Res } from '@nestjs/common'
 import type { Request, Response } from 'express'
+import { bindArrivalPaymentTerminal } from '../print-jobs/pickup-arrival-hold'
+import { PrismaService } from '../prisma/prisma.service'
 import { CreateCodePayAttemptDto, CreatePayAttemptDto, SandboxSimulateDto } from './dto/online-payment.dto'
 import { OnlinePaymentService } from './online-payment.service'
 import { PricingService } from './pricing.service'
@@ -32,6 +34,7 @@ export class PaymentController {
     private readonly onlinePayment: OnlinePaymentService,
     private readonly pricing: PricingService,
     private readonly refunds: RefundService,
+    private readonly prisma: PrismaService,
   ) {}
 
   // POST /api/v1/payment/wechat/refund-notify — 微信退款结果异步通知。
@@ -67,6 +70,7 @@ export class PaymentController {
     @Headers('x-payment-session-token') paymentSessionToken: string | undefined,
     @Body() dto: CreatePayAttemptDto,
   ) {
+    await bindArrivalPaymentTerminal(this.prisma, id, paymentSessionToken)
     return this.onlinePayment.createPayAttempt(id, paymentSessionToken, dto?.channel)
   }
 
@@ -77,6 +81,7 @@ export class PaymentController {
     @Headers('x-payment-session-token') paymentSessionToken: string | undefined,
     @Body() dto: CreateCodePayAttemptDto,
   ) {
+    await bindArrivalPaymentTerminal(this.prisma, id, paymentSessionToken)
     return this.onlinePayment.createCodePayAttempt(id, paymentSessionToken, dto.authCode, dto.channel)
   }
 

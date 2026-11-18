@@ -38,6 +38,7 @@ import {
   type PaymentProvider,
 } from './payment-provider.types'
 import { SandboxPaymentProvider } from './providers/sandbox-payment.provider'
+import { parkRepricedAttemptCollection } from './stale-attempt-collection'
 import { settleServiceOrderCallback } from './service-order.payment'
 import { ONLINE_PAYMENT_CHANNELS, type PaymentAttemptStatus, type PaymentChannel } from './payment.types'
 
@@ -729,7 +730,22 @@ export class OnlinePaymentService {
     // 必须在补写 prepayId 之前完成，避免金额不对的签名报文先污染标识。
     if (attempt.amountCents !== event.amountCents) throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
     const order = attempt.order
-    if (order.amountCents !== event.amountCents) throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
+    if (order.amountCents !== event.amountCents) {
+      // 改价后过期尝试的迟到扣款：不按旧金额入账放行，也不把钱丢在渠道里没人管。
+      const parked = await parkRepricedAttemptCollection(this.prisma, {
+        orderId: order.id,
+        payStatus: order.payStatus,
+        refundReason: order.refundReason,
+        attemptId: attempt.id,
+        attemptStatus: attempt.status,
+        attemptAmountCents: attempt.amountCents,
+        orderAmountCents: order.amountCents,
+        channel,
+        channelTxnNo: event.channelTxnNo,
+      })
+      if (parked) return { ok: true, idempotent: true, ack }
+      throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
+    }
     await this.bindCallbackIdentifiersIfMissing(attempt, event.prepayId)
 
     if (event.result === 'success') {
