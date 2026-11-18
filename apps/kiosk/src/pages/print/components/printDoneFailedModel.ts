@@ -291,6 +291,18 @@ export function paymentRow(money: OutOfPaperMoney): SummaryRow {
  * useTerminalDeviceStatus 的 mapTerminalPrinterStatus：心跳在线且 printerStatus 为 paper_jam 或别名 jam 时，
  * kind 是 error、printer.errorCode 是 paperJam。还在读、离线、缺纸、其它故障都不是。
  */
+/** 三态失败页的「设备上报」只留设备那一句，不把第 3 步的服务电话再贴一遍。普通失败仍用已经换成无人值守口径的整句。 */
+export function shownFailureReason(variant: FailureVariant, deviceReason: string, presentedReason: string): string {
+  if (variant === 'paper-jam' || variant === 'out-of-paper' || variant === 'offline') return deviceReason
+  return presentedReason
+}
+
+/** 带走链接取不到。三态里不再接「打印有问题？拨打服务电话」，服务电话只留在第 3 步。 */
+export function faultScreenTakeawayMiss(visual: string): string {
+  if (visual === 'paper-jam' || visual === 'out-of-paper' || visual === 'offline') return '带走链接没取到。'
+  return `带走链接没取到。${printProblemLine()}`
+}
+
 export function printerJamConfirmed(device: {
   loading: boolean
   kind: 'ready' | 'offline' | 'error' | 'low_paper' | 'unknown'

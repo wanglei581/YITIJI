@@ -27,7 +27,7 @@ import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { PrintDoneUnverified } from './components/PrintDoneUnverified'
 import { UNKNOWN_NO_TASK_SUBTITLE, UNKNOWN_TASK_SUBTITLE } from './components/printDoneUnverifiedCopy'
 import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
-import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, printerJamConfirmed, retryBlockedReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
+import { failureCopy, failureSummaryRows, faultScreenTakeawayMiss, feeInfoCopy, paymentRow, printerJamConfirmed, retryBlockedReason, shownFailureReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
 import { CONTACT_ENTRY_LABEL, PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintDoneRecordSection } from './components/PrintDoneSections'
@@ -342,11 +342,12 @@ export function PrintDonePage() {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setTakeawayError(preferUnattended(userMessageOf(err, `带走链接没取到。${printProblemLine()}`), `带走链接没取到。${printProblemLine()}`))
+          const fallback = faultScreenTakeawayMiss(resultState === 'failed' ? failVisual(verification?.errorCode) : 'failed')
+          setTakeawayError(preferUnattended(userMessageOf(err, fallback), fallback))
         }
       })
     return () => { cancelled = true }
-  }, [getToken, resultState, state.paymentSessionToken, taskId])
+  }, [getToken, resultState, state.paymentSessionToken, taskId, verification?.errorCode])
 
   const takeawayCopy = doneTakeaway(file ? { pages: file.pages } : null, params)
 
@@ -549,7 +550,13 @@ export function PrintDonePage() {
           pickupSource: state.pickupSource === true,
           confirmedJam: variant === 'paper-jam' && printerJamConfirmed(device),
         })}
-        rows={failureSummaryRows({ orderNo: faultOrderNo, file: file ?? null, params: params ?? null, money, reason: failureReason })}
+        rows={failureSummaryRows({
+          orderNo: faultOrderNo,
+          file: file ?? null,
+          params: params ?? null,
+          money,
+          reason: shownFailureReason(variant, verification?.failureReason ?? '', failureReason),
+        })}
         free={amountCents === 0}
         retry={{ available: canRetry, blockedReason: retryBlockedReason(device), busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}
         takeaway={{

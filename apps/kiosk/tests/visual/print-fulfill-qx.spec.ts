@@ -128,7 +128,8 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   // 正是"页面没给出重试出口"的那一态：此时更不能让用户以为补个纸就能等到结果。
   const outOfPaper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
   await expect(outOfPaper).toContainText('不会在加纸后自动继续')
-  await expect(outOfPaper).toContainText('打印有问题？')
+  await expect(outOfPaper).toContainText('带走链接没取到。')
+  await expect(outOfPaper).not.toContainText('打印有问题？')
   await expect(outOfPaper).not.toContainText('联系现场工作人员')
   await expect(outOfPaper).toContainText('订单和已付金额都保留着')
   // 「只有出现按钮时才能自己重打」——重试必须被说成有条件的，不是无条件可用。
@@ -166,7 +167,8 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   }
   await expect(page.getByRole('button', { name: '查看费用说明' })).toBeVisible()
   await expect(page.getByTestId('print-fulfill-primary')).toHaveText('使用帮助')
-  await expect(outOfPaper.getByRole('status')).toContainText('打印有问题？')
+  await expect(outOfPaper.getByRole('status')).toContainText('带走链接没取到。')
+  await expect(outOfPaper.getByRole('status')).not.toContainText('打印有问题？')
   await expect(outOfPaper.getByRole('status')).not.toContainText('联系工作人员')
 
   await expectTouchAndBounds(page)

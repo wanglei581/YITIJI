@@ -126,3 +126,42 @@ test('离线副题与卡纸同结构，同一屏不再混用请稍后重试和�
   assert.equal(deviceLine, '打印机离线，当前无法打印。')
   assert.doesNotMatch(deviceLine, /请稍后重试|请稍后再来/)
 })
+
+test('三态失败页上服务电话只出现一次，设备上报和带走失败都不带电话', async () => {
+  const unattended = await import(unattendedUrl)
+  unattended.bindSupportContactPeek(() => ({
+    servicePhone: '18369161921',
+    serviceHours: '工作日 9:00–18:00',
+    otherOnlineTerminalNearby: false,
+    miniappPublished: false,
+    selfNoteTab: false,
+  }))
+  const cases = [
+    ['out-of-paper', 'PAPER_EMPTY'],
+    ['paper-jam', 'PRINTER_ERROR'],
+    ['offline', 'PRINTER_OFFLINE'],
+  ]
+  for (const [variant, errorCode] of cases) {
+    const deviceReason = progress.screenFailureReason({ errorCode, failureReasonForUser: '请联系工作人员处理' })
+    const presented = progress.presentScreenFailure({ errorCode, failureReasonForUser: deviceReason })
+    const copy = failedModel.failureCopy({ variant, confirmedJam: false, money, orderNo: 'ORD-PHONE', canRetry: false })
+    const reason = failedModel.shownFailureReason(variant, deviceReason, presented)
+    const rows = failedModel.failureSummaryRows({ orderNo: 'ORD-PHONE', file: null, params: null, money, reason })
+    const miss = failedModel.faultScreenTakeawayMiss(variant)
+    const text = [screenText(copy), ...rows.map((row) => `${row.label}${row.value}`), miss].join('\n')
+    assert.equal((text.match(/服务电话/g) ?? []).length, 1, `${variant} 服务电话应只出现一次`)
+    assert.match(copy.steps[2].detail, /服务电话/)
+    assert.doesNotMatch(reason, /服务电话|这台机器暂时打不了|打印有问题/)
+    assert.equal(miss, '带走链接没取到。')
+    assert.doesNotMatch(text, /工作人员/)
+  }
+  const retryCopy = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-PHONE', canRetry: true })
+  const retryReason = failedModel.shownFailureReason('out-of-paper', progress.errorCodeToMessage('PAPER_EMPTY'), '')
+  const retryRows = failedModel.failureSummaryRows({ orderNo: 'ORD-PHONE', file: null, params: null, money, reason: retryReason })
+  const retryText = [screenText(retryCopy), ...retryRows.map((row) => row.value), failedModel.faultScreenTakeawayMiss('out-of-paper')].join('\n')
+  assert.equal((retryText.match(/服务电话/g) ?? []).length, 1, '缺纸能重提时，服务电话只留在小字里那一次')
+  assert.match(failedModel.faultScreenTakeawayMiss('failed'), /打印有问题？/)
+  const page = readFileSync(join(kioskRoot, 'src/pages/print/PrintDonePage.tsx'), 'utf8')
+  assert.match(page, /shownFailureReason\(variant, verification\?\.failureReason \?\? '', failureReason\)/)
+  assert.match(page, /faultScreenTakeawayMiss\(/)
+})
