@@ -118,7 +118,8 @@ async function grant(id: string, action = 'close_account') {
 
 // 第 11 组按「前后不挨字母数字的四位数」反查尾号。先避开库里已有的，再避开本文件写死的日期、
 // 当天日期，以及这次运行按当前时间生成、稍后写进字符串列的日期。
-// 微信标识、手机号密文是身份本身，写法不动；里面若出现已占的四位数就换一次，最多 8 次，用尽即失败。
+// 手机号候选、微信标识、手机号密文若出现已占的四位数就换一次。手机号候选算进同一笔 8 次预算，
+// 用尽即失败，不能在预算外面一直重抽。每个已收下的手机号下，微信标识和密文再最多换 8 次。
 const MAX_IDENTITY_DRAWS = 8
 const HYPHENATED_UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 const FIXTURE_DAY = '2026-10-03'
@@ -184,19 +185,15 @@ async function collectBoundedFourDigitTokens(client: typeof scanClient) {
 }
 
 let takenTails: Set<string> | undefined
-async function member(nickname: string) {
-  if (!takenTails) {
-    takenTails = await collectBoundedFourDigitTokens(scanClient)
-    reserveClosureDates(takenTails)
-  }
-  const taken = takenTails
-  assert.ok(taken.size < 9000, `库里已有 ${taken.size} 个独立 4 位数，选不出不撞号的手机号`)
+/** 手机号候选每次消耗 1 次预算。尾号已占就继续抽，抽满仍没有可留的身份就失败。 */
+function reserveMemberIdentity(taken: Set<string>, source: () => number): { phone: string; wxOpenId: string; phoneEnc: string } {
   let phone = ''
   let wxOpenId = ''
   let phoneEnc = ''
   let reserved = false
   for (let attempt = 0; attempt < MAX_IDENTITY_DRAWS && !reserved; attempt += 1) {
-    do phone = `139${randomInt(10000000, 99999999)}`; while (taken.has(phone.slice(-4)))
+    phone = `139${source()}`
+    if (taken.has(phone.slice(-4))) continue
     const tail = phone.slice(-4)
     for (let draw = 0; draw < MAX_IDENTITY_DRAWS; draw += 1) {
       const openId = `wx-${randomUUID()}`
@@ -210,6 +207,16 @@ async function member(nickname: string) {
     }
   }
   assert.ok(reserved, '测试手机号和身份随机值避让 8 次后仍撞号')
+  return { phone, wxOpenId, phoneEnc }
+}
+async function member(nickname: string) {
+  if (!takenTails) {
+    takenTails = await collectBoundedFourDigitTokens(scanClient)
+    reserveClosureDates(takenTails)
+  }
+  const taken = takenTails
+  assert.ok(taken.size < 9000, `库里已有 ${taken.size} 个独立 4 位数，选不出不撞号的手机号`)
+  const { phone, wxOpenId, phoneEnc } = reserveMemberIdentity(taken, () => randomInt(10000000, 99999999))
   const identity: ClosureScanIdentity = { phone, phoneHash: hashPhone(phone), phoneEnc,
     wxOpenId, nickname: `${nickname}·${tag.slice(0, 6)}-${memberIds.length}` }
   const row = await put('endUser', { ...identity, phone: undefined, status: 'active', enabled: true })
@@ -350,6 +357,24 @@ async function opaqueFixtureTokens(endUserId: string, built: { terminalId: strin
 async function main() {
   await prisma.onModuleInit()
   if (realRedis) await (client as Redis).ping()
+  await check('手机号重抽有上限：随机源一直给已占尾号时明确失败且不挂住', async () => {
+    const blocked = new Set<string>(['2026'])
+    let calls = 0
+    let thrown: unknown
+    try {
+      reserveMemberIdentity(blocked, () => {
+        calls += 1
+        // 超过预算仍来要号码时立刻停下。正确实现只会要满 8 次已占尾号，不会走到这里。
+        if (calls > MAX_IDENTITY_DRAWS) throw new Error('手机号候选超过 8 次仍在抽')
+        return 10002026
+      })
+    } catch (error) { thrown = error }
+    assert.equal(thrown instanceof assert.AssertionError, true, thrown instanceof Error ? thrown.message : '没有失败')
+    if (!(thrown instanceof assert.AssertionError)) return
+    assert.match(thrown.message, /测试手机号和身份随机值避让 8 次后仍撞号/)
+    assert.equal(calls, MAX_IDENTITY_DRAWS, `手机号候选抽了 ${calls} 次`)
+    assert.equal(blocked.size, 1, '失败时不得写入新尾号')
+  })
   await put('user', { id: admin.userId, username: `closure-admin-${tag}`, name: '运营管理员', passwordHash: 'not-a-login-password', role: 'admin' })
   const owned = await member('林知远'); const other = await member('沈嘉宁')
   const ownedFixture = await fixture(owned.id, owned.identity); const otherFixture = await fixture(other.id, other.identity)
