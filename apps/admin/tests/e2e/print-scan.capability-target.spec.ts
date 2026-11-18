@@ -28,13 +28,16 @@ const TERMINALS = [
   },
 ]
 
-function capabilityRows(note: string, withSignature = false): CapabilityRow[] {
+function capabilityRows(note: string, withSignature = false, withScanDevice = false): CapabilityRow[] {
   const rows: CapabilityRow[] = [
     { capabilityKey: 'document_print', status: 'available', note, configured: true, updatedAt: '2026-10-01T00:00:00.000Z' },
     { capabilityKey: 'material_pack', status: 'not_verified', note: null, configured: false, updatedAt: null },
   ]
   if (withSignature) {
     rows.push({ capabilityKey: 'signature_stamp', status: 'not_verified', note: null, configured: false, updatedAt: null })
+  }
+  if (withScanDevice) {
+    rows.push({ capabilityKey: 'scan_device', status: 'not_verified', note: null, configured: false, updatedAt: null })
   }
   return rows
 }
@@ -50,6 +53,7 @@ async function setup(page: Page, options: {
   putStatus?: number
   putErrorMessage?: string
   withSignature?: boolean
+  withScanDevice?: boolean
 } = {}) {
   const calls: CapabilityCall[] = []
   const json = (route: Route, body: unknown) =>
@@ -74,7 +78,7 @@ async function setup(page: Page, options: {
       if (hold) await hold
       const note = terminalId === 'term-new01' ? 'A-TABLE' : 'B-TABLE'
       const terminalCode = terminalId === 'term-new01' ? 'new01' : 'KSK-001'
-      return json(route, { data: { terminalCode, capabilities: capabilityRows(note, options.withSignature) } })
+      return json(route, { data: { terminalCode, capabilities: capabilityRows(note, options.withSignature, options.withScanDevice) } })
     }
     const saved = url.pathname.match(/\/admin\/terminals\/([^/]+)\/capabilities\/([^/]+)$/)
     if (method === 'PUT' && saved) {
@@ -305,4 +309,37 @@ test('签名确认打到页面选中的终端，回执在签名行正下方', as
   const receiptRow = signature.locator('xpath=following-sibling::tr[1]')
   await expect(receiptRow).toContainText('已登记到 PUT-CODE-KSK · 2026-10-16 08:30')
   await expect(page.getByText('大厅终端 · KSK-001 · Agent 0.4.11 · 离线')).not.toContainText('已登记到')
+})
+
+const SCAN_DEVICE_AVAILABLE_RECEIPT = '已登记到 PUT-CODE-KSK · 2026-10-16 08:30。云端已标为可用。还要在这台终端的终端程序配置里打开扫描（把 agent-config.json 的 scanDeviceEnabled 写成 true），并重启终端程序（Terminal Agent）才生效。终端程序只在启动时读取这个开关，保存配置文件本身不会马上生效。'
+
+test('屏上扫描存成可用后，成功提示写明还要打开本机扫描开关并重启终端程序', async ({ page }) => {
+  const calls = await setup(page, { withScanDevice: true })
+  await terminalSelect(page).selectOption('term-ksk')
+  const scan = page.locator('tr').filter({ hasText: '屏上扫描（需真机验证）' })
+  await scan.locator('select').selectOption('available')
+  await scan.getByRole('button', { name: '登记' }).click()
+  await page.getByRole('button', { name: '确认', exact: true }).click()
+  await expect.poll(() => calls.filter((call) => call.method === 'PUT').map((call) => call.pathname)).toEqual([
+    '/api/v1/admin/terminals/term-ksk/capabilities/scan_device',
+  ])
+  await expect(page.getByText(SCAN_DEVICE_AVAILABLE_RECEIPT)).toBeVisible()
+})
+
+test('屏上扫描存成测试中时，成功提示不提本机扫描开关', async ({ page }) => {
+  const calls = await setup(page, {
+    withScanDevice: true,
+    putResult: (_terminalId, key) => ({
+      terminalCode: 'PUT-CODE-KSK',
+      capability: { capabilityKey: key, status: 'testing', note: null, configured: true, updatedAt: '2026-10-16T00:30:00.000Z' },
+    }),
+  })
+  await terminalSelect(page).selectOption('term-ksk')
+  const scan = page.locator('tr').filter({ hasText: '屏上扫描（需真机验证）' })
+  await scan.locator('select').selectOption('testing')
+  await scan.getByRole('button', { name: '登记' }).click()
+  await page.getByRole('button', { name: '确认', exact: true }).click()
+  await expect.poll(() => calls.filter((call) => call.method === 'PUT').length).toBe(1)
+  await expect(page.getByText('已登记到 PUT-CODE-KSK · 2026-10-16 08:30')).toBeVisible()
+  await expect(page.getByText('scanDeviceEnabled')).toHaveCount(0)
 })

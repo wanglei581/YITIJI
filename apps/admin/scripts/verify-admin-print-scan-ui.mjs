@@ -151,6 +151,16 @@ if (
 } else {
   fail('copy and material-pack must use the read-only endpoints, and mock must return an empty page')
 }
+if (
+  cap.includes("receipt.key !== 'scan_device' || receipt.status !== 'available'") &&
+  cap.includes('scanDeviceEnabled') &&
+  cap.includes('重启终端程序（Terminal Agent）') &&
+  cap.includes('终端程序只在启动时读取这个开关，保存配置文件本身不会马上生效。')
+) {
+  pass('saving scan_device as available tells the operator to enable scanDeviceEnabled and restart Terminal Agent')
+} else {
+  fail('scan_device available receipt must name scanDeviceEnabled and the Terminal Agent restart')
+}
 for (const key of ["type: 'photo'", "type: 'copy'", "type: 'material_pack'"]) {
   if (service.includes(`${key},`) && service.includes('MOCK') && new RegExp(`MOCK_[A-Z_]*\\s*[:=][^]*${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(service)) {
     fail(`mock adapter must not fabricate rows for unimplemented type: ${key}`)
