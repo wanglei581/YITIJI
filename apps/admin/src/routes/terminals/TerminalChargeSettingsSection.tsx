@@ -23,6 +23,12 @@ const REASON_TEXT: Record<EffectivePriceReason, string> = {
 }
 
 const ORG_PAYS_WARNING = '这台机器绑定了机构。机构买的机器由机构承担；只有我方自己投放的机器才向用户收费，不用我方收款账户替机构收钱。'
+const STALE_CHARGE_CODE = 'TERMINAL_CHARGE_SETTINGS_STALE'
+const STALE_CHARGE_MESSAGE = '机构刚改过，收费设置已复位，请重新读取后再改'
+
+function isStaleChargeSettings(reason: unknown): boolean {
+  return typeof reason === 'object' && reason !== null && (reason as { code?: unknown }).code === STALE_CHARGE_CODE
+}
 
 function yuanText(cents: number): string {
   return (cents / 100).toFixed(2)
@@ -54,12 +60,15 @@ export function TerminalChargeSettingsSection({
   terminalId,
   orgId,
   resetNotice,
+  savingOrg,
   onSaved,
 }: {
   terminalId: string
   orgId: string | null
   /** 本次改绑接口返回已复位时，由抽屉外层留下这一句。重新打开抽屉时外层清掉。 */
   resetNotice: string | null
+  /** 改绑机构的请求还没回来。这段时间不能保存，否则会把旧价写进新机构。 */
+  savingOrg: boolean
   onSaved: (terminalId: string, view: TerminalChargeSettingsView) => void
 }) {
   const [view, setView] = useState<TerminalChargeSettingsView | null>(null)
@@ -98,9 +107,11 @@ export function TerminalChargeSettingsSection({
   }, [terminalId, orgId])
 
   const onSave = async () => {
+    if (savingOrg) return
     if (!view || !yuan || view.isPublicSite) return
     const requestTerminalId = terminalId
     const requestId = ++requestSeq.current
+    const generation = view.orgBindingGeneration
     const prices = {} as Record<TerminalChargeServiceKey, number>
     for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
       const cents = parseYuan(yuan[key])
@@ -116,7 +127,11 @@ export function TerminalChargeSettingsSection({
     setError(null)
     setNotice(null)
     try {
-      const saved = await saveTerminalChargeSettings(requestTerminalId, { userChargeMode: mode, prices })
+      const saved = await saveTerminalChargeSettings(requestTerminalId, {
+        userChargeMode: mode,
+        prices,
+        orgBindingGeneration: generation,
+      })
       onSaved(requestTerminalId, saved)
       if (terminalIdRef.current !== requestTerminalId || requestId !== requestSeq.current) return
       setView(saved)
@@ -125,6 +140,25 @@ export function TerminalChargeSettingsSection({
       setNotice('已保存，并记入审计。')
     } catch (reason) {
       if (terminalIdRef.current !== requestTerminalId || requestId !== requestSeq.current) return
+      if (isStaleChargeSettings(reason)) {
+        setNotice(null)
+        setError(STALE_CHARGE_MESSAGE)
+        setView(null)
+        setYuan(null)
+        try {
+          const loaded = await loadTerminalChargeSettings(requestTerminalId)
+          if (terminalIdRef.current !== requestTerminalId || requestId !== requestSeq.current) return
+          setView(loaded)
+          setMode(loaded.userChargeMode)
+          setYuan(yuanFields(loaded))
+        } catch (reloadReason) {
+          if (terminalIdRef.current !== requestTerminalId || requestId !== requestSeq.current) return
+          setView(null)
+          setYuan(null)
+          setError(reloadReason instanceof Error ? reloadReason.message : '收费设置读取失败')
+        }
+        return
+      }
       setMode(view.userChargeMode)
       setYuan(yuanFields(view))
       setError(reason instanceof Error ? reason.message : '收费设置保存失败')
@@ -180,7 +214,7 @@ export function TerminalChargeSettingsSection({
           {locked ? null : (
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || savingOrg}
               onClick={() => void onSave()}
               className="min-h-12 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-60"
             >

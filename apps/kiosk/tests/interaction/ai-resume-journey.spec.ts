@@ -547,6 +547,16 @@ async function confirmCompareFacts(page: Page): Promise<void> {
   }
 }
 
+/** 对照页里「只能手改」的那一条没有「这一条用哪一版」按钮（R1：改写没原样写进优化稿就不画选择），只能翻到下一条。 */
+async function keepOriginalUnlessManual(page: Page): Promise<void> {
+  const manual = page.getByRole('button', { name: '去编辑区改这一条' })
+  if (await manual.isVisible().catch(() => false)) {
+    await expect(page.getByRole('group', { name: '这一条用哪一版' }), '只能手改的那一条不该有选择按钮').toHaveCount(0)
+    return
+  }
+  await chooseCompare(page, '保留原文')
+}
+
 async function chooseCompare(page: Page, name: '用改写' | '保留原文'): Promise<void> {
   await confirmCompareFacts(page)
   const choice = page.getByRole('group', { name: '这一条用哪一版' }).getByRole('button', { name, exact: true })
@@ -641,12 +651,12 @@ test('J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @inter
       kind: 'click', collectors,
       act: async () => { await page.getByRole('button', { name: '下一条', exact: true }).click() },
     })
-    await chooseCompare(page, '保留原文')
+    await keepOriginalUnlessManual(page)
     await page.getByRole('button', { name: '下一条', exact: true }).click()
     for (let i = 0; i < 4 && page.url().includes('/resume/optimize/compare'); i += 1) {
       const finish = page.getByRole('button', { name: '去编辑', exact: true })
       const next = page.getByRole('button', { name: '下一条', exact: true })
-      await chooseCompare(page, '保留原文')
+      await keepOriginalUnlessManual(page)
       if (await finish.isVisible().catch(() => false)) {
         await finish.click()
         break

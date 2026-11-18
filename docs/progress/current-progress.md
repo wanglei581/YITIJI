@@ -9,6 +9,39 @@
 - 交互走查：存储扫描连键名一起查；交接存储只在 `fileUrl` 等于本次 `printFileUrl` 时才从值里剔除。去确认页先装上本机终端身份和打印机在线，等主按钮可点后用 Playwright 真点。终端用这次走查 API 的 `POST /auth/terminal/register` 写进走查库，会话票用 `POST /terminals/boot-ticket` 再 `POST /terminals/session-token` 签发，不写库伪造票据。打印来回之后的优化请求仍带 `x-terminal-id` 和 `x-terminal-session-token`，走服务单前置检查。U6d 结束后把 `globalThis.window` 和它的 `sessionStorage` 还原成进来之前的对象。
 - 验证：确认页视觉 26 条、交互走查 `interaction-resume` 7/7。反向：直接字符串、拼接提前返回、模板字符串、变量路径带允许名单之外的键都红；状态对象展开、计算属性、先建 state 变量再传也红。2026-11-18 又补：别名、`router.navigate`、`nav.current`、`recvRouter.go` 带名单外的键都红；整组参数展开，以及别名或属性调用把第二个参数放进变量，都因认不出而红。会员 401、签名地址键名、U6d 还原这三处本轮没改。
 
+## 2026-11-17：简历「新增事实本人确认」第十一版收货返工（未推送）
+
+- 分支 `claude/resume-r2k-1117`。末段「一位数字加十」不再看到十就截断：十后面紧跟数字，或紧跟万、亿、千、百、十，就把后面并进同一条，读数和停在十的原文不同。两份规则仍逐字节相同。
+- 单测补上三例加后缀（各 1 条待确认）、三例删后缀（各至少 1 条），以及「一万2千5百两百」拆成整串和两百。没改现有用例的期望。
+- 没改岗位、招聘会、打印、收费、数据库和密钥。
+
+## 2026-11-17：简历「新增事实本人确认」第十一版（未推送）
+
+- 分支 `claude/resume-r2k-1117`。混写单位链：百后面接十；链里的阿拉伯「十」算一级。末段是「一位数字加十」，或中间只隔一段本来不接的数再落到这个十位，仍算同一条。探针里第九版起漏报、第八版会报的 138 组，删掉末段都会要本人确认。规格要求拆开的 36 组（亿后没有万、万后接百）仍拆开。
+- 删掉四处删了也不改变读数的写法（标点那个 `break`、`lead !== '十' &&`、两处 `first < 4 &&`）。`digit > 0` 留着：去掉后「1百零十」会从两个数合成一整串。
+- 单测补上「3千五十万」拆开、「2亿两百万」拆开、「一万2千5千」在第二个千处拆开，以及上面 138 组和 36 组。没改现有用例的期望。
+- 没改岗位、招聘会、打印、收费、数据库和密钥。
+
+## 2026-11-17：#1640 自报改成许可证编号或公共就业服务机构登记信息二选一（未推送）
+
+- 新增 `RECRUITMENT_OPERATOR_CREDENTIAL_TYPE`。没设或空值仍是人力资源服务许可证编号那句。`public_employment_registration` 用「公共就业服务机构登记信息」那句。别的值在生产预检报 `PRODUCTION_RECRUITMENT_OPERATOR_CREDENTIAL_TYPE_INVALID`，不回显该值。内容仍填 `RECRUITMENT_OPERATOR_LICENSE_NO`。
+- 只改这条自报。托管开关、部署归属、发布流程 0a/3c/3b 没动。没有推送，没有改生产配置。
+
+## 2026-11-17：#1640 并入主线 9b50f8e0f（未推送）
+
+- 分支 `claude/move-1468-1113` 从 `c2127a815` 合并 `origin/main` `9b50f8e0f`（#1643 收费第 2 期 a，其上是 #1641 收费第 1 期、#1642 简历事实确认）。没有推送，没有改生产配置。
+- 冲突五处。`docs/graph/README.md`、`gates.md`、`graph.json`、`orphans.md` 不手改，用 `node scripts/generate-project-graph.mjs` 整套重生。`services/api/src/orgs/partner-stats.service.ts` 只在导入处冲突：本分支要招聘托管开关，主线要按机器收费的价目类型与生效价，两套导入都留，后文两边的调用已自动合上。
+- 自动合并且两边都改过：`.github/workflows/ci.yml`（本分支招聘托管门禁，主线免费角标、收费设置、服务单门禁）、`apps/kiosk/package.json`（本分支 `verify:recruitment-hosting-open`，主线 `verify:resume-fact-additions`）、`packages/shared/src/types/device.ts`（本分支改 `recruitmentHosting` 注释，主线加 `homeFreeBadge` 与 `pricing`）。
+
+## 2026-11-15：收费设置保存核对绑定版本，改绑在途不能把旧价写进新机构（分支 `claude/pricing-p1d-1115`，未推送）
+
+- 来由：补全线第十七任 P1d。管理员在终端抽屉里改绑机构的请求已经在服务端提交、响应还没回到页面时点「保存收费设置」，旧的向用户收费价会写进新机构，顶上却写「改绑机构，收费设置已复位」。
+- 用绑定版本号，不用机构 id。机构 id 在改走又改回、或解绑后再绑再解绑时会和读取时一样，旧价仍能写进去。`orgBoundAt` 在未绑定时是空，解绑后再绑再解绑也会撞上同一个空值。`orgBindingGeneration` 每次归属真变化加一（含解绑，机构没变不加），与最后落在哪个机构无关，并且放进同一条 `updateMany` 的 WHERE。SQLite 和 PostgreSQL 都不会在核对和写入之间漏掉并发改绑。
+- 保存收费设置必须带回读取时的版本。同一事务里对不上就回 409 `TERMINAL_CHARGE_SETTINGS_STALE`（「机构刚改过，收费设置已复位，请重新读取后再改」），不写价、不关待付单。改绑仍复位成机构承担、清空价目、记审计，并照旧关掉当时的待付单。
+- 后台改绑在途时停用「保存收费设置」。收到这个 409 就提示上面那句并重读，不留下旧价。
+- 默认值没变：新机器机构承担、五个价 0、个人收费总开关关。公共就业点位仍不收费。没有与岗位、招聘、投递挂钩的收费。
+- 没推送，没上线。
+
 ## 2026-11-15：收钱后端并上已含收费第 1 期的主线（未推送）
 
 - 分支 `claude/pricing-p2a-1113` 从 `039abd8d0` 合并 `origin/main` `17dbea8e0`（PR #1641，收费第 1 期含 P1c 返工）。

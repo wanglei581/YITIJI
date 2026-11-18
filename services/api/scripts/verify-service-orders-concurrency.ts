@@ -69,6 +69,14 @@ async function main(): Promise<void> {
     function stillCharged(row: { status: string }): boolean {
       return row.status === 'paid' || row.status === 'consumed' || row.status === 'refunding' || row.status === 'refund_failed'
     }
+    async function chargeGeneration(): Promise<number> {
+      const row = await prisma.terminal.findUnique({
+        where: { id: TERM_CHARGE },
+        select: { orgBindingGeneration: true },
+      })
+      assert.ok(row, '收费终端还在')
+      return row.orgBindingGeneration
+    }
 
     const r16Releases: Array<() => void> = []
     const r16Session = await openKiosk(TERM_CHARGE, chargeToken)
@@ -258,6 +266,7 @@ async function main(): Promise<void> {
     await saveTerminalChargeSettings(prisma, TERM_CHARGE, {
       userChargeMode: 'user_pays',
       prices: { ...DEMO_PRICES, resume_optimize: 180 },
+      orgBindingGeneration: await chargeGeneration(),
     }, ADMIN)
     const repricedClosed = await loadOrder(repriced.row.id)
     assert.equal(repricedClosed.status, 'closed', '改价成功后、付款通知前必须已经关掉')
@@ -695,6 +704,7 @@ async function main(): Promise<void> {
       await saveTerminalChargeSettings(prisma, TERM_CHARGE, {
         userChargeMode: 'user_pays',
         prices: { ...DEMO_PRICES, resume_optimize: 180 },
+        orgBindingGeneration: await chargeGeneration(),
       }, ADMIN)
       const g5Closed = await loadOrder(g5.row.id)
       assert.equal(g5Closed.status, 'closed', '关单失败也要先把这一单关掉')

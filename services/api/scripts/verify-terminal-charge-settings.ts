@@ -119,6 +119,7 @@ interface EffectiveBody {
   userChargeMode?: string
   personalChargeEnabled?: boolean
   isPublicSite?: boolean
+  orgBindingGeneration?: number
   prices?: Record<string, { configuredCents?: number; effectiveCents?: number; reason?: string }>
 }
 
@@ -284,6 +285,7 @@ async function main(): Promise<void> {
     assert.equal(freshData.personalChargeEnabled, false)
     assert.equal(freshData.isPublicSite, false)
     assert.equal(freshData.userChargeMode, 'org_pays')
+    assert.equal(freshData.orgBindingGeneration, 0, '新终端绑定版本是 0')
     for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
       assert.equal(freshData.prices?.[key]?.effectiveCents, 0, key)
     }
@@ -309,6 +311,7 @@ async function main(): Promise<void> {
 
     const savedWhileOff = await call('PUT', `/api/v1/admin/terminals/${SELF_TERMINAL}/charge-settings`, {
       userChargeMode: 'user_pays',
+      orgBindingGeneration: 0,
       prices: SAMPLE_PRICES,
     }, adminHeaders)
     expectStatus(savedWhileOff, 200, '总开关关着仍可预先保存')
@@ -344,14 +347,15 @@ async function main(): Promise<void> {
     }
     const beforeInvalid = await selfChargeRows()
     const invalidBodies: unknown[] = [
-      { userChargeMode: 'user_pays', prices: { ...SAMPLE_PRICES, print_bw_page: -1 } },
-      { userChargeMode: 'user_pays', prices: { ...SAMPLE_PRICES, print_bw_page: 1.5 } },
-      { userChargeMode: 'user_pays', prices: { ...SAMPLE_PRICES, print_bw_page: 100001 } },
+      { userChargeMode: 'user_pays', orgBindingGeneration: 0, prices: { ...SAMPLE_PRICES, print_bw_page: -1 } },
+      { userChargeMode: 'user_pays', orgBindingGeneration: 0, prices: { ...SAMPLE_PRICES, print_bw_page: 1.5 } },
+      { userChargeMode: 'user_pays', orgBindingGeneration: 0, prices: { ...SAMPLE_PRICES, print_bw_page: 100001 } },
       {
         userChargeMode: 'user_pays',
+        orgBindingGeneration: 0,
         prices: { resume_optimize: 0, mock_interview: 0, print_color_page: 0, scan: 0 },
       },
-      { userChargeMode: 'user_pays', prices: { ...SAMPLE_PRICES, unknown_service: 1 } },
+      { userChargeMode: 'user_pays', orgBindingGeneration: 0, prices: { ...SAMPLE_PRICES, unknown_service: 1 } },
     ]
     for (const body of invalidBodies) {
       const rejected = await call('PUT', `/api/v1/admin/terminals/${SELF_TERMINAL}/charge-settings`, body, adminHeaders)
@@ -360,8 +364,17 @@ async function main(): Promise<void> {
     }
     console.log('PASS 负数、小数、超上限、缺键、未知键返回 400 且不写库')
 
+    const missingGeneration = await call('PUT', `/api/v1/admin/terminals/${SELF_TERMINAL}/charge-settings`, {
+      userChargeMode: 'user_pays',
+      prices: SAMPLE_PRICES,
+    }, adminHeaders)
+    assert.equal(missingGeneration.status, 400, `缺绑定版本必须 400：${missingGeneration.status} ${JSON.stringify(missingGeneration.json)}`)
+    assert.deepEqual(await selfChargeRows(), beforeInvalid, '缺绑定版本不能写库')
+    console.log('PASS 不带绑定版本返回 400 且不写库')
+
     const publicSave = await call('PUT', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/charge-settings`, {
       userChargeMode: 'user_pays',
+      orgBindingGeneration: 0,
       prices: SAMPLE_PRICES,
     }, adminHeaders)
     expectStatus(publicSave, 409, '公共点位写收费')
@@ -586,6 +599,7 @@ async function main(): Promise<void> {
     const reboundView = await call('GET', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/charge-settings`, undefined, adminHeaders)
     const reboundData = reboundView.json.data as EffectiveBody
     assert.equal(reboundData.userChargeMode, 'org_pays')
+    assert.equal(reboundData.orgBindingGeneration, 1, '改绑一次，绑定版本加一')
     assert.equal(reboundData.isPublicSite, false)
     for (const key of TERMINAL_CHARGE_SERVICE_KEYS) {
       assert.equal(reboundData.prices?.[key]?.configuredCents, 0, `改绑后配置价清零：${key}`)
@@ -606,11 +620,12 @@ async function main(): Promise<void> {
     const sameOrg = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: ORG_OTHER }, adminHeaders)
     expectStatus(sameOrg, 200, '同一机构再绑一次')
     assert.equal(sameOrg.json.data?.chargeSettingsReset, false, '机构没变，响应不能再说已复位')
-    const kept = await prisma.terminal.findUnique({ where: { id: PUBLIC_TERMINAL }, select: { userChargeMode: true } })
+    const kept = await prisma.terminal.findUnique({ where: { id: PUBLIC_TERMINAL }, select: { userChargeMode: true, orgBindingGeneration: true } })
     const keptScan = await prisma.terminalServicePrice.findUnique({
       where: { terminalId_serviceKey: { terminalId: PUBLIC_TERMINAL, serviceKey: 'scan' } },
     })
     assert.equal(kept?.userChargeMode, 'user_pays', '机构没变不能复位谁付钱')
+    assert.equal(kept?.orgBindingGeneration, 1, '机构没变不加绑定版本')
     assert.equal(keptScan?.unitCents, 40, '机构没变不能清价')
     assert.equal(
       await prisma.auditLog.count({
@@ -626,9 +641,10 @@ async function main(): Promise<void> {
     assert.equal(unbound.json.data?.chargeSettingsReset, true, '解绑的响应要标明收费设置已复位')
     const unboundRow = await prisma.terminal.findUnique({
       where: { id: PUBLIC_TERMINAL },
-      select: { userChargeMode: true, orgId: true, servicePrices: { select: { serviceKey: true } } },
+      select: { userChargeMode: true, orgId: true, orgBindingGeneration: true, servicePrices: { select: { serviceKey: true } } },
     })
     assert.equal(unboundRow?.orgId, null)
+    assert.equal(unboundRow?.orgBindingGeneration, 2, '解绑也加绑定版本')
     assert.equal(unboundRow?.userChargeMode, 'org_pays', '解绑必须把谁付钱复位成 org_pays')
     assert.equal(unboundRow?.servicePrices.length, 0, '解绑必须清掉五个价')
     assert.equal(
@@ -647,9 +663,10 @@ async function main(): Promise<void> {
     assert.equal(bound.json.data?.chargeSettingsReset, true, '绑定的响应要标明收费设置已复位')
     const boundRow = await prisma.terminal.findUnique({
       where: { id: PUBLIC_TERMINAL },
-      select: { userChargeMode: true, orgId: true, servicePrices: true },
+      select: { userChargeMode: true, orgId: true, orgBindingGeneration: true, servicePrices: true },
     })
     assert.equal(boundRow?.orgId, ORG_SCHOOL)
+    assert.equal(boundRow?.orgBindingGeneration, 3, '再绑定一次，绑定版本是 3')
     assert.equal(boundRow?.userChargeMode, 'org_pays', '绑定必须把谁付钱复位成 org_pays')
     assert.equal(boundRow?.servicePrices.length, 0, '绑定必须清掉五个价')
     assert.equal(
@@ -661,8 +678,75 @@ async function main(): Promise<void> {
     )
     console.log('PASS 绑定与解绑同样复位收费设置')
 
+    const readBeforeRebind = await call('GET', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/charge-settings`, undefined, adminHeaders)
+    const readGeneration = (readBeforeRebind.json.data as EffectiveBody).orgBindingGeneration
+    assert.equal(readGeneration, 3, '读取时绑定版本是 3')
+    await prisma.serviceOrder.create({
+      data: {
+        id: 'stale-before',
+        terminalId: PUBLIC_TERMINAL,
+        serviceKey: 'scan',
+        amountCents: 100,
+        kioskSessionId: 'stale-session-before',
+        provider: 'sandbox',
+        providerOrderNo: 'stale-before-no',
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    })
+    const staleRebind = await call('PATCH', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/org`, { orgId: ORG_OTHER }, adminHeaders)
+    expectStatus(staleRebind, 200, '读取之后再改绑')
+    const closedByRebind = await prisma.serviceOrder.findUnique({ where: { id: 'stale-before' } })
+    assert.equal(closedByRebind?.status, 'closed', '改绑仍要关掉当时的待付单')
+    assert.equal(closedByRebind?.closeReason, 'org_rebound')
+    await prisma.serviceOrder.create({
+      data: {
+        id: 'stale-after',
+        terminalId: PUBLIC_TERMINAL,
+        serviceKey: 'scan',
+        amountCents: 80,
+        kioskSessionId: 'stale-session-after',
+        provider: 'sandbox',
+        providerOrderNo: 'stale-after-no',
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    })
+    const keptOrder = await prisma.serviceOrder.findUnique({ where: { id: 'stale-after' } })
+    const chargeAuditsBefore = await prisma.auditLog.count({
+      where: { action: TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
+    })
+    const staleSave = await call('PUT', `/api/v1/admin/terminals/${PUBLIC_TERMINAL}/charge-settings`, {
+      userChargeMode: 'user_pays',
+      orgBindingGeneration: readGeneration,
+      prices: SAMPLE_PRICES,
+    }, adminHeaders)
+    assert.equal(staleSave.status, 409, `旧绑定版本保存必须 409：${staleSave.status} ${JSON.stringify(staleSave.json)}`)
+    assert.equal(staleSave.json.error?.code, 'TERMINAL_CHARGE_SETTINGS_STALE')
+    assert.equal(staleSave.json.error?.message, '机构刚改过，收费设置已复位，请重新读取后再改')
+    const staleRow = await prisma.terminal.findUnique({
+      where: { id: PUBLIC_TERMINAL },
+      select: { userChargeMode: true, orgBindingGeneration: true, servicePrices: { select: { serviceKey: true, unitCents: true } } },
+    })
+    assert.equal(staleRow?.userChargeMode, 'org_pays', '409 不能把谁付钱写回去')
+    assert.equal(staleRow?.orgBindingGeneration, 4, '409 不能改绑定版本')
+    assert.equal(staleRow?.servicePrices.length, 0, '409 不能把旧价写进新机构')
+    const keptAfter = await prisma.serviceOrder.findUnique({ where: { id: 'stale-after' } })
+    assert.equal(keptAfter?.status, keptOrder?.status, '409 不能关改绑之后的待付单')
+    assert.equal(keptAfter?.amountCents, keptOrder?.amountCents)
+    assert.equal(keptAfter?.closeReason ?? null, keptOrder?.closeReason ?? null)
+    assert.equal(keptAfter?.channelClosePending, keptOrder?.channelClosePending)
+    const closedStill = await prisma.serviceOrder.findUnique({ where: { id: 'stale-before' } })
+    assert.equal(closedStill?.status, 'closed')
+    assert.equal(closedStill?.closeReason, 'org_rebound', '409 不能改掉改绑已经关掉的单')
+    assert.equal(closedStill?.amountCents, closedByRebind?.amountCents)
+    assert.equal(closedStill?.channelClosePending, closedByRebind?.channelClosePending)
+    assert.equal(await prisma.auditLog.count({
+      where: { action: TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION, targetId: 'CHG-PUBLIC' },
+    }), chargeAuditsBefore, '409 不能记收费设置修改审计')
+    console.log('PASS 读取后改绑，再用旧绑定版本保存得到 409，价目和改绑后的待付单都不变')
+
     const partnerWrite = await call('PUT', `/api/v1/admin/terminals/${SCHOOL_TERMINAL}/charge-settings`, {
       userChargeMode: 'org_pays',
+      orgBindingGeneration: 0,
       prices: ZERO_PRICES,
     }, partnerHeaders)
     expectStatus(partnerWrite, 403, '机构不能改收费设置')
