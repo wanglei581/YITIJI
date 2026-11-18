@@ -7,7 +7,7 @@
  *
  * 清场、登出、删记录、空闲清扫都会把这一条换成新号，并记下墓碑。
  * 墓碑让清场后的在途写回立刻失败，也让这段时间不再沿用同一个会话号。
- * 墓碑到期或被容量丢掉之后，旧号仍然对不上；下一次抓住的是新号，可以写回。
+ * 墓碑到期之后，旧号仍然对不上；下一次抓住的是新号，可以写回。
  *
  * 活着的代次最多留 cap 条（默认 8192）。挤掉一条时只作废这一条，并刷新它的墓碑。
  * 还在等模型的请求钉住自己的会话号。挤的时候跳过钉住的，也跳过刚放进来的这一条。
@@ -16,9 +16,11 @@
  * 小青一轮模型调用最长 LLM_TIMEOUT_MS（默认 45 秒，上限 60 秒，见 ai/llm/llm-http.ts）。
  * 作业追问最多试两轮（advisor/llm-advisor.service.ts 的 MAX_ATTEMPTS），每轮同一档。
  * 两条链路在途最长 120 秒。墓碑再留 30 秒余量，超过 150 秒就清掉。
- * 没有钉住时，活表最多 cap 条，墓碑最多同样多条，两者合计不超过 2 * cap。
- * 同一条可以同时在活表和墓碑里，直到墓碑到期。超过这个数时会先清到期墓碑，仍超再丢掉最老的一块。
- * 丢掉墓碑不会把代次退回成还能对上的旧号。
+ * 没有钉住时，活表最多 cap 条。墓碑在这 150 秒内不因条数被丢掉：
+ * 丢掉后 wasRetired 变 false，清过场的会话号会被小青再次沿用。
+ * 时限内墓碑条数等于这段时间里作废过的不同会话号，可以暂时超过 cap。
+ * 同一条可以同时在活表和墓碑里，直到墓碑到期。到期只由 purgeExpired 清掉。
+ * 丢掉墓碑不会把代次退回成还能对上的旧号。新的、没清过场的会话号照常抓住。
  * 墓碑只存会话号和记下的时间，不存对话。进程重启后清空。反复作废同一条会把它挪到队尾，
  * 避免一条热会话卡在队首，挤掉时把很高的代次套到别人头上。
  * 抓代次、作废、核对都先去掉会话号两端空白。
@@ -68,7 +70,6 @@ export class ConversationEpoch {
     this.current.set(key, value)
     this.place(key)
     this.tombstones.set(key, this.now())
-    this.capTombstones()
   }
 
   matches(id: string, captured: number): boolean {
@@ -96,7 +97,7 @@ export class ConversationEpoch {
     else this.pins.delete(key)
   }
 
-  /** 墓碑还在：这段时间不要再沿用这个会话号。到期或被容量丢掉之后为 false。 */
+  /** 墓碑还在：这段时间不要再沿用这个会话号。到期之后为 false。 */
   wasRetired(id: string): boolean {
     const key = id.trim()
     if (!key) return false
@@ -109,7 +110,7 @@ export class ConversationEpoch {
     this.purgeExpired()
   }
 
-  /** 活表条数加墓碑条数。没有在途钉住时不超过 2 * cap。 */
+  /** 活表条数加墓碑条数。墓碑到期清掉之后，没有钉住时不超过 2 * cap。 */
   size(): number {
     return this.current.size + this.tombstones.size
   }
@@ -133,23 +134,6 @@ export class ConversationEpoch {
       if (!dropped) break
       this.order.splice(droppedIndex, 1)
       if (this.current.delete(dropped)) this.tombstones.set(dropped, this.now())
-    }
-    this.capTombstones()
-  }
-
-  /** 到期的已经清过。仍超过 cap 时丢掉最老的墓碑。 */
-  private capTombstones(): void {
-    while (this.tombstones.size > this.cap) {
-      let oldestKey: string | null = null
-      let oldestAt = Number.POSITIVE_INFINITY
-      for (const [id, at] of this.tombstones) {
-        if (at < oldestAt) {
-          oldestAt = at
-          oldestKey = id
-        }
-      }
-      if (!oldestKey) return
-      this.tombstones.delete(oldestKey)
     }
   }
 }
