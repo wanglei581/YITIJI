@@ -28,6 +28,7 @@ import { isPickupClaimWindowClosed } from './pickup-claim-window'
 import { resumeReleasedFailure } from './pickup-code-resume'
 import { settlePickupArrival } from './pickup-arrival-price'
 import { releaseStaleArrivalHold } from './pickup-arrival-hold'
+import { findOpenRefund } from '../payment/open-refund-hold'
 
 export { isPickupClaimWindowClosed }
 
@@ -328,6 +329,8 @@ export class PickupOrderService {
     if (order.printTaskId) return this.releasedView(order)
     if (order.pickupStatus !== 'claimed') throw new BadRequestException('PICKUP_NOT_CLAIMED')
     if (order.payStatus !== 'paid') throw new BadRequestException('ORDER_NOT_PAID')
+    // 退款还可能变成成功时不能建任务。放在文件和打印机检查之前，避免没文件时把这笔冲突藏起来。
+    if (await findOpenRefund(this.prisma, order.id)) throw new BadRequestException('ORDER_REFUND_UNRESOLVED')
     const firstItem = !order.sourceFileId
       ? await this.prisma.orderItem.findFirst({ where: { orderId: order.id, seq: 0 }, orderBy: { seq: 'asc' } })
       : null
@@ -347,6 +350,7 @@ export class PickupOrderService {
       if (current.pickupStatus !== 'claimed' || current.payStatus !== 'paid') {
         throw new BadRequestException('ORDER_RELEASE_INVALID_STATE')
       }
+      if (await findOpenRefund(tx, current.id)) throw new BadRequestException('ORDER_REFUND_UNRESOLVED')
       const packageRows = !current.sourceFileId
         ? await tx.orderItem.findMany({ where: { orderId: current.id }, orderBy: { seq: 'asc' } })
         : []

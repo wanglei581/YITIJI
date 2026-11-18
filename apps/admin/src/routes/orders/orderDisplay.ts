@@ -76,6 +76,7 @@ export function autoRefundStatusText(status: string | null): string {
   if (status === 'success') return '已原路退回'
   if (status === 'failed') return '没有成功'
   if (status === 'pending') return '处理中'
+  if (status === 'manual_review') return '待人工核对'
   return status ?? '—'
 }
 

@@ -9,6 +9,7 @@
 import type { Prisma } from '../generated/prisma/client'
 import { assertUserPaysUnit, getEffectiveUserPrices } from '../payment/effective-user-prices'
 import type { EffectiveUserPrices } from '../payment/terminal-charge.contract'
+import { findOpenRefund } from '../payment/open-refund-hold'
 import { hasLiveArrivalPayment, releaseStaleArrivalHold } from './pickup-arrival-hold'
 import type { PrintPriceLine } from '../payment/payment.types'
 import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
@@ -329,6 +330,7 @@ async function settlePickupArrivalOnce(
     // 退款中、已退款不能放行。抢到「已付款」之后把任务标成认领中，退款的状态门进不来，
     // 避免退款成功回调和核码各走各的，既退了钱又出纸。
     if (current.payStatus === 'paid' && current.amountCents > 0) {
+      if (await findOpenRefund(tx, current.id)) return lost()
       if (!await claimTerminal(tx, current.id, input.terminalId, current.amountCents, current.payStatus)) return lost()
       const held = await tx.order.updateMany({
         where: { id: current.id, payStatus: 'paid', taskStatus: { notIn: ['claimed', 'printing'] } },

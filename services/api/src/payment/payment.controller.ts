@@ -14,9 +14,10 @@
 //
 // 鉴权口径：与 print-jobs controller 一致（kiosk 匿名层，cuid 不可猜）；
 // 出码/轮询/查单必须携带打印建单返回的 x-payment-session-token。回调端点靠签名鉴权，不走登录态。
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Req, Res } from '@nestjs/common'
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Req, Res, UnauthorizedException } from '@nestjs/common'
 import type { Request, Response } from 'express'
-import { bindArrivalPaymentTerminal } from '../print-jobs/pickup-arrival-hold'
+import { bindArrivalPaymentTerminal, releaseArrivalPaymentHold } from '../print-jobs/pickup-arrival-hold'
+import { readPaymentSessionClaims } from './payment-session-token'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateCodePayAttemptDto, CreatePayAttemptDto, SandboxSimulateDto } from './dto/online-payment.dto'
 import { OnlinePaymentService } from './online-payment.service'
@@ -70,8 +71,9 @@ export class PaymentController {
     @Headers('x-payment-session-token') paymentSessionToken: string | undefined,
     @Body() dto: CreatePayAttemptDto,
   ) {
+    const view = await this.onlinePayment.createPayAttempt(id, paymentSessionToken, dto?.channel)
     await bindArrivalPaymentTerminal(this.prisma, id, paymentSessionToken)
-    return this.onlinePayment.createPayAttempt(id, paymentSessionToken, dto?.channel)
+    return view
   }
 
   @Post('orders/:id/code-pay')
@@ -81,8 +83,23 @@ export class PaymentController {
     @Headers('x-payment-session-token') paymentSessionToken: string | undefined,
     @Body() dto: CreateCodePayAttemptDto,
   ) {
+    const view = await this.onlinePayment.createCodePayAttempt(id, paymentSessionToken, dto.authCode, dto.channel)
     await bindArrivalPaymentTerminal(this.prisma, id, paymentSessionToken)
-    return this.onlinePayment.createCodePayAttempt(id, paymentSessionToken, dto.authCode, dto.channel)
+    return view
+  }
+
+  @Post('orders/:id/pay/abandon')
+  @HttpCode(HttpStatus.OK)
+  async abandonPayAttempt(
+    @Param('id') id: string,
+    @Headers('x-payment-session-token') paymentSessionToken: string | undefined,
+  ) {
+    const read = readPaymentSessionClaims(paymentSessionToken)
+    if (!read.ok || read.claims.orderId !== id) {
+      throw new UnauthorizedException(read.ok ? 'PAYMENT_SESSION_MISMATCH' : read.code)
+    }
+    const hold = await releaseArrivalPaymentHold(this.prisma, id, read.claims.terminalId)
+    return { ok: true, hold }
   }
 
   @Get('orders/:id/pay-status')

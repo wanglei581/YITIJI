@@ -314,7 +314,9 @@ export class AdminOrdersReadonlyService {
       refundStatus: printRefund.refundStatus,
       refundFailureReason: printRefund.disposition === 'auto_failed' ? printRefund.reason : null,
       printRefundDisposition: printRefund.disposition,
-      printRefundReason: printRefund.disposition === 'auto_success' ? null : printRefund.reason,
+      printRefundReason: printRefund.reason,
+      refundLedgerNo: printRefund.refundNo,
+      refundLedgerCents: printRefund.amountCents,
     }
   }
 

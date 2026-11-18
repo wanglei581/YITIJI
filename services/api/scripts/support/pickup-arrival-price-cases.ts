@@ -34,6 +34,9 @@ import { runArrivalHoldCases } from './pickup-arrival-hold-cases'
 import { assertArrivalQuoteAmounts } from './pickup-arrival-quote-cases'
 import { runArrivalMoneyCases } from './pickup-arrival-money-cases'
 import { runNoPaperAllowlistCases } from './pickup-arrival-no-paper-allowlist-cases'
+import { runArrivalDispositionCases } from './pickup-arrival-disposition-cases'
+import { runQueueSweepRefundCases } from './pickup-arrival-queue-sweep-cases'
+import { runRefundPaperGuardCases } from './pickup-arrival-refund-guard-cases'
 import {
   restoreTerminalChargeFixture,
   setTerminalUserPrintPrices,
@@ -61,6 +64,16 @@ function assertWiring(): void {
   assert.match(source('src/payment/print-no-paper-refund.ts'), /if \(!enabled\)[\s\S]{0,500}return 'signaled'/)
   assert.match(source('src/payment/print-no-paper-refund.ts'), /EXPLICIT_NO_PAPER_ERROR_CODES\.has\(errorCode\)/)
   assert.match(source('src/payment/print-no-paper-refund.ts'), /reason: PAID_NO_PAPER_AUTO_REASON/)
+  assert.match(source('src/payment/payment.controller.ts'), /createPayAttempt\([\s\S]*?bindArrivalPaymentTerminal/)
+  assert.match(source('src/payment/payment.controller.ts'), /orders\/:id\/pay\/abandon/)
+  assert.match(
+    readFileSync(resolve(API_ROOT, '../../apps/kiosk/src/services/print/paymentApi.ts'), 'utf8'),
+    /\/pay\/abandon/,
+  )
+  assert.match(
+    readFileSync(resolve(API_ROOT, '../../apps/kiosk/src/pages/print/PrintCashierPage.tsx'), 'utf8'),
+    /abandonPayAttempt\(/,
+  )
 }
 
 export async function runPickupArrivalPriceCases(db: PrismaService, tag: string): Promise<void> {
@@ -495,6 +508,20 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
       orderIds,
     })
 
+    await runQueueSweepRefundCases(db, {
+      tag,
+      terminalId: pricedTerminalId,
+      orderIds,
+      taskIds,
+    })
+    await runArrivalDispositionCases(db, {
+      tag,
+      terminalId: pricedTerminalId,
+      orderIds,
+      taskIds,
+    })
+    await runRefundPaperGuardCases(db, tag)
+
     await db.platformSetting.upsert({
       where: { key: PERSONAL_CHARGE_SETTING_KEY },
       create: { key: PERSONAL_CHARGE_SETTING_KEY, value: 'false' },
@@ -537,8 +564,12 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     await db.paymentAttempt.deleteMany({ where: { orderId: { in: orderIds } } })
     await db.orderItem.deleteMany({ where: { orderId: { in: orderIds } } })
     await db.order.deleteMany({ where: { id: { in: orderIds } } })
+    await db.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await db.printTask.deleteMany({ where: { id: { in: taskIds } } })
     await db.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
+    await db.terminalHeartbeat.deleteMany({
+      where: { terminalId: { in: [pricedTerminalId, zeroTerminalId, publicTerminalId, otherTerminalId] } },
+    })
     await restoreTerminalChargeFixture(db)
     await db.terminal.deleteMany({
       where: { id: { in: [pricedTerminalId, zeroTerminalId, publicTerminalId, otherTerminalId] } },

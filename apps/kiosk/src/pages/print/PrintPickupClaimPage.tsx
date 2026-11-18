@@ -55,6 +55,7 @@ import { useSupportContactSnapshot } from '../../hooks/useSupportContact'
 import { loginPathForPrintStep } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
 import { claimHereOrder } from '../../services/api/pickupHereOrdersApi'
+import { abandonPayAttempt } from '../../services/print/paymentApi'
 import { errorCodeOf } from '../../services/api/userErrorMessage'
 import { maskPickupFileName, pickupHereClaimDropsRow, pickupHereMismatchMessage, pickupHereNetworkLine, pickupHereRecoverableLine } from './pickupHereOrders'
 import { classifyClaimFailure, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
@@ -408,7 +409,15 @@ export function PrintPickupClaimPage() {
       back={screen === 'success'
         ? {
             label: result?.arrivalChargeNotice ? '返回' : (claimedByOrder ? '返回取件' : '重新输入'),
-            onBack: handleReset,
+            onBack: () => {
+              if (result?.arrivalChargeNotice && result.orderId && result.paymentSessionToken) {
+                void abandonPayAttempt({
+                  orderId: result.orderId,
+                  paymentSessionToken: result.paymentSessionToken,
+                }).catch(() => undefined)
+              }
+              handleReset()
+            },
           }
         : { label: '返回', onBack: () => navigate('/print-scan') }}
       title={successCopy?.title ?? (screen === 'legacy' ? '输入历史码' : '输入你的到机码')}

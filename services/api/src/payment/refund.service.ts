@@ -38,6 +38,8 @@ import { ReplayGuard } from '../sync/replay-guard'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
 import { settleServiceRefundNotify } from './service-order.payment'
 import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput, type RefundExecuteResult } from './payment-provider.types'
+import { notifyPrintReturnHold } from './print-return-alert'
+import { convergeNotifiedRefundSuccess } from './refund-notify-paper-guard'
 import {
   holdMismatchedChannelRefund,
   isWholeOrderRefundAmount,
@@ -146,11 +148,12 @@ export class RefundService {
    * Refund.refundNo（RFD-<orderNo>）→ 通道/金额交叉核对 → 幂等状态机：
    * - SUCCESS：pending→success + 订单 refunding→refunded（与查证收敛同一完成语义）；
    *   若本地曾错判 failed（渠道账本为准）→ 修复为 success（审计带 repairedFromFailed）；
+   *   已经失败过、并且打印任务还能出纸时不记成退款成功，退款行改待人工；
    *   已 success → 幂等返回，不重复副作用/审计。
    * - CLOSED/ABNORMAL：pending→failed + 订单回 paid（可同号重试）；已 failed 幂等；
    *   **已 success 绝不回退**（冲突拒绝）。
    * - 未知 out_refund_no：拒绝，不改任何订单。
-   * - 全程不触碰 PrintTask。
+   * - 只读打印任务，用来拦住「曾经退款失败、后来又放行出纸」的迟到成功通知；不改任务状态。
    */
   async processWechatRefundNotify(
     rawBody: Buffer | undefined,
@@ -204,42 +207,19 @@ export class RefundService {
     if (event.status === 'success') {
       if (refund.status === 'success') return { ok: true, idempotent: true }
       const repairedFromFailed = refund.status === 'failed'
-      // 完成（与查证收敛同一语义）：CAS 同事务，渠道账本为准 —— 曾错判 failed 的记录一并修复。
-      const { completed } = await this.prisma.$transaction(async (tx) => {
-        const casRefund = await tx.refund.updateMany({
-          where: { id: refund.id, status: { in: ['pending', 'failed'] } },
-          data: { status: 'success', channelRefundNo: event.channelRefundNo ?? refund.channelRefundNo },
-        })
-        if (casRefund.count === 0) return { completed: false } // 并发下他方已完成
-        // paid/refunding：普通退款。closed/unpaid/paying + ONLINE_PAID_PENDING_REFUND：
-        // 迟到回调待退曾明确失败回滚 closed 后，渠道 SUCCESS 通知仍须收敛同一 refundNo，
-        // 不得因 payStatus=closed 抛 ORDER_INVALID_TRANSITION，也不得再打渠道。
-        await tx.order.updateMany({
-          where: {
-            id: refund.orderId,
-            OR: [
-              { payStatus: { in: ['refunding', 'paid'] } },
-              {
-                payStatus: { in: [...ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES] },
-                refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
-                paymentSource: null,
-                paidAt: null,
-              },
-            ],
-          },
-          data: {
-            payStatus: 'refunded',
-            refundedAt: new Date(),
-            refundReason: refund.reason,
-            refundedAmountCents: refund.amountCents,
-          },
-        })
-        const o = await tx.order.findUnique({ where: { id: refund.orderId } })
-        if (!o) throw new NotFoundException('ORDER_NOT_FOUND')
-        if (o.payStatus !== 'refunded') throw new BadRequestException('ORDER_INVALID_TRANSITION')
-        return { completed: true }
-      })
-      if (!completed) return { ok: true, idempotent: true }
+      const outcome = await this.prisma.$transaction((tx) => convergeNotifiedRefundSuccess(tx, {
+        refundId: refund.id,
+        orderId: refund.orderId,
+        priorStatus: refund.status,
+        channelRefundNo: event.channelRefundNo ?? refund.channelRefundNo,
+        amountCents: refund.amountCents,
+        reason: refund.reason,
+      }))
+      if (outcome === 'blocked') {
+        await notifyPrintReturnHold(this.prisma, refund.orderId)
+        return { ok: true }
+      }
+      if (outcome !== 'completed') return { ok: true, idempotent: true }
       await this.audit.write({
         actorId: null,
         actorRole: 'system',

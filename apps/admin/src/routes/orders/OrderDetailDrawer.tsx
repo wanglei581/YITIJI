@@ -50,6 +50,9 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
                 <>
                   <Info label="退款方式" value="自动原路退" />
                   <Info label="退款状态" value={autoRefundStatusText(detail.refundStatus)} />
+                  {detail.printRefundReason ? <Info label="说明" value={detail.printRefundReason} /> : null}
+                  <Info label="退款单号" value={detail.refundLedgerNo ?? '—'} />
+                  <Info label="退款金额" value={recordedCentsText(detail.refundLedgerCents, detail.currency)} />
                 </>
               ) : null}
               {detail.printRefundDisposition === 'auto_failed' ? (
@@ -57,12 +60,20 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
                   <Info label="退款方式" value="自动原路退" />
                   <Info label="退款状态" value={autoRefundStatusText(detail.refundStatus)} />
                   <Info label="失败原因" value={detail.printRefundReason ?? detail.refundFailureReason ?? '—'} />
+                  <Info label="退款单号" value={detail.refundLedgerNo ?? '—'} />
+                  <Info label="退款金额" value={recordedCentsText(detail.refundLedgerCents, detail.currency)} />
                 </>
               ) : null}
               {detail.printRefundDisposition === 'manual' ? (
                 <>
                   <Info label="退款方式" value="待人工退款" />
+                  <Info label="退款状态" value={autoRefundStatusText(detail.refundStatus)} />
                   <Info label="原因" value={detail.printRefundReason ?? '—'} />
+                  <Info label="退款单号" value={detail.refundLedgerNo ?? '—'} />
+                  <Info label="退款金额" value={recordedCentsText(detail.refundLedgerCents, detail.currency)} />
+                  {detail.refundStatus === 'manual_review' ? (
+                    <p className="col-span-2 text-xs font-semibold text-neutral-600">这笔退款待人工核对。订单还在退款处理中时不要再发起一笔，避免同一单出两次钱。</p>
+                  ) : null}
                 </>
               ) : null}
             </div>

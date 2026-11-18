@@ -94,8 +94,12 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   refundFailureReason: string | null
   /** 已付没出纸的去向。自动退成功、自动退失败、待人工。都不是时为 null。 */
   printRefundDisposition: 'auto_success' | 'auto_failed' | 'manual' | null
-  /** 这一去向的原因。自动退成功时为 null。 */
+  /** 这一去向的原因。普通没出纸自动退成功时为 null；过期付款退成时写明金额。 */
   printRefundReason: string | null
+  /** 这一去向对应的退款单号。没有退款行时为 null。 */
+  refundLedgerNo: string | null
+  /** 这一去向对应的退款金额（分）。没有退款行时为 null。 */
+  refundLedgerCents: number | null
 }
 
 export interface AdminOrderReadonlyPage {

@@ -1,17 +1,19 @@
 /**
  * 看价不占终端、本机价 0 免费放行、非法价拒绝、改价不抹折扣、
- * 行数对不上不写、过期尝试的迟到扣款进待人工。
+ * 行数对不上不写、过期尝试的迟到扣款按尝试金额原路退。
  */
 import assert from 'node:assert/strict'
 import { BadRequestException } from '@nestjs/common'
+import { AdminOrdersReadonlyService } from '../../src/admin-orders-readonly/admin-orders-readonly.service'
 import { AuditService } from '../../src/audit/audit.service'
 import { getEffectiveUserPrices } from '../../src/payment/effective-user-prices'
 import { OnlinePaymentService } from '../../src/payment/online-payment.service'
 import { OrderStatusService } from '../../src/payment/order-status.service'
 import { PaymentProviderRegistry } from '../../src/payment/payment-provider.factory'
 import { createPaymentSessionToken } from '../../src/payment/payment-session-token'
-import { ONLINE_PAID_PENDING_REFUND_REASON } from '../../src/payment/pending-refund-signal'
 import { SandboxPaymentProvider } from '../../src/payment/providers/sandbox-payment.provider'
+import { staleCollectedRefundReason } from '../../src/payment/print-return-disposition'
+import { staleAttemptRefundNo } from '../../src/payment/print-no-paper-refund.constants'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 import { ARRIVAL_REPRICE_AUDIT, applyArrivalReprice, settlePickupArrival } from '../../src/print-jobs/pickup-arrival-price'
 import { bindArrivalPaymentTerminal, releaseArrivalPaymentHold } from '../../src/print-jobs/pickup-arrival-hold'
@@ -272,8 +274,9 @@ export async function runArrivalHoldCases(
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     },
   })
-  assert.equal(await releaseArrivalPaymentHold(db, keptId, input.pricedTerminalId), 'kept', '渠道已受理时不能放开')
-  assert.equal((await db.order.findUniqueOrThrow({ where: { id: keptId } })).terminalId, input.pricedTerminalId)
+  assert.equal(await releaseArrivalPaymentHold(db, keptId, input.pricedTerminalId), 'released', '用户放弃付款时，渠道已受理也要放开这台机器')
+  assert.equal((await db.order.findUniqueOrThrow({ where: { id: keptId } })).terminalId, null)
+  assert.equal((await db.paymentAttempt.findUniqueOrThrow({ where: { id: `pa_${keptId}` } })).status, 'expired')
 
   const bindId = await createOrder({ amountCents: 200, payStatus: 'unpaid' })
   const bindOrder = await db.order.findUniqueOrThrow({ where: { id: bindId } })
@@ -284,9 +287,37 @@ export async function runArrivalHoldCases(
     amountCents: bindOrder.amountCents,
   })
   await bindArrivalPaymentTerminal(db, bindId, token)
-  assert.equal((await db.order.findUniqueOrThrow({ where: { id: bindId } })).terminalId, input.pricedTerminalId)
+  assert.equal((await db.order.findUniqueOrThrow({ where: { id: bindId } })).terminalId, null, '还没有付款尝试时不占机器')
   const boundElsewhere = await settlePickupArrival(db, { orderId: bindId, terminalId: input.publicTerminalId })
-  assert.equal(boundElsewhere.kind, 'lost', '已经开始在这台付款时，别的机器不能把单抢走')
+  assert.equal(boundElsewhere.kind, 'release', '没占上机器时，公共就业点位免费放行')
+  const boundRow = await db.order.findUniqueOrThrow({ where: { id: bindId } })
+  assert.equal(boundRow.paymentSource, 'free')
+  assert.equal(boundRow.amountCents, 0)
+
+  const closedId = await createOrder({
+    amountCents: 200,
+    payStatus: 'paying',
+    terminalId: input.pricedTerminalId,
+  })
+  await db.paymentAttempt.create({
+    data: {
+      id: `pa_${closedId}`,
+      orderId: closedId,
+      channel: 'sandbox',
+      amountCents: 200,
+      status: 'expired',
+      prepayId: `prepay_${closedId}`,
+      qrCodeContent: `qr_${closedId}`,
+      expiresAt: new Date(Date.now() - 60_000),
+      failReason: '渠道已关闭这次付款',
+    },
+  })
+  const closedMove = await settlePickupArrival(db, { orderId: closedId, terminalId: input.publicTerminalId })
+  assert.equal(closedMove.kind, 'release', '渠道关单后换到公共点位按那台免费放行')
+  const closedRow = await db.order.findUniqueOrThrow({ where: { id: closedId } })
+  assert.equal(closedRow.paymentSource, 'free')
+  assert.equal(closedRow.amountCents, 0)
+  assert.equal(closedRow.terminalId, input.publicTerminalId)
 
   const staleId = await createOrder({ amountCents: 0, payStatus: 'paid', paymentSource: 'free' })
   await db.paymentAttempt.create({
@@ -314,14 +345,85 @@ export async function runArrivalHoldCases(
   const parkedRow = await db.order.findUniqueOrThrow({ where: { id: staleId } })
   assert.equal(parkedRow.payStatus, 'unpaid', '过期尝试的旧金额不能入账放行')
   assert.equal(parkedRow.amountCents, 200)
-  assert.equal(parkedRow.refundReason, ONLINE_PAID_PENDING_REFUND_REASON)
+  assert.equal(parkedRow.refundReason, null, '原路退成之后清掉待退信号，下一笔才能按现在的价付')
   const staleAudit = JSON.parse(
     (await db.auditLog.findFirstOrThrow({ where: { targetId: staleId, action: 'order.stale_attempt_collection' } })).payloadJson ?? '{}',
-  ) as { reason?: string; attemptAmountCents?: number; orderAmountCents?: number }
+  ) as { reason?: string; attemptAmountCents?: number; orderAmountCents?: number; refundNo?: string }
   assert.equal(staleAudit.reason, 'repriced_attempt_collected')
   assert.equal(staleAudit.attemptAmountCents, 80)
   assert.equal(staleAudit.orderAmountCents, 200)
-  assert.equal((await db.paymentAttempt.findUniqueOrThrow({ where: { id: staleAttempt.id } })).status, 'expired')
+  assert.equal(staleAudit.refundNo, staleAttemptRefundNo(staleAttempt.id))
+  const parkedAttempt = await db.paymentAttempt.findUniqueOrThrow({ where: { id: staleAttempt.id } })
+  assert.equal(parkedAttempt.status, 'success')
+  assert.ok(parkedAttempt.channelTxnNo)
+  const parkedRefund = await db.refund.findUnique({ where: { refundNo: staleAttemptRefundNo(staleAttempt.id) } })
+  assert.equal(parkedRefund?.status, 'success')
+  assert.equal(parkedRefund?.amountCents, 80)
+  const parkedDetail = await new AdminOrdersReadonlyService(db).getById(staleId)
+  assert.equal(parkedDetail.printRefundDisposition, 'auto_success')
+  assert.equal(parkedDetail.printRefundReason, staleCollectedRefundReason(80))
+  assert.equal(parkedDetail.refundLedgerNo, parkedRefund?.refundNo)
+  assert.equal(parkedDetail.refundLedgerCents, 80)
+  await db.order.update({ where: { id: staleId }, data: { terminalId: input.pricedTerminalId } })
+  const nextToken = createPaymentSessionToken({
+    orderId: staleId,
+    orderNo: parkedRow.orderNo,
+    terminalId: input.pricedTerminalId,
+    amountCents: 200,
+  })
+  await payment.createPayAttempt(staleId, nextToken, 'sandbox')
+  const nextAttempt = await db.paymentAttempt.findFirst({
+    where: { orderId: staleId, amountCents: 200, status: { in: ['created', 'pending'] } },
+  })
+  assert.ok(nextAttempt, '旧的 80 分已经退成，可以按现在的 200 分再付款')
+
+  const lateFailId = await createOrder({ amountCents: 200, payStatus: 'unpaid' })
+  await db.paymentAttempt.create({
+    data: {
+      id: `pa_${lateFailId}`,
+      orderId: lateFailId,
+      channel: 'sandbox',
+      amountCents: 80,
+      status: 'expired',
+      expiresAt: new Date(Date.now() - 60_000),
+    },
+  })
+  const lateFail = await payment.simulateSandboxCallback({ attemptId: `pa_${lateFailId}`, result: 'failed' })
+  assert.equal(lateFail.ok, true)
+  const lateFailRow = await db.order.findUniqueOrThrow({ where: { id: lateFailId } })
+  assert.equal(lateFailRow.payStatus, 'unpaid')
+  assert.equal(lateFailRow.refundReason, null)
+  assert.equal(await db.refund.count({ where: { orderId: lateFailId } }), 0)
+  assert.equal(await db.auditLog.count({ where: { targetId: lateFailId, action: 'order.stale_attempt_collection' } }), 0)
+  assert.equal((await db.paymentAttempt.findUniqueOrThrow({ where: { id: `pa_${lateFailId}` } })).status, 'expired')
+
+  const freedId = await createOrder({ amountCents: 200, payStatus: 'unpaid' })
+  await db.paymentAttempt.create({
+    data: {
+      id: `pa_${freedId}`,
+      orderId: freedId,
+      channel: 'sandbox',
+      amountCents: 80,
+      status: 'expired',
+      expiresAt: new Date(Date.now() - 60_000),
+    },
+  })
+  const freed = await settlePickupArrival(db, { orderId: freedId, terminalId: input.publicTerminalId })
+  assert.equal(freed.kind, 'release', '过期付款还没到时，公共点位先免费放行')
+  const freedPaid = await payment.simulateSandboxCallback({ attemptId: `pa_${freedId}`, result: 'success' })
+  assert.equal(freedPaid.ok, true)
+  const freedRow = await db.order.findUniqueOrThrow({ where: { id: freedId } })
+  assert.equal(freedRow.payStatus, 'paid')
+  assert.equal(freedRow.paymentSource, 'free')
+  assert.equal(freedRow.amountCents, 0)
+  const freedRefund = await db.refund.findUnique({ where: { refundNo: staleAttemptRefundNo(`pa_${freedId}`) } })
+  assert.equal(freedRefund?.status, 'success')
+  assert.equal(freedRefund?.amountCents, 80, '免费放行之后迟到的 80 分要原路退，不能记成 0 分')
+  const freedDetail = await new AdminOrdersReadonlyService(db).getById(freedId)
+  assert.equal(freedDetail.printRefundDisposition, 'auto_success')
+  assert.equal(freedDetail.printRefundReason, staleCollectedRefundReason(80))
+  assert.equal(freedDetail.refundLedgerCents, 80)
+  assert.notEqual(freedDetail.refundLedgerCents, 0)
 
   const freshId = await createOrder({ amountCents: 200, payStatus: 'unpaid' })
   await db.paymentAttempt.create({

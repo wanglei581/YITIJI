@@ -19,11 +19,10 @@ import { AuditService } from '../audit/audit.service'
 import { readPersonalChargeEnabled } from './effective-user-prices'
 import { resolvePaymentProviders } from './payment-provider.factory'
 import { markPaidUnfulfilledRefundRequired, payableCents } from './pending-refund-signal'
+import { PAID_NO_PAPER_AUTO_REASON } from './print-no-paper-refund.constants'
+import { notifyPrintReturnHold } from './print-return-alert'
 import {
-  PAID_NO_PAPER_AUTO_REASON,
-  PRINT_RETURN_MANUAL_TYPE,
-} from './print-no-paper-refund.constants'
-import {
+  CHANNEL_UNCONFIRMED_REFUND_REASON,
   PRINT_NO_PAPER_AUTO_FAILED_AUDIT,
   PRINT_NO_PAPER_MANUAL_AUDIT,
   manualHoldReason,
@@ -75,57 +74,8 @@ function isExplicitNoPaper(status: string, errorCode: string | null): boolean {
   return EXPLICIT_NO_PAPER_ERROR_CODES.has(errorCode)
 }
 
-async function terminalCodeForOrder(db: PrismaService, orderId: string): Promise<string | null> {
-  const order = await db.order.findUnique({ where: { id: orderId }, select: { terminalId: true } })
-  if (!order?.terminalId) return null
-  const terminal = await db.terminal.findUnique({
-    where: { id: order.terminalId },
-    select: { terminalCode: true },
-  })
-  const code = terminal?.terminalCode?.trim()
-  return code ? code : null
-}
-
 async function pushPrintReturnAlert(db: PrismaService, orderId: string): Promise<void> {
-  const webhook = process.env['ALERT_WEBHOOK_URL']?.trim() || null
-  const redisUrl = process.env['REDIS_URL']?.trim()
-  if (!webhook || !redisUrl) return
-  const terminalCode = await terminalCodeForOrder(db, orderId)
-  try {
-    const { default: Redis } = await import('ioredis')
-    const client = new Redis(redisUrl, {
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-      connectTimeout: 1000,
-    })
-    try {
-      const { deliverOpsAlert } = await import('../admin-ops/admin-alert-push.service')
-      await deliverOpsAlert({
-        redis: {
-          setIfAbsent: async (key, value, ttlSeconds) => {
-            const result = await client.set(key, value, 'EX', ttlSeconds, 'NX')
-            return result === 'OK'
-          },
-          del: (key) => client.del(key),
-        },
-        webhook,
-        fetchImpl: fetch,
-        alert: {
-          subjectKey: `${PRINT_RETURN_MANUAL_TYPE}:${orderId}`,
-          episodeToken: orderId,
-          type: PRINT_RETURN_MANUAL_TYPE,
-          severity: 'error',
-          title: '打印没出纸，待人工处理',
-          terminalCode,
-        },
-        state: 'firing',
-      })
-    } finally {
-      client.disconnect()
-    }
-  } catch {
-    // 推送失败不改变退款结果。列表仍由收集器现算。
-  }
+  await notifyPrintReturnHold(db, orderId)
 }
 
 async function rememberOnce(
@@ -215,6 +165,15 @@ export async function settleExplicitNoPaper(
       })
       await pushPrintReturnAlert(db, order.id)
       return 'failed'
+    }
+    if (view.refund.status !== 'success') {
+      await rememberOnce(db, order.id, PRINT_NO_PAPER_MANUAL_AUDIT, {
+        detail: CHANNEL_UNCONFIRMED_REFUND_REASON,
+        refundNo: view.refund.refundNo,
+        refundStatus: view.refund.status,
+      })
+      await pushPrintReturnAlert(db, order.id)
+      return 'manual'
     }
     await rememberOnce(db, order.id, 'print_order.auto_return', {
       refundNo: view.refund.refundNo,

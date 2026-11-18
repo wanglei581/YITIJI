@@ -69,6 +69,8 @@ export const PICKUP_CLOSED_CODES: ReadonlySet<string> = new Set([
   'PRINT_RETRY_FILE_UNAVAILABLE',
   'PRINT_RETRY_AGENT_VERSION',
   'PICKUP_RESUME_REFUND_PENDING',
+  // 还有可能变成成功的退款时拒绝出纸。再输同一个码也不会放行。
+  'ORDER_REFUND_UNRESOLVED',
 ])
 
 /**
@@ -107,6 +109,7 @@ export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认。请过 5 分钟后回到这台机器，再输一次同一个到机码，按屏幕提示办理；符合条件时可以整份重打。',
   PICKUP_RESUME_PARTIAL_OUTPUT: '这单已经出了一部分纸，不能整单重打',
   PICKUP_RESUME_REFUND_PENDING: PICKUP_RESUME_REFUND_PENDING_COPY,
+  ORDER_REFUND_UNRESOLVED: '这单的退款还没结清，现在不能出纸。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。',
   PRINT_RETRY_FILE_UNAVAILABLE: '这笔订单的文件现在无法用于打印。请在手机上重新上传文件、重新下单。',
   // 后端那句带版本号，是给维护看的，不上屏。
   PRINT_RETRY_AGENT_VERSION: '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。',

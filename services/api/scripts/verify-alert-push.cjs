@@ -35,8 +35,11 @@ function scanFixture() {
     feedbackTicket: { count: async () => 0, findFirst: async () => null },
     aiUsageRecord: { findMany: async () => [], groupBy: async () => [], count: async () => 0 },
     serviceOrder: { findMany: async () => [], findFirst: async () => null },
-    // 打印没出纸的自动退失败会查 Refund。这组夹具没有这种单。
+    // 打印没出纸的去向会查退款、订单和审计。这组夹具没有这种单，查询必须返回空，不能缺模型。
     refund: { findMany: async () => [], findFirst: async () => null },
+    auditLog: { findMany: async () => [], findFirst: async () => null },
+    order: { findMany: async () => [], findUnique: async () => null },
+    orderItem: { groupBy: async () => [], count: async () => 0 },
   }
   const calls = []
   const service = make('https://example.invalid', {}, calls)

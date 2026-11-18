@@ -22,6 +22,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { API_MODE } from '../../services/api/client'
 import {
+  abandonPayAttempt,
   createCodePayAttempt,
   createPayAttempt,
   fetchPaymentChannels,
@@ -578,7 +579,12 @@ export function PrintCashierPage() {
           className="qx-btn"
           data-variant="ghost"
           data-cashier-exit=""
-          onClick={() => navigate('/', { replace: true })}
+          onClick={() => {
+            if (orderId && paymentSessionToken) {
+              void abandonPayAttempt({ orderId, paymentSessionToken }).catch(() => undefined)
+            }
+            navigate('/', { replace: true })
+          }}
         >
           <XCircleIcon aria-hidden="true" />退出支付
         </button>

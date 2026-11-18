@@ -1,6 +1,7 @@
 /**
- * 已付款没出纸：自动退失败，或不能自动退而待人工。进告警中心。
- * 退成、或不再是已付款的失败单，从列表消失。不复用服务单那条。
+ * 已付款没出纸：自动退失败，或待人工（含金额对不上、渠道还没确认、已经放行不能再退成）。
+ * 自动退成功从列表消失。退款停在失败、待确认或待人工时，订单即使已是退款中也还留在列表里。
+ * 不复用服务单那条。
  */
 import type { PrismaService } from '../prisma/prisma.service'
 import { PRINT_RETURN_MANUAL_TYPE } from '../payment/print-no-paper-refund.constants'

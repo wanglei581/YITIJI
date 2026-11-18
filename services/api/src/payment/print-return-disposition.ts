@@ -1,9 +1,19 @@
 /**
- * 已付金额大于 0、打印失败的单，最后只落在三种去向之一：
- * 自动退成功、自动退失败、待人工退款。原因按当次决定写进审计，后台照着读。
+ * 已付金额大于 0、没出纸的单，最后只落在三种去向之一：
+ * 自动退成功、自动退失败、待人工退款。一张单只进一种。
+ *
+ * 状态落点：
+ * - 自动退款成功，或过期付款已按尝试金额原路退成：自动退成功，不进待处理列表。
+ * - 自动退款失败，或只有失败审计还没有退款行：自动退失败，告警。订单停在退款中也算。
+ * - 退款待人工（金额对不上、已经放行不能再记成功、过期付款没有渠道流水）：待人工，告警。
+ * - 自动退或过期付款还在处理中：待人工，不能写成已经退成。
+ * - 说不准、部分出纸、缺纸、个人收费总开关关着：待人工，告警。
  */
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON, payableCents } from './pending-refund-signal'
-import { PAID_NO_PAPER_AUTO_REASON } from './print-no-paper-refund.constants'
+import {
+  PAID_NO_PAPER_AUTO_REASON,
+  STALE_ATTEMPT_REFUND_REASON,
+} from './print-no-paper-refund.constants'
 import type { PrismaService } from '../prisma/prisma.service'
 
 export const PRINT_NO_PAPER_MANUAL_AUDIT = 'print_order.no_paper_manual'
@@ -18,7 +28,23 @@ export interface PrintRefundView {
   disposition: PrintRefundDisposition | null
   refundStatus: string | null
   reason: string | null
+  refundNo: string | null
+  amountCents: number | null
 }
+
+const EMPTY_VIEW: PrintRefundView = {
+  disposition: null,
+  refundStatus: null,
+  reason: null,
+  refundNo: null,
+  amountCents: null,
+}
+
+export function staleCollectedRefundReason(amountCents: number): string {
+  return `过期付款 ${amountCents} 分已原路退回`
+}
+
+export const CHANNEL_UNCONFIRMED_REFUND_REASON = '渠道还没确认退款结果，不能当成已经退成'
 
 export function switchOffRefundReason(): string {
   return SWITCH_OFF_REASON
@@ -91,7 +117,66 @@ const REASON_ACTIONS = [
   'refund.blocked',
   PRINT_NO_PAPER_AUTO_FAILED_AUDIT,
   PRINT_NO_PAPER_MANUAL_AUDIT,
+  'refund.notify_amount_mismatch',
+  'refund.notify_paper_already_released',
 ] as const
+
+const AUTO_REASONS = new Set<string>([PAID_NO_PAPER_AUTO_REASON, STALE_ATTEMPT_REFUND_REASON])
+
+interface RefundFact {
+  refundNo: string
+  amountCents: number
+  status: string
+  reason: string | null
+}
+
+function viewOf(
+  disposition: PrintRefundDisposition,
+  refund: RefundFact | undefined,
+  reason: string | null,
+  refundStatus?: string,
+): PrintRefundView {
+  return {
+    disposition,
+    refundStatus: refundStatus ?? refund?.status ?? null,
+    reason,
+    refundNo: refund?.refundNo ?? null,
+    amountCents: refund?.amountCents ?? null,
+  }
+}
+
+function readNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) ? value : null
+}
+
+function mismatchReason(audits: AuditFact[]): string | null {
+  for (const audit of audits) {
+    if (audit.action !== 'refund.notify_amount_mismatch') continue
+    const payload = readPayload(audit.payloadJson) as { notifyAmountCents?: unknown; wholeOrderCents?: unknown }
+    const notify = readNumber(payload.notifyAmountCents)
+    const whole = readNumber(payload.wholeOrderCents)
+    if (notify != null && whole != null) return `渠道通知退了 ${notify} 分，这笔应退 ${whole} 分，待人工核对`
+  }
+  return null
+}
+
+function paperReleasedReason(audits: AuditFact[]): string | null {
+  for (const audit of audits) {
+    if (audit.action !== 'refund.notify_paper_already_released') continue
+    const detail = readPayload(audit.payloadJson).detail
+    if (typeof detail === 'string' && detail.trim()) return detail.trim()
+  }
+  return null
+}
+
+function manualReviewReason(refund: RefundFact, audits: AuditFact[]): string {
+  return mismatchReason(audits)
+    ?? paperReleasedReason(audits)
+    ?? manualReasonFromAudit(audits)
+    ?? (refund.reason === STALE_ATTEMPT_REFUND_REASON
+      ? `过期付款 ${refund.amountCents} 分没有渠道流水，待人工原路退回`
+      : '退款结果对不上，待人工核对')
+}
 
 export async function explainPrintRefund(db: PrismaService, orderId: string): Promise<PrintRefundView> {
   const order = await db.order.findUnique({
@@ -105,26 +190,41 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
       printTask: { select: { printOutcome: true, errorCode: true } },
     },
   })
-  const refund = await db.refund.findFirst({
-    where: { orderId, reason: PAID_NO_PAPER_AUTO_REASON },
+  const refunds = await db.refund.findMany({
+    where: { orderId },
     orderBy: { createdAt: 'desc' },
-    select: { status: true },
+    select: { refundNo: true, amountCents: true, status: true, reason: true },
   })
-  if (!order) return { disposition: null, refundStatus: refund?.status ?? null, reason: null }
-  if (refund?.status === 'success' || (order.payStatus === 'refunded' && order.refundReason === PAID_NO_PAPER_AUTO_REASON)) {
-    return { disposition: 'auto_success', refundStatus: refund?.status ?? 'success', reason: null }
+  const latest = refunds[0]
+  if (!order) {
+    return latest
+      ? { ...EMPTY_VIEW, refundStatus: latest.status, refundNo: latest.refundNo, amountCents: latest.amountCents }
+      : EMPTY_VIEW
   }
   const audits = await db.auditLog.findMany({
     where: { targetId: orderId, action: { in: [...REASON_ACTIONS] } },
     orderBy: { createdAt: 'desc' },
     select: { action: true, payloadJson: true },
   })
-  if (refund?.status === 'failed') {
-    return { disposition: 'auto_failed', refundStatus: 'failed', reason: autoRefundFailureReason(audits) }
+  const success = refunds.find((refund) => refund.status === 'success' && refund.reason != null && AUTO_REASONS.has(refund.reason))
+  if (success || (order.payStatus === 'refunded' && order.refundReason === PAID_NO_PAPER_AUTO_REASON)) {
+    const stale = success?.reason === STALE_ATTEMPT_REFUND_REASON
+    return viewOf(
+      'auto_success',
+      success,
+      stale && success ? staleCollectedRefundReason(success.amountCents) : null,
+      success?.status ?? 'success',
+    )
   }
-  if (refund?.status === 'pending') {
-    return { disposition: null, refundStatus: 'pending', reason: null }
+  const manualReview = refunds.find((refund) => refund.status === 'manual_review')
+  if (manualReview) return viewOf('manual', manualReview, manualReviewReason(manualReview, audits))
+  const failedAuto = refunds.find((refund) => refund.status === 'failed' && refund.reason != null && AUTO_REASONS.has(refund.reason))
+  const failedAudit = audits.some((audit) => audit.action === PRINT_NO_PAPER_AUTO_FAILED_AUDIT)
+  if (failedAuto || failedAudit) {
+    return viewOf('auto_failed', failedAuto, autoRefundFailureReason(audits), failedAuto?.status ?? 'failed')
   }
+  const pending = refunds.find((refund) => refund.status === 'pending' && refund.reason != null && AUTO_REASONS.has(refund.reason))
+  if (pending) return viewOf('manual', pending, CHANNEL_UNCONFIRMED_REFUND_REASON)
   const printed = order.printTask?.printOutcome === 'printed'
   const manualDetail = manualReasonFromAudit(audits)
   // 开关关着仍用待退款信号。缺纸和说不准不写那条信号，只靠待人工审计认。
@@ -136,18 +236,14 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
       order.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON
       || (order.refundReason == null && manualDetail != null)
     )
-  if (!manual) return { disposition: null, refundStatus: null, reason: null }
+  if (!manual) return EMPTY_VIEW
   const itemCount = await db.orderItem.count({ where: { orderId } })
   const completedItemCount = await db.orderItem.count({ where: { orderId, status: 'completed' } })
-  return {
-    disposition: 'manual',
-    refundStatus: null,
-    reason: manualDetail ?? manualHoldReason({
-      errorCode: order.printTask?.errorCode ?? null,
-      completedItemCount,
-      itemCount,
-    }),
-  }
+  return viewOf('manual', undefined, manualDetail ?? manualHoldReason({
+    errorCode: order.printTask?.errorCode ?? null,
+    completedItemCount,
+    itemCount,
+  }))
 }
 
 export interface PrintReturnHold {
@@ -158,89 +254,48 @@ export interface PrintReturnHold {
   reason: string
 }
 
+const HOLD_AUDIT_ACTIONS = [
+  PRINT_NO_PAPER_MANUAL_AUDIT,
+  PRINT_NO_PAPER_AUTO_FAILED_AUDIT,
+  'refund.notify_amount_mismatch',
+  'refund.notify_paper_already_released',
+] as const
+
 export async function listPrintReturnHolds(db: PrismaService): Promise<PrintReturnHold[]> {
-  const failedRefunds = await db.refund.findMany({
-    where: { reason: PAID_NO_PAPER_AUTO_REASON, status: 'failed', order: { payStatus: 'paid' } },
-    select: { orderId: true, updatedAt: true, order: { select: { terminalId: true } } },
-    orderBy: { updatedAt: 'asc' },
-  })
-  const manualAudits = await db.auditLog.findMany({
-    where: { action: PRINT_NO_PAPER_MANUAL_AUDIT },
-    select: { targetId: true },
-  })
-  const manualAuditIds = [...new Set(
-    manualAudits.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
-  )]
-  const manuals = await db.order.findMany({
-    where: {
-      payStatus: 'paid',
-      taskStatus: 'failed',
-      refunds: { none: { reason: PAID_NO_PAPER_AUTO_REASON } },
-      OR: [
-        { refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON },
-        ...(manualAuditIds.length > 0 ? [{ id: { in: manualAuditIds }, refundReason: null }] : []),
-      ],
-    },
-    select: {
-      id: true,
-      terminalId: true,
-      updatedAt: true,
-      amountCents: true,
-      discountCents: true,
-      printTask: { select: { printOutcome: true, errorCode: true } },
-    },
-    orderBy: { updatedAt: 'asc' },
-  })
-  const manualOrders = manuals.filter((order) => payableCents(order) > 0 && order.printTask?.printOutcome !== 'printed')
-  const orderIds = [...failedRefunds.map((row) => row.orderId), ...manualOrders.map((order) => order.id)]
-  const audits = orderIds.length === 0
-    ? []
-    : await db.auditLog.findMany({
-      where: { targetId: { in: orderIds }, action: { in: [...REASON_ACTIONS] } },
-      orderBy: { createdAt: 'desc' },
-      select: { targetId: true, action: true, payloadJson: true },
+  const [openRefunds, audits, signaled] = await Promise.all([
+    db.refund.findMany({
+      where: { status: { in: ['failed', 'pending', 'manual_review'] } },
+      select: { orderId: true },
+    }),
+    db.auditLog.findMany({
+      where: { action: { in: [...HOLD_AUDIT_ACTIONS] } },
+      select: { targetId: true },
+    }),
+    db.order.findMany({
+      where: { refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON },
+      select: { id: true },
+    }),
+  ])
+  const orderIds = [...new Set([
+    ...openRefunds.map((row) => row.orderId),
+    ...audits.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
+    ...signaled.map((row) => row.id),
+  ])]
+  const holds: PrintReturnHold[] = []
+  for (const orderId of orderIds) {
+    const explained = await explainPrintRefund(db, orderId)
+    if (explained.disposition !== 'auto_failed' && explained.disposition !== 'manual') continue
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: { terminalId: true, updatedAt: true },
     })
-  const byOrder = new Map<string, AuditFact[]>()
-  for (const audit of audits) {
-    if (!audit.targetId) continue
-    const list = byOrder.get(audit.targetId) ?? []
-    list.push(audit)
-    byOrder.set(audit.targetId, list)
-  }
-  const holds: PrintReturnHold[] = failedRefunds.map((row) => ({
-    orderId: row.orderId,
-    terminalId: row.order.terminalId,
-    updatedAt: row.updatedAt,
-    disposition: 'auto_failed' as const,
-    reason: autoRefundFailureReason(byOrder.get(row.orderId) ?? []),
-  }))
-  const itemCounts = new Map<string, { total: number; completed: number }>()
-  if (manualOrders.length > 0) {
-    const grouped = await db.orderItem.groupBy({
-      by: ['orderId', 'status'],
-      where: { orderId: { in: manualOrders.map((order) => order.id) } },
-      _count: { _all: true },
-    })
-    for (const row of grouped) {
-      const current = itemCounts.get(row.orderId) ?? { total: 0, completed: 0 }
-      current.total += row._count._all
-      if (row.status === 'completed') current.completed += row._count._all
-      itemCounts.set(row.orderId, current)
-    }
-  }
-  for (const order of manualOrders) {
-    const facts = byOrder.get(order.id) ?? []
-    const counts = itemCounts.get(order.id) ?? { total: 0, completed: 0 }
+    if (!order || !explained.reason) continue
     holds.push({
-      orderId: order.id,
+      orderId,
       terminalId: order.terminalId,
       updatedAt: order.updatedAt,
-      disposition: 'manual',
-      reason: manualReasonFromAudit(facts) ?? manualHoldReason({
-        errorCode: order.printTask?.errorCode ?? null,
-        completedItemCount: counts.completed,
-        itemCount: counts.total,
-      }),
+      disposition: explained.disposition,
+      reason: explained.reason,
     })
   }
   return holds

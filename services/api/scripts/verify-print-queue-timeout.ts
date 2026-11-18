@@ -243,6 +243,11 @@ async function main(): Promise<void> {
   assert.equal(staleTask?.claimedAt, null)
   assert.equal(staleOrder?.taskStatus, 'failed')
   assert.equal(staleOrder?.refundReason, PAID_UNFULFILLED_PENDING_REFUND_REASON)
+  assert.equal(await prisma.refund.count({ where: { orderId: stalePaid.orderId } }), 0)
+  const manualAudit = await prisma.auditLog.findFirst({
+    where: { action: 'print_order.no_paper_manual', targetId: stalePaid.orderId },
+  })
+  assert.ok(manualAudit, '开关关着时，清扫要留下待人工审计，不能只改退款原因')
   assert.equal((await claim()).length, 0)
   const timeoutAudit = await prisma.auditLog.findFirst({
     where: { action: PRINT_QUEUE_TIMEOUT_AUDIT, targetId: stalePaid.taskId },

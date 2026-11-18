@@ -1,67 +1,169 @@
 /**
- * 到机改价之后，旧的付款尝试如果已经过期，渠道仍可能把旧金额扣成功。
- * 这笔钱和现在的订单金额对不上：不能按旧金额把订单改成已付（少收就出纸），
- * 也不能只拒掉回调让渠道把钱留下。记待人工退款，订单保持未按这笔钱放行。
+ * 到机改价或免费放行之后，过期的付款尝试仍可能把旧金额扣成功。
+ * 只处理成功回调：失败回调不写成已收款。
+ * 钱按尝试上的金额原路退，订单保持现在的支付状态，不按旧金额放行，也不把免费单退成 0 分。
+ * 渠道退成则退款单成功；退不成或没有渠道时退款单失败或待人工，并告警。
  * 尝试还没过期时金额对不上，仍当校验失败，不在这里收账。
  */
 import type { PrismaService } from '../prisma/prisma.service'
+import type { PaymentProviderRegistry } from './payment-provider.factory'
 import { ONLINE_PAID_PENDING_REFUND_REASON } from './pending-refund-signal'
+import { notifyPrintReturnHold } from './print-return-alert'
+import { REFUND_STATUS_MANUAL_REVIEW } from './refund-amount-hold'
+import { STALE_ATTEMPT_REFUND_REASON, staleAttemptRefundNo } from './print-no-paper-refund.constants'
 
 const STALE_ATTEMPT_AUDIT = 'order.stale_attempt_collection'
-const PARKABLE_PAY_STATUSES = ['unpaid', 'paying', 'closed'] as const
 
-export async function parkRepricedAttemptCollection(
-  db: PrismaService,
-  input: {
-    orderId: string
-    payStatus: string
-    refundReason: string | null
-    attemptId: string
-    attemptStatus: string
-    attemptAmountCents: number
-    orderAmountCents: number
-    channel: string
-    channelTxnNo: string | null
-  },
-): Promise<boolean> {
-  if (input.attemptStatus !== 'expired') return false
-  if (input.attemptAmountCents === input.orderAmountCents) return false
-  if ((PARKABLE_PAY_STATUSES as readonly string[]).includes(input.payStatus) && !input.refundReason) {
-    await db.order.updateMany({
-      where: {
-        id: input.orderId,
-        payStatus: { in: [...PARKABLE_PAY_STATUSES] },
-        refundReason: null,
-      },
-      data: { refundReason: ONLINE_PAID_PENDING_REFUND_REASON },
-    })
-  }
-  await db.paymentAttempt.updateMany({
-    where: { id: input.attemptId, status: 'expired' },
-    data: { failReason: '到机改价之后付来的钱，没有按这个金额入账，待人工退回' },
-  })
+export interface StaleAttemptCallback {
+  orderId: string
+  orderNo: string
+  payStatus: string
+  attemptId: string
+  attemptStatus: string
+  attemptAmountCents: number
+  orderAmountCents: number
+  channel: string
+  channelTxnNo: string | null
+  result: 'success' | 'failed' | 'ignored'
+}
+
+async function rememberAudit(db: PrismaService, input: StaleAttemptCallback, refundNo: string): Promise<void> {
   const existing = await db.auditLog.findFirst({
     where: { targetId: input.orderId, action: STALE_ATTEMPT_AUDIT },
     select: { id: true },
   })
-  if (!existing) {
-    await db.auditLog.create({
-      data: {
-        actorId: null,
-        actorRole: 'system',
-        action: STALE_ATTEMPT_AUDIT,
-        targetType: 'order',
-        targetId: input.orderId,
-        payloadJson: JSON.stringify({
-          attemptId: input.attemptId,
-          attemptAmountCents: input.attemptAmountCents,
-          orderAmountCents: input.orderAmountCents,
+  if (existing) return
+  await db.auditLog.create({
+    data: {
+      actorId: null,
+      actorRole: 'system',
+      action: STALE_ATTEMPT_AUDIT,
+      targetType: 'order',
+      targetId: input.orderId,
+      payloadJson: JSON.stringify({
+        attemptId: input.attemptId,
+        attemptAmountCents: input.attemptAmountCents,
+        orderAmountCents: input.orderAmountCents,
+        channel: input.channel,
+        channelTxnNo: input.channelTxnNo,
+        refundNo,
+        reason: 'repriced_attempt_collected',
+      }),
+    },
+  })
+}
+
+async function clearCollectedSignal(db: PrismaService, orderId: string): Promise<void> {
+  await db.order.updateMany({
+    where: { id: orderId, refundReason: ONLINE_PAID_PENDING_REFUND_REASON },
+    data: { refundReason: null },
+  })
+}
+
+/** 过期且金额不符的回调已处理（含失败回调的空确认）时返回 true。调用方据此 ACK。 */
+export async function settleStaleRepricedCollection(
+  db: PrismaService,
+  registry: PaymentProviderRegistry,
+  input: StaleAttemptCallback,
+): Promise<boolean> {
+  if (input.attemptAmountCents === input.orderAmountCents) return false
+  if (input.result !== 'success') return input.attemptStatus === 'expired'
+  if (input.attemptStatus !== 'expired' && input.attemptStatus !== 'success') return false
+
+  const refundNo = staleAttemptRefundNo(input.attemptId)
+  const existing = await db.refund.findUnique({ where: { refundNo } })
+  if (existing?.status === 'success') return true
+
+  if (!input.channelTxnNo) {
+    await rememberAudit(db, input, refundNo)
+    if (!existing) {
+      await db.refund.create({
+        data: {
+          orderId: input.orderId,
+          refundNo,
+          amountCents: input.attemptAmountCents,
+          status: REFUND_STATUS_MANUAL_REVIEW,
+          reason: STALE_ATTEMPT_REFUND_REASON,
           channel: input.channel,
-          channelTxnNo: input.channelTxnNo,
-          reason: 'repriced_attempt_collected',
-        }),
-      },
-    })
+        },
+      })
+    }
+    await notifyPrintReturnHold(db, input.orderId)
+    return true
   }
-  return true
+
+  try {
+    const marked = await db.paymentAttempt.updateMany({
+      where: { id: input.attemptId, status: 'expired' },
+      data: { status: 'success', channelTxnNo: input.channelTxnNo, failReason: null },
+    })
+    if (marked.count === 0) {
+      const fresh = await db.paymentAttempt.findUnique({ where: { id: input.attemptId } })
+      if (fresh?.status !== 'success' || fresh.channelTxnNo !== input.channelTxnNo) return true
+    }
+  } catch (error) {
+    if ((error as { code?: string }).code === 'P2002') return true
+    throw error
+  }
+
+  await rememberAudit(db, input, refundNo)
+  const refund = existing ?? await db.refund.create({
+    data: {
+      orderId: input.orderId,
+      refundNo,
+      amountCents: input.attemptAmountCents,
+      status: 'pending',
+      reason: STALE_ATTEMPT_REFUND_REASON,
+      channel: input.channel,
+    },
+  })
+  const provider = registry.get(input.channel)
+  if (!provider) {
+    await db.refund.update({
+      where: { id: refund.id },
+      data: { status: 'failed' },
+    })
+    await notifyPrintReturnHold(db, input.orderId)
+    return true
+  }
+  try {
+    const executed = await provider.refund({
+      orderId: input.orderId,
+      orderNo: input.orderNo,
+      refundNo,
+      amountCents: input.attemptAmountCents,
+      orderAmountCents: input.attemptAmountCents,
+      outTradeNo: input.attemptId,
+      channelTxnNo: input.channelTxnNo,
+    })
+    if (executed.status === 'success') {
+      await db.refund.update({
+        where: { id: refund.id },
+        data: { status: 'success', channelRefundNo: executed.channelRefundNo },
+      })
+      await clearCollectedSignal(db, input.orderId)
+      return true
+    }
+    if (executed.status === 'failed') {
+      await db.refund.update({
+        where: { id: refund.id },
+        data: { status: 'failed', channelRefundNo: executed.channelRefundNo },
+      })
+      await notifyPrintReturnHold(db, input.orderId)
+      return true
+    }
+    await db.refund.update({
+      where: { id: refund.id },
+      data: { channelRefundNo: executed.channelRefundNo },
+    })
+    await notifyPrintReturnHold(db, input.orderId)
+    return true
+  } catch {
+    await db.refund.update({
+      where: { id: refund.id },
+      data: { status: 'failed' },
+    })
+    await notifyPrintReturnHold(db, input.orderId)
+    return true
+  }
 }
