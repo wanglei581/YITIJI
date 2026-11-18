@@ -299,3 +299,14 @@ test('翻页停用只降低透明度，不改成米色底 @kiosk', async ({ page
   await expect(next).toHaveCSS('background-color', nextBg)
   await expect(prev).toHaveCSS('opacity', '1')
 })
+
+test('搜索框焦点只靠外框绿边，输入框自己不再描边 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  await routePolicies(page)
+  await openHome(page)
+  const input = page.getByTestId('policy-search-input')
+  await input.click()
+  await expect(input).toBeFocused()
+  await expect(page.locator('.policy-search-field')).toHaveClass(/is-on/)
+  await expect(input).toHaveCSS('outline-style', 'none')
+})
