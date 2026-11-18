@@ -168,11 +168,11 @@ export class LlmJobFitService {
       `岗位：${job.title}${job.company ? `（${job.company}）` : ''}\n` +
       (job.description ? `岗位描述：${job.description.slice(0, 1500)}\n` : '') +
       (job.requirements ? `任职要求：${job.requirements.slice(0, 1500)}\n` : '')
-    // S0-2 / 风险 R2：简历先截断再遮盖高置信 PII，然后才拼 prompt。
+    // S0-2 / 风险 R2：简历先遮盖高置信 PII，再截到 8000 字，然后才拼 prompt。
     // ⚠️ 校验必须用**送出去的这份**（maskedResume），不能用原文：
     // 防编造校验的口径是「evidence 必须能在模型看得到的文本里找到」，
     // 拿原文去校验会放宽这条不变量。
-    const maskedResume = maskUserTextForLlmText(resumeText.slice(0, 8000), 'job_fit')
+    const maskedResume = maskUserTextForLlmText(resumeText, 'job_fit').slice(0, 8000)
     const user = `【目标岗位】\n${jobText}\n【简历原文】\n${maskedResume}`
 
     for (let attempt = 0; attempt < 2; attempt += 1) {

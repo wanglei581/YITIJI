@@ -1,0 +1,254 @@
+/**
+ * 出站与落库先遮盖再截断。
+ *
+ * 证件号跨在字数上限上时，先截断会把前 10 位明文送进模型或写进库。
+ * 每条用例都用「上限减 10 个乙 + 固定 18 位号」，断言出站正文或落库摘要里
+ * 既没有整号，也没有前 10 位，并且出现了遮盖占位符（证明号就在截断窗口里）。
+ *
+ * 运行：pnpm --filter @ai-job-print/api verify:mask-before-truncate
+ */
+import 'dotenv/config'
+import type { LlmConfigService } from '../src/ai/llm/llm-config.service'
+import type { GeneratedResume, ResumeReport } from '../src/ai/interfaces/ai-provider.interface'
+import { AssistantSummaryService } from '../src/advisor/assistant-summary.service'
+import { LlmAdvisorService } from '../src/advisor/llm-advisor.service'
+import { LlmCareerPlanService } from '../src/ai/resume/llm-career-plan.service'
+import { LlmFairVisitPlanService } from '../src/ai/resume/llm-fair-visit-plan.service'
+import { LlmJobFitService } from '../src/ai/resume/llm-job-fit.service'
+import { LlmResumeService } from '../src/ai/resume/llm-resume.service'
+import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
+import { LLM_MASK_INPUT_LIMIT } from '../src/common/pii/llm-input-mask'
+import { JobAiLlmService } from '../src/job-ai/job-ai-llm.service'
+import { MockInterviewLlmService } from '../src/mock-interview/mock-interview-llm.service'
+import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
+
+process.env['AI_ENDPOINT_ALLOWLIST_EXTRA'] = [process.env['AI_ENDPOINT_ALLOWLIST_EXTRA'], 'llm.invalid']
+  .filter(Boolean)
+  .join(',')
+
+const ID = '110101199003077777'
+const PREFIX = '1101011990'
+const PLACEHOLDER = '[身份证_'
+
+let passCount = 0
+function pass(message: string): void {
+  passCount += 1
+  console.log(`  PASS ${message}`)
+}
+function fail(message: string): never {
+  console.error(`  FAIL ${message}`)
+  throw new Error(message)
+}
+
+const captured: string[] = []
+const realFetch = global.fetch
+
+function installFakeLlm(): void {
+  captured.length = 0
+  global.fetch = (async (_url: string, init?: { body?: string }) => {
+    captured.push(init?.body ?? '')
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: '{}' } }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+    }
+  }) as unknown as typeof fetch
+}
+
+function cross(limit: number): string {
+  return `${'乙'.repeat(limit - 10)}${ID}`
+}
+
+function assertClean(label: string, text: string): void {
+  if (text.includes(ID)) fail(`${label} 出站或落库含整号`)
+  if (text.includes(PREFIX)) fail(`${label} 出站或落库含证件号前 10 位`)
+  if (!text.includes(PLACEHOLDER)) fail(`${label} 没有遮盖占位符，跨边界号可能没进窗口`)
+  pass(label)
+}
+
+const llmConfig = {
+  getApiKey: () => 'test-key',
+  getConfig: () => ({
+    enabled: true,
+    baseURL: 'https://llm.invalid/v1',
+    model: 'stub-model',
+    vendor: 'openai',
+    temperature: 0.2,
+    forbiddenWords: [] as string[],
+  }),
+  isReady: () => true,
+} as unknown as LlmConfigService
+
+async function outbound(label: string, run: () => Promise<unknown>): Promise<void> {
+  installFakeLlm()
+  try {
+    await run()
+  } catch {
+    // 假模型回的是空 JSON。断言只看已经发出去的正文。
+  }
+  if (captured.length === 0) fail(`${label} 没有出站`)
+  for (const body of captured) assertClean(`${label}#${captured.indexOf(body) + 1}`, body)
+}
+
+function emptyResume(): GeneratedResume {
+  return {
+    basic: { name: '甲' },
+    intention: { position: '测试岗位' },
+    summary: '',
+    education: [],
+    experience: [],
+    projects: [],
+    skills: [],
+    certificates: [],
+  }
+}
+
+async function main(): Promise<void> {
+  const summary = new AssistantSummaryService(
+    {} as never,
+    {} as never,
+    llmConfig,
+    {} as never,
+    {} as never,
+    {} as never,
+  )
+  await outbound('小青摘要用户轮 800', () =>
+    (summary as unknown as {
+      condense: (turns: Array<{ role: 'user' | 'assistant'; content: string }>) => Promise<unknown>
+    }).condense([{ role: 'user', content: cross(800) }]))
+
+  const jobs = new JobAiLlmService(llmConfig)
+  await outbound('岗位推荐简历 6000', () => jobs.recommend(cross(6000), [{
+    jobId: 'job-1',
+    title: '测试岗位',
+    company: '来源企业',
+    sourceName: '来源平台',
+    sourceUrl: 'https://example.invalid/job',
+    externalId: 'ext-1',
+    skills: [],
+    city: '上海',
+  }]))
+
+  const advisor = new LlmAdvisorService(llmConfig)
+  await outbound('比对材料 8000', () => advisor.compare(cross(8000), '岗位要求：能独立完成工作'))
+  await outbound('比对要求 4000', () => advisor.compare('材料里写了项目经历', cross(4000)))
+
+  const interviewLlm = new MockInterviewLlmService(llmConfig)
+  const questionBase = {
+    interviewerType: 'hr',
+    industry: '软件',
+    position: '测试岗位',
+    experience: 'y1_3',
+    difficulty: 'standard',
+    questionTarget: 4,
+    askedCount: 1,
+  }
+  await outbound('面试出题摘要 3000', () => interviewLlm.nextQuestion({
+    ...questionBase,
+    resumeDigest: cross(3000),
+    transcript: [],
+  }))
+  await outbound('面试出题回答 500', () => interviewLlm.nextQuestion({
+    ...questionBase,
+    resumeDigest: null,
+    transcript: [{ role: 'candidate', content: cross(500) }],
+  }))
+  await outbound('面试报告摘要 3000', () => interviewLlm.buildReport({
+    ...questionBase,
+    resumeDigest: cross(3000),
+    transcript: [{ role: 'candidate', content: '做过一个内部工具' }],
+  }))
+  await outbound('面试报告回答 800', () => interviewLlm.buildReport({
+    ...questionBase,
+    resumeDigest: null,
+    transcript: [{ role: 'candidate', content: cross(800) }],
+  }))
+
+  let storedDigest = ''
+  const interviews = new MockInterviewService(
+    {
+      fileObject: { findUnique: async () => ({ endUserId: 'member-1' }) },
+      mockInterviewSession: {
+        create: async ({ data }: { data: { resumeDigest?: string | null; interviewerType: string; durationMin: number; questionTarget: number } }) => {
+          storedDigest = data.resumeDigest ?? ''
+          return { id: 'iv-1', interviewerType: data.interviewerType, durationMin: data.durationMin, questionTarget: data.questionTarget }
+        },
+      },
+    } as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    { extractResumeText: async () => ({ ok: true, text: cross(6000) }) } as never,
+    { write: async () => undefined } as never,
+    {} as never,
+    {} as never,
+  )
+  await interviews.createSession({
+    interviewerType: 'hr',
+    industry: '软件',
+    position: '测试岗位',
+    experience: 'y1_3',
+    difficulty: 'standard',
+    durationMin: 5,
+    resumeFileId: 'file-1',
+  }, { endUserId: 'member-1', accessToken: null })
+  assertClean('面试摘要落库 6000', storedDigest)
+
+  const fair = new LlmFairVisitPlanService(llmConfig)
+  await outbound('参会准备简历 8000', () => fair.build({
+    resumeText: cross(8000),
+    mode: 'preparation',
+    fair: {
+      id: 'fair-1',
+      title: '春季招聘会',
+      sourceName: '来源机构',
+      sourceUrl: 'https://example.invalid/fair',
+      startAt: '2026-04-01T01:00:00.000Z',
+      endAt: '2026-04-01T09:00:00.000Z',
+      venue: '来源场馆',
+      city: '上海',
+    },
+    fairCompanies: [],
+  }))
+
+  const diagnosis = new LlmResumeService(llmConfig)
+  await outbound('简历诊断 12000', () => diagnosis.diagnose(cross(12000)))
+
+  const fit = new LlmJobFitService(llmConfig)
+  await outbound('岗位对照简历 8000', () => fit.analyze(cross(8000), { title: '测试岗位' }))
+
+  const career = new LlmCareerPlanService(llmConfig)
+  await outbound('职业规划简历 8000', () => career.build({ resumeText: cross(8000) }))
+
+  const optimize = new LlmResumeOptimizeService(llmConfig)
+  const report = { sections: [], suggestions: [] } as ResumeReport
+  await outbound('简历优化 12000', () => optimize.optimize(cross(12000), report))
+
+  const current = emptyResume()
+  const json = JSON.stringify(current)
+  const values = ['甲', '测试岗位'].join('\n')
+  const split = '\n<<<PII_MASK_SPLIT>>>\n'
+  const room = Math.max(0, LLM_MASK_INPUT_LIMIT - json.length - values.length - split.length * 2)
+  if (room <= 12000) fail(`排版夹具预算 ${room} 没有留在 12000 字截断上`)
+  const layoutText = `${cross(12000)}${'丙'.repeat(40)}`
+  await outbound('排版原文 12000', () => optimize.adjustLayoutDraft({
+    currentResume: current,
+    originalText: layoutText,
+    action: 'reformat',
+  }))
+
+  console.log(`verify:mask-before-truncate ${passCount} PASS`)
+}
+
+main()
+  .catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error)
+    process.exitCode = 1
+  })
+  .finally(() => {
+    global.fetch = realFetch
+  })

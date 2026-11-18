@@ -191,16 +191,17 @@ export class MockInterviewLlmService {
     const sys = interviewQuestionSystemPrompt(input)
 
     const recentTurns = input.transcript.slice(-10)
+    // 先遮盖整段，再按字数截。摘要 3000、每轮 500。先截再会把跨边界的证件号前 10 位送出去。
     const masked = maskInterviewMaterial(
-      input.resumeDigest ? input.resumeDigest.slice(0, 3000) : null,
-      recentTurns.map((t) => (t.skipped ? '' : t.content.slice(0, 500))),
+      input.resumeDigest,
+      recentTurns.map((t) => (t.skipped ? '' : t.content)),
       'mock_interview_question',
     )
     const userParts: string[] = []
-    if (masked.digest) userParts.push(`【求职者简历摘要（仅练习用）】\n${masked.digest}`)
+    if (masked.digest) userParts.push(`【求职者简历摘要（仅练习用）】\n${masked.digest.slice(0, 3000)}`)
     if (recentTurns.length > 0) {
       const recent = recentTurns
-        .map((t, i) => `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过了这个问题）' : masked.contents[i]}`)
+        .map((t, i) => `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过了这个问题）' : (masked.contents[i] ?? '').slice(0, 500)}`)
         .join('\n')
       userParts.push(`【已进行的对话】\n${recent}`)
     }
@@ -233,19 +234,20 @@ export class MockInterviewLlmService {
 
     // 送模型的是遮盖后的对话；报告页 / 打印稿里展示的「你的回答」取自库里本人原话
     // （buildQaExcerpts(turns)），不取模型产物，所以这里遮盖不影响用户看到自己的原话。
+    // 先遮盖整段，再按字数截。摘要 3000、每轮 800。
     const masked = maskInterviewMaterial(
-      input.resumeDigest ? input.resumeDigest.slice(0, 3000) : null,
-      input.transcript.map((t) => (t.skipped ? '' : t.content.slice(0, 800))),
+      input.resumeDigest,
+      input.transcript.map((t) => (t.skipped ? '' : t.content)),
       'mock_interview_report',
     )
     const transcript = input.transcript
       .map((t, i) => {
         const meta = t.role === 'candidate' && typeof t.durationSec === 'number' ? `（回答耗时 ${t.durationSec} 秒）` : ''
-        return `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过）' : masked.contents[i]}${meta}`
+        return `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过）' : (masked.contents[i] ?? '').slice(0, 800)}${meta}`
       })
       .join('\n')
     const user =
-      (masked.digest ? `【简历摘要】\n${masked.digest}\n\n` : '') +
+      (masked.digest ? `【简历摘要】\n${masked.digest.slice(0, 3000)}\n\n` : '') +
       `【完整对话】\n${transcript || '（用户未回答任何问题）'}`
 
     for (let attempt = 0; attempt < 2; attempt += 1) {

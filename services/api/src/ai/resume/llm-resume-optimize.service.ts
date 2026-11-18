@@ -236,12 +236,11 @@ export class LlmResumeOptimizeService {
     // 服务端内存里发生，真值从未离开本进程）。
     // 库里早先存下的简历文字可能还带着部首字符（新上传的在抽取时已经换掉）：在入口换一次，后面的遮盖、章节识别、送模型、事实串比对用的都是同一份常用字文本。
     const original = foldCjkRadicals(extractedText ?? '')
-    const input = original.slice(0, MAX_INPUT_CHARS)
-    const masked = maskUserTextForLlmReversible(input, 'resume_optimize')
-    // 旧报告摘录仍是部首字符。只换字符串叶子，返回新对象，不改报告本身。覆盖检查和提示词用同一份。
+    const masked = maskUserTextForLlmReversible(original, 'resume_optimize')
+    // 先遮盖再截到上限。旧报告摘录仍是部首字符，只换字符串叶子，不改报告本身。
     const foldedReport = foldCjkRadicalStrings(report)
-    const baseline = buildOriginalCoverage(original, foldedReport, input.length, masked.restore)
-    const text = masked.text
+    const baseline = buildOriginalCoverage(original, foldedReport, Math.min(original.length, MAX_INPUT_CHARS), masked.restore)
+    const text = masked.text.slice(0, MAX_INPUT_CHARS)
     const reportBrief = foldedReport.sections.map((s) => `${s.label}:${s.score}/${s.maxScore}`).join('、')
     const directionPrompt = buildTargetContextPrompt(targetContext)
     const baseMessages: ChatMessage[] = [
@@ -310,7 +309,7 @@ export class LlmResumeOptimizeService {
       })
     }
 
-    const originalText = (input.originalText ?? '').slice(0, MAX_INPUT_CHARS)
+    const originalText = (input.originalText ?? '').slice(0, MAX_INPUT_CHARS + 32)
     if (!originalText.trim()) {
       throw new ServiceUnavailableException({
         error: { code: 'AI_RESUME_SOURCE_UNAVAILABLE', message: '简历原文已按隐私策略自动清理，请重新上传简历后再调整排版' },
@@ -326,18 +325,18 @@ export class LlmResumeOptimizeService {
     //
     // 预算：遮盖入口会把超过 LLM_MASK_INPUT_LIMIT 的部分静默截断，被截掉的是**后半段**。
     // JSON 残缺会直接毁掉条目数量上限校验，所以优先保后两段完整，不够的额度从
-    // originalText 预算里扣（originalText 本来就已按 MAX_INPUT_CHARS 截断）。
+    // originalText 预算里扣。原文超预算时先多留 32 字遮盖跨边界证件号，送出再截回。
     const resumeJson = JSON.stringify(input.currentResume)
     const resumeValues = extractResumeValueText(input.currentResume)
-    const originalBudget = Math.max(
-      0,
-      LLM_MASK_INPUT_LIMIT - resumeJson.length - resumeValues.length - MASK_SPLIT.length * 2,
-    )
+    const room = Math.max(0, LLM_MASK_INPUT_LIMIT - resumeJson.length - resumeValues.length - MASK_SPLIT.length * 2)
+    const guard = originalText.length > room ? 32 : 0
+    const originalBudget = Math.max(0, room - guard)
     const maskedTriple = maskUserTextForLlmReversible(
-      `${originalText.slice(0, originalBudget)}${MASK_SPLIT}${resumeValues}${MASK_SPLIT}${resumeJson}`,
+      `${originalText.slice(0, originalBudget + guard)}${MASK_SPLIT}${resumeValues}${MASK_SPLIT}${resumeJson}`,
       'resume_layout_adjust',
     )
-    const [maskedOriginal = '', maskedResumeValues = '', maskedResumeJson = ''] = maskedTriple.text.split(MASK_SPLIT)
+    const [maskedWindow = '', maskedResumeValues = '', maskedResumeJson = ''] = maskedTriple.text.split(MASK_SPLIT)
+    const maskedOriginal = maskedWindow.slice(0, Math.min(originalBudget, MAX_INPUT_CHARS))
     const factSource = `${maskedOriginal}\n${maskedResumeValues}`
     const layoutHint = buildLayoutHint(input.layout)
     const actionHint =

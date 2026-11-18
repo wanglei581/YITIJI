@@ -373,8 +373,9 @@ export class LlmAdvisorService {
       '"summary":"一句话总览（说明这是逐条比对结果，不代表录用判断）"}',
     )
 
-    const maskedMaterial = maskUserTextForLlmText(material.slice(0, 8000), 'advisor_compare_material')
-    const maskedReq = maskUserTextForLlmText(requirements.slice(0, 4000), 'advisor_compare_req')
+    // 先遮盖再截断。证件号跨在字数上限上时，先截断会把前 10 位明文送出去。
+    const maskedMaterial = maskUserTextForLlmText(material, 'advisor_compare_material').slice(0, 8000)
+    const maskedReq = maskUserTextForLlmText(requirements, 'advisor_compare_req').slice(0, 4000)
     const user = `【你的材料】\n${maskedMaterial}\n\n【岗位正文要求】\n${maskedReq}`
     const normalizedMaterial = normalizeForMatch(maskedMaterial)
 
