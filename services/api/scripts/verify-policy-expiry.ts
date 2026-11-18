@@ -399,6 +399,11 @@ async function main(): Promise<void> {
       assert.deepEqual(got, [...expected].sort(), `关键词 ${JSON.stringify(keyword)} 在 ${prisma.dbKind} 上的命中集合不对`)
       assert.equal(page.pagination.total, expected.length, `关键词 ${JSON.stringify(keyword)} 在 ${prisma.dbKind} 上的总数不对`)
     }
+    const cafeUpper = await seedPublished(`店名Cafe${caseMarker}`, '普通词大写')
+    const cafeLower = await seedPublished(`店名cafe${caseMarker}`, '普通词小写')
+    const cafeIds = [cafeUpper, cafeLower]
+    await assertCaseFold(`Cafe${caseMarker}`, cafeIds)
+    await assertCaseFold(`cafe${caseMarker}`, cafeIds)
     const aiIds = [aiUpper, aiLower]
     await assertCaseFold(`AI${caseMarker}`, aiIds)
     await assertCaseFold(`ai${caseMarker}`, aiIds)
@@ -414,8 +419,6 @@ async function main(): Promise<void> {
 
     const ecoleUpper = await seedPublished(`学校École${caseMarker}`, '大写重音按字面')
     const ecoleLower = await seedPublished(`学校école${caseMarker}`, '小写重音按字面')
-    const cafeUpper = await seedPublished(`店名Cafe${caseMarker}`, '普通词大写')
-    const cafeLower = await seedPublished(`店名cafe${caseMarker}`, '普通词小写')
     const ePercentUpper = await seedPublished(`比率É%${caseMarker}`, '重音百分号大写')
     const ePercentLower = await seedPublished(`比率é%${caseMarker}`, '重音百分号小写')
     const abLower = await seedPublished(`标记a_b${caseMarker}`, '下划线小写')
@@ -425,9 +428,6 @@ async function main(): Promise<void> {
     await assertCaseFold(`ÉCOLE${caseMarker}`, [ecoleUpper])
     await assertCaseFold(`É%${caseMarker}`, [ePercentUpper])
     await assertCaseFold(`é%${caseMarker}`, [ePercentLower])
-    const cafeIds = [cafeUpper, cafeLower]
-    await assertCaseFold(`Cafe${caseMarker}`, cafeIds)
-    await assertCaseFold(`cafe${caseMarker}`, cafeIds)
     // 上面的 A_B 断言发生在这条小写夹具写入之前，期望仍是当时那一条。这里两种写法都要命中两条。
     await assertCaseFold('A_B', [ab, abLower])
     await assertCaseFold('a_b', [ab, abLower])
