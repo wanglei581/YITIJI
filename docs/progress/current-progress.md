@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-18：扫描回传文档并入当时的主线，图谱按 683 个门禁重生（未推送）
+
+- 分支 `claude/scan-return-docs-1118`。`git fetch origin && git merge origin/main` 时主线仍是 `d71f1c37c`，没有新提交，没有冲突。
+- `verify-scan-return-documents.ts` 进入已跟踪文件后，门禁从 682 计到 683。`node scripts/generate-project-graph.mjs` 重生 `docs/graph/README.md`、`gates.md`、`graph.json`，`--check` 通过。没有手改图谱。
+
 ## 2026-11-18：面板扫描回传后，登录会员能在「我的文档」看到普通文档、简历和证件（未推送）
 
 - 分支 `claude/scan-return-docs-1118`。根因：回传本来就会把扫描任务上的 `endUserId` 写进文件（`services/api/src/scan-tasks/scan-tasks.service.ts` 的 `uploadArgs.endUserId = task.endUserId`，`services/api/src/files/files.service.ts` 落 `endUserId` 并按它定归属）。「我的文档」`memberDocumentWhere`（`services/api/src/member-assets/member-assets.service.ts`）收 `print_doc`、`resume_scan`、`id_scan`。这三类不是没写归属，也不是列表没收。

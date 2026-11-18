@@ -26730,6 +26730,7 @@
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
+      "services/api/scripts/verify-scan-return-documents.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
       "services/api/scripts/verify-terminal-charge-binding-race.ts",
@@ -28260,6 +28261,7 @@
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
+      "services/api/scripts/verify-scan-return-documents.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
@@ -29192,6 +29194,7 @@
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
+      "services/api/scripts/verify-scan-return-documents.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
@@ -29839,6 +29842,7 @@
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts",
+      "services/api/scripts/verify-scan-return-documents.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
@@ -30960,6 +30964,7 @@
       "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-production-db-guard.ts",
+      "services/api/scripts/verify-scan-return-documents.ts",
       "services/api/scripts/verify-scan-tasks.ts"
     ],
     "services/api/src/prisma/pg-session-timeouts.ts": [
@@ -31314,6 +31319,7 @@
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
       "services/api/scripts/verify-scan-quiet-period.ts",
+      "services/api/scripts/verify-scan-return-documents.ts",
       "services/api/scripts/verify-scan-tasks.ts"
     ],
     "services/api/src/smart-campus/dto/save-smart-campus-config.dto.ts": [
@@ -31426,6 +31432,7 @@
       "services/api/scripts/verify-scan-device-lifecycle.ts",
       "services/api/scripts/verify-scan-device-sessions.ts",
       "services/api/scripts/verify-scan-device-settings.ts",
+      "services/api/scripts/verify-scan-return-documents.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
       "services/api/scripts/verify-self-assessment-append-file-scope.ts",
@@ -49001,6 +49008,31 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:scan-quiet-period"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/prisma/create-client.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-scan-return-documents.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:scan-return-documents",
+        "@ai-job-print/api::verify:scan-return-documents:postgres"
       ],
       "wired": true
     },
