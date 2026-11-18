@@ -16,6 +16,11 @@
   gap: 10px;
 }
 
+/* me-states 在 me-touch 之后载入，单写 .me-pin 压不过上面的 flex:1。待取单列表要钉住，空带才留给下面的出路卡。 */
+[data-qx-page="me"] .me-stack.me-pin {
+  flex: 0 0 auto;
+}
+
 [data-qx-page="me"] .me-login {
   display: grid;
   grid-template-columns: 188px minmax(0, 1fr);

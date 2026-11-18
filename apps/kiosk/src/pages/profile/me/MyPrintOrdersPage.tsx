@@ -14,7 +14,7 @@ import { LicenseLock } from '../../../layouts/LicenseLock'
 // - 「再打一份」不从订单侧直连，详单内引导「去我的文档再打印」（新任务新订单）。
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
 import { getMyPrintOrders } from '../../../services/api/memberPrintOrders'
@@ -29,6 +29,7 @@ import { MeActs, MeBtn, MeP, MeRow, MeRows, MeSeg } from '../touch/MeKit'
 import { MeEmptyPack, MeExitCard } from '../touch/MeStatePacks'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
 import { PendingPickupSection, pendingPickupBannerNote, usePendingPickupOrders } from './printOrders/PendingPickupSection'
+import { pendingPickupExitCards } from './printOrders/pendingPickupExits'
 import {
   formatAmountCents,
   isFreeMemberOrder,
@@ -283,7 +284,34 @@ export function MyPrintOrdersPage() {
       </div>
     )
   } else if (items.length === 0) {
-    body = pickupBlock
+    const exits = pendingPickupExitCards({
+      printTaskCount: items.length,
+      presence: pendingPickup.presence,
+      miniOn,
+    })
+    body = (
+      <>
+        {pickupBlock}
+        {exits.length > 0 ? (
+          <div className="me-stack" data-testid="pending-pickup-exits">
+            {exits.map((card) => {
+              const node = (
+                <MeExitCard
+                  art={card.art}
+                  artWidth={card.artWidth}
+                  title={card.title}
+                  desc={card.desc}
+                  onClick={() => navigate(card.to)}
+                />
+              )
+              return card.locked
+                ? <LicenseLock key={card.to}>{node}</LicenseLock>
+                : <Fragment key={card.to}>{node}</Fragment>
+            })}
+          </div>
+        ) : null}
+      </>
+    )
   } else {
     const syncNote = autoRefreshChecking
         ? '正在同步进行中的订单…'

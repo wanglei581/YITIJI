@@ -179,6 +179,24 @@ test('我的打印订单复用取件时间线，不另造接口', () => {
   assert.doesNotMatch(`${page}\n${section}`, /工作人员/)
 })
 
+test('有待取单、没有打印任务时，待取单块下面接去打印和输到机码取件', async () => {
+  const exits = await import(transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/pendingPickupExits.ts')))
+  const cards = exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'rows', miniOn: true })
+  assert.deepEqual(cards.map((card) => card.title), ['去打印', '输到机码取件'])
+  assert.deepEqual(cards.map((card) => card.to), ['/print-scan', '/print/pickup-claim'])
+  assert.equal(exits.pendingPickupExitCards({ printTaskCount: 2, presence: 'rows', miniOn: true }).length, 0, '已有打印任务不再接空态出路卡')
+  assert.equal(exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'hidden', miniOn: true }).length, 0)
+  assert.equal(exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'error', miniOn: true }).length, 0)
+  const withoutMini = exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'rows', miniOn: false })
+  assert.deepEqual(withoutMini.map((card) => card.title), ['去打印', '看看我的文档'])
+  assert.equal(JSON.stringify(cards).includes('工作人员'), false)
+  const page = readFileSync(join(kioskRoot, 'src/pages/profile/me/MyPrintOrdersPage.tsx'), 'utf8')
+  const section = readFileSync(join(kioskRoot, 'src/pages/profile/me/printOrders/PendingPickupSection.tsx'), 'utf8')
+  assert.match(page, /pendingPickupExitCards\(/)
+  assert.match(page, /data-testid="pending-pickup-exits"/)
+  assert.match(section, /data-testid="pending-pickup-list"[^>]*className="me-stack me-pin"|className="me-stack me-pin"[^>]*data-testid="pending-pickup-list"/)
+})
+
 test('点领取时服务端说不在这台机器：用服务端那句，空句或叫人找工作人员时用无人值守替身', () => {
   assert.equal(
     here.pickupHereMismatchMessage('这笔订单不在这台机器取件，请到下单时选的网点领取'),

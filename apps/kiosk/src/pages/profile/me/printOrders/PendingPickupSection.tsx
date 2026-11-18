@@ -83,7 +83,7 @@ export function PendingPickupSection({
   }
   if (presence !== 'rows' || rows.length === 0) return null
   return (
-    <section className="me-stack" data-testid="pending-pickup-list" aria-label="手机上还没取的单">
+    <section className="me-stack me-pin" data-testid="pending-pickup-list" aria-label="手机上还没取的单">
       {rows.map((row) => (
         <div className="me-line" key={row.orderId} data-testid="pending-pickup-row">
           <b>{row.label}</b>
