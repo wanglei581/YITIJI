@@ -35,6 +35,8 @@ const ACTION_LABELS: Record<string, string> = {
   'ai_quota.release_cap_exceeded': 'AI 调用失败，当日退回次数已达上限，不再退回额度',
   'ai.access_switch_changed': '修改 AI 使用开关',
   'ai.access_switch_failed': '修改 AI 使用开关失败',
+  'ai.quota_daily_limit_changed': '修改每天的免费 AI 次数',
+  'ai.quota_daily_limit_failed': '修改每天的免费 AI 次数失败',
   'ai.content_blocked': 'AI 内容安全拦截',
   'ai_safety.lexicon.update': '更新 AI 内容安全词库',
   'ai_safety.content_blocked': 'AI 内容安全拦截',

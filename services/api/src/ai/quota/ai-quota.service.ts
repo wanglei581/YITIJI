@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { createHash } from 'node:crypto'
 import type { AiQuotaReservation } from '../../generated/prisma/client'
 import type { AiQuotaBucket } from '../../member-benefits/member-benefits.types'
@@ -8,6 +8,7 @@ import { isSerializationConflict, waitBeforeSerializationRetry } from '../../com
 import { currentAiRequestContext } from '../usage/ai-usage-context'
 import { activeGrants, AI_QUOTA_BUCKETS, dailyLimit, exhausted, hashQuotaOperation, quotaDay, quotaEnv, quotaResetsAt, RELEASE_REASONS, type ReleaseReason } from './ai-quota.policy'
 import type { AdminAiQuotaUsage, KioskAiQuota } from './ai-quota.types'
+import { AiQuotaLimitService } from './ai-quota-limit.service'
 
 export interface ReserveQuotaParams {
   bucket: AiQuotaBucket
@@ -35,7 +36,8 @@ export const AI_QUOTA_STALE_RESERVATION_MS = 20 * 60_000
 @Injectable()
 export class AiQuotaService {
   private readonly logger = new Logger(AiQuotaService.name)
-  constructor(private readonly prisma: PrismaService) {}
+  // limits 可省：门禁用 `new AiQuotaService(prisma)`，那时没有快照，dailyLimit 仍只读环境变量。
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly limits?: AiQuotaLimitService) {}
 
   async reserve(params: ReserveQuotaParams): Promise<QuotaReceipt> {
     const now = params.now ?? new Date()
@@ -47,7 +49,7 @@ export class AiQuotaService {
     const terminalId = identity?.terminalVerified && identity.terminalId
       && (!params.terminalId || params.terminalId === identity.terminalId) ? identity.terminalId : null
     if (!endUserId && !terminalId) exhausted(params.bucket, now)
-    const limit = endUserId ? dailyLimit(params.bucket) : quotaEnv('AI_QUOTA_GUEST_TERMINAL_DAILY', 0)
+    const limit = endUserId ? await this.memberDailyLimit(params.bucket) : quotaEnv('AI_QUOTA_GUEST_TERMINAL_DAILY', 0)
     if (!endUserId && limit === 0) exhausted(params.bucket, now)
     const key = this.dailyKey(endUserId, terminalId, params.bucket, day)
     // 在事务外确保行存在。PG 事务中捕获唯一冲突后继续 SQL 会得到 25P02。
@@ -174,6 +176,7 @@ export class AiQuotaService {
   async remaining({ endUserId, now = new Date() }: { endUserId: string; now?: Date }) {
     if (!endUserId) throw new BadRequestException('AI_QUOTA_MEMBER_REQUIRED')
     const day = quotaDay(now)
+    await this.limits?.ensureFresh()
     return Promise.all(AI_QUOTA_BUCKETS.map(async (bucket) => {
       const row = await this.prisma.aiQuotaDaily.findUnique({ where: { endUserId_bucket_day: this.dailyKey(endUserId, null, bucket, day) } })
       const grants = await this.prisma.benefitGrant.findMany({ where: activeGrants(endUserId, bucket, now), select: { quantityRemaining: true, validUntil: true } })
@@ -204,6 +207,7 @@ export class AiQuotaService {
    * 机构次数「30 天内到期」只计仍可用、剩余大于 0，且到期时刻落在 (now, now+30 天] 的数量。
    */
   async adminUsage(now = new Date()): Promise<AdminAiQuotaUsage> {
+    await this.limits?.ensureFresh()
     const day = quotaDay(now)
     const horizon = now.getTime() + 30 * 24 * 3600_000
     const [rows, grants] = await Promise.all([
@@ -252,6 +256,11 @@ export class AiQuotaService {
         }
       }),
     }
+  }
+
+  private async memberDailyLimit(bucket: AiQuotaBucket): Promise<number> {
+    await this.limits?.ensureFresh()
+    return dailyLimit(bucket)
   }
 
   private dailyKey(endUserId: string | null, terminalId: string | null, bucket: AiQuotaBucket, day: string) {
