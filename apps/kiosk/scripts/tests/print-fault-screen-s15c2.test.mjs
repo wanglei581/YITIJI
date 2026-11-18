@@ -213,3 +213,19 @@ test('缺纸胶囊和卡纸、离线同一写法，写成前缀加打印机缺�
   assert.equal(offline.pill.split(' · ')[0], paper.pill.split(' · ')[0])
   assert.doesNotMatch(paper.pill, /工作人员/)
 })
+
+test('失败文案注释放在各自函数上方', () => {
+  const source = readFileSync(join(kioskRoot, 'src/pages/print/components/printDoneFailedModel.ts'), 'utf8')
+  const sitsOn = (marker, fnName) => {
+    const fnAt = source.indexOf(`export function ${fnName}`)
+    const markAt = source.lastIndexOf(marker, fnAt)
+    assert.ok(fnAt > 0 && markAt >= 0, `${fnName} 上方应有「${marker}」`)
+    assert.doesNotMatch(source.slice(markAt, fnAt), /export function /, `${fnName} 的注释和函数之间不应再夹别的函数`)
+  }
+  sitsOn('三态失败页的「设备上报」', 'shownFailureReason')
+  sitsOn('公开打印机状态是不是卡纸', 'printerJamConfirmed')
+  sitsOn('重新提交打印要打印机现在能出纸', 'retryBlockedReason')
+  const shownAt = source.indexOf('export function shownFailureReason')
+  const beforeShown = source.slice(Math.max(0, shownAt - 500), shownAt)
+  assert.doesNotMatch(beforeShown, /重新提交打印要打印机现在能出纸|公开打印机状态是不是卡纸/)
+})

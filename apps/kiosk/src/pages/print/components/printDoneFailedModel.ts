@@ -288,16 +288,6 @@ export function paymentRow(money: OutOfPaperMoney): SummaryRow {
   return { key: 'pay', label: '支付状态', value: '以订单为准' }
 }
 
-/**
- * 重新提交打印要打印机现在能出纸才有意义：缺纸、卡纸、离线、读不到状态时，按钮置灰，并写清为什么。
- * 打印机恢复后状态刷新（每分钟一次）按钮自己亮起。读不到就按不能算（和打印预览、核价页一个口径：状态没读到不放行）。
- * 返回 null = 现在能提交；返回一句话 = 不能提交的原因，放在按钮下面。
- */
-/**
- * 公开打印机状态是不是卡纸。
- * useTerminalDeviceStatus 的 mapTerminalPrinterStatus：心跳在线且 printerStatus 为 paper_jam 或别名 jam 时，
- * kind 是 error、printer.errorCode 是 paperJam。还在读、离线、缺纸、其它故障都不是。
- */
 /** 三态失败页的「设备上报」只留设备那一句，不把第 3 步的服务电话再贴一遍。普通失败仍用已经换成无人值守口径的整句。 */
 export function shownFailureReason(variant: FailureVariant, deviceReason: string, presentedReason: string): string {
   if (variant === 'paper-jam' || variant === 'out-of-paper' || variant === 'offline') return deviceReason
@@ -312,6 +302,11 @@ export function faultScreenTakeawayMiss(visual: string): string {
   return `带走链接没取到。${printProblemLine()}`
 }
 
+/**
+ * 公开打印机状态是不是卡纸。
+ * useTerminalDeviceStatus 的 mapTerminalPrinterStatus：心跳在线且 printerStatus 为 paper_jam 或别名 jam 时，
+ * kind 是 error、printer.errorCode 是 paperJam。还在读、离线、缺纸、其它故障都不是。
+ */
 export function printerJamConfirmed(device: {
   loading: boolean
   kind: 'ready' | 'offline' | 'error' | 'low_paper' | 'unknown'
@@ -320,6 +315,11 @@ export function printerJamConfirmed(device: {
   return !device.loading && device.kind === 'error' && device.printer.errorCode === 'paperJam'
 }
 
+/**
+ * 重新提交打印要打印机现在能出纸才有意义：缺纸、卡纸、离线、读不到状态时，按钮置灰，并写清为什么。
+ * 打印机恢复后状态刷新（每分钟一次）按钮自己亮起。读不到就按不能算（和打印预览、核价页一个口径：状态没读到不放行）。
+ * 返回 null = 现在能提交；返回一句话 = 不能提交的原因，放在按钮下面。
+ */
 export function retryBlockedReason(device: {
   loading: boolean
   printerReady: boolean
