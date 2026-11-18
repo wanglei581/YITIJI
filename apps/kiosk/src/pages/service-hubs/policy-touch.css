@@ -43,6 +43,7 @@
 .policy-min-phone { display: flex; align-items: center; gap: 26px; }
 .qxt-screen .policy-min-actions .qxt-tile { min-height: 132px; }
 .policy-min-body.policy-detail-excerpt { gap: 14px; }
+.qxt-screen[data-qxt-state='ready'][data-qx-page='policy-min'] .policy-min-body.policy-detail-excerpt { justify-content: flex-start; }
 .policy-min-body.policy-detail-excerpt .policy-min-section { padding: 24px 32px; }
 .policy-min-body.policy-detail-excerpt .policy-min-section li { line-height: 1.5; }
 .qxt-screen .policy-detail-excerpt .policy-min-actions .qxt-tile { min-height: 116px; padding-top: 14px; padding-bottom: 14px; }
