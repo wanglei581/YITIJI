@@ -168,11 +168,70 @@ test('三态失败页上服务电话只出现一次，设备上报和带走失�
   const retryReason = failedModel.shownFailureReason('out-of-paper', progress.errorCodeToMessage('PAPER_EMPTY'), '')
   const retryRows = failedModel.failureSummaryRows({ orderNo: 'ORD-PHONE', file: null, params: null, money, reason: retryReason })
   const retryText = [screenText(retryCopy), ...retryRows.map((row) => row.value), failedModel.faultScreenTakeawayMiss('out-of-paper')].join('\n')
-  assert.equal((retryText.match(/服务电话/g) ?? []).length, 1, '缺纸能重提时，服务电话只留在小字里那一次')
+  assert.equal((retryText.match(/服务电话/g) ?? []).length, 1, '缺纸能重提时，服务电话只出现一次')
+  assert.match(retryCopy.steps[2].detail, /服务电话/, '能重提时服务电话接在第 3 步说明末尾')
+  assert.doesNotMatch(retryCopy.fine, /服务电话/)
   assert.match(failedModel.faultScreenTakeawayMiss('failed'), /打印有问题？/)
   const page = readFileSync(join(kioskRoot, 'src/pages/print/PrintDonePage.tsx'), 'utf8')
   assert.match(page, /shownFailureReason\(variant, verification\?\.failureReason \?\? '', failureReason\)/)
   assert.match(page, /faultScreenTakeawayMiss\(/)
+})
+
+test('缺纸、卡纸、离线不论能否重提，服务电话都只在第 3 步出现一次', async () => {
+  const unattended = await import(unattendedUrl)
+  unattended.bindSupportContactPeek(() => ({
+    servicePhone: '18369161921',
+    serviceHours: '工作日 9:00–18:00',
+    otherOnlineTerminalNearby: false,
+    miniappPublished: false,
+    selfNoteTab: false,
+  }))
+  const phoneCount = (text) => (text.match(/服务电话/g) ?? []).length
+  const deviceReasonOf = {
+    'out-of-paper': progress.errorCodeToMessage('PAPER_EMPTY'),
+    'paper-jam': progress.errorCodeToMessage('PRINTER_ERROR'),
+    offline: progress.errorCodeToMessage('PRINTER_OFFLINE'),
+  }
+  for (const variant of ['out-of-paper', 'paper-jam', 'offline']) {
+    for (const canRetry of [false, true]) {
+      const copy = failedModel.failureCopy({
+        variant,
+        confirmedJam: false,
+        money,
+        orderNo: 'ORD-RETRY-PHONE',
+        canRetry,
+      })
+      const reason = failedModel.shownFailureReason(variant, deviceReasonOf[variant], '不应上屏的整句')
+      const rows = failedModel.failureSummaryRows({
+        orderNo: 'ORD-RETRY-PHONE',
+        file: null,
+        params: null,
+        money,
+        reason,
+      })
+      const step3 = `${copy.steps[2].title}\n${copy.steps[2].detail}`
+      const elsewhere = [
+        copy.title,
+        copy.subtitle,
+        copy.pill,
+        copy.steps[0].title,
+        copy.steps[0].detail,
+        copy.steps[1].title,
+        copy.steps[1].detail,
+        copy.fine,
+        copy.resumeLine ?? '',
+        ...rows.map((row) => `${row.label}${row.value}`),
+        failedModel.faultScreenTakeawayMiss(variant),
+      ].join('\n')
+      assert.equal(phoneCount(step3), 1, `${variant}/canRetry=${canRetry} 第 3 步应有且只有一次服务电话`)
+      assert.equal(phoneCount(elsewhere), 0, `${variant}/canRetry=${canRetry} 第 3 步以外不应再出现服务电话`)
+      assert.doesNotMatch(`${step3}\n${elsewhere}`, /工作人员/)
+      if (canRetry) {
+        assert.equal(copy.steps[2].title, '机器恢复后可点下方「重新提交打印」')
+        assert.match(copy.steps[2].detail, /打印有问题？/)
+      }
+    }
+  }
 })
 
 test('三态失败页里订单还在和已收到提醒各只说一次', () => {

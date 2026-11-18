@@ -76,13 +76,15 @@ function faultNextStep(): string {
 /**
  * 同一订单整份重打（takeaway-url 给出 canRetry 才有这个出口）。
  * 现场没人加纸、没人处理（走查 I-11），所以不写「加完纸」：按钮只在打印机恢复后才亮，没亮就是机器还没好。
+ * 缺纸、卡纸、离线能重提时，把现成的求助句接在说明末尾，服务电话只在这一步出现一次。
  */
-function retryStep(money: OutOfPaperMoney): FailureStep {
+function retryStep(money: OutOfPaperMoney, help?: string): FailureStep {
+  const detail = money.fact === 'free'
+    ? '同一订单整份重打，请不要重新下单。'
+    : '同一订单整份重打、不再收费；不要重新下单，那会变成两笔费用。'
   return {
     title: '机器恢复后可点下方「重新提交打印」',
-    detail: money.fact === 'free'
-      ? '同一订单整份重打，请不要重新下单。'
-      : '同一订单整份重打、不再收费；不要重新下单，那会变成两笔费用。',
+    detail: help ? `${detail}${help}` : detail,
   }
 }
 
@@ -125,8 +127,10 @@ export function failureCopy(input: {
       steps: [
         { title: '把出纸口里已经出来的纸取走收好', detail: '别留在机器上。' },
         { title: '不要自己开机盖、不要拽纸', detail: '撕在里面更难取，也可能弄坏机器。' },
-        // 卡纸要机器恢复才能再打。已经收到提醒写在副题，这一步只说暂时打不了、请稍后再来、怎么找到我们。
-        { title: `记下${orderRef}`, detail: faultNextStep() },
+        // 能重提时电话接在「重新提交打印」说明末尾。不能重提时，这一步只说暂时打不了、请稍后再来、怎么找到我们。
+        canRetry
+          ? retryStep(money, help)
+          : { title: `记下${orderRef}`, detail: faultNextStep() },
       ],
       fine: PAPER_HELP_FINE,
       resumeLine,
@@ -145,7 +149,7 @@ export function failureCopy(input: {
           ? { title: '订单和支付记录都在', detail: '是否处理费用、处理多少，以订单记录为准；本机不会自动处理费用。' }
           : { title: '是否补打，以订单记录为准', detail: '本机不会自动补打。' },
         canRetry
-          ? retryStep(money)
+          ? retryStep(money, help)
           : { title: `记下${orderRef}`, detail: faultNextStep() },
       ],
       fine: `${paid ? '订单和支付记录保留着' : '订单记录保留着'}，不会因为这次失败消失。`,
@@ -156,7 +160,7 @@ export function failureCopy(input: {
   if (variant === 'out-of-paper') {
     const next = faultNextStep()
     const third: FailureStep = canRetry
-      ? retryStep(money)
+      ? retryStep(money, help)
       : free
         ? { title: `记下${orderRef}，请不要重新下单`, detail: next }
         : { title: `记下${orderRef}，不要重新下单再打一次`, detail: `那会变成两笔费用。${next}` }
@@ -174,7 +178,7 @@ export function failureCopy(input: {
         { title: '纸匣空了，这次打印也不会自己接着打', detail: '机器恢复后，只有本页的「重新提交打印」能整份重打。' },
         third,
       ],
-      fine: `纸匣已空，这次打印不会在加纸后自动继续。${kept}；只有本页出现「重新提交打印」按钮时，才能自己重打一次${free ? '。' : '，且不会重复收费。'}${money2}${canRetry ? help : ''}`,
+      fine: `纸匣已空，这次打印不会在加纸后自动继续。${kept}；只有本页出现「重新提交打印」按钮时，才能自己重打一次${free ? '。' : '，且不会重复收费。'}${money2}`,
       resumeLine,
     }
   }
