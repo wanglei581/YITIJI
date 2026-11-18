@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import type { RedisService } from '../redis/redis.service'
 import { memberSessionKey, touchMemberSessionIfSupported } from '../guards/end-user-auth.guard'
@@ -14,6 +15,50 @@ export interface OptionalEndUser {
   sessionId: string
 }
 
+export interface ResolveOptionalEndUserOptions {
+  /**
+   * 清场专用。Redis 或会员库查身份失败时回 503，不当游客。
+   * 默认仍是公开接口口径：查失败就当游客，避免把匿名流量打成 500。
+   */
+  strict?: boolean
+}
+
+const MEMBER_SESSION_STORE_UNAVAILABLE = {
+  error: {
+    code: 'MEMBER_SESSION_STORE_UNAVAILABLE',
+    message: '登录状态暂时无法核验，请稍后重试',
+  },
+} as const
+
+function memberLookupUnavailable(): never {
+  throw new ServiceUnavailableException(MEMBER_SESSION_STORE_UNAVAILABLE)
+}
+
+/**
+ * 只验签，不查 Redis、不查会员库。
+ * 身份库故障时，清场只能动这个令牌自己名下的会话，不能按请求里的号去清别人的。
+ */
+export function verifiedEndUserId(authorization: string | undefined, jwtService: JwtService): string | null {
+  if (!authorization || !authorization.toLowerCase().startsWith('bearer ')) return null
+  const token = authorization.slice(7).trim()
+  if (!token) return null
+  try {
+    const payload = jwtService.verify<EndUserJwtPayload>(token, { audience: 'enduser' })
+    return typeof payload.sub === 'string' && payload.sub.trim() ? payload.sub.trim() : null
+  } catch {
+    return null
+  }
+}
+
+/** 清场专用：身份库暂时查不了。其它错误不能当成这一条。 */
+export function isMemberLookupUnavailable(error: unknown): boolean {
+  if (!(error instanceof ServiceUnavailableException)) return false
+  const body = error.getResponse()
+  if (typeof body !== 'object' || body === null) return false
+  const code = (body as { error?: { code?: unknown } }).error?.code
+  return code === MEMBER_SESSION_STORE_UNAVAILABLE.error.code
+}
+
 /**
  * Resolve an optional C-end member token.
  *
@@ -27,7 +72,9 @@ export async function resolveOptionalEndUser(
   jwtService: JwtService,
   redis: RedisService,
   prisma: PrismaService,
+  options?: ResolveOptionalEndUserOptions,
 ): Promise<OptionalEndUser | null> {
+  const strict = options?.strict === true
   if (!authorization || !authorization.toLowerCase().startsWith('bearer ')) {
     return null
   }
@@ -44,7 +91,11 @@ export async function resolveOptionalEndUser(
   if (!payload.sub || !sessionId) return null
 
   const owner = await tryRedis('optional-member-session:get', () => redis.get(memberSessionKey(sessionId)))
-  if (!owner.ok || owner.value !== payload.sub) return null
+  if (!owner.ok) {
+    if (strict) memberLookupUnavailable()
+    return null
+  }
+  if (owner.value !== payload.sub) return null
 
   let user: { enabled: boolean; status: string } | null
   try {
@@ -53,8 +104,9 @@ export async function resolveOptionalEndUser(
       select: { enabled: true, status: true },
     })
   } catch {
-    // This helper is used by public endpoints. A status lookup outage must
-    // never convert an otherwise anonymous request into a 500 response.
+    // 公开接口：库故障当游客，不把匿名流量打成 500。
+    // 清场接口 strict：不能把「没查到是谁」当成「已清 0」。
+    if (strict) memberLookupUnavailable()
     return null
   }
   if (!user || !user.enabled || user.status !== 'active') {

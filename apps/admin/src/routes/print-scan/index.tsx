@@ -1,8 +1,8 @@
 // Admin 打印扫描运维中心（Task 10）。
 //
 // 三个板块：
-//   任务中心   — print/scan/document_process 真实聚合；photo/copy/材料包/格式转换/
-//               签章无数据模型，如实显示"未上线"，不伪造行数据。
+//   任务中心   — 打印、扫描、文档处理走统一聚合。复印与材料包走只读履约列表。
+//               证件照、格式转换、签名停放，写明不在本期，不造行。
 //   设备能力   — 终端 × 能力键开关（fail-closed：仅 available 对普通用户开放），
 //               终端 Agent 版本/降级/打印机状态为心跳真实值。实现在 ./CapabilityCenter.tsx。
 //   商业化控制 — 定价/权益复用既有 billing、benefit 页面入口；补贴标签与退款
@@ -17,6 +17,7 @@ import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
 import { PrinterIcon, RefreshCwIcon, SlidersHorizontalIcon, WalletIcon } from 'lucide-react'
 import { CapabilityCenter } from './CapabilityCenter'
+import { FulfillmentJobList } from './FulfillmentJobList'
 import { FreePrintQuotaCard } from './FreePrintQuotaCard'
 import { PrintQueueTimeoutCard } from './PrintQueueTimeoutCard'
 import { CloseUnpaidPrintTaskForm } from './CloseUnpaidPrintTaskForm'
@@ -31,16 +32,29 @@ import {
 
 // ─── 展示映射 ─────────────────────────────────────────────────────────────────
 
-const TASK_TYPE_TABS: { value: PrintScanTaskType; label: string; implemented: boolean }[] = [
-  { value: 'print', label: '打印', implemented: true },
-  { value: 'scan', label: '扫描', implemented: true },
-  { value: 'document_process', label: '文档处理', implemented: true },
-  { value: 'photo', label: '证件照', implemented: false },
-  { value: 'copy', label: '复印', implemented: false },
-  { value: 'material_pack', label: '材料包', implemented: false },
-  { value: 'format_conversion', label: '格式转换', implemented: false },
-  { value: 'signature_stamp', label: '签名', implemented: false },
+type TaskTabMode = 'live' | 'fulfillment' | 'parked'
+
+const TASK_TYPE_TABS: { value: PrintScanTaskType; label: string; mode: TaskTabMode }[] = [
+  { value: 'print', label: '打印', mode: 'live' },
+  { value: 'scan', label: '扫描', mode: 'live' },
+  { value: 'document_process', label: '文档处理', mode: 'live' },
+  { value: 'photo', label: '证件照', mode: 'parked' },
+  { value: 'copy', label: '复印', mode: 'fulfillment' },
+  { value: 'material_pack', label: '材料包', mode: 'fulfillment' },
+  { value: 'format_conversion', label: '格式转换', mode: 'parked' },
+  { value: 'signature_stamp', label: '签名', mode: 'parked' },
 ]
+
+// 页签保留：能力配置里仍有同名项。藏掉会让人以为入口丢了。点开写明停放，不再是可点却永远空。
+const PARKED_TASK_COPY: Partial<Record<PrintScanTaskType, string>> = {
+  photo: '证件照不在本期。这里没有证件照任务可以查看。',
+  format_conversion: '格式转换不在本期。没有格式转换任务表或订单表，不能列出真实任务。',
+  signature_stamp: '签名不在本期。签名功能已停放，这里不列出签名任务。',
+}
+
+function tabLabel(tab: { label: string; mode: TaskTabMode }): string {
+  return tab.mode === 'parked' ? `${tab.label}（停放）` : tab.label
+}
 
 const TASK_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'info' | 'default'; label: string }> = {
   pending: { badge: 'warning', label: '待领取' },
@@ -196,7 +210,7 @@ function TaskCenter() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionErrorScope, setActionErrorScope] = useState<'list' | 'detail'>('detail')
 
-  const implemented = TASK_TYPE_TABS.find((t) => t.value === taskType)?.implemented ?? false
+  const mode = TASK_TYPE_TABS.find((t) => t.value === taskType)?.mode ?? 'live'
 
   // 请求序号防竞态：快速切换类型/筛选时，旧的慢响应不得覆盖新状态。
   const queryKey = [taskType, status, String(page), String(pageSize), unconfirmed ? '1' : ''].join('\u0000')
@@ -204,6 +218,13 @@ function TaskCenter() {
   queryKeyRef.current = queryKey
   const loadSeq = useRef(0)
   const load = useCallback(async (): Promise<'success' | 'failed' | 'stale'> => {
+    if (mode !== 'live') {
+      setLoading(false)
+      setError(null)
+      setData(null)
+      setUnconfirmedPreview(false)
+      return 'success'
+    }
     const requestQueryKey = queryKey
     const seq = ++loadSeq.current
     setLoading(true)
@@ -226,7 +247,7 @@ function TaskCenter() {
     } finally {
       if (seq === loadSeq.current) setLoading(false)
     }
-  }, [taskType, status, page, pageSize, unconfirmed, queryKey])
+  }, [taskType, status, page, pageSize, unconfirmed, queryKey, mode])
 
   useEffect(() => {
     void load()
@@ -305,7 +326,8 @@ function TaskCenter() {
     }
   }
 
-  const statusFilters = implemented ? STATUS_FILTERS[taskType as 'print' | 'scan' | 'document_process'] : []
+  const statusFilters = mode === 'live' ? STATUS_FILTERS[taskType as 'print' | 'scan' | 'document_process'] : []
+  const activeTab = TASK_TYPE_TABS.find((tab) => tab.value === taskType)
 
   return (
     <div className="space-y-3">
@@ -314,7 +336,7 @@ function TaskCenter() {
           <FilterChip
             key={tab.value}
             active={taskType === tab.value}
-            label={tab.implemented ? tab.label : `${tab.label}（未上线）`}
+            label={tabLabel(tab)}
             onClick={() => {
               setTaskType(tab.value)
               setStatus('')
@@ -331,7 +353,7 @@ function TaskCenter() {
         ))}
       </div>
 
-      {implemented && (
+      {mode === 'live' && (
         <div className="flex flex-wrap items-center gap-2">
           {statusFilters.map((f) => (
             <FilterChip
@@ -370,7 +392,7 @@ function TaskCenter() {
         </div>
       )}
 
-      {implemented && taskType === 'print' && (
+      {mode === 'live' && taskType === 'print' && (
         <p className="text-[12px] leading-relaxed text-neutral-500">
           后台不提供强制重打；需要补打请让用户另下新单。
         </p>
@@ -380,11 +402,13 @@ function TaskCenter() {
         <div role="alert" className="rounded-lg bg-error-bg px-3 py-2 text-[12.5px] font-bold text-error-text">{actionError}</div>
       )}
 
-      {!implemented ? (
+      {mode === 'parked' ? (
         <EmptyState
-          title="该任务类型尚未上线"
-          description="该能力尚未开放，目前没有可查看的真实任务。"
+          title={`${activeTab?.label ?? '这项'}已停放`}
+          description={PARKED_TASK_COPY[taskType] ?? '这项不在本期。这里没有任务可以查看。'}
         />
+      ) : mode === 'fulfillment' ? (
+        <FulfillmentJobList key={taskType} kind={taskType === 'material_pack' ? 'material_pack' : 'copy'} />
       ) : unconfirmedPreview ? (
         <p className="rounded-xl border border-neutral-900/10 bg-surface px-4 py-8 text-center text-sm text-neutral-600">演示模式不显示出纸未确认</p>
       ) : (

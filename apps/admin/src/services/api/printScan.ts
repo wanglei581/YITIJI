@@ -7,8 +7,9 @@
 //   GET  /admin/terminals/:terminalId/capabilities        终端能力开关列表
 //   PUT  /admin/terminals/:terminalId/capabilities/:key   upsert 单个能力开关（写审计）
 //
-// 诚实约束：photo/copy/material_pack/format_conversion/signature_stamp 未上线，
-// 后端返回 implemented=false + 空 items；本客户端与页面不得伪造这些类型的数据。
+// 诚实约束：统一任务聚合对 photo/copy/material_pack/format_conversion/signature_stamp
+// 仍返回 implemented=false + 空 items。复印与材料包另有只读列表，演示模式返回空列表，不造行。
+// 证件照、格式转换、签名没有可列出的任务，页面写停放，不调用列表接口。
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
@@ -166,6 +167,59 @@ interface AdminPrintScanServiceInterface {
     capabilityKey: PrintScanCapabilityKey,
     patch: { status: PrintScanCapabilityStatus; note?: string },
   ): Promise<{ terminalCode: string; capability: TerminalCapabilityView }>
+  listCopyJobs(query: AdminFulfillmentListQuery): Promise<AdminFulfillmentListPage>
+  listMaterialPackOrders(query: AdminFulfillmentListQuery): Promise<AdminFulfillmentListPage>
+}
+
+export type AdminFulfillmentStatus =
+  | 'queued'
+  | 'scanning'
+  | 'printing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'expired'
+  | 'unconfirmed'
+  | 'unclassified'
+
+export interface AdminFulfillmentListItem {
+  id: string
+  recordNo: string
+  terminalId: string | null
+  terminalCode: string | null
+  startedAt: string
+  copies: number | null
+  lineCount: number | null
+  status: AdminFulfillmentStatus
+  statusLabel: string
+  failureReason: string | null
+}
+
+export interface AdminFulfillmentListPage {
+  items: AdminFulfillmentListItem[]
+  pagination: { page: number; pageSize: number; total: number; totalPages: number }
+}
+
+export interface AdminFulfillmentListQuery {
+  terminalId?: string
+  status?: string
+  page?: number
+  pageSize?: number
+}
+
+function fulfillmentQuery(path: string, params: AdminFulfillmentListQuery): Promise<AdminFulfillmentListPage> {
+  const q = new URLSearchParams()
+  if (params.terminalId) q.set('terminalId', params.terminalId)
+  if (params.status) q.set('status', params.status)
+  if (params.page) q.set('page', String(params.page))
+  if (params.pageSize) q.set('pageSize', String(params.pageSize))
+  const suffix = q.toString()
+  return request(suffix ? `${path}?${suffix}` : path)
+}
+
+const EMPTY_FULFILLMENT_PAGE: AdminFulfillmentListPage = {
+  items: [],
+  pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -225,6 +279,8 @@ const httpAdapter: AdminPrintScanServiceInterface = {
       method: 'PUT',
       body: JSON.stringify(patch),
     }),
+  listCopyJobs: (query) => fulfillmentQuery('/admin/print-scan/copy-jobs', query),
+  listMaterialPackOrders: (query) => fulfillmentQuery('/admin/print-scan/material-pack-orders', query),
 }
 
 // ── Mock（本地演示，无后端；只演示已上线类型，不伪造未上线类型） ─────────────
@@ -327,6 +383,8 @@ const mockAdapter: AdminPrintScanServiceInterface = {
     row.updatedAt = new Date().toISOString()
     return { terminalCode: 'KSK-001', capability: { ...row } }
   },
+  listCopyJobs: async () => EMPTY_FULFILLMENT_PAGE,
+  listMaterialPackOrders: async () => EMPTY_FULFILLMENT_PAGE,
 }
 
 export const adminPrintScanService: AdminPrintScanServiceInterface = API_MODE === 'http' ? httpAdapter : mockAdapter

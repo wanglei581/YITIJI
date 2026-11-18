@@ -170,7 +170,13 @@ export default function FilesPage() {
     setCleaning(true)
     setNotice(null)
     cleanupExpiredFiles()
-      .then((res) => { setNotice(`已清理 ${res.deletedCount} 个过期文件`); load() })
+      .then((res) => {
+        const left = res.remainingCount
+        setNotice(left > 0
+          ? `已清理 ${res.deletedCount} 个过期文件，还剩 ${left} 个。请稍后再次清理。`
+          : `已清理 ${res.deletedCount} 个过期文件，还剩 0 个。`)
+        load()
+      })
       .catch((e: unknown) => setNotice(`清理失败：${e instanceof Error ? e.message : '请稍后重试'}`))
       .finally(() => setCleaning(false))
   }

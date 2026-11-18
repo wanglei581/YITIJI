@@ -213,6 +213,8 @@ export interface FileLifecycleSummaryResponse {
 export interface FileCleanupResponse {
   deletedCount: number
   deletedFileIds: string[]
+  /** 手动清理才返回：这次之后仍待清理的文件数。定时清理不填。 */
+  remainingCount?: number
   triggeredBy: 'manual' | 'cron'
   triggeredAt: string
 }

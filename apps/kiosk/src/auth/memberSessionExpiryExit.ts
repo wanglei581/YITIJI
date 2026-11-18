@@ -1,4 +1,5 @@
 import { whenScanCleanupSettled } from '../pages/scan/scanCleanupGate'
+import { aiSessionForgetPending, noteAiForgetPageGone, whenAiSessionsForgotten } from '../services/api/aiSessionForget'
 import { isLoginPath, loginPathForCurrentLocation } from './returnPath'
 
 /**
@@ -110,8 +111,18 @@ function createMemberSessionExpiryExit(): MemberSessionExpiryExit {
     dispose = whenScanCleanupSettled(() => {
       // cancel() 之后不许再跳：这一位可能已经重新登录，或清场链路自己接管了出口。
       if (!armed) return
-      exited = true
-      window.location.assign(loginPath)
+      const go = (): void => {
+        if (!armed) return
+        exited = true
+        noteAiForgetPageGone()
+        window.location.assign(loginPath)
+      }
+      // 没有在途清场时同步跳，和这条闸出现之前一样。还在重试就等有结果，上限在清场模块。
+      if (!aiSessionForgetPending()) {
+        go()
+        return
+      }
+      void whenAiSessionsForgotten().then(go)
     })
   }
 

@@ -310,13 +310,24 @@ export function PrintPreviewPage({
             : { ...materialCheck.redaction, previewConfirmedAt: new Date().toISOString() },
         }
       : materialCheck
-    // 只带交接编号去报价确认页；文件、参数、检查结论都在上下文里。
+    // 文件、参数、检查结论只留在交接上下文。去确认页带交接编号；
+    // 报告页的导出回执只作为已经校验过的返回状态原样带走，不进浏览器存储。
     const saved = contextId ? patchPrintHandoff(contextId, { file, materialCheck: materialCheckForNext, printParams: params }) : null
     if (!saved) {
       setHandoffError('这一单已失效，请重新发起。')
       return
     }
-    navigate('/print/confirm', { state: { printContextId: saved.contextId } })
+    const routeState = location.state
+    const carriedReturn = readPrintReturnCarry(
+      routeState && typeof routeState === 'object' && !Array.isArray(routeState)
+        ? (routeState as { printReturnState?: unknown }).printReturnState
+        : undefined,
+    )
+    navigate('/print/confirm', {
+      state: carriedReturn
+        ? { printContextId: saved.contextId, printReturnState: carriedReturn }
+        : { printContextId: saved.contextId },
+    })
   }
 
   if (!hasFile) {

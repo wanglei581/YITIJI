@@ -63,6 +63,7 @@ export type AdminFileLifecycleSummary = FileLifecycleSummaryResponse
 export interface AdminFileCleanupResult {
   deletedCount: number
   deletedFileIds: string[]
+  remainingCount: number
   triggeredBy: 'manual' | 'cron'
   triggeredAt: string
 }
@@ -275,6 +276,7 @@ export const adminFilesMockAdapter: AdminFilesServiceInterface = {
     return {
       deletedCount: expired.length,
       deletedFileIds: expired.map((f) => f.id),
+      remainingCount: 0,
       triggeredBy: 'manual',
       triggeredAt: '2026-06-05T12:00:00.000Z',
     }

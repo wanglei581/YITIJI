@@ -94,9 +94,15 @@ export function readScanWorkbenchSession() {
   const returnPathUrl = toDataUrl(
     `${transpile('src/auth/returnPath.ts', 'returnPath.ts')}\n// instance ${seed}\n`,
   )
+  const forgetStub = toDataUrl(`
+    export function aiSessionForgetPending() { return false }
+    export function whenAiSessionsForgotten() { return Promise.resolve() }
+    export function noteAiForgetPageGone() {}
+  `)
   const exitCode = `${transpile('src/auth/memberSessionExpiryExit.ts', 'memberSessionExpiryExit.ts')}\n// instance ${seed}\n`
     .replaceAll("'../pages/scan/scanCleanupGate'", `'${gateUrl}'`)
     .replaceAll("'./returnPath'", `'${returnPathUrl}'`)
+    .replaceAll("'../services/api/aiSessionForget'", `'${forgetStub}'`)
 
   // 假时钟 + 假定时器：闸的退避表、稳定重试、自然过期全按时间判，真等要跑十分钟。
   let now = T0
