@@ -20,6 +20,7 @@ import { PolicyExpiryTask } from '../src/policies/policy-expiry.task'
 import { PolicyChecklistService } from '../src/policies/policy-checklist.service'
 import { AssistantPolicyContextService } from '../src/ai/llm/assistant-policy-context'
 import { publicPolicyWhere } from '../src/policies/policy-public-visibility'
+import { policyKeywordIncludes } from '../src/policies/policy-keyword'
 import { policyDeadlineThreshold } from '../src/policies/policy-validity'
 import { checklistMetadata } from '../src/policies/policy-checklist-metadata'
 import { assertPiiScanned } from '../src/print-jobs/pii-scan-gate'
@@ -362,6 +363,42 @@ async function main(): Promise<void> {
     assert.equal(afterDeadline.pagination.total, 11, '过了截止日期的一条要退出字面关键词结果')
     assert.equal(afterDeadline.data.some((row) => row.id === pageIds[0]), false)
     console.log('  PASS 关键词按字面匹配，通配符、撇号、分页和截止日期一起生效')
+
+    const caseMarker = `Q${suffix}`
+    const aiUpper = await seedPublished(`课程AI${caseMarker}`, '大写英文字母')
+    const aiLower = await seedPublished(`课程ai${caseMarker}`, '小写英文字母')
+    const oreillyLower = await seedPublished(`书名o'reilly${suffix}`, '小写撇号')
+    const chineseHit = await seedPublished(`汉字对照${caseMarker}`, '中文按字面')
+    const chineseMiss = await seedPublished(`汉子对照${caseMarker}`, '中文差一个字')
+    const percentUpper = await seedPublished(`比率AI%${caseMarker}`, '百分号大写')
+    const percentLower = await seedPublished(`比率ai%${caseMarker}`, '百分号小写')
+    const percentWild = await seedPublished(`比率AIX${caseMarker}`, '百分号不是通配')
+    const assertCaseFold = async (keyword: string, expected: string[]) => {
+      const page = await literalPage(keyword)
+      const got = page.data.map((row) => row.id).sort()
+      assert.deepEqual(got, [...expected].sort(), `关键词 ${JSON.stringify(keyword)} 在 ${prisma.dbKind} 上的命中集合不对`)
+      assert.equal(page.pagination.total, expected.length, `关键词 ${JSON.stringify(keyword)} 在 ${prisma.dbKind} 上的总数不对`)
+      const needle = keyword.trim()
+      for (const row of page.data) {
+        assert.ok(
+          policyKeywordIncludes(row.title, needle) || policyKeywordIncludes(row.summary ?? '', needle),
+          `${row.id} 的标题和摘要都不符合关键词口径 ${JSON.stringify(needle)}`,
+        )
+      }
+    }
+    const aiIds = [aiUpper, aiLower]
+    await assertCaseFold(`AI${caseMarker}`, aiIds)
+    await assertCaseFold(`ai${caseMarker}`, aiIds)
+    const oreillyIds = [oreilly, oreillyLower]
+    await assertCaseFold("O'Reilly", oreillyIds)
+    await assertCaseFold("o'reilly", oreillyIds)
+    await assertCaseFold(`汉字对照${caseMarker}`, [chineseHit])
+    assert.equal((await literalPage(`汉字对照${caseMarker}`)).data.some((row) => row.id === chineseMiss), false, '中文不得按形近字命中')
+    const percentCaseIds = [percentUpper, percentLower]
+    await assertCaseFold(`AI%${caseMarker}`, percentCaseIds)
+    await assertCaseFold(`ai%${caseMarker}`, percentCaseIds)
+    assert.equal((await literalPage(`AI%${caseMarker}`)).data.some((row) => row.id === percentWild), false, '含 % 的关键词不得把百分号当成通配')
+    console.log(`  PASS 关键词英文字母不分大小写（${prisma.dbKind}：AI/ai、O'Reilly/o'reilly、中文、含 %）`)
 
     const stillPrintable = await seedPublished(`清单仍有效_${suffix}`, '可以打印')
     const expiredPrintable = await seedPublished(`清单已过期_${suffix}`, '不能打印', {

@@ -214,7 +214,7 @@ export class PoliciesService {
     const page = Math.min(10_000, Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1)
     const parsedPageSize = Number.parseInt(String(params?.pageSize ?? 200), 10)
     const pageSize = Math.min(200, Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : 200)
-    const keywordPlan = policyKeywordPlan(params?.keyword)
+    const keywordPlan = policyKeywordPlan(params?.keyword, this.prisma.dbKind)
     const where = await publicPolicyLookupWhere(this.prisma, {
       reviewStatus: 'approved',
       publishStatus: 'published',
