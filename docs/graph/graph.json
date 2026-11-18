@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 662,
+    "endpointCount": 663,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -3602,7 +3602,8 @@
           "PaymentAttempt",
           "PrintTask",
           "Refund",
-          "ServiceOrder"
+          "ServiceOrder",
+          "Terminal"
         ],
         "path": "/api/v1/admin/orders/:id/refund",
         "roles": [
@@ -10177,6 +10178,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/orders/:id/code-pay",
@@ -10196,6 +10198,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/orders/:id/pay",
@@ -10215,6 +10218,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/orders/:id/pay-status",
@@ -10228,12 +10232,23 @@
       },
       {
         "controller": "services/api/src/payment/payment.controller.ts",
+        "handler": "PaymentController.abandonPayAttempt",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/orders/:id/pay/abandon",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/payment/payment.controller.ts",
         "handler": "PaymentController.reconcile",
         "method": "POST",
         "models": [
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/orders/:id/pay/reconcile",
@@ -12150,6 +12165,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/payment/channels",
@@ -12169,6 +12185,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/payment/sandbox/simulate",
@@ -12190,7 +12207,8 @@
           "PaymentAttempt",
           "PrintTask",
           "Refund",
-          "ServiceOrder"
+          "ServiceOrder",
+          "Terminal"
         ],
         "path": "/api/v1/payment/wechat/refund-notify",
         "roles": [],
@@ -18979,6 +18997,7 @@
           "services/api/src/payment/print-return-disposition.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
+          "services/api/src/payment/refund-notify-paper-guard.ts",
           "services/api/src/payment/stale-attempt-collection.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
@@ -19810,9 +19829,11 @@
           "services/api/src/payment/pending-refund-signal.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
+          "services/api/src/payment/print-return-alert.ts",
           "services/api/src/payment/print-return-disposition.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
+          "services/api/src/payment/refund-notify-paper-guard.ts",
           "services/api/src/payment/refund.service.ts",
           "services/api/src/payment/stale-attempt-collection.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
@@ -19934,6 +19955,7 @@
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/settled-collection-guard.ts",
           "services/api/src/payment/stale-attempt-collection.ts",
           "services/api/src/print-jobs/pickup-arrival-hold.ts",
           "services/api/src/print-jobs/pickup-arrival-price.ts"
@@ -20063,6 +20085,7 @@
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
+          "services/api/src/payment/refund-notify-paper-guard.ts",
           "services/api/src/payment/refund.service.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
@@ -20157,11 +20180,15 @@
         ],
         "usedBy": [
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/payment/open-refund-hold.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
           "services/api/src/payment/print-return-disposition.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
-          "services/api/src/payment/refund.service.ts"
+          "services/api/src/payment/refund-notify-paper-guard.ts",
+          "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/settled-collection-guard.ts",
+          "services/api/src/payment/stale-attempt-collection.ts"
         ]
       },
       {
@@ -20376,7 +20403,7 @@
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/effective-user-prices.ts",
           "services/api/src/payment/order-quote.service.ts",
-          "services/api/src/payment/print-no-paper-refund.ts",
+          "services/api/src/payment/print-return-alert.ts",
           "services/api/src/payment/terminal-charge-settings.ts",
           "services/api/src/policies/policy-scope.service.ts",
           "services/api/src/print-jobs/free-print-quota.decide.ts",
