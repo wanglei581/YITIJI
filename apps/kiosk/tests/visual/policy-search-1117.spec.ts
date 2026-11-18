@@ -228,7 +228,10 @@ test('服务端回关键词超长时按超过 30 字显示，不当成没连上 
   await page.getByTestId('policy-search-go').click()
   await expect(page.getByRole('heading', { level: 1, name: '这个词超过 30 个字' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '最多 30 个字，现在 2 个字' })).toBeVisible()
-  await expect(page.getByText('这次没有按没连上处理，也没有发出搜索。')).toBeVisible()
+  // 这条请求已经发出，服务端以 400 拒绝。旧句「这次没有按没连上处理，也没有发出搜索」与事实相反，也是写给开发看的。
+  // 本地拦截和服务端拒绝都改用稿上「超过 30 字」的句子。
+  await expect(page.getByText('这里按政策标题和摘要里的词找，输入一个词就够，比如「创业」「补贴」。')).toBeVisible()
+  await expect(page.getByText(/没有发出搜索|没有按没连上处理/)).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '这次没连上' })).toHaveCount(0)
   await expect(page.getByText(/没有找到/)).toHaveCount(0)
 })

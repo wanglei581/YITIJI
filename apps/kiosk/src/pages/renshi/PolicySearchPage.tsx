@@ -8,7 +8,7 @@ import { PolicySearchField } from './PolicySearchField'
 import { PolicyTouchLayout } from './PolicyTouchLayout'
 import { POLICY_ASK_HOME, POLICY_CATEGORIES, POLICY_PAGE_SIZE, policyPage, policyPagination, policyRead } from './policyModel'
 import { clearPolicyKeyword, getPolicyKeyword, setPolicyKeyword, subscribePolicyKeywordClear } from './policyKeywordSession'
-import { policyDeadlineLabel, resolvePolicySearch, type PolicySearchOutcome } from './policySearchModel'
+import { policyDeadlineLabel, policyTooLongCopy, resolvePolicySearch, type PolicySearchOutcome } from './policySearchModel'
 
 type View =
   | { status: 'idle' }
@@ -62,15 +62,17 @@ export function PolicySearchPage() {
   const word = view.status === 'idle' ? keyword.trim() : view.keyword
   const found = view.status === 'ready' ? view.result : null
   const none = found !== null && found.total === 0
+  // view.blocked 分开「没发请求」和「发了被拒」。两种都用稿上超过 30 字的句子，不把内部判定写到屏上。
+  const tooLong = view.status === 'too-long' ? policyTooLongCopy(view.count) : null
   const title = view.status === 'loading' ? `正在找含「${word}」的政策`
     : view.status === 'failed' ? '这次没读到搜索结果'
-      : view.status === 'too-long' ? '这个词超过 30 个字'
+      : tooLong ? tooLong.title
         : none ? `没有找到含「${word}」的政策`
           : found ? `找到 ${found.total} 条含「${word}」的政策`
             : '输入一个词找政策'
   const sub = view.status === 'loading' ? '找到后列出标题、发布机构和更新时间。'
     : view.status === 'failed' ? '不是没有相关政策，是这次没连上。关键词还在，可以再搜一次。'
-      : view.status === 'too-long' ? '按政策标题和摘要找，输入一个词就够。这次没有发出搜索。'
+      : tooLong ? tooLong.sub
         : none ? '只按政策标题和摘要找；过了截止日期的政策不再显示。'
           : found ? '按标题和摘要找 · 每条写明发布机构 · 过了截止日期的不显示'
             : '按政策标题和摘要找，输入一个词就行。'
@@ -104,9 +106,9 @@ export function PolicySearchPage() {
         <QxTouchTile icon="landmark" title="按类别看全部政策" desc="六类都在政策首页" onClick={goHome} />
       </div>
     </>}
-    {view.status === 'too-long' && <section className="policy-min-section" role="status">
-      <h2>最多 30 个字，现在 {view.count} 个字</h2>
-      <p>输入一个词就够。这次没有按没连上处理，也没有发出搜索。</p>
+    {tooLong && <section className="policy-min-section" role="status">
+      <h2>{tooLong.heading}</h2>
+      <p>{tooLong.body}</p>
     </section>}
     {found && found.items.length > 0 && <>
       <div className="policy-min-list" data-testid="policy-search-list">

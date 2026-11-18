@@ -72,13 +72,26 @@ export function isPolicyKeywordTooLong(error: unknown): boolean {
     || (typeof error === 'object' && error !== null && (error as { code?: string }).code === 'POLICY_KEYWORD_TOO_LONG')
 }
 
+/** 本地在发出请求前拦住，或服务端已经拒绝。屏上都不写这个区别。 */
+export type PolicyKeywordBlock = 'local' | 'server'
+
 export type PolicySearchOutcome =
   | { status: 'idle' }
-  | { status: 'too-long'; count: number; keyword: string }
+  | { status: 'too-long'; count: number; keyword: string; blocked: PolicyKeywordBlock }
   | { status: 'ready'; result: PublishedPoliciesResult; keyword: string }
   | { status: 'failed'; keyword: string }
 
-/** 去掉首尾空白后是空的、或超过 30 字，都不发请求。400 超长不当成没连上。 */
+/** 超过 30 字这一态的屏上句子。本地没发请求、服务端回 400，都用这几句。 */
+export function policyTooLongCopy(count: number): { title: string; sub: string; heading: string; body: string } {
+  return {
+    title: '这个词超过 30 个字',
+    sub: '按政策标题和摘要找，输入一个词就够。',
+    heading: `最多 ${POLICY_KEYWORD_MAX_LENGTH} 个字，现在 ${count} 个字`,
+    body: '这里按政策标题和摘要里的词找，输入一个词就够，比如「创业」「补贴」。',
+  }
+}
+
+/** 去掉首尾空白后是空的、或超过 30 字，都不发请求。服务端 400 是发过并被拒绝，同样按超长，不当成没连上。 */
 export async function resolvePolicySearch(
   keyword: string,
   request: (word: string) => Promise<PublishedPoliciesResult>,
@@ -86,12 +99,12 @@ export async function resolvePolicySearch(
 ): Promise<PolicySearchOutcome> {
   const word = keyword.trim()
   if (!word) return { status: 'idle' }
-  if (word.length > POLICY_KEYWORD_MAX_LENGTH) return { status: 'too-long', count: word.length, keyword: word }
+  if (word.length > POLICY_KEYWORD_MAX_LENGTH) return { status: 'too-long', count: word.length, keyword: word, blocked: 'local' }
   try {
     const result = await policyRead(request(word), timeoutMs)
     return { status: 'ready', result, keyword: word }
   } catch (error) {
-    if (isPolicyKeywordTooLong(error)) return { status: 'too-long', count: word.length, keyword: word }
+    if (isPolicyKeywordTooLong(error)) return { status: 'too-long', count: word.length, keyword: word, blocked: 'server' }
     return { status: 'failed', keyword: word }
   }
 }
