@@ -63,7 +63,7 @@ const SECRET = 'verify-refund-sandbox-secret-0001'
 let passed = 0
 const pass = (m: string): void => { passed += 1; console.log(`  PASS ${m}`) }
 const fail = (m: string): never => { console.error(`  FAIL ${m}`); throw new Error(`FAIL_GATE: ${m}`) }
-const assert = (c: unknown, m: string): void => { c ? pass(m) : fail(m) }
+const assert = (c: unknown, m: string): void => { if (c) pass(m); else fail(m) }
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
   try { await fn() } catch (e) {
     const msg = (e as Error)?.message ?? String(e)
