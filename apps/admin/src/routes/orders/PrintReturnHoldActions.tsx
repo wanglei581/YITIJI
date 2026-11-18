@@ -13,8 +13,10 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
   const [verifiedOpen, setVerifiedOpen] = useState(false)
   if (!detail || detail.recordKind === 'service') return null
 
+  const remainderOnly = detail.payStatus === 'partial_refunded' && detail.refundStatus === 'success'
   const hold = (detail.printRefundDisposition === 'manual' || detail.printRefundDisposition === 'auto_failed')
     && Boolean(detail.refundLedgerNo)
+    && !remainderOnly
   const paperOut = orderPaperReleased(detail)
   const verified = detail.payStatus === 'paid'
     && paperOut
@@ -53,6 +55,14 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
     } finally {
       setPending(null)
     }
+  }
+
+  if (remainderOnly) {
+    return (
+      <p className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5 text-xs leading-relaxed text-neutral-700">
+        只退了一部分。请用上面的「退还剩余」，不要再点确认退成、改为出纸或关单。
+      </p>
+    )
   }
 
   if (!hold && !verified) return note || error ? <p className="mt-4 text-xs text-neutral-600">{error ?? note}</p> : null

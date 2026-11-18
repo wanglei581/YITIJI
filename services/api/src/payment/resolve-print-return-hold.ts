@@ -7,6 +7,7 @@ import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { paperAlreadyReleased } from './refund-paper-exclusion'
+import { settlementAfterSuccess } from './refund-remainder'
 
 export type PrintReturnResolution = 'confirm_refunded' | 'release_paper' | 'close_order'
 export type RefundChannelVerdict = 'success' | 'processing' | 'failed' | 'unknown' | 'unsupported'
@@ -278,18 +279,26 @@ export async function resolvePrintReturnHold(
         data: { status: 'success' },
       })
       if (confirmed.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
-      if (!leaveOrder) {
+      const settlement = leaveOrder
+        ? null
+        : await settlementAfterSuccess(tx, {
+          id: refund.id,
+          orderId,
+          amountCents: refund.amountCents,
+          reason: refund.reason,
+        }, order)
+      if (settlement) {
         const marked = await tx.order.updateMany({
-          where: { id: orderId, payStatus: { in: ['paid', 'refunding'] } },
+          where: { id: orderId, payStatus: { in: ['paid', 'refunding', 'partial_refunded'] } },
           data: {
-            payStatus: 'refunded',
-            refundedAt: new Date(),
-            refundedAmountCents: refund.amountCents,
-            refundReason: refund.reason,
+            payStatus: settlement.payStatus,
+            refundedAmountCents: settlement.refundedAmountCents,
+            refundReason: settlement.refundReason,
+            ...(settlement.payStatus === 'refunded' ? { refundedAt: new Date() } : {}),
           },
         })
         if (marked.count === 0) throw deny('ORDER_INVALID_TRANSITION', '这单现在的支付状态不能记成已退。')
-        if (task && task.status === 'pending' && task.printOutcome !== 'printed') {
+        if (settlement.payStatus === 'refunded' && task && task.status === 'pending' && task.printOutcome !== 'printed') {
           await tx.printTask.updateMany({
             where: { id: task.id, status: 'pending' },
             data: {
@@ -320,7 +329,9 @@ export async function resolvePrintReturnHold(
               ? (order.payStatus === 'closed'
                 ? '确认退款已经退成，订单保持关闭'
                 : '确认过期付款已经退回，订单仍按未付，可以付现在的价')
-              : '确认退款已经退成',
+              : settlement?.payStatus === 'partial_refunded'
+                ? '确认退了一部分，还没退完'
+                : '确认退款已经退成',
           }),
         },
       })

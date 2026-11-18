@@ -73,7 +73,11 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
                   <Info label="退款单号" value={detail.refundLedgerNo ?? '—'} />
                   <Info label="退款金额" value={recordedCentsText(detail.refundLedgerCents, detail.currency)} />
                   {detail.refundLedgerNo ? (
-                    <p className="col-span-2 text-xs font-semibold text-neutral-600">这笔待人工处理。可以确认已经退成、改为出纸，或关闭这张单。做完只剩一种状态。</p>
+                    detail.payStatus === 'partial_refunded' && detail.refundStatus === 'success' ? (
+                      <p className="col-span-2 text-xs font-semibold text-neutral-600">只退了一部分。请用下面的「退还剩余」，不要再点确认退成、改为出纸或关单。</p>
+                    ) : (
+                      <p className="col-span-2 text-xs font-semibold text-neutral-600">这笔待人工处理。可以确认已经退成、改为出纸，或关闭这张单。做完只剩一种状态。</p>
+                    )
                   ) : null}
                 </>
               ) : null}
