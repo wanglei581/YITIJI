@@ -214,10 +214,10 @@ async function main(): Promise<void> {
       await refundService.refund(ordPrinted, { reason: '已出纸不应退款', operatorId: adminId })
       fail('已确认出纸应禁止退款')
     } catch (err) {
-      if (!(err instanceof BadRequestException) || err.message !== 'PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN') {
+      if (!(err instanceof BadRequestException) || errorCode(err) !== 'PAPER_ALREADY_RELEASED') {
         throw err
       }
-      pass('已确认出纸退款被 PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN 拒绝')
+      pass('已确认出纸的普通退款被 PAPER_ALREADY_RELEASED 拒绝，须走核对后仍退款')
     }
 
     const notPrintedResult = await verifySvc.verifyOutcome(taskNotPrinted, { outcome: 'not_printed', confirm: 'VERIFY_NOT_PRINTED' }, adminId)
