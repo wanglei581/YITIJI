@@ -26878,6 +26878,7 @@
       "services/api/scripts/verify-copy-quota.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-file-admin-delete-audit-postgres.ts",
       "services/api/scripts/verify-file-admin-delete-audit.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-free-print-quota.ts",
@@ -28426,6 +28427,7 @@
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-field-mapping-rule.ts",
+      "services/api/scripts/verify-file-admin-delete-audit-postgres.ts",
       "services/api/scripts/verify-file-admin-delete-audit.ts",
       "services/api/scripts/verify-first-order-http.ts",
       "services/api/scripts/verify-free-print-quota.ts",
@@ -29343,6 +29345,9 @@
       "services/api/scripts/verify-conversion-queue-bound.mjs",
       "services/api/scripts/verify-document-conversion.ts"
     ],
+    "services/api/src/files/admin-required-audit.ts": [
+      "services/api/scripts/verify-file-admin-delete-audit.ts"
+    ],
     "services/api/src/files/collect-raw-upload-body.ts": [
       "services/api/scripts/verify-file-internal-auth.ts"
     ],
@@ -29400,6 +29405,7 @@
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/files/files.controller.ts": [
+      "services/api/scripts/verify-file-admin-delete-audit-postgres.ts",
       "services/api/scripts/verify-file-admin-delete-audit.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
@@ -29424,6 +29430,7 @@
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
+      "services/api/scripts/verify-file-admin-delete-audit-postgres.ts",
       "services/api/scripts/verify-file-admin-delete-audit.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
@@ -31327,6 +31334,7 @@
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-field-mapping-rule.ts",
+      "services/api/scripts/verify-file-admin-delete-audit-postgres.ts",
       "services/api/scripts/verify-file-admin-delete-audit.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-first-admin-bootstrap-postgres.ts",
@@ -31642,6 +31650,7 @@
       "services/api/scripts/verify-member-data-export-files.ts"
     ],
     "services/api/src/storage/storage.interface.ts": [
+      "services/api/scripts/verify-file-admin-delete-audit-postgres.ts",
       "services/api/scripts/verify-file-admin-delete-audit.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -31681,6 +31690,7 @@
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
+      "services/api/scripts/verify-file-admin-delete-audit-postgres.ts",
       "services/api/scripts/verify-file-admin-delete-audit.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-guest-file-proof.ts",
@@ -43330,8 +43340,33 @@
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.controller.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.interface.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-file-admin-delete-audit-postgres.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:file-admin-delete-audit:postgres"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/admin-required-audit.ts",
           "services/api/src/files/files.controller.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/prisma/prisma.service.ts",

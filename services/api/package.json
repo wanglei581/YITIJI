@@ -202,6 +202,7 @@
     "verify:file-list-purpose": "node -r @swc-node/register --test src/files/__tests__/file-list-purpose.test.ts",
     "verify:file-cleanup-schedule": "node -r @swc-node/register --test src/files/__tests__/cleanup-schedule.test.ts",
     "verify:file-admin-delete-audit": "node -r @swc-node/register --test scripts/verify-file-admin-delete-audit.ts",
+    "verify:file-admin-delete-audit:postgres": "node -r @swc-node/register scripts/verify-file-admin-delete-audit-postgres.ts",
     "verify:boot-resilience": "node -r @swc-node/register scripts/verify-boot-resilience.ts",
     "verify:redis-degradation-truth": "node -r @swc-node/register scripts/verify-redis-degradation-truth.ts",
     "verify:ai-platform-degradation": "node -r @swc-node/register scripts/verify-ai-platform-degradation.ts",
