@@ -1,5 +1,8 @@
-import { useEffect, useState, type ReactNode, type Ref } from 'react'
-import { POLICY_KEYWORD_MAX_LENGTH, committedKeyword, policyKeywordCount } from './policySearchModel'
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
+import {
+  POLICY_KEYWORD_MAX_LENGTH, committedKeyword, policyCompositionSpan, policyKeywordCount,
+  type PolicyCompositionSpan,
+} from './policySearchModel'
 import { subscribePolicyKeywordClear } from './policyKeywordSession'
 
 const PLACEHOLDER = '输入一个词找政策，比如「补贴」「见习」'
@@ -23,6 +26,8 @@ function KeyboardMark() {
 export type PolicySearchFieldViewProps = {
   value: string
   composition?: string
+  /** 组字区间。拼音不在末尾时也按这段扣字，组字中的字母不触发超长。 */
+  compositionSpan?: PolicyCompositionSpan | null
   /** 正在点着框或还在组字。框变青绿，并写出字数。 */
   active: boolean
   /** 框里已经有字。清空和搜索留着，字数先收起。 */
@@ -32,8 +37,8 @@ export type PolicySearchFieldViewProps = {
   clearLabel?: string
   inputRef?: Ref<HTMLInputElement>
   onValue: (value: string) => void
-  onCompositionStart?: () => void
-  onCompositionUpdate?: (data: string) => void
+  onCompositionStart?: (anchor: number | null) => void
+  onCompositionUpdate?: (data: string, input: HTMLInputElement) => void
   onCompositionEnd?: () => void
   onFocus?: () => void
   onBlur?: () => void
@@ -43,10 +48,10 @@ export type PolicySearchFieldViewProps = {
 
 /** 纯展示。字数由 policyKeywordCount 算，组字中的拼音不计入。 */
 export function PolicySearchFieldView({
-  value, composition = '', active, filled, disabled = false, showGo = true, clearLabel = '清空', inputRef,
+  value, composition = '', compositionSpan = null, active, filled, disabled = false, showGo = true, clearLabel = '清空', inputRef,
   onValue, onCompositionStart, onCompositionUpdate, onCompositionEnd, onFocus, onBlur, onSearch, onClear,
 }: PolicySearchFieldViewProps) {
-  const count = policyKeywordCount(value, composition)
+  const count = policyKeywordCount(value, composition, compositionSpan)
   const over = count > POLICY_KEYWORD_MAX_LENGTH
   const idle = !active && !filled
   const canSearch = !disabled && count > 0 && !over
@@ -82,8 +87,8 @@ export function PolicySearchFieldView({
             value={value}
             disabled={disabled}
             onChange={(event) => onValue(event.target.value)}
-            onCompositionStart={() => onCompositionStart?.()}
-            onCompositionUpdate={(event) => onCompositionUpdate?.(event.data ?? '')}
+            onCompositionStart={(event) => onCompositionStart?.(event.currentTarget.selectionStart)}
+            onCompositionUpdate={(event) => onCompositionUpdate?.(event.data ?? '', event.currentTarget)}
             onCompositionEnd={() => onCompositionEnd?.()}
             onFocus={onFocus}
             onBlur={onBlur}
@@ -128,21 +133,26 @@ export function PolicySearchField({
 }) {
   const [value, setValue] = useState(initial)
   const [composition, setComposition] = useState('')
+  const [compositionSpan, setCompositionSpan] = useState<PolicyCompositionSpan | null>(null)
   const [focused, setFocused] = useState(false)
+  const anchorRef = useRef<number | null>(null)
   useEffect(() => subscribePolicyKeywordClear(() => {
     setValue('')
     setComposition('')
+    setCompositionSpan(null)
+    anchorRef.current = null
     setFocused(false)
   }), [])
   const submit = () => {
-    const count = policyKeywordCount(value, composition)
-    const word = committedKeyword(value, composition).trim()
+    const count = policyKeywordCount(value, composition, compositionSpan)
+    const word = committedKeyword(value, composition, compositionSpan).trim()
     if (disabled || count === 0 || count > POLICY_KEYWORD_MAX_LENGTH) return
     onSearch(word)
   }
   return <PolicySearchFieldView
     value={value}
     composition={composition}
+    compositionSpan={compositionSpan}
     active={focused || composition.length > 0}
     filled={value.length > 0}
     disabled={disabled}
@@ -150,15 +160,28 @@ export function PolicySearchField({
     clearLabel={clearLabel}
     inputRef={inputRef}
     onValue={setValue}
-    onCompositionStart={() => setComposition('')}
-    onCompositionUpdate={setComposition}
-    onCompositionEnd={() => setComposition('')}
+    onCompositionStart={(anchor) => {
+      anchorRef.current = anchor
+      setComposition('')
+      setCompositionSpan(null)
+    }}
+    onCompositionUpdate={(data, input) => {
+      setComposition(data)
+      setCompositionSpan(policyCompositionSpan(input.value, data, input.selectionStart, input.selectionEnd, anchorRef.current))
+    }}
+    onCompositionEnd={() => {
+      setComposition('')
+      setCompositionSpan(null)
+      anchorRef.current = null
+    }}
     onFocus={() => setFocused(true)}
     onBlur={() => setFocused(false)}
     onSearch={submit}
     onClear={() => {
       setValue('')
       setComposition('')
+      setCompositionSpan(null)
+      anchorRef.current = null
       onClear?.()
     }}
   />

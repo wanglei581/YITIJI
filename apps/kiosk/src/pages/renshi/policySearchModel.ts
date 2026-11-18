@@ -6,17 +6,65 @@ export const POLICY_KEYWORD_MAX_LENGTH = 30
 /** 和 policyRead 同一个 8 秒。到点没回来就按没连上，不一直停在正在找。 */
 export const POLICY_SEARCH_TIMEOUT_MS = 8_000
 
-/**
- * 拼音还在候选栏里时，输入框的 value 带了未选的字母。
- * 这段接在已提交文字后面时，不计入字数。
- */
-export function committedKeyword(value: string, composition = ''): string {
-  if (composition && value.endsWith(composition)) return value.slice(0, -composition.length)
-  return value
+/** 组字区间，下标与 input 选区一样，按 UTF-16 代码单元，end 不含。 */
+export type PolicyCompositionSpan = {
+  start: number
+  end: number
 }
 
-export function policyKeywordCount(value: string, composition = ''): number {
-  return committedKeyword(value, composition).trim().length
+/**
+ * 由 compositionstart 记下的起点，和 compositionupdate 当时的选区，得到组字区间。
+ * 选区盖住整段拼音时用选区；光标收在拼音末尾时，区间就在光标前；否则用组字开始时的起点。
+ */
+export function policyCompositionSpan(
+  value: string,
+  composition: string,
+  selectionStart: number | null,
+  selectionEnd: number | null,
+  anchor: number | null,
+): PolicyCompositionSpan | null {
+  if (!composition) return null
+  if (selectionStart !== null && selectionEnd !== null && selectionEnd > selectionStart
+    && value.slice(selectionStart, selectionEnd) === composition) {
+    return { start: selectionStart, end: selectionEnd }
+  }
+  if (selectionEnd !== null) {
+    const start = selectionEnd - composition.length
+    if (start >= 0 && value.slice(start, selectionEnd) === composition) return { start, end: selectionEnd }
+  }
+  if (anchor !== null && anchor >= 0) {
+    const end = anchor + composition.length
+    if (end <= value.length && value.slice(anchor, end) === composition) return { start: anchor, end }
+  }
+  return null
+}
+
+function withoutCompositionSpan(value: string, span: PolicyCompositionSpan): string | null {
+  const { start, end } = span
+  if (!Number.isInteger(start) || !Number.isInteger(end)) return null
+  if (start < 0 || end <= start || end > value.length) return null
+  return value.slice(0, start) + value.slice(end)
+}
+
+/**
+ * 拼音还在候选栏里时，输入框的 value 带了未选的字母。
+ * 有组字区间就按区间扣，区间可以在词的任何位置。没有区间时，这段拼音只出现一次就扣掉。
+ */
+export function committedKeyword(value: string, composition = '', span?: PolicyCompositionSpan | null): string {
+  if (span) {
+    const stripped = withoutCompositionSpan(value, span)
+    if (stripped !== null) return stripped
+  }
+  if (!composition) return value
+  const at = value.indexOf(composition)
+  if (at < 0) return value
+  const later = value.indexOf(composition, at + composition.length)
+  const cut = later >= 0 && value.endsWith(composition) ? value.length - composition.length : at
+  return value.slice(0, cut) + value.slice(cut + composition.length)
+}
+
+export function policyKeywordCount(value: string, composition = '', span?: PolicyCompositionSpan | null): number {
+  return committedKeyword(value, composition, span).trim().length
 }
 
 export function isPolicyKeywordTooLong(error: unknown): boolean {
