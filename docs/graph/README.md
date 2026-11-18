@@ -33,7 +33,7 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
-| kiosk | `apps/kiosk` | 86 | 1019 | 828 |
+| kiosk | `apps/kiosk` | 86 | 1020 | 829 |
 | admin | `apps/admin` | 38 | 320 | 292 |
 | partner | `apps/partner` | 15 | 105 | 102 |
 
