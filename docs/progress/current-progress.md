@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-11-18：到期下架并发改成两个服务实例（未推送）
+
+- 分支 `claude/policy-expiry-1117`。到期下架的并发用例改成两个独立的服务实例，各自一条数据库连接同时跑。只有一方把这一行改成功，`policy.auto_expire` 恰好一条。SQLite 上没抢到的一方是锁冲突，事务不提交，记为 0。SQLite 与临时 PostgreSQL（5523）都跑过。
+- 没推送，没上线。
+
 ## 2026-11-18：公开政策关键词英文字母不分大小写（未推送）
 
 - 分支 `claude/policy-expiry-1117`。公开列表关键词：英文字母不分大小写，其余字符按字面。SQLite 沿用 LIKE；PostgreSQL 的 contains 使用 `mode: 'insensitive'`。含 `%`、`_`、`\` 的关键词仍先按各段粗筛，内存里用同一口径比较。SQLite 与临时 PostgreSQL（5523）都断言了 `AI`/`ai`、`O'Reilly`/`o'reilly`、中文、含 `%`。

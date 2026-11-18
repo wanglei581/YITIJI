@@ -46,6 +46,26 @@ function errorText(error: unknown): string {
   return [record?.message, record?.meta ? JSON.stringify(record.meta) : '', record?.cause ? errorText(record.cause) : ''].join('\n')
 }
 
+function isSqliteBusy(error: unknown): boolean {
+  const seen = new Set<unknown>()
+  let current: unknown = error
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current)
+    const record = current as {
+      rawCode?: number
+      originalCode?: string
+      message?: string
+      originalMessage?: string
+      cause?: unknown
+      meta?: { driverAdapterError?: unknown }
+    }
+    if (record.rawCode === 5 || record.originalCode === '5') return true
+    if (`${record.message ?? ''}\n${record.originalMessage ?? ''}`.includes('SQLITE_BUSY')) return true
+    current = record.meta?.driverAdapterError ?? record.cause
+  }
+  return false
+}
+
 function errCode(error: unknown): string | undefined {
   const ex = error as { getResponse?: () => unknown }
   const body = typeof ex.getResponse === 'function' ? ex.getResponse() : undefined
@@ -548,11 +568,33 @@ async function main(): Promise<void> {
     const raceRow = await seedPublished(`审计并发_${suffix}`, '只有一方写审计', {
       validThrough: new Date(`${yesterday}T00:00:00.000Z`),
     })
-    const [left, right] = await Promise.all([expiry.expirePastDeadline(), expiry.expirePastDeadline()])
-    assert.equal(left + right, 1, '并发下只有一方把这一行改成功')
-    assert.equal((await prisma.policyPost.findUnique({ where: { id: raceRow } }))?.publishStatus, 'expired')
-    assert.equal(await auditCount(raceRow), 1, '并发下只写一条审计')
-    console.log('  PASS 到期下架与审计同成同败，并发只写一条')
+    // 两个独立的服务实例，各自一条数据库连接。同一个实例上的 Promise.all 不算两路。
+    const peers: PrismaService[] = []
+    try {
+      const leftDb = new PrismaService()
+      peers.push(leftDb)
+      const rightDb = new PrismaService()
+      peers.push(rightDb)
+      await leftDb.onModuleInit()
+      await rightDb.onModuleInit()
+      const runExpiry = async (db: PrismaService): Promise<number> => {
+        try {
+          return await new PolicyExpiryTask(db, new AuditService(db)).expirePastDeadline()
+        } catch (error) {
+          // 两条延迟事务同时升级写锁时，SQLite 立刻给没抢到的一方 SQLITE_BUSY，事务不提交。
+          // PostgreSQL 会等到对方提交，再按条件更新得到 0，不会进这里。
+          if (prisma.dbKind === 'sqlite' && isSqliteBusy(error)) return 0
+          throw error
+        }
+      }
+      const [left, right] = await Promise.all([runExpiry(leftDb), runExpiry(rightDb)])
+      assert.equal(left + right, 1, '并发下只有一方把这一行改成功')
+      assert.equal((await prisma.policyPost.findUnique({ where: { id: raceRow } }))?.publishStatus, 'expired')
+      assert.equal(await auditCount(raceRow), 1, '并发下只写一条审计')
+    } finally {
+      await Promise.all(peers.map((peer) => peer.onModuleDestroy().catch(() => undefined)))
+    }
+    console.log('  PASS 到期下架与审计同成同败，两个实例并发只写一条')
 
     console.log('PASS verify:policy-expiry')
   } finally {
