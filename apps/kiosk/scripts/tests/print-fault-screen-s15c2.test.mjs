@@ -71,7 +71,16 @@ test('PRINTER_ERROR 不出现确定的「打印机卡纸」，公开状态 paper
   })
   const unconfirmedText = screenText(unconfirmed)
   assert.equal(unconfirmed.title, '打印机出了故障（可能卡纸）')
-  assert.match(unconfirmed.subtitle, /你的订单还在。打印机出了故障（可能卡纸），我们已经收到提醒，会尽快处理/)
+  assert.match(unconfirmed.subtitle, /你的订单还在。机器出了故障，我们已经收到提醒，会尽快处理/)
+  assert.doesNotMatch(unconfirmed.subtitle, /打印机出了故障（可能卡纸）/)
+  const paidUnconfirmed = failedModel.failureCopy({
+    variant: 'paper-jam',
+    confirmedJam: false,
+    money: { fact: 'paid', amountCents: 200 },
+    orderNo: 'ORD-FAULT-PAID',
+    canRetry: false,
+  })
+  assert.match(paidUnconfirmed.subtitle, /你的订单和已付金额都保留着。机器出了故障，我们已经收到提醒，会尽快处理/)
   assert.match(unconfirmed.pill, /打印机出了故障（可能卡纸）/)
   assert.doesNotMatch(unconfirmedText, /打印机卡纸/)
   assert.doesNotMatch(unconfirmedText, /机器卡纸/)
@@ -175,7 +184,10 @@ test('缺纸胶囊和卡纸、离线同一写法，写成前缀加打印机缺�
   assert.equal(progress.outOfPaperPill(unknown), `${progress.paidLabelOf(unknown)} · 打印机缺纸`)
   assert.match(progress.outOfPaperPill(paid), / · 打印机缺纸$/)
   const paper = failedModel.failureCopy({ variant: 'out-of-paper', money: paid, orderNo: 'ORD-PILL', canRetry: false })
+  const paperFree = failedModel.failureCopy({ variant: 'out-of-paper', money: free, orderNo: 'ORD-PILL', canRetry: false })
   const offline = failedModel.failureCopy({ variant: 'offline', money: paid, orderNo: 'ORD-PILL', canRetry: false })
+  assert.match(paper.subtitle, /你的订单和已付金额都保留着。机器缺纸，加纸后不会自动续打，我们已经收到提醒，会尽快处理/)
+  assert.match(paperFree.subtitle, /你的订单还在。机器缺纸，加纸后不会自动续打，我们已经收到提醒，会尽快处理/)
   assert.equal(paper.pill, progress.outOfPaperPill(paid))
   assert.equal(offline.pill.split(' · ')[0], paper.pill.split(' · ')[0])
   assert.doesNotMatch(paper.pill, /工作人员/)

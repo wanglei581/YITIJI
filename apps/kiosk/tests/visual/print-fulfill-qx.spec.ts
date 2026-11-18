@@ -451,7 +451,7 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
   // 意图带的副题和正文都不能提已付金额：整屏断言。
   const jamScreen = page.locator('[data-qx-page="print-done"]')
   // 本用例的打印机公开状态是 ready，不是 paper_jam。PRINTER_ERROR 不再说死「打印机卡纸」。
-  await expect(jamScreen).toContainText('你的订单还在。打印机出了故障（可能卡纸），我们已经收到提醒，会尽快处理')
+  await expect(jamScreen).toContainText('你的订单还在。机器出了故障，我们已经收到提醒，会尽快处理')
   await expect(jamScreen).not.toContainText('打印机卡纸')
   await expect(jamScreen).not.toContainText('已付金额')
   await expect(jamScreen).not.toContainText('已支付')

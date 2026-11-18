@@ -58,6 +58,12 @@ const LOOK_AT_TRAY: FailureStep = {
   detail: '本机不知道出了几页，以你手里的实物为准。',
 }
 
+/** 缺纸副题。结构与故障副题相同，并保留「加纸后不会自动续打」。 */
+function outOfPaperKeptLine(fact: OutOfPaperMoney['fact']): string {
+  const kept = fact === 'paid' ? '你的订单和已付金额都保留着' : '你的订单还在'
+  return `${kept}。机器缺纸，加纸后不会自动续打，我们已经收到提醒，会尽快处理`
+}
+
 /**
  * 同一订单整份重打（takeaway-url 给出 canRetry 才有这个出口）。
  * 现场没人加纸、没人处理（走查 I-11），所以不写「加完纸」：按钮只在打印机恢复后才亮，没亮就是机器还没好。
@@ -104,7 +110,7 @@ export function failureCopy(input: {
     const fault = confirmed ? '打印机卡纸' : '打印机出了故障（可能卡纸）'
     return {
       title: fault,
-      subtitle: confirmed ? jamOrderKeptLine(money.fact) : orderKeptFaultLine(money.fact, fault),
+      subtitle: confirmed ? jamOrderKeptLine(money.fact) : orderKeptFaultLine(money.fact, '机器出了故障'),
       pill: `${paidLabelOf(money)} · ${fault}`,
       stepsLabel: STEPS_LABEL,
       steps: [
@@ -152,7 +158,7 @@ export function failureCopy(input: {
       : '是否处理费用、处理多少，以订单记录为准，本机不承诺自动处理。'
     return {
       title: '打印机缺纸',
-      subtitle: '订单还在。机器缺纸，这次打印不会在加纸后自动续打',
+      subtitle: outOfPaperKeptLine(money.fact),
       pill: outOfPaperPill(money),
       stepsLabel: STEPS_LABEL,
       steps: [
