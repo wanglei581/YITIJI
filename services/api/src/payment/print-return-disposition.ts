@@ -223,7 +223,10 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
   const failedAuto = refunds.find((refund) => refund.status === 'failed' && refund.reason != null && AUTO_REASONS.has(refund.reason))
   const failedAudit = audits.some((audit) => audit.action === PRINT_NO_PAPER_AUTO_FAILED_AUDIT)
   if (failedAuto || failedAudit) {
-    return viewOf('auto_failed', failedAuto, autoRefundFailureReason(audits), failedAuto?.status ?? 'failed')
+    // 失败审计可能先于退款行落成失败。排队超时、渠道没开时，行还是 pending，金额仍要挂在这一笔上。
+    const holdRow = refunds.find((refund) => refund.status === 'pending' || refund.status === 'failed' || refund.status === 'manual_review')
+    const shown = holdRow ?? failedAuto
+    return viewOf('auto_failed', shown, autoRefundFailureReason(audits), shown?.status ?? 'failed')
   }
   const pendingAuto = refunds.find((refund) => refund.status === 'pending' && refund.reason != null && AUTO_REASONS.has(refund.reason))
   if (pendingAuto) return viewOf('manual', pendingAuto, CHANNEL_UNCONFIRMED_REFUND_REASON)
