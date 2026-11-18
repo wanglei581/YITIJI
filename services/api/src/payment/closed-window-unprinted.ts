@@ -16,6 +16,7 @@ export const PICKUP_WINDOW_CLOSED_UNPRINTED_REASON = 'pickup_window_closed_unpri
 export async function parkClosedWindowUnprinted(
   db: PrismaService,
   orderId: string,
+  notify: (db: PrismaService, orderId: string) => Promise<void> = notifyPrintReturnHold,
 ): Promise<'manual' | 'skipped'> {
   const order = await db.order.findUnique({ where: { id: orderId } })
   if (!order || order.payStatus !== 'paid') return 'skipped'
@@ -39,26 +40,22 @@ export async function parkClosedWindowUnprinted(
       status: { in: ['manual_review', 'pending', 'failed', 'success'] },
     },
   })
-  if (existing?.status === 'success') return 'skipped'
-  if (!existing) {
-    const refundNo = `RFD-WINDOW-${order.orderNo}`
-    const taken = await db.refund.findUnique({ where: { refundNo } })
-    if (!taken) {
-      await db.refund.create({
-        data: {
-          orderId,
-          refundNo,
-          amountCents: payableCents(order),
-          status: 'manual_review',
-          reason: PICKUP_WINDOW_CLOSED_UNPRINTED_REASON,
-          channel: order.paymentSource ?? 'offline',
-        },
-      })
-    } else if (taken.status === 'success') {
-      return 'skipped'
-    }
-  }
-  await notifyPrintReturnHold(db, orderId)
+  // 已经记过这一原因的，不再写、不再告警。清扫每 10 分钟跑一轮。
+  if (existing) return 'skipped'
+  const refundNo = `RFD-WINDOW-${order.orderNo}`
+  const taken = await db.refund.findUnique({ where: { refundNo } })
+  if (taken) return 'skipped'
+  await db.refund.create({
+    data: {
+      orderId,
+      refundNo,
+      amountCents: payableCents(order),
+      status: 'manual_review',
+      reason: PICKUP_WINDOW_CLOSED_UNPRINTED_REASON,
+      channel: order.paymentSource ?? 'offline',
+    },
+  })
+  await notify(db, orderId)
   return 'manual'
 }
 
