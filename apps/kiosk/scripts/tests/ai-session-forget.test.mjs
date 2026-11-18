@@ -406,47 +406,68 @@ test('接线：重载前等清场结果，拆页时停下还在睡的重试', ()
   assert.match(hold, /whenAiSessionsForgotten\(\)\.then/)
 })
 
-test('清场时小青页换掉会话号，页面不卸载也不再送上一位的号', () => {
+async function loadSessionClear() {
+  seed += 1
+  const hosting = toDataUrl(`export function isRecruitmentRoute() { return false }\n// ${seed}`)
+  const forget = toDataUrl(`export function rememberAssistantSession() {}\n// ${seed}`)
+  const scenes = `${transpile('src/pages/assistant/advisorScenes.ts')}\n// ${seed}\n`
+    .replaceAll("from '../../hooks/useRecruitmentHosting'", `from '${hosting}'`)
+    .replaceAll("from '../../services/api/aiSessionForget'", `from '${forget}'`)
+  const clear = `${transpile('src/pages/assistant/assistantSessionClear.ts')}\n// ${seed}\n`
+    .replaceAll("from './advisorScenes'", `from '${toDataUrl(scenes)}'`)
+  return import(toDataUrl(clear))
+}
+
+test('清场时小青页换掉会话号，页面不卸载也不再送上一位的号', async () => {
   const page = readFileSync(join(root, 'src/pages/assistant/AssistantPage.tsx'), 'utf8')
   const start = page.indexOf('subscribeKioskSensitiveSessionClear')
   assert.ok(start > 0, '小青页没有订阅清场')
   const effect = page.slice(start, page.indexOf('}, [])', start))
-  assert.match(effect, /requestTokenRef\.current \+= 1/)
-  assert.match(effect, /sessionIdRef\.current = newSessionId\(\)/)
+  assert.match(effect, /applyAssistantSessionClear\(\s*requestTokenRef,\s*sessionIdRef,/)
   assert.match(effect, /setMessages\(\[WELCOME\]\)/)
   assert.match(effect, /setInput\(''\)/)
+  assert.doesNotMatch(effect, /requestTokenRef\.current \+= 1/)
+  assert.doesNotMatch(effect, /sessionIdRef\.current = newSessionId\(\)/)
 
-  const effects = []
-  const react = { useEffect: (fn) => effects.push(fn), useState: (initial) => [initial, () => undefined] }
+  const { applyAssistantSessionClear } = await loadSessionClear()
+  const sessionIdRef = { current: 'a'.repeat(32) }
+  const requestTokenRef = { current: 2 }
+  let screen = '旧对话'
+  applyAssistantSessionClear(requestTokenRef, sessionIdRef, () => { screen = '欢迎' })
+  assert.equal(requestTokenRef.current, 3)
+  assert.match(sessionIdRef.current, /^[0-9a-f]{32}$/)
+  assert.notEqual(sessionIdRef.current, 'a'.repeat(32))
+  assert.equal(screen, '欢迎')
+
   const exports = {}
   const sensitiveSrc = ts.transpileModule(
     readFileSync(join(root, 'src/auth/kioskSensitiveSession.ts'), 'utf8'),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, fileName: 'kioskSensitiveSession.ts' },
   ).outputText
   const requireSensitive = (name) => {
-    if (name === 'react') return react
+    if (name === 'react') return { useEffect: () => undefined, useState: (initial) => [initial, () => undefined] }
     if (name === '../services/assistantDraft') {
       return { clearAssistantDraft() {}, clearAssistantPolicyContext() {}, ASSISTANT_DRAFT_KEY: 'draft', ASSISTANT_POLICY_KEY: 'policy' }
     }
     return new Proxy({}, { get: () => () => undefined })
   }
   new Function('exports', 'require', sensitiveSrc)(exports, requireSensitive)
-  const sessionIdRef = { current: 'a'.repeat(32) }
-  const requestTokenRef = { current: 2 }
-  let screen = '旧对话'
+  const sessionIdRef2 = { current: 'c'.repeat(32) }
+  const requestTokenRef2 = { current: 2 }
+  let screen2 = '旧对话'
   const stop = exports.subscribeKioskSensitiveSessionClear(() => {
-    requestTokenRef.current += 1
-    sessionIdRef.current = 'b'.repeat(32)
-    screen = '欢迎'
+    applyAssistantSessionClear(requestTokenRef2, sessionIdRef2, () => { screen2 = '欢迎' })
   })
   exports.clearKioskSensitiveSession()
-  assert.equal(sessionIdRef.current, 'b'.repeat(32))
-  assert.equal(requestTokenRef.current, 3)
-  assert.equal(screen, '欢迎')
-  const held = sessionIdRef.current
+  assert.equal(requestTokenRef2.current, 3)
+  assert.match(sessionIdRef2.current, /^[0-9a-f]{32}$/)
+  assert.notEqual(sessionIdRef2.current, 'c'.repeat(32))
+  assert.notEqual(sessionIdRef2.current, sessionIdRef.current)
+  assert.equal(screen2, '欢迎')
+  const held = sessionIdRef2.current
   stop()
   exports.clearKioskSensitiveSession()
-  assert.equal(sessionIdRef.current, held, '退订之后不再换号')
+  assert.equal(sessionIdRef2.current, held, '退订之后不再换号')
 })
 
 test('接线：小青总结回了作业号也登记（aiHttpAdapter 的 summarizeAssistantSession）', () => {

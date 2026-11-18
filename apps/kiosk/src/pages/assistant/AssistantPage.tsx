@@ -19,6 +19,7 @@ import { chatWithAssistant } from '../../services/api'
 import { API_BASE_URL } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
 import { subscribeKioskSensitiveSessionClear } from '../../auth/kioskSensitiveSession'
+import { applyAssistantSessionClear } from './assistantSessionClear'
 import { AiTaskRegion, aiErrorCodeOf, isAiOutage, useAiTask } from '../../ai'
 import { AI_QUOTA_EXHAUSTED_ASSISTANT_COPY } from '../../services/api/userErrorMessage'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
@@ -158,9 +159,9 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   useEffect(() => {
     cancelledRef.current = false
     const stopClear = subscribeKioskSensitiveSessionClear(() => {
-      requestTokenRef.current += 1
-      sessionIdRef.current = newSessionId()
-      setMessages([WELCOME]); setInput(''); setLoading(false); setTurnFailed(false)
+      applyAssistantSessionClear(requestTokenRef, sessionIdRef, () => {
+        setMessages([WELCOME]); setInput(''); setLoading(false); setTurnFailed(false)
+      })
     })
     return () => { cancelledRef.current = true; stopClear() }
   }, [])
