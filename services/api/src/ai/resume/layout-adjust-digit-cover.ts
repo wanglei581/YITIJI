@@ -2,7 +2,8 @@
  * 排版出站兜底：引擎没认出的长数字，按现实写法再遮一层。
  *
  * 检测前先把全角数字、全角 X 折成半角，占位符里存的仍是原文，还原才能逐字对上。
- * 数字段之间只隔一个空格、短横、点或零宽字符，且合计达到 11 位的，按一整串遮。
+ * 数字段之间可以隔空格、制表符、各种短横和点、零宽字符，也可以把一段用括号包住。
+ * 连续多个空格、空格包住的短横，同样把两边接成一串。合计达到 11 位的按一整串遮。
  * 简历 JSON 再按字段对齐：相邻字符串值拼起来够 11 位的，各换成自己的占位符。
  * 占位符是本次请求的标记，用户原文里写不出同样的一串。
  * 年月日期轴不是号码，原样留下，排版还要看见时间。
@@ -14,14 +15,27 @@ export interface LayoutDigitBook {
   issue(original: string): string
 }
 
-/** 段与段之间只认这一个字符。两个空格、空格加短横，都不把两边接成一串。 */
-const SINGLE_SEPARATORS = new Set<string>([
+/**
+ * 段与段之间的分隔。可以连续出现，也可以和括号一起把一段包住。
+ * 短横：- – — ‐ ‑ － ﹣。点：. · • ． ・。制表符含正文里的 U+0009，
+ * 以及 JSON 字符串里写成反斜杠加 t 的那两个字符。
+ */
+const SEPARATOR_CHARS = new Set<string>([
   ' ',
+  '\t',
   '\u00A0',
   '\u3000',
   '-',
+  '\u2010',
+  '\u2011',
+  '\u2013',
+  '\u2014',
+  '\uFE63',
   '\uFF0D',
   '.',
+  '\u00B7',
+  '\u2022',
+  '\u30FB',
   '\uFF0E',
   '\u200B',
   '\u200C',
@@ -100,9 +114,13 @@ function isDigit(char: string): boolean {
   return char >= '0' && char <= '9'
 }
 
-/** 年月用点或短横连起来的日期轴。破折号不在分隔符里，到不了这里。 */
+/** 年月用点或短横连起来的日期轴。各种点和短横先折成半角，空白和转义制表符拿掉再认。 */
 function isDateAxis(foldedSpan: string): boolean {
-  const normalized = foldedSpan.replace(/．/gu, '.').replace(/－/gu, '-')
+  const normalized = foldedSpan
+    .replace(/\\t/gu, '')
+    .replace(/[·•・．]/gu, '.')
+    .replace(/[‐‑–—﹣－]/gu, '-')
+    .replace(/[ \t\u00A0\u3000]/gu, '')
   return DATE_AXIS.test(normalized)
 }
 
@@ -120,27 +138,17 @@ export function coverRealisticNumbers(text: string, book: LayoutDigitBook): stri
       continue
     }
     const runStart = index
-    let digits = 0
-    while (index < folded.length && isDigit(folded[index] ?? '')) {
-      while (index < folded.length && isDigit(folded[index] ?? '')) {
-        digits += 1
-        index += 1
-      }
-      const separator = folded[index]
-      const next = folded[index + 1]
-      if (separator && next && SINGLE_SEPARATORS.has(separator) && isDigit(next)) {
-        index += 1
-        continue
-      }
-      break
-    }
+    const joined = readJoinedDigits(folded, index)
+    const digits = joined.digits
+    index = joined.end
     let end = index
     const tail = folded[end]
     if ((tail === 'X' || tail === 'x') && end > runStart && isDigit(folded[end - 1] ?? '')) end += 1
     let start = runStart
-    const before = text[runStart - 1]
+    const before = text[runStart - 1] ?? ''
     const digitRun = folded.slice(runStart, end).replace(/\D/gu, '')
     if ((before === '+' || before === '＋') && digitRun.startsWith('86')) start -= 1
+    else if (before === '(' || before === '（') start -= 1
     if (digits >= 11 && !isDateAxis(folded.slice(runStart, end))) spans.push([start, end])
     index = Math.max(index, end)
   }
@@ -228,7 +236,7 @@ function isJsonWhitespace(char: string): boolean {
   return char === ' ' || char === '\t' || char === '\n' || char === '\r'
 }
 
-/** 整段都是数字，中间只隔一个允许的分隔符。日期轴留在外面，当断开用。 */
+/** 整段都是数字，中间只隔允许的分隔符或括号。日期轴留在外面，当断开用。 */
 function isJoinableNumber(raw: string): boolean {
   if (raw.length === 0) return false
   const folded = foldDigits(raw)
@@ -236,22 +244,57 @@ function isJoinableNumber(raw: string): boolean {
   let index = 0
   const digitsOnly = folded.replace(/\D/gu, '')
   if ((folded[0] === '+' || folded[0] === '＋') && digitsOnly.startsWith('86')) index = 1
+  if (folded[index] === '(' || folded[index] === '（') index += 1
   if (!isDigit(folded[index] ?? '')) return false
-  while (index < folded.length) {
-    if (isDigit(folded[index] ?? '')) {
+  const joined = readJoinedDigits(folded, index)
+  let end = joined.end
+  const tail = folded[end] ?? ''
+  if ((tail === 'X' || tail === 'x') && end > index && isDigit(folded[end - 1] ?? '')) end += 1
+  return end === folded.length && joined.digits > 0
+}
+
+/** 从第一位数字起，把隔着分隔符或括号的后续数字段一起读完。 */
+function readJoinedDigits(folded: string, start: number): { end: number; digits: number } {
+  let index = start
+  let digits = 0
+  while (index < folded.length && isDigit(folded[index] ?? '')) {
+    while (index < folded.length && isDigit(folded[index] ?? '')) {
+      digits += 1
       index += 1
-      continue
     }
-    const separator = folded[index] ?? ''
-    const next = folded[index + 1] ?? ''
-    if (SINGLE_SEPARATORS.has(separator) && isDigit(next)) {
-      index += 1
-      continue
-    }
-    if ((separator === 'X' || separator === 'x') && index === folded.length - 1) return true
-    return false
+    const nextDigit = bridgeToNextDigit(folded, index)
+    if (nextDigit === null) break
+    index = nextDigit
   }
-  return true
+  return { end: index, digits }
+}
+
+/**
+ * 数字段之后如果是括号和分隔符，并且后面还是数字，返回下一段数字的下标。
+ * 接不上就返回 null。JSON 里的制表符是反斜杠加 t，按一个分隔符读。
+ */
+function bridgeToNextDigit(folded: string, index: number): number | null {
+  let cursor = index
+  const close = folded[cursor] ?? ''
+  if (close === ')' || close === '）') cursor += 1
+  let separators = 0
+  while (cursor < folded.length) {
+    const length = separatorLength(folded, cursor)
+    if (length === 0) break
+    cursor += length
+    separators += 1
+  }
+  const open = folded[cursor] ?? ''
+  if (open === '(' || open === '（') cursor += 1
+  if (!isDigit(folded[cursor] ?? '')) return null
+  if (separators === 0 && close !== ')' && close !== '）' && open !== '(' && open !== '（') return null
+  return cursor
+}
+
+function separatorLength(folded: string, index: number): number {
+  const char = folded[index] ?? ''
+  if (char === '\\' && folded[index + 1] === 't') return 2
+  return SEPARATOR_CHARS.has(char) ? 1 : 0
 }
 
 function countDigits(folded: string): number {
