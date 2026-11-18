@@ -23,10 +23,11 @@ export function ResumeCompareDraft(props: {
       </p>
       <ol>
         {props.items.map((item, index) => {
-          const key = moduleKeyOf(item, index)
+          const sourceIndex = item.sourceIndex ?? index
+          const key = moduleKeyOf(item, sourceIndex)
           const draft = draftTextFor(
             item,
-            index,
+            sourceIndex,
             props.decisions,
             props.confirmedByModule[key] ?? [],
             props.customByModule[key],

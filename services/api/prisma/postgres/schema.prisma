@@ -59,6 +59,10 @@ model Terminal {
   /// 谁付钱。org_pays：机构或我方承担，用户免费。user_pays：向用户收费。
   /// 公共就业点位即使写成 user_pays，生效价仍是 0。
   userChargeMode String @default("org_pays")
+  /// 绑定版本。归属真的变了才加一，含解绑。机构没变不加。
+  /// 保存收费设置要带回读取时的这个数。不用机构 id：改走再改回、或解绑后再绑再解绑时，
+  /// 机构 id 会回到原值，旧价仍能写进已经复位过的绑定。
+  orgBindingGeneration Int @default(0)
 
   heartbeats   TerminalHeartbeat[]
   servicePrices TerminalServicePrice[]

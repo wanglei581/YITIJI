@@ -39,7 +39,7 @@ export async function loadTerminalChargeSettings(terminalId: string): Promise<Te
 
 export async function saveTerminalChargeSettings(
   terminalId: string,
-  input: { userChargeMode: TerminalUserChargeMode; prices: Record<TerminalChargeServiceKey, number> },
+  input: { userChargeMode: TerminalUserChargeMode; prices: Record<TerminalChargeServiceKey, number>; orgBindingGeneration: number },
 ): Promise<TerminalChargeSettingsView> {
   if (API_MODE !== 'http') return demoSaveChargeSettings(terminalId, input)
   const res = await fetch(`${API_BASE_URL}/admin/terminals/${encodeURIComponent(terminalId)}/charge-settings`, {

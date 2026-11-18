@@ -71,25 +71,56 @@ function resumeContainsText(resume: unknown, text: string): boolean {
   return false
 }
 
-/** 全部字符串字段里，不重叠出现次数的合计。 */
-function countTextOccurrences(resume: unknown, text: string): number {
-  if (!text) return 0
+interface TextSpot { path: string; start: number }
+
+/**
+ * 全部字符串字段里的出现位置。path 与 replaceAt 同一套。
+ * 逐字前进：互相重叠的两处都要数到（「ABA」在「ABABA」里是两处）。
+ * 从上一处末尾接着找会把这两处并成一处，恰好一处的判断就会放行不该换的位置。
+ */
+function findTextSpots(resume: unknown, text: string, path = ''): TextSpot[] {
+  if (!text) return []
   if (typeof resume === 'string') {
-    let count = 0
+    const spots: TextSpot[] = []
     let from = 0
-    while (from < resume.length) {
+    while (from <= resume.length - text.length) {
       const index = resume.indexOf(text, from)
       if (index < 0) break
-      count += 1
-      from = index + text.length
+      spots.push({ path, start: index })
+      from = index + 1
     }
-    return count
+    return spots
   }
-  if (Array.isArray(resume)) return resume.reduce((sum: number, value: unknown) => sum + countTextOccurrences(value, text), 0)
+  if (Array.isArray(resume)) return resume.flatMap((value, index) => findTextSpots(value, text, `${path}/${index}`))
   if (resume && typeof resume === 'object') {
-    return Object.values(resume as Record<string, unknown>).reduce((sum: number, value: unknown) => sum + countTextOccurrences(value, text), 0)
+    return Object.entries(resume as Record<string, unknown>).flatMap(([key, value]) => findTextSpots(value, text, `${path}.${key}`))
   }
-  return 0
+  return []
+}
+
+/** 全部字符串字段里的出现次数合计，重叠的每处都算。 */
+function countTextOccurrences(resume: unknown, text: string): number {
+  return findTextSpots(resume, text).length
+}
+
+function replaceAt(resume: GeneratedResume, path: string, start: number, from: string, to: string): GeneratedResume | null {
+  let replaced = false
+  const walk = (value: unknown, current: string): unknown => {
+    if (typeof value === 'string') {
+      if (current !== path || value.slice(start, start + from.length) !== from) return value
+      replaced = true
+      return value.slice(0, start) + to + value.slice(start + from.length)
+    }
+    if (Array.isArray(value)) return value.map((item, index) => walk(item, `${current}/${index}`))
+    if (value && typeof value === 'object') {
+      const out: Record<string, unknown> = {}
+      for (const [key, nested] of Object.entries(value as Record<string, unknown>)) out[key] = walk(nested, `${current}.${key}`)
+      return out
+    }
+    return value
+  }
+  const next = walk(resume, '') as GeneratedResume
+  return replaced ? next : null
 }
 
 /**
@@ -165,10 +196,18 @@ function isSameTextEntry(module: ResumeOptimizeModule): boolean {
 }
 
 /**
+ * 不用用户做任何事的条目：K 类保持原文说明条，或改写与原文去掉首尾空白后相同。
+ * 总览、对照页和批量都用这一个判断，不另写一套。
+ */
+export function isNoActionModule(module: ResumeOptimizeModule): boolean {
+  return module.after.trim() === KEEP_ORIGINAL_NOTE || isSameTextEntry(module)
+}
+
+/**
  * 对照页带回的选择里，哪些要真正去改编辑区。
  * 默认选择按基准稿分类：B、C 是保留原文，所以带回「用改写」一定算变更。
  * 默认已经是用改写、但改写仍不在当前稿里时也要带上，避免被当成已经应用。
- * 保持原文说明条（K）没有可换的改写，带回哪一边都不算变更。
+ * 无需操作的条目（K 类说明条、同文条目）没有可换的改写，带回哪一边都不算变更。
  */
 export function compareDecisionChanges(
   resume: GeneratedResume,
@@ -183,7 +222,7 @@ export function compareDecisionChanges(
     const next = incoming[key]
     if (!next) return
     const state = moduleBaseState(base, module)
-    if (state.kind === 'K') return
+    if (isNoActionModule(module)) return
     const now = current[key] ?? state.defaultDecision
     if (now !== next) {
       changes.push([key, next])
@@ -194,24 +233,95 @@ export function compareDecisionChanges(
   return changes
 }
 
-function keepOriginal(resume: GeneratedResume, module: ResumeOptimizeModule): { resume: GeneratedResume; applied: boolean; reason?: ResumeDecisionFailureReason } {
+/**
+ * 换句时要知道其他条目现在占着哪一段。不传时仍按整份稿恰好一处来判断。
+ * decisions 里没有的条目用基准稿上的默认选择。
+ */
+export interface ResumeReplaceContext {
+  modules: ResumeOptimizeModule[]
+  decisions: ResumeDecisionMap
+  index: number
+}
+
+/** 其他条目当前占着的文字。K 类说明条不占任何文字。 */
+function occupiedNeedle(module: ResumeOptimizeModule, decision: ResumeModuleDecision, resume: GeneratedResume): string | null {
+  if (module.after.trim() === KEEP_ORIGINAL_NOTE) return null
+  if (decision === 'optimized') return module.after && resumeContainsText(resume, module.after) ? module.after : null
+  return module.before.trim() || null
+}
+
+function occupiedSpans(resume: GeneratedResume, context: ResumeReplaceContext, base?: GeneratedResume | null): Array<{ path: string; start: number; end: number }> {
+  const spans: Array<{ path: string; start: number; end: number }> = []
+  context.modules.forEach((module, index) => {
+    if (index === context.index) return
+    const decision = context.decisions[moduleKeyOf(module, index)] ?? defaultModuleDecision(base, module)
+    const needle = occupiedNeedle(module, decision, resume)
+    if (!needle) return
+    for (const spot of findTextSpots(resume, needle)) spans.push({ path: spot.path, start: spot.start, end: spot.start + needle.length })
+  })
+  return spans
+}
+
+/**
+ * 落在别的条目占着的文字里面，或与那段文字交错、换了就会改到别人的字，都不算可换的位置。
+ * 自己这段整句包住了别人的较短原文时仍算可换：换上后那条较短的再按找不准则退回手改。
+ */
+function spotBlocked(spot: TextSpot, length: number, spans: Array<{ path: string; start: number; end: number }>): boolean {
+  const end = spot.start + length
+  return spans.some((span) => {
+    if (span.path !== spot.path || spot.start >= span.end || end <= span.start) return false
+    const inside = spot.start >= span.start && end <= span.end
+    const wraps = span.start >= spot.start && span.end <= end
+    return inside || !wraps
+  })
+}
+
+/** 剔除别的条目占着的位置之后，还剩哪些可换的出现。 */
+function freeSpots(resume: GeneratedResume, text: string, context: ResumeReplaceContext, base?: GeneratedResume | null): TextSpot[] {
+  const spans = occupiedSpans(resume, context, base)
+  return findTextSpots(resume, text).filter((spot) => !spotBlocked(spot, text.length, spans))
+}
+
+function keepOriginal(
+  resume: GeneratedResume,
+  module: ResumeOptimizeModule,
+  context?: ResumeReplaceContext,
+  base?: GeneratedResume | null,
+): { resume: GeneratedResume; applied: boolean; reason?: ResumeDecisionFailureReason } {
   const original = module.before.trim()
   const afterCount = module.after ? countTextOccurrences(resume, module.after) : 0
   if (afterCount === 0) {
     if (original && resumeContainsText(resume, original)) return { resume, applied: true }
     return { resume, applied: false, reason: 'edited' }
   }
-  if (afterCount !== 1) return { resume, applied: false, reason: 'edited' }
-  const result = replaceResumeTextWithStatus(resume, module.after, original)
-  return result.applied ? result : { resume, applied: false, reason: 'edited' }
+  if (!context) {
+    if (afterCount !== 1) return { resume, applied: false, reason: 'edited' }
+    const result = replaceResumeTextWithStatus(resume, module.after, original)
+    return result.applied ? result : { resume, applied: false, reason: 'edited' }
+  }
+  const spots = freeSpots(resume, module.after, context, base)
+  if (spots.length !== 1) return { resume, applied: false, reason: 'edited' }
+  const next = replaceAt(resume, spots[0].path, spots[0].start, module.after, original)
+  return next ? { resume: next, applied: true } : { resume, applied: false, reason: 'edited' }
 }
 
-/** B、C：当前编辑区里 before.trim() 恰好一处才换成 after，零处或多处都不换。 */
-function replaceUniqueOriginal(resume: GeneratedResume, module: ResumeOptimizeModule): { resume: GeneratedResume; applied: boolean; reason?: ResumeDecisionFailureReason } {
+/** B、C：剔除别的条目占着的文字后，before.trim() 恰好剩一处才换成 after。不传上下文时仍看整份稿恰好一处。 */
+function replaceUniqueOriginal(
+  resume: GeneratedResume,
+  module: ResumeOptimizeModule,
+  context?: ResumeReplaceContext,
+  base?: GeneratedResume | null,
+): { resume: GeneratedResume; applied: boolean; reason?: ResumeDecisionFailureReason } {
   const from = module.before.trim()
-  if (countTextOccurrences(resume, from) !== 1) return { resume, applied: false, reason: 'edited' }
-  const result = replaceResumeTextWithStatus(resume, from, module.after)
-  return result.applied ? result : { resume, applied: false, reason: 'edited' }
+  if (!context) {
+    if (countTextOccurrences(resume, from) !== 1) return { resume, applied: false, reason: 'edited' }
+    const result = replaceResumeTextWithStatus(resume, from, module.after)
+    return result.applied ? result : { resume, applied: false, reason: 'edited' }
+  }
+  const spots = freeSpots(resume, from, context, base)
+  if (spots.length !== 1) return { resume, applied: false, reason: 'edited' }
+  const next = replaceAt(resume, spots[0].path, spots[0].start, from, module.after)
+  return next ? { resume: next, applied: true } : { resume, applied: false, reason: 'edited' }
 }
 
 export function toggleModuleDecision(
@@ -220,6 +330,7 @@ export function toggleModuleDecision(
   current: ResumeModuleDecision,
   next: ResumeModuleDecision,
   base?: GeneratedResume | null,
+  context?: ResumeReplaceContext,
 ): { resume: GeneratedResume; applied: boolean; reason?: ResumeDecisionFailureReason } {
   const state = moduleBaseState(base, module)
   if (state.kind === 'K') {
@@ -236,7 +347,7 @@ export function toggleModuleDecision(
     if (current === next && (next === 'original' || resumeContainsText(resume, module.after))) {
       return { resume, applied: true }
     }
-    return next === 'optimized' ? replaceUniqueOriginal(resume, module) : keepOriginal(resume, module)
+    return next === 'optimized' ? replaceUniqueOriginal(resume, module, context, base) : keepOriginal(resume, module, context, base)
   }
   if (current === next) {
     if (next === 'optimized' && !resumeContainsText(resume, module.after)) {
@@ -247,11 +358,24 @@ export function toggleModuleDecision(
   }
   const block = moduleSwitchBlock(base, module)
   if (block) return { resume, applied: false, reason: block }
+  // 没有基准稿分不出这一条占哪一段（unloaded）。两个方向都不猜，正文不动。
+  if (!base || state.kind === 'unloaded') return { resume, applied: false, reason: 'edited' }
+  // A 类：有上下文时两个方向都剔除别的条目占着的文字，恰好一处才换。
+  // 不传上下文的旧调用也按完整位置表（重叠出现算多处），不是整份稿的第一处。
+  if (state.kind === 'A') {
+    const from = next === 'original' ? module.after : module.before
+    const to = next === 'original' ? module.before : module.after
+    const spots = context ? freeSpots(resume, from, context, base) : findTextSpots(resume, from)
+    if (spots.length !== 1) return { resume, applied: false, reason: 'edited' }
+    const replaced = replaceAt(resume, spots[0].path, spots[0].start, from, to)
+    return replaced ? { resume: replaced, applied: true } : { resume, applied: false, reason: 'edited' }
+  }
   const from = next === 'original' ? module.after : module.before
   const to = next === 'original' ? module.before : module.after
-  const result = replaceResumeTextWithStatus(resume, from, to)
-  if (result.applied) return result
-  return { ...result, reason: next === 'optimized' && !module.before ? 'original-empty' : 'edited' }
+  const spots = context ? freeSpots(resume, from, context, base) : findTextSpots(resume, from)
+  if (spots.length !== 1) return { resume, applied: false, reason: next === 'optimized' && !module.before ? 'original-empty' : 'edited' }
+  const replaced = replaceAt(resume, spots[0].path, spots[0].start, from, to)
+  return replaced ? { resume: replaced, applied: true } : { resume, applied: false, reason: 'edited' }
 }
 
 export function applyDecisionChanges(
@@ -268,12 +392,62 @@ export function applyDecisionChanges(
     const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
     if (index < 0) continue
     const currentDecision = nextDecisions[key] ?? moduleBaseState(base, modules[index]).defaultDecision
-    const result = toggleModuleDecision(nextResume, modules[index], currentDecision, next, base)
+    const result = toggleModuleDecision(nextResume, modules[index], currentDecision, next, base, {
+      modules, decisions: nextDecisions, index,
+    })
     nextResume = result.resume
     if (result.applied) nextDecisions[key] = next
     else if (result.reason) failures.push({ key, reason: result.reason })
   }
   return { resume: nextResume, decisions: nextDecisions, failures }
+}
+
+function fieldTextAt(resume: unknown, path: string): string | null {
+  let current = resume
+  for (const part of path.split(/[./]/u).filter(Boolean)) {
+    if (Array.isArray(current)) {
+      const index = Number(part)
+      if (!Number.isInteger(index)) return null
+      current = current[index]
+    } else if (current && typeof current === 'object' && part in current) {
+      current = (current as Record<string, unknown>)[part]
+    } else return null
+  }
+  return typeof current === 'string' ? current : null
+}
+
+/** 这一处前后都是字段边界或句末，才算这一条自己的整句。嵌在别的句子里的子串不算。 */
+function isWholeSentence(field: string, start: number, length: number): boolean {
+  const prev = start === 0 ? '' : field[start - 1] ?? ''
+  const end = start + length
+  const next = end >= field.length ? '' : field[end] ?? ''
+  const edge = (ch: string) => ch === '' || ch === '\n' || ch === '。' || ch === '！' || ch === '？'
+  return edge(prev) && edge(next)
+}
+
+/**
+ * 保留原文时只在这一条自己的字段里整句定位，整句换成原文。
+ * 改写是原句的一部分、正文里已经是原句时不再替换，避免「主要主要负责……」。
+ * 整句找不到，或不止一处，就不改任何条目。
+ */
+function replaceSentenceOnce(resume: GeneratedResume, after: string, before: string): ResumeTextReplacement {
+  const from = after.trim()
+  const to = before.trim()
+  if (!from || from === to) return { resume, applied: false }
+  const fromSpots = findTextSpots(resume, from).filter((spot) => {
+    const field = fieldTextAt(resume, spot.path)
+    return field != null && isWholeSentence(field, spot.start, from.length)
+  })
+  const toSpots = findTextSpots(resume, to)
+  const insideOriginal = (spot: TextSpot) => toSpots.some((origin) =>
+    origin.path === spot.path && origin.start <= spot.start && spot.start + from.length <= origin.start + to.length,
+  )
+  if (toSpots.length > 0 && fromSpots.length > 0 && fromSpots.every(insideOriginal)) return { resume, applied: false }
+  const uncovered = fromSpots.filter((spot) => !insideOriginal(spot))
+  if (uncovered.length !== 1) return { resume, applied: false }
+  const spot = uncovered[0]
+  const replaced = replaceAt(resume, spot.path, spot.start, from, to)
+  return replaced ? { resume: replaced, applied: true } : { resume, applied: false }
 }
 
 export function applyResumeDecisionsWithStatus(
@@ -294,7 +468,7 @@ export function applyResumeDecisionsWithStatus(
       })
       return
     }
-    const result = replaceResumeTextWithStatus(current, module.after, module.before)
+    const result = replaceSentenceOnce(current, module.after, module.before)
     current = result.resume
     const original = module.before.trim()
     if (!result.applied && original && !resumeContainsText(current, original)) failures.push({
