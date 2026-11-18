@@ -173,6 +173,8 @@ jobs:
           node --test apps/kiosk/scripts/tests/assistant-policy-context.test.mjs
           # 首页「免费使用」是否该显示：开关、价目读失败、单价不是 0，都要判成不显示。
           node --test apps/kiosk/scripts/tests/home-free-badge.test.mjs
+          # 面板扫描完成页：核对到这份 fileId 才说已存进「我的文档」。纯函数真跑，不连库、不起浏览器。
+          node --test apps/kiosk/scripts/tests/scan-result-documents-note.test.mjs
           # 后台同一开关：换终端不卡住保存中，保存之后取回的列表以服务器为准。
           pnpm --filter @ai-job-print/admin verify:admin-home-free-badge-ui
           pnpm --filter @ai-job-print/kiosk verify:ai-down-fallbacks
