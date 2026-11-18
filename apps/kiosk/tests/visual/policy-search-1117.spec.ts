@@ -269,6 +269,15 @@ test('阅读层顶边在 250，日期整段留下，第 24 行仍在第 1 页 @k
   await expect(sheet.locator('.qxt-grab')).toBeVisible()
   const rest = page.getByTestId('policy-read-rest')
   await expect(rest).toHaveText(' · 示例人社局发布 · 11 月 5 日')
+  const leadingSpace = await rest.evaluate((el) => {
+    const node = el.firstChild
+    if (!node) return 0
+    const range = document.createRange()
+    range.setStart(node, 0)
+    range.setEnd(node, 1)
+    return range.getBoundingClientRect().width
+  })
+  expect(leadingSpace).toBeGreaterThan(2)
   const restFit = await rest.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
   expect(restFit).toBe(true)
   const titleFit = await page.getByTestId('policy-read-title').evaluate((el) => el.scrollWidth > el.clientWidth)

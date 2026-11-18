@@ -157,7 +157,7 @@
 .qxt-screen .policy-read-sheet .policy-excerpt-head > div { flex: 1; min-width: 0; }
 .qxt-screen .policy-read-sheet .policy-read-meta { display: flex; align-items: baseline; min-width: 0; max-width: 100%; margin: 6px 0 0; font-size: 22px; line-height: 1.4; color: var(--qxt-ink-3); white-space: nowrap; }
 .qxt-screen .policy-read-sheet .policy-read-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.qxt-screen .policy-read-sheet .policy-read-rest { flex: none; }
+.qxt-screen .policy-read-sheet .policy-read-rest { flex: none; white-space: pre; }
 .qxt-screen .policy-read-sheet .policy-min-chip,
 .qxt-screen .policy-read-sheet .policy-info-chip { margin-top: 8px; flex: none; }
 .policy-read { flex: 1; min-height: 0; overflow: hidden; padding: 24px 30px; border-radius: 24px; background: var(--qxt-card); border: 1.5px solid var(--qxt-line); font-size: 27px; line-height: 1.75; white-space: pre-wrap; word-break: break-all; }
