@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectDialogAndDismiss } from './helpers/guards'
+import { expectDialogAndAccept, expectDialogAndDismiss } from './helpers/guards'
 import { openAuthed, settleAdminPage } from './helpers/open'
 
 test.describe('文件管理（mock 口径）', () => {
@@ -24,6 +24,15 @@ test.describe('文件管理（mock 口径）', () => {
     expect(message).toMatch(/物理删除清理到的文件并写入审计/)
 
     await expect(page.getByRole('heading', { name: '文件管理' })).toBeVisible()
+  })
+
+  test('确认清理后说明清掉了几个、还剩几个', async ({ page }) => {
+    const guards = await openAuthed(page, '/files')
+    await settleAdminPage(page, guards)
+    const cleanup = page.getByRole('button', { name: /清理过期/ })
+    await expectDialogAndAccept(page, () => cleanup.click(), /立即清理已过期、且当前没有在打印的文件/)
+    await expect(page.getByText('已清理 0 个过期文件，还剩 0 个。')).toBeVisible()
+    await expect(page.getByText(/联系工作人员|请工作人员/)).toHaveCount(0)
   })
 
   test('招聘会资料同时列出两种用途', async ({ page }) => {

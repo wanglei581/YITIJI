@@ -15,6 +15,7 @@ import type { RedisService } from '../src/common/redis/redis.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
+import { MANUAL_CLEANUP_BATCH_SIZE } from '../src/files/admin-required-audit'
 import { FilesController } from '../src/files/files.controller'
 import { FilesService } from '../src/files/files.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -411,6 +412,7 @@ describe('管理员删除与手动清理的审计必达', { concurrency: 1 }, ()
     const beforeIds = await cleanupAuditIds()
     const result = await controller.cleanupExpired(admin, req())
     assert.equal(result.data.deletedCount, 0)
+    assert.equal(result.data.remainingCount, 0)
     assert.deepEqual(result.data.deletedFileIds, [])
     const mine = await newCleanupAudits(beforeIds)
     assert.equal(mine.length, 1)
@@ -472,6 +474,93 @@ describe('管理员删除与手动清理的审计必达', { concurrency: 1 }, ()
       assert.equal(racedRow?.deletedBy, `user:${partnerUserId}`)
     } finally {
       svc.hasActivePrintTaskForFile = original
+    }
+  })
+
+  test('两批半过期文件全部清完，汇总审计条数与批数一致', async () => {
+    assert.equal(MANUAL_CLEANUP_BATCH_SIZE % 2, 0)
+    const total = (MANUAL_CLEANUP_BATCH_SIZE * 5) / 2
+    const expectedBatches = Math.ceil(total / MANUAL_CLEANUP_BATCH_SIZE)
+    await setAuditInsertFailure(false)
+    await controller.cleanupExpired(admin, req())
+    const seeded: Array<{ id: string; storageKey: string }> = []
+    for (let index = 0; index < total; index += 1) {
+      seeded.push(await seedFile(`batch-ok-${index}`, new Date(Date.now() - 3_600_000)))
+    }
+    const beforeIds = await cleanupAuditIds()
+    const result = await controller.cleanupExpired(admin, req())
+    assert.equal(result.data.deletedCount, total)
+    assert.equal(result.data.remainingCount, 0)
+    assert.equal(result.data.deletedFileIds.length, total)
+    for (const file of seeded) {
+      assert.ok(result.data.deletedFileIds.includes(file.id))
+      assert.equal(await objectExists(file.storageKey), false)
+      const row = await prisma.fileObject.findUnique({ where: { id: file.id } })
+      assert.ok(row?.deletedAt)
+      assert.equal(row?.status, 'deleted')
+    }
+    const mine = await newCleanupAudits(beforeIds)
+    assert.equal(mine.length, expectedBatches)
+    const cleaned = mine.reduce((sum, row) => {
+      const payload = JSON.parse(row.payloadJson) as { deletedCount?: number }
+      return sum + (payload.deletedCount ?? 0)
+    }, 0)
+    assert.equal(cleaned, total)
+  })
+
+  test('第二批审计写不进时，只回滚这一批，已清的批次保留，并说明还剩几个', async () => {
+    assert.equal(MANUAL_CLEANUP_BATCH_SIZE % 2, 0)
+    const total = (MANUAL_CLEANUP_BATCH_SIZE * 5) / 2
+    await setAuditInsertFailure(false)
+    await controller.cleanupExpired(admin, req())
+    const seeded: Array<{ id: string; storageKey: string }> = []
+    for (let index = 0; index < total; index += 1) {
+      seeded.push(await seedFile(`batch-fail-${index}`, new Date(Date.now() - 3_600_000)))
+    }
+    const beforeIds = await cleanupAuditIds()
+    await execSql('DROP TRIGGER IF EXISTS o1_audit_fail_second_cleanup')
+    await execSql(`
+CREATE TRIGGER o1_audit_fail_second_cleanup
+BEFORE INSERT ON "AuditLog"
+WHEN NEW."action" = 'file.cleanup_expired'
+ AND (SELECT COUNT(*) FROM "AuditLog" WHERE "action" = 'file.cleanup_expired') >= ${beforeIds.size + 1}
+BEGIN
+  SELECT RAISE(ABORT, 'injected second batch audit failure');
+END`)
+    try {
+      const err = await controller.cleanupExpired(admin, req()).then(
+        () => assert.fail('第二批审计失败时不该把后面的文件也清掉'),
+        (error: unknown) => error,
+      )
+      const body = errorOf(err)
+      assert.equal(body.code, 'ADMIN_USER_AUDIT_UNAVAILABLE')
+      assert.match(body.message, /未删除/)
+      assert.match(body.message, /请稍后重试/)
+      assert.match(body.message, new RegExp(`已清理 ${MANUAL_CLEANUP_BATCH_SIZE} 个`))
+      assert.match(body.message, new RegExp(`还剩 ${total - MANUAL_CLEANUP_BATCH_SIZE} 个`))
+      const rows = await prisma.fileObject.findMany({
+        where: { id: { in: seeded.map((file) => file.id) } },
+        select: { id: true, deletedAt: true, status: true, storageKey: true },
+      })
+      const cleaned = rows.filter((row) => row.deletedAt)
+      const left = rows.filter((row) => !row.deletedAt)
+      assert.equal(cleaned.length, MANUAL_CLEANUP_BATCH_SIZE)
+      assert.equal(left.length, total - MANUAL_CLEANUP_BATCH_SIZE)
+      for (const row of cleaned) {
+        assert.equal(row.status, 'deleted')
+        assert.equal(await objectExists(row.storageKey), false)
+      }
+      for (const row of left) {
+        assert.equal(row.status, 'active')
+        assert.equal(await objectExists(row.storageKey), true)
+      }
+      const mine = await newCleanupAudits(beforeIds)
+      assert.equal(mine.length, 1)
+      const payload = JSON.parse(mine[0]?.payloadJson ?? '{}') as { deletedCount?: number; fileIds?: string[] }
+      assert.equal(payload.deletedCount, MANUAL_CLEANUP_BATCH_SIZE)
+      assert.deepEqual(new Set(payload.fileIds ?? []), new Set(cleaned.map((row) => row.id)))
+    } finally {
+      await execSql('DROP TRIGGER IF EXISTS o1_audit_fail_second_cleanup')
     }
   })
 })

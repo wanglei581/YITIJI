@@ -8,7 +8,19 @@ import { toMetadata } from './file-metadata'
 export const ADMIN_AUDIT_UNAVAILABLE_CODE = 'ADMIN_USER_AUDIT_UNAVAILABLE'
 
 const DELETE_AUDIT_MESSAGE = '删除未能写入审计，文件未删除，请稍后重试'
-const CLEANUP_AUDIT_MESSAGE = '清理未能写入审计，文件未删除，请稍后重试'
+
+/**
+ * 手动清理每一批的条数。
+ * Prisma 交互事务默认 5 秒超时，仓库没有覆写。一批里每条至少一次 updateMany，
+ * 有材料桥时再更新一次，最后写一条审计。40 条按每条约 50 毫秒估算大约 2 秒，
+ * 留在 5 秒里面；再大，积压时整笔回滚，管理员会一直看到清理没写上审计。
+ * 清理审计的 payload 只记下前 50 个文件编号，40 不超过 50，这一批提交了哪些都记全。
+ */
+export const MANUAL_CLEANUP_BATCH_SIZE = 40
+
+function cleanupAuditFailureMessage(deletedCount: number, remainingCount: number): string {
+  return `已清理 ${deletedCount} 个。本批未能写入审计，这批文件未删除，还剩 ${remainingCount} 个，请稍后重试。`
+}
 
 export type AdminDeleteAuditWriter = (
   tx: PrismaTransactionClient,
@@ -109,9 +121,9 @@ export async function commitAdminFileDelete(args: {
 
 /**
  * 管理员点的「清理过期文件」。
- * 先跳过正在打印的文件（那些不写删除审计），再在一笔事务里做 CAS 墓碑、
- * 收口招聘会材料桥，最后写汇总审计。审计失败则整笔回滚，存储未动。
- * 零条候选也写一条汇总审计。存储删除放在提交之后；单项失败只记账，不当成审计不可用。
+ * 按固定批量分批：每批一个事务，里面做 CAS 墓碑、收口招聘会材料桥，再写这一批的必达审计。
+ * 一批审计失败只回滚这一批，已经提交的批次保持墓碑和审计。正在打印的文件跳过。
+ * 一条候选都没有时，仍写一条汇总审计。存储删除放在该批提交之后；单项失败只记账。
  */
 export async function commitManualCleanupAudit(args: {
   prisma: PrismaService
@@ -131,30 +143,13 @@ export async function commitManualCleanupAudit(args: {
       { purpose: 'contract_upload', expiresAt: null },
     ],
   }
-  const expired = await args.prisma.fileObject.findMany({
-    where: stillEligibleWhere,
-    select: { id: true, storageKey: true, bucket: true },
-  })
+  const deletedIds: string[] = []
+  const skippedPrinting: string[] = []
+  let wroteAudit = false
 
-  const eligible: CleanupRow[] = []
-  for (const file of expired) {
-    if (await args.isPrinting(file.id)) continue
-    const bridge = await args.prisma.fairMaterialPrintBridge.findFirst({
-      where: { fileObjectId: file.id },
-      select: { id: true, status: true, revokedAt: true },
-    })
-    eligible.push({
-      id: file.id,
-      storageKey: file.storageKey,
-      bucket: file.bucket,
-      bridgeId: bridge && bridge.status === 'ready' && !bridge.revokedAt ? bridge.id : null,
-    })
-  }
-
-  let deletedIds: string[] = []
-  try {
-    deletedIds = await args.prisma.$transaction(async (tx) => {
-      const committed: string[] = []
+  const runBatch = async (eligible: CleanupRow[]): Promise<void> => {
+    const committed = await args.prisma.$transaction(async (tx) => {
+      const ids: string[] = []
       for (const file of eligible) {
         const tombstoned = await tx.fileObject.updateMany({
           where: { ...stillEligibleWhere, id: file.id },
@@ -177,31 +172,69 @@ export async function commitManualCleanupAudit(args: {
             },
           })
         }
-        committed.push(file.id)
+        ids.push(file.id)
       }
-      await args.requireAudit(tx, committed)
-      return committed
+      await args.requireAudit(tx, ids)
+      return ids
     })
-  } catch (error) {
-    throw auditFailure(error, CLEANUP_AUDIT_MESSAGE)
-  }
-
-  const deleted = new Set(deletedIds)
-  for (const file of eligible) {
-    if (!deleted.has(file.id)) continue
-    try {
-      await args.storage.deleteObject(file.storageKey, file.bucket)
-      await args.markStorageDeleted(file.id)
-    } catch (error) {
-      const errorType = error instanceof Error ? error.constructor.name : typeof error
-      await args.markStorageDeletePending(file.id, errorType)
-      args.warn(`code=FILE_CLEANUP_ITEM_FAILED file=${digestFileId(file.id)} errorType=${errorType}`)
+    wroteAudit = true
+    deletedIds.push(...committed)
+    const deleted = new Set(committed)
+    for (const file of eligible) {
+      if (!deleted.has(file.id)) continue
+      try {
+        await args.storage.deleteObject(file.storageKey, file.bucket)
+        await args.markStorageDeleted(file.id)
+      } catch (error) {
+        const errorType = error instanceof Error ? error.constructor.name : typeof error
+        await args.markStorageDeletePending(file.id, errorType)
+        args.warn(`code=FILE_CLEANUP_ITEM_FAILED file=${digestFileId(file.id)} errorType=${errorType}`)
+      }
     }
   }
 
+  try {
+    while (true) {
+      const expired = await args.prisma.fileObject.findMany({
+        where: skippedPrinting.length > 0
+          ? { ...stillEligibleWhere, id: { notIn: skippedPrinting } }
+          : stillEligibleWhere,
+        orderBy: { id: 'asc' },
+        take: MANUAL_CLEANUP_BATCH_SIZE,
+        select: { id: true, storageKey: true, bucket: true },
+      })
+      if (expired.length === 0) break
+      const eligible: CleanupRow[] = []
+      for (const file of expired) {
+        if (await args.isPrinting(file.id)) {
+          skippedPrinting.push(file.id)
+          continue
+        }
+        const bridge = await args.prisma.fairMaterialPrintBridge.findFirst({
+          where: { fileObjectId: file.id },
+          select: { id: true, status: true, revokedAt: true },
+        })
+        eligible.push({
+          id: file.id,
+          storageKey: file.storageKey,
+          bucket: file.bucket,
+          bridgeId: bridge && bridge.status === 'ready' && !bridge.revokedAt ? bridge.id : null,
+        })
+      }
+      if (eligible.length === 0) continue
+      await runBatch(eligible)
+    }
+    if (!wroteAudit) await runBatch([])
+  } catch (error) {
+    const remainingCount = await args.prisma.fileObject.count({ where: stillEligibleWhere })
+    throw auditFailure(error, cleanupAuditFailureMessage(deletedIds.length, remainingCount))
+  }
+
+  const remainingCount = await args.prisma.fileObject.count({ where: stillEligibleWhere })
   return {
     deletedCount: deletedIds.length,
     deletedFileIds: deletedIds,
+    remainingCount,
     triggeredBy: 'manual',
     triggeredAt: now.toISOString(),
   }
