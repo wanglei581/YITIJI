@@ -208,6 +208,15 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
   })
   const printed = order.printTask?.printOutcome === 'printed'
   const payable = payableCents(order)
+  // 当前这笔还没收口时，更早的过期付款退款不属于这一笔，不能拿来报成功或部分退。
+  const paymentOpen = payable > 0 && (
+    order.payStatus === 'paid'
+    || order.payStatus === 'refunding'
+    || order.payStatus === 'partial_refunded'
+  )
+  const forThisPayment = (refund: RefundFact): boolean =>
+    !(paymentOpen && refund.reason === STALE_ATTEMPT_REFUND_REASON)
+  const thisPaymentRefunds = refunds.filter(forThisPayment)
   // 还没结清的退款优先于更早的一笔成功，避免旧的过期退款把后来的失败盖住。
   const manualReview = refunds.find((refund) => refund.status === 'manual_review')
   if (manualReview) return viewOf('manual', manualReview, manualReviewReason(manualReview, audits))
@@ -222,7 +231,7 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
   if (failedOther) return viewOf('manual', failedOther, '退款没有成功，待人工处理')
   const pendingOther = refunds.find((refund) => refund.status === 'pending')
   if (pendingOther) return viewOf('manual', pendingOther, '退款还在处理，待人工核对')
-  const autoSuccess = refunds.find((refund) => refund.status === 'success' && refund.reason != null && AUTO_REASONS.has(refund.reason))
+  const autoSuccess = thisPaymentRefunds.find((refund) => refund.status === 'success' && refund.reason != null && AUTO_REASONS.has(refund.reason))
   if (autoSuccess || (order.payStatus === 'refunded' && order.refundReason === PAID_NO_PAPER_AUTO_REASON)) {
     const stale = autoSuccess?.reason === STALE_ATTEMPT_REFUND_REASON
     return viewOf(
@@ -232,13 +241,13 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
       autoSuccess?.status ?? 'success',
     )
   }
-  const fullSuccess = refunds.find((refund) => refund.status === 'success' && (
+  const fullSuccess = thisPaymentRefunds.find((refund) => refund.status === 'success' && (
     order.payStatus === 'refunded' || (payable > 0 && refund.amountCents >= payable)
   ))
   if (fullSuccess) return viewOf('auto_success', fullSuccess, null)
-  if (!printed && (order.payStatus === 'partial_refunded' || refunds.some((refund) => refund.status === 'success' && payable > 0 && refund.amountCents < payable))) {
-    const partial = refunds.find((refund) => refund.status === 'success')
-    return viewOf('manual', partial, '只退了一部分，纸没有出，待人工核对')
+  const thisSuccess = thisPaymentRefunds.filter((refund) => refund.status === 'success')
+  if (!printed && ((order.payStatus === 'partial_refunded' && thisSuccess.length > 0) || thisSuccess.some((refund) => payable > 0 && refund.amountCents < payable))) {
+    return viewOf('manual', thisSuccess[0], '只退了一部分，纸没有出，待人工核对')
   }
   if (printed || payable <= 0) return EMPTY_VIEW
   const manualDetail = manualReasonFromAudit(audits)
@@ -257,10 +266,10 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
       itemCount,
     }))
   }
-  if (order.payStatus === 'paid' && order.taskStatus === 'failed' && refunds.length === 0) {
+  if (order.payStatus === 'paid' && order.taskStatus === 'failed' && thisPaymentRefunds.length === 0) {
     return viewOf('manual', undefined, '已付款，打印失败，没有退款记录，待人工处理')
   }
-  if (order.payStatus === 'refunding' && refunds.length === 0) {
+  if (order.payStatus === 'refunding' && thisPaymentRefunds.length === 0) {
     return viewOf('manual', undefined, '订单停在退款中，但没有退款记录，待人工处理')
   }
   return EMPTY_VIEW
