@@ -3,6 +3,7 @@
  * 没设过后台值时等于环境变量，环境变量没设就是简历 20、小青 80、面试 5。
  * 同进程改完立刻生效；另一实例最迟 30 秒读到 Redis。越界 400 且原值不动。
  * Redis 读失败回落环境变量，不当成 0。改小后已用够的下一次是 AI_QUOTA_EXHAUSTED。
+ * 用量查询跨过缓存有效期后，面板上限仍是后台值，并且和下一次扣次一致。
  * 非管理员 401/403。审计有改前改后，不带姓名和手机号。
  *
  * 默认自建 SQLite。--postgres 只用调用方给的本机隔离库，不自己建库。
@@ -36,6 +37,7 @@ import {
   aiQuotaDailyLimitKey,
   clearDailyLimitCache,
   dailyLimit,
+  quotaDay,
   type AiQuotaBucket,
 } from '../src/ai/quota/ai-quota.policy'
 
@@ -107,6 +109,7 @@ async function main() {
   const memberId = `quota-limit-member-${run}`
   const exhaustId = `quota-limit-exhaust-${run}`
   const readerId = `quota-limit-reader-${run}`
+  const slowId = `quota-limit-slow-${run}`
   const now = new Date('2026-11-17T03:00:00.000Z')
   const client = new Redis(process.env.REDIS_URL, {
     lazyConnect: true,
@@ -228,6 +231,72 @@ async function main() {
         assert.equal(dailyLimit('ai_interview'), 17)
       } finally {
         Date.now = originalNow
+      }
+    })
+
+    await check('用量查询跨过缓存有效期后，面板上限仍是后台值，并且和实扣一致', async () => {
+      const savedRaw = await Promise.all(AI_QUOTA_BUCKETS.map((name) => rawOf(name)))
+      const originalNow = Date.now
+      let clock = originalNow()
+      const daily = prisma.aiQuotaDaily
+      const grants = prisma.benefitGrant
+      const originalDailyFindMany = daily.findMany.bind(daily)
+      const originalDailyFindUnique = daily.findUnique.bind(daily)
+      const originalGrantFindMany = grants.findMany.bind(grants)
+      const crossCache = async <T>(run: () => Promise<T>): Promise<T> => {
+        await new Promise((resolve) => setTimeout(resolve, 15))
+        // 缓存只看 Date.now()。查询里把时钟拨过有效期，和查询真的超过 30 秒是同一种过期。
+        clock += AI_QUOTA_LIMIT_CACHE_MS + 1
+        return run()
+      }
+      daily.findMany = ((args: unknown) => crossCache(() => originalDailyFindMany(args))) as typeof daily.findMany
+      daily.findUnique = ((args: unknown) => crossCache(() => originalDailyFindUnique(args))) as typeof daily.findUnique
+      grants.findMany = ((args: unknown) => crossCache(() => originalGrantFindMany(args))) as typeof grants.findMany
+      Date.now = () => clock
+      try {
+        await clearKeys()
+        await limits.update(input(11, 12, 13), adminId, null)
+        await prisma.aiQuotaDaily.create({
+          data: { endUserId: `member:${slowId}`, bucket: 'ai_resume', day: quotaDay(now), used: 11 },
+        })
+        const beforeUsage = clock
+        const usage = await quota.adminUsage(now)
+        assert.ok(clock - beforeUsage > AI_QUOTA_LIMIT_CACHE_MS, '用量查询应当跨过缓存有效期')
+        const resumeUsage = usage.buckets.find((item) => item.bucket === 'ai_resume')
+        assert.equal(resumeUsage?.dailyLimit, 11, '用量面板上限')
+        assert.equal(resumeUsage?.usedTotal, 11)
+        assert.equal(resumeUsage?.membersExhausted, 1)
+        assert.equal(usage.buckets.find((item) => item.bucket === 'ai_assistant')?.dailyLimit, 12)
+        assert.equal(usage.buckets.find((item) => item.bucket === 'ai_interview')?.dailyLimit, 13)
+        const beforeRemaining = clock
+        const left = await quota.remaining({ endUserId: slowId, now })
+        assert.ok(clock - beforeRemaining > AI_QUOTA_LIMIT_CACHE_MS, '余量查询应当跨过缓存有效期')
+        const resumeLeft = left.find((item) => item.bucket === 'ai_resume')
+        assert.equal(resumeLeft?.dailyLimit, 11, '余量上限')
+        assert.equal(resumeLeft?.dailyUsed, 11)
+        assert.equal(resumeLeft?.dailyRemaining, 0)
+        assert.equal(left.find((item) => item.bucket === 'ai_assistant')?.dailyLimit, 12)
+        assert.equal(left.find((item) => item.bucket === 'ai_interview')?.dailyLimit, 13)
+        daily.findMany = originalDailyFindMany
+        daily.findUnique = originalDailyFindUnique
+        grants.findMany = originalGrantFindMany
+        Date.now = originalNow
+        await expectHttpError(429, 'AI_QUOTA_EXHAUSTED', () => quota.reserve({
+          bucket: 'ai_resume', endUserId: slowId, operationKey: `q23b:${run}:across-cache`, now,
+        }))
+      } finally {
+        Date.now = originalNow
+        daily.findMany = originalDailyFindMany
+        daily.findUnique = originalDailyFindUnique
+        grants.findMany = originalGrantFindMany
+        await Promise.all(AI_QUOTA_BUCKETS.map(async (name, index) => {
+          const value = savedRaw[index]
+          if (value == null) await client.del(aiQuotaDailyLimitKey(name))
+          else await client.set(aiQuotaDailyLimitKey(name), value)
+        }))
+        clearDailyLimitCache()
+        await prisma.aiQuotaReservation.deleteMany({ where: { endUserId: slowId } }).catch(() => undefined)
+        await prisma.aiQuotaDaily.deleteMany({ where: { endUserId: `member:${slowId}` } }).catch(() => undefined)
       }
     })
 
@@ -425,8 +494,8 @@ async function main() {
     await nest?.close().catch(() => undefined)
     await clearKeys().catch(() => undefined)
     await prisma.auditLog.deleteMany({ where: { actorId: { in: [adminId, kioskId] } } }).catch(() => undefined)
-    await prisma.aiQuotaReservation.deleteMany({ where: { endUserId: { in: [memberId, exhaustId, readerId] } } }).catch(() => undefined)
-    await prisma.aiQuotaDaily.deleteMany({ where: { endUserId: { in: [`member:${memberId}`, `member:${exhaustId}`, `member:${readerId}`] } } }).catch(() => undefined)
+    await prisma.aiQuotaReservation.deleteMany({ where: { endUserId: { in: [memberId, exhaustId, readerId, slowId] } } }).catch(() => undefined)
+    await prisma.aiQuotaDaily.deleteMany({ where: { endUserId: { in: [`member:${memberId}`, `member:${exhaustId}`, `member:${readerId}`, `member:${slowId}`] } } }).catch(() => undefined)
     await prisma.user.deleteMany({ where: { id: { in: [adminId, kioskId] } } }).catch(() => undefined)
     await prisma.onModuleDestroy().catch(() => undefined)
     client.disconnect()
