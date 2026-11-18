@@ -273,6 +273,10 @@ export class AiQuotaService {
     return limits
   }
 
+  /**
+   * 扣次自己去刷新后台上限。
+   * 缓存过期后如果改走 dailyLimit()，会退回环境默认值，已用满的人还能再扣。
+   */
   private async memberDailyLimit(bucket: AiQuotaBucket): Promise<number> {
     const limits = await this.freshDailyLimits()
     return limits[bucket]

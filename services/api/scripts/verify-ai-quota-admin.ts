@@ -3,6 +3,7 @@
  * 没设过后台值时等于环境变量，环境变量没设就是简历 20、小青 80、面试 5。
  * 同进程改完立刻生效。另一进程有自己的缓存，最迟 30 秒读到 Redis。越界 400 且原值不动。
  * Redis 读失败回落环境变量，不当成 0。改小后已用够的下一次是 AI_QUOTA_EXHAUSTED。
+ * 本进程缓存过期后，不读面板、不读余量，扣次仍按新的后台上限拒绝。
  * 用量查询跨过缓存有效期后，面板上限仍是后台值，并且和下一次扣次一致。
  * 非管理员 401/403。审计有改前改后，不带姓名和手机号。
  *
@@ -39,6 +40,7 @@ import {
   clearDailyLimitCache,
   dailyLimit,
   quotaDay,
+  readPublishedDailyLimits,
   type AiQuotaBucket,
 } from '../src/ai/quota/ai-quota.policy'
 
@@ -113,6 +115,7 @@ async function main() {
   const exhaustId = `quota-limit-exhaust-${run}`
   const readerId = `quota-limit-reader-${run}`
   const slowId = `quota-limit-slow-${run}`
+  const staleId = `quota-limit-stale-${run}`
   const now = new Date('2026-11-17T03:00:00.000Z')
   const client = new Redis(process.env.REDIS_URL, {
     lazyConnect: true,
@@ -239,6 +242,46 @@ async function main() {
         assert.equal(dailyLimit('ai_interview', readerCache), 17)
       } finally {
         Date.now = originalNow
+      }
+    })
+
+    await check('缓存过期后不读面板和余量，扣次按新的后台上限拒绝', async () => {
+      const savedRaw = await Promise.all(AI_QUOTA_BUCKETS.map((name) => rawOf(name)))
+      const originalNow = Date.now
+      let clock = originalNow()
+      Date.now = () => clock
+      try {
+        await clearKeys()
+        await limits.ensureFresh()
+        assert.equal(dailyLimit('ai_resume'), 20)
+        await prisma.aiQuotaDaily.create({
+          data: { endUserId: `member:${staleId}`, bucket: 'ai_resume', day: quotaDay(now), used: 11 },
+        })
+        const saved = await limits.update(input(11), adminId, null)
+        assert.equal(saved.buckets.find((item) => item.bucket === 'ai_resume')?.effective, 11)
+        assert.equal(dailyLimit('ai_resume'), 11)
+        clock += AI_QUOTA_LIMIT_CACHE_MS + 1
+        assert.equal(readPublishedDailyLimits(), null, '本进程配置缓存应当已经过期')
+        assert.equal(dailyLimit('ai_resume'), 20, '过期后不刷新会退回环境默认')
+        try {
+          await quota.reserve({ bucket: 'ai_resume', endUserId: staleId, operationKey: `q23c:${run}:after-expiry`, now })
+          assert.fail('缓存过期后应按新上限拒绝')
+        } catch (error) {
+          if ((error as { name?: string }).name === 'AssertionError') throw error
+          assert.equal(statusOf(error), 429, (error as Error).message)
+          assert.equal(bodyOf(error).error?.code, 'AI_QUOTA_EXHAUSTED')
+          assert.equal(bodyOf(error).error?.message, '今天的 AI 次数用完了，明天 0 点恢复')
+        }
+      } finally {
+        Date.now = originalNow
+        await Promise.all(AI_QUOTA_BUCKETS.map(async (name, index) => {
+          const value = savedRaw[index]
+          if (value == null) await client.del(aiQuotaDailyLimitKey(name))
+          else await client.set(aiQuotaDailyLimitKey(name), value)
+        }))
+        clearDailyLimitCache()
+        await prisma.aiQuotaReservation.deleteMany({ where: { endUserId: staleId } }).catch(() => undefined)
+        await prisma.aiQuotaDaily.deleteMany({ where: { endUserId: `member:${staleId}` } }).catch(() => undefined)
       }
     })
 
@@ -502,8 +545,8 @@ async function main() {
     await nest?.close().catch(() => undefined)
     await clearKeys().catch(() => undefined)
     await prisma.auditLog.deleteMany({ where: { actorId: { in: [adminId, kioskId] } } }).catch(() => undefined)
-    await prisma.aiQuotaReservation.deleteMany({ where: { endUserId: { in: [memberId, exhaustId, readerId, slowId] } } }).catch(() => undefined)
-    await prisma.aiQuotaDaily.deleteMany({ where: { endUserId: { in: [`member:${memberId}`, `member:${exhaustId}`, `member:${readerId}`, `member:${slowId}`] } } }).catch(() => undefined)
+    await prisma.aiQuotaReservation.deleteMany({ where: { endUserId: { in: [memberId, exhaustId, readerId, slowId, staleId] } } }).catch(() => undefined)
+    await prisma.aiQuotaDaily.deleteMany({ where: { endUserId: { in: [`member:${memberId}`, `member:${exhaustId}`, `member:${readerId}`, `member:${slowId}`, `member:${staleId}`] } } }).catch(() => undefined)
     await prisma.user.deleteMany({ where: { id: { in: [adminId, kioskId] } } }).catch(() => undefined)
     await prisma.onModuleDestroy().catch(() => undefined)
     client.disconnect()
