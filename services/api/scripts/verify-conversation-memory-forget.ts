@@ -746,6 +746,7 @@ async function main(): Promise<void> {
       memory,
       advisor,
       auth,
+      assets,
       controller,
       advisorController,
       redis,

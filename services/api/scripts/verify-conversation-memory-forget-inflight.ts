@@ -2,6 +2,7 @@
  * 在途请求的清场补洞。挂在 verify-conversation-memory-forget 末尾。
  *
  * A 首次追问还没进内存时登出（Redis 成功 / 失败）；首次小青在途、内存里还没有这条时清场。
+ *   归属查询回执挂起时删记录或登出、政策查询挂起时登出，放行后都不把原话写回。
  * B 容量淘汰本身作废在途回复；淘汰之后再登出 / forgetOwner 也不写回。
  * C 代次表挤满后，挤掉之前抓住的代次不能再对上；三个方法同样去掉会话号两端空白。
  * D 两个清场接口在身份查询 503 时，内存已清、在途作废，作业行仍在库里。
@@ -17,6 +18,7 @@ import { AdvisorQaMemory } from '../src/advisor/advisor-qa-memory'
 import { AdvisorService } from '../src/advisor/advisor.service'
 import { ConversationEpoch } from '../src/common/conversation-epoch'
 import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
+import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { MemberAuthService } from '../src/member-auth/member-auth.service'
 import type { PrismaService } from '../src/prisma/prisma.service'
 
@@ -42,6 +44,7 @@ export interface InflightForgetContext {
   memory: AdvisorQaMemory
   advisor: AdvisorService
   auth: MemberAuthService
+  assets: MemberAssetsService
   controller: AssistantSessionForgetController
   advisorController: AdvisorController
   redis: RedisStub
@@ -187,6 +190,76 @@ async function fillUntilEvicted(chat: LlmChatService, sessionId: string, owner: 
   }
 }
 
+/** 查询已经取到行，回执交还之前挂起。删记录或登出发生在这一段，才对得上「先等查询、后登记」的窗口。 */
+function hangAdvisorReceipt(prisma: PrismaService, sessionId: string): HungAsk & { restore: () => void } {
+  const delegate = prisma.advisorSession as unknown as {
+    findUnique: (args: { where?: { id?: string } }) => Promise<unknown>
+  }
+  const original = delegate.findUnique.bind(delegate)
+  let releaseGate: () => void = () => undefined
+  let markEntered: () => void = () => undefined
+  const gate = new Promise<void>((resolve) => { releaseGate = resolve })
+  const entered = new Promise<void>((resolve) => { markEntered = resolve })
+  let armed = true
+  delegate.findUnique = async (args) => {
+    const row = await original(args)
+    if (armed && args?.where?.id === sessionId) {
+      armed = false
+      markEntered()
+      await gate
+    }
+    return row
+  }
+  return {
+    pending: Promise.resolve({ answer: '' }),
+    entered,
+    release: () => releaseGate(),
+    restore() { delegate.findUnique = original },
+  }
+}
+
+/** 政策查询是聊天的第一次 await。挂起发生在进模型之前。 */
+function hangPolicyRead(chat: LlmChatService, owner: string, mark: string): HungChat & { restore: () => void } {
+  const target = chat as unknown as { policyContext?: { read: (policyId: string) => Promise<string | null> } }
+  const previous = target.policyContext
+  let releaseGate: () => void = () => undefined
+  let markEntered: () => void = () => undefined
+  const gate = new Promise<void>((resolve) => { releaseGate = resolve })
+  const entered = new Promise<void>((resolve) => { markEntered = resolve })
+  target.policyContext = {
+    read: async () => {
+      markEntered()
+      await gate
+      return '政策原文'
+    },
+  }
+  const pending = chat.chat(
+    { message: mark, channel: 'kiosk', policyId: 'policy-hang' } as never,
+    undefined,
+    owner,
+  ) as Promise<{ reply: string; sessionId: string }>
+  return {
+    pending,
+    entered,
+    release() { releaseGate() },
+    restore() { target.policyContext = previous },
+  }
+}
+
+function emptyShellId(chat: LlmChatService, owner: string): string | undefined {
+  for (const [id, session] of sessionsOf(chat)) {
+    if (session.ownerKey === owner && session.messages.length === 0) return id
+  }
+  return undefined
+}
+
+function ownerHasMark(chat: LlmChatService, owner: string, mark: string): boolean {
+  for (const session of sessionsOf(chat).values()) {
+    if (session.ownerKey === owner && session.messages.some((message) => message.content.includes(mark))) return true
+  }
+  return false
+}
+
 function runEpochCases(check: InflightForgetContext['check']): void {
   const epoch = new ConversationEpoch(2)
   const captured = epoch.capture('target-job')
@@ -214,7 +287,7 @@ function runEpochCases(check: InflightForgetContext['check']): void {
 
 export async function runInflightForgetScenarios(ctx: InflightForgetContext): Promise<void> {
   const {
-    check, textMark, chat, memory, advisor, auth, controller, advisorController,
+    check, textMark, chat, memory, advisor, auth, assets, controller, advisorController,
     redis, prisma, createUser, createQa, bearer, modelGate,
   } = ctx
   runEpochCases(check)
@@ -466,5 +539,72 @@ export async function runInflightForgetScenarios(ctx: InflightForgetContext): Pr
     redis.get = originalGet
     resetRedisCooldownForTests()
     hungWork.release()
+  }
+
+  const userReceipt = `verify-a-receipt-${randomUUID()}`
+  await createUser(userReceipt)
+  const workReceipt = `verify-work-a-receipt-${randomUUID()}`
+  const artReceipt = `verify-art-a-receipt-${randomUUID()}`
+  await createQa(userReceipt, workReceipt, artReceipt)
+  const markReceipt = textMark('查询回执挂起删记录原话')
+  const hungReceipt = hangAdvisorReceipt(prisma, workReceipt)
+  const pendingReceipt = advisor.ask(workReceipt, markReceipt, { endUserId: userReceipt, accessToken: null }) as Promise<{ answer: string }>
+  try {
+    await waitFor(hungReceipt.entered, '作业归属查询回执挂起')
+    check(memory.read(workReceipt).length === 0, '场景 A 阳性：查询回执挂起时，首次追问还没写入内存')
+    await assets.deleteQaRecord(userReceipt, artReceipt)
+    hungReceipt.release()
+    const answered = await pendingReceipt
+    const row = await prisma.advisorSession.findUnique({ where: { id: workReceipt } })
+    check(
+      answered.answer.length > 0 && row === null && !qaText(memory, workReceipt).includes(markReceipt),
+      '场景 A：归属查询回执挂起时删记录，放行后库行仍无、内存不写回原话，回答仍返回',
+    )
+  } finally {
+    hungReceipt.release()
+    hungReceipt.restore()
+  }
+
+  const userReceiptOut = `verify-a-receipt-out-${randomUUID()}`
+  await createUser(userReceiptOut)
+  const workReceiptOut = `verify-work-a-receipt-out-${randomUUID()}`
+  await createQa(userReceiptOut, workReceiptOut, `verify-art-a-receipt-out-${randomUUID()}`)
+  const markReceiptOut = textMark('查询回执挂起登出原话')
+  const hungReceiptOut = hangAdvisorReceipt(prisma, workReceiptOut)
+  const pendingReceiptOut = advisor.ask(workReceiptOut, markReceiptOut, { endUserId: userReceiptOut, accessToken: null }) as Promise<{ answer: string }>
+  try {
+    await waitFor(hungReceiptOut.entered, '作业归属查询回执挂起后登出')
+    await auth.logout(userReceiptOut, randomUUID())
+    hungReceiptOut.release()
+    const answered = await pendingReceiptOut
+    check(
+      answered.answer.length > 0 && !qaText(memory, workReceiptOut).includes(markReceiptOut),
+      '场景 A：归属查询回执挂起时登出，放行后内存不写回原话，回答仍返回',
+    )
+  } finally {
+    hungReceiptOut.release()
+    hungReceiptOut.restore()
+  }
+
+  const userPolicy = `verify-a-policy-${randomUUID()}`
+  await createUser(userPolicy)
+  const ownerPolicy = `u:${userPolicy}`
+  const markPolicy = textMark('政策查询挂起原话')
+  const hungPolicy = hangPolicyRead(chat, ownerPolicy, markPolicy)
+  try {
+    await waitFor(hungPolicy.entered, '政策查询挂起')
+    const sessionId = emptyShellId(chat, ownerPolicy)
+    check(typeof sessionId === 'string' && sessionId.length === 32, '场景 A 阳性：政策查询还挂着，会话壳和在途登记已经在')
+    await auth.logout(userPolicy, randomUUID())
+    hungPolicy.release()
+    const answered = await hungPolicy.pending
+    const left = sessionId ? transcriptOf(chat, sessionId, ownerPolicy) : markPolicy
+    check(
+      answered.reply.length > 0 && !left.includes(markPolicy) && !ownerHasMark(chat, ownerPolicy, markPolicy),
+      '场景 A：政策查询挂起时登出，放行后内存不写回原话，回答仍返回',
+    )
+  } finally {
+    hungPolicy.release()
+    hungPolicy.restore()
   }
 }

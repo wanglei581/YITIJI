@@ -368,7 +368,7 @@ export class LlmChatService {
       .map((message) => ({ role: message.role, content: message.content }))
   }
 
-  /** 进模型前登记。请求结束（答完或抛错）后注销。 */
+  /** 请求一进来就登记，在任何 await 之前。请求结束（答完或抛错）后注销。 */
   private noteInflight(sessionId: string, ownerKey: string): void {
     const id = sessionId.trim()
     if (!id) return
@@ -447,8 +447,6 @@ export class LlmChatService {
     ownerKey = 'anon',
     policyPrompt?: string,
   ): Promise<ChatOutput> {
-    const currentPolicy = policyPrompt ?? (input.policyId === undefined ? undefined : await this.readPolicyContext(input.policyId))
-    if (currentPolicy === null) return policyUnavailableResult()
     const apiKey = this.config.getApiKey('assistant_chat')
     const cfg = this.config.getConfig('assistant_chat')
 
@@ -463,6 +461,7 @@ export class LlmChatService {
     const existing = requestedId ? this.sessions.get(requestedId) : undefined
     let sessionId: string
     let session: SessionEntry
+    let created = false
     if (existing && existing.ownerKey === ownerKey) {
       sessionId = requestedId
       session = existing
@@ -476,9 +475,21 @@ export class LlmChatService {
       if (this.sessions.size >= MAX_ASSISTANT_SESSIONS) this.evictOldest()
       sessionId = randomBytes(16).toString('hex')
       session = { messages: [], updatedAt: now, ownerKey }
+      created = true
       this.sessions.set(sessionId, session)
     }
+    // 政策查询是第一次 await。先登记并抓住代次，查询挂起期间的登出和清场才作废得了这次写回。
+    const capturedEpoch = this.epoch.capture(sessionId)
+    this.noteInflight(sessionId, ownerKey)
     const channel = resolveAssistantChannel(input.channel)
+    try {
+    const currentPolicy = policyPrompt ?? (input.policyId === undefined ? undefined : await this.readPolicyContext(input.policyId))
+    if (currentPolicy === null) {
+      if (created && this.sessions.get(sessionId) === session && session.messages.length === 0) {
+        this.sessions.delete(sessionId)
+      }
+      return policyUnavailableResult()
+    }
     // 切换/取消政策后不再把上一条政策的对话作为本轮依据。
     if (session.policyId !== input.policyId) {
       session.messages = []
@@ -501,9 +512,6 @@ export class LlmChatService {
     }
     session.deviceFaultJustAnswered = false
     session.messages.push({ role: 'user', content: input.message })
-    const capturedEpoch = this.epoch.capture(sessionId)
-    this.noteInflight(sessionId, ownerKey)
-    try {
     const skill = input.skill
     const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
     const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()

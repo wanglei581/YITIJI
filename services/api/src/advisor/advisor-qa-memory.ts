@@ -54,8 +54,9 @@ export class AdvisorQaMemory {
   }
 
   /**
-   * 进模型前登记这一次在途请求属于谁，并抓住代次。
+   * 请求一进来就登记这一次在途请求属于谁，并抓住代次。必须在任何 await 之前。
    * 首次追问还没写进内存，登出和按作业号清也要能找到它。
+   * 归属查询挂起时若还没登记，清理抬高代次之后这次才会抓到新代次，原话又写回。
    */
   begin(sessionId: string, ownerKey: string | null): number {
     const id = sessionId.trim()

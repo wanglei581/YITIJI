@@ -333,16 +333,18 @@ export class AdvisorService {
    *（设计页的「那超过半年呢」），而不是每次都当成一个新问题。
    */
   async ask(sessionId: string, question: string, requester: AdvisorRequester, req?: QuotaAbortRequest) {
-    const row = await this.loadOwned(sessionId, requester)
-    if (this.skillOf(row) !== 'qa') {
-      throw new BadRequestException({
-        error: { code: 'ADVISOR_ASK_WRONG_SKILL', message: '当前作业型不是问答型，请先切换作业型' },
-      })
-    }
-    const memory = this.qaMemory.read(sessionId)
-    const ownerKey = row.endUserId ? `u:${row.endUserId}` : null
-    const capturedEpoch = this.qaMemory.begin(sessionId, ownerKey)
+    // 归属查询是第一次 await。先登记在途并抓住代次，查询挂起期间的登出、删记录、清场、淘汰才作废得了这次写回。
+    const ownerKeyHint = requester.endUserId ? `u:${requester.endUserId}` : null
+    const capturedEpoch = this.qaMemory.begin(sessionId, ownerKeyHint)
     try {
+      const row = await this.loadOwned(sessionId, requester)
+      if (this.skillOf(row) !== 'qa') {
+        throw new BadRequestException({
+          error: { code: 'ADVISOR_ASK_WRONG_SKILL', message: '当前作业型不是问答型，请先切换作业型' },
+        })
+      }
+      const memory = this.qaMemory.read(sessionId)
+      const ownerKey = row.endUserId ? `u:${row.endUserId}` : null
       // 作业面请求里没有渠道。小程序只读会话和本次要点，不走 ask()，所以固定用一体机那段。
       if (isDeviceFaultQuestion(question)) {
         return {
