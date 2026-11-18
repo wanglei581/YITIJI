@@ -130,6 +130,7 @@ async function main(): Promise<void> {
   const adminId = `batch-admin-${suffix}`
   const partnerId = `batch-partner-${suffix}`
   const orgId = `batch-org-${suffix}`
+  const quotaOrgId = `batch-quota-org-${suffix}`
   const prefixes: string[] = []
   const batchIds: string[] = []
   const actor = { actorId: adminId, actorRole: 'admin' }
@@ -257,6 +258,73 @@ async function main(): Promise<void> {
     const hugeCount = await prisma.terminal.count({ where: { terminalCode: { startsWith: hugePrefix } } })
     assert.equal(hugeCount, 0)
     console.log('PASS 超过 200 台拒绝，一台都不建')
+
+    // 上限 3 台、已绑 1 台（剩 2 个名额）时再批量建 3 台。额度在同一事务里按已写入的台数累计。
+    // 第 3 行超额后整笔事务回滚：前两台也不留下，绑定台数仍不得超过上限。
+    const quotaPrefix = `Q${suffix}`
+    prefixes.push(quotaPrefix)
+    const quotaNow = new Date()
+    await prisma.organization.create({
+      data: { id: quotaOrgId, name: '批量额度验证机构', type: 'public_service', licenseMode: 'required' },
+    })
+    await prisma.license.create({
+      data: {
+        orgId: quotaOrgId,
+        licenseeName: '批量额度被授权企业',
+        creditCode: '91330100799655058B',
+        contractNo: `HT-BQ-${suffix}`,
+        startsAt: new Date(quotaNow.getTime() - 86_400_000),
+        endsAt: new Date(quotaNow.getTime() + 365 * 86_400_000),
+        terminalQuota: 3,
+        createdBy: adminId,
+      },
+    })
+    await prisma.terminal.create({
+      data: {
+        id: `t_quota_exist_${suffix}`,
+        terminalCode: `${quotaPrefix}0`,
+        agentToken: `planned$quota-${suffix}`,
+        deviceFingerprint: `fp-quota-${suffix}`,
+        lifecycleStatus: 'planned',
+        orgId: quotaOrgId,
+        orgBoundAt: quotaNow,
+      },
+    })
+    const quotaBefore = await prisma.terminal.count({
+      where: { orgId: quotaOrgId, lifecycleStatus: { not: 'retired' } },
+    })
+    assert.equal(quotaBefore, 1, '开测前已绑定 1 台，上限 3 台，还剩 2 个名额')
+    const createAuditsBefore = await prisma.auditLog.count({
+      where: { action: 'terminal.batch.create', actorId: adminId },
+    })
+    let quotaMessage = ''
+    await expectCode(async () => {
+      try {
+        await batches.create({
+          range: { prefix: quotaPrefix, start: 1, end: 3, orgId: quotaOrgId },
+        }, actor)
+      } catch (error) {
+        quotaMessage = errorMessage(error)
+        throw error
+      }
+    }, 'TERMINAL_BATCH_ROW_INVALID', '剩 2 个名额却批量建 3 台')
+    assert.match(quotaMessage, /第 3 行/)
+    assert.match(quotaMessage, /授权台数已用完/)
+    assert.equal(quotaMessage.includes('第 1 行'), false, `只有超额的那一行报错，实际：${quotaMessage}`)
+    assert.equal(quotaMessage.includes('第 2 行'), false, `只有超额的那一行报错，实际：${quotaMessage}`)
+    const quotaCodes = [`${quotaPrefix}1`, `${quotaPrefix}2`, `${quotaPrefix}3`]
+    const quotaCreated = await prisma.terminal.count({ where: { terminalCode: { in: quotaCodes } } })
+    assert.equal(quotaCreated, 0, '整批拒绝：已经通过额度检查的前两台也不能留下')
+    const quotaAfter = await prisma.terminal.count({
+      where: { orgId: quotaOrgId, lifecycleStatus: { not: 'retired' } },
+    })
+    assert.equal(quotaAfter, quotaBefore, '失败后绑定台数不变')
+    assert.ok(quotaAfter <= 3, `绑定台数 ${quotaAfter} 不得超过授权上限 3`)
+    const createAuditsAfter = await prisma.auditLog.count({
+      where: { action: 'terminal.batch.create', actorId: adminId },
+    })
+    assert.equal(createAuditsAfter, createAuditsBefore, '整批拒绝不得增加成功审计')
+    console.log('PASS 授权剩 2 台额度、批量建 3 台：整批拒绝，没有超额')
 
     const issued = await batches.issue({ batchId: created.batchId }, actor)
     assert.equal(issued.issued.length, 3)
@@ -512,7 +580,8 @@ async function main(): Promise<void> {
       })
     }
     await prisma.user.deleteMany({ where: { id: { in: [adminId, partnerId] } } }).catch(() => undefined)
-    await prisma.organization.deleteMany({ where: { id: orgId } }).catch(() => undefined)
+    await prisma.license.deleteMany({ where: { orgId: quotaOrgId } }).catch(() => undefined)
+    await prisma.organization.deleteMany({ where: { id: { in: [orgId, quotaOrgId] } } }).catch(() => undefined)
     await prisma.onModuleDestroy().catch(() => undefined)
     if (temporary) rmSync(temporary, { recursive: true, force: true })
   }
