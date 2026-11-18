@@ -1,6 +1,7 @@
 /**
- * 待人工的三种解开办法。都在一个事务里改完，改完只剩一种状态。
+ * 待人工的三种解开办法。改状态在一个事务里做完，改完只剩一种状态。
  * 确认退成才把钱记成已退。改为出纸和关单都不把钱记成已退。
+ * 在途退款改为出纸要先查渠道。已经出纸不能关单。拒绝写在事务外，审计才能留下。
  */
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
@@ -8,6 +9,12 @@ import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { paperAlreadyReleased } from './refund-paper-exclusion'
 
 export type PrintReturnResolution = 'confirm_refunded' | 'release_paper' | 'close_order'
+export type RefundChannelVerdict = 'success' | 'processing' | 'failed' | 'unknown' | 'unsupported'
+export type PendingRefundChannelQuery = (input: {
+  channel: string
+  refundNo: string
+  orderId: string
+}) => Promise<RefundChannelVerdict>
 
 const HOLD_STATUSES = ['failed', 'manual_review', 'pending'] as const
 const NOT_REFUNDED_NOTE = '这笔钱不会记成已退回'
@@ -56,6 +63,65 @@ async function rejectReleasedPaper(
   if (action === 'confirm_refunded') {
     throw deny('PAPER_ALREADY_RELEASED', '纸已经出去。确认退成不能用，请走核对后仍退款。')
   }
+  if (action === 'close_order') {
+    await db.auditLog.create({
+      data: {
+        actorId: null,
+        actorRole: 'admin',
+        action: 'refund.hold_rejected',
+        targetType: 'order',
+        targetId: orderId,
+        payloadJson: JSON.stringify({
+          action,
+          operatorId,
+          code: 'PAPER_ALREADY_OUT_CANNOT_CLOSE',
+          detail: '纸已经出去，不能关单',
+        }),
+      },
+    })
+    throw deny('PAPER_ALREADY_OUT_CANNOT_CLOSE', '纸已经出去，不能关单。钱还在的话请走核对后仍退款。')
+  }
+}
+
+/** 在途退款改为出纸：只有渠道明确失败才放行。没查到、还在处理、已经退成，都拒绝并写审计。 */
+async function rejectPendingReleaseUntilChannelFailed(
+  db: PrismaService,
+  orderId: string,
+  operatorId: string,
+  channelQuery: PendingRefundChannelQuery | undefined,
+): Promise<void> {
+  const refund = await db.refund.findFirst({
+    where: { orderId, status: 'pending' },
+    orderBy: { createdAt: 'desc' },
+    select: { channel: true, refundNo: true },
+  })
+  if (!refund) return
+  let verdict: RefundChannelVerdict = 'unsupported'
+  if (channelQuery) {
+    try {
+      verdict = await channelQuery({ channel: refund.channel, refundNo: refund.refundNo, orderId })
+    } catch {
+      verdict = 'unknown'
+    }
+  }
+  if (verdict === 'failed') return
+  await db.auditLog.create({
+    data: {
+      actorId: null,
+      actorRole: 'admin',
+      action: 'refund.hold_rejected',
+      targetType: 'order',
+      targetId: orderId,
+      payloadJson: JSON.stringify({
+        action: 'release_paper',
+        operatorId,
+        code: 'REFUND_CHANNEL_UNCONFIRMED',
+        channelVerdict: verdict,
+        detail: '渠道还没确认这笔退款失败，不能改为出纸',
+      }),
+    },
+  })
+  throw deny('REFUND_CHANNEL_UNCONFIRMED', '渠道还没确认这笔退款失败。请先向渠道查证，确认失败后再改为出纸。')
 }
 
 export async function resolvePrintReturnHold(
@@ -63,6 +129,7 @@ export async function resolvePrintReturnHold(
   orderId: string,
   action: PrintReturnResolution,
   operatorId: string,
+  channelQuery?: PendingRefundChannelQuery,
 ): Promise<{
   orderId: string
   payStatus: string
@@ -72,6 +139,9 @@ export async function resolvePrintReturnHold(
   amountCents: number
 }> {
   await rejectReleasedPaper(db, orderId, action, operatorId)
+  if (action === 'release_paper') {
+    await rejectPendingReleaseUntilChannelFailed(db, orderId, operatorId, channelQuery)
+  }
   return db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } })
     if (!order) throw new BadRequestException('ORDER_NOT_FOUND')
@@ -156,6 +226,9 @@ export async function resolvePrintReturnHold(
         },
       })
     } else if (action === 'close_order') {
+      if (released) {
+        throw deny('PAPER_ALREADY_OUT_CANNOT_CLOSE', '纸已经出去，不能关单。钱还在的话请走核对后仍退款。')
+      }
       const closedRefund = await tx.refund.updateMany({
         where: { id: refund.id, status: { in: [...HOLD_STATUSES] } },
         data: { status: 'closed' },

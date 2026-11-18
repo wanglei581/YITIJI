@@ -1,5 +1,6 @@
 /**
- * 待人工的 pending 退款，三步处置都要能处理。
+ * 待人工的 pending 退款。确认退成和关单能处理。
+ * 改为出纸要先查渠道。sandbox 没有查证，这一步必须拒绝。
  */
 import assert from 'node:assert/strict'
 import { BadRequestException } from '@nestjs/common'
@@ -91,10 +92,15 @@ export async function runP2b5PendingHoldCases(
     assert.equal(confirmed.refundStatus, 'success')
     assert.equal(confirmed.payStatus, 'refunded')
     assert.equal(confirmed.amountCents, 200)
-    const released = await resolvePrintReturnHold(db, ids.release, 'release_paper', 'admin-test')
-    assert.equal(released.refundStatus, 'withdrawn')
-    assert.equal(released.payStatus, 'paid')
-    assert.equal(released.taskStatus, 'pending')
+    const releaseCode = await resolvePrintReturnHold(db, ids.release, 'release_paper', 'admin-test').then(
+      () => 'ok',
+      (error: unknown) => errorCode(error),
+    )
+    assert.equal(releaseCode, 'REFUND_CHANNEL_UNCONFIRMED')
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: ids.release } })).payStatus, 'paid')
+    assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: ids.release } })).status, 'pending')
+    assert.equal((await db.printTask.findFirstOrThrow({ where: { orderId: ids.release } })).status, 'failed')
+    assert.equal(await db.auditLog.count({ where: { targetId: ids.release, action: 'refund.hold_rejected' } }), 1)
     const closed = await resolvePrintReturnHold(db, ids.close, 'close_order', 'admin-test')
     assert.equal(closed.refundStatus, 'closed')
     assert.equal(closed.payStatus, 'closed')

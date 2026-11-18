@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Param, Post, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Inject, Optional, Param, Post, UseGuards } from '@nestjs/common'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { Roles } from '../common/decorators/roles.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -6,7 +6,9 @@ import { RolesGuard } from '../common/guards/roles.guard'
 import { PrismaService } from '../prisma/prisma.service'
 import { AdminMarkPaidDto, AdminRefundDto } from './dto/order-action.dto'
 import { OrderStatusService } from './order-status.service'
+import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
 import { RefundService } from './refund.service'
+import { queryRefundChannel } from './refund-channel-query'
 import { resolvePrintReturnHold } from './resolve-print-return-hold'
 
 // Admin 端点只放行线下/人工确认；free 只由 0 元建单自动产生，绝不经 Admin 手动置 free；
@@ -28,6 +30,7 @@ export class AdminOrderActionsController {
     private readonly orderStatus: OrderStatusService,
     private readonly refundService: RefundService,
     private readonly prisma: PrismaService,
+    @Optional() @Inject(PAYMENT_PROVIDER_TOKEN) private readonly providers: PaymentProviderRegistry | null = null,
   ) {}
 
   @Post('admin/orders/:id/mark-paid')
@@ -79,7 +82,9 @@ export class AdminOrderActionsController {
 
   @Post('admin/orders/:id/print-return/release-paper')
   releasePaper(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
-    return resolvePrintReturnHold(this.prisma, id, 'release_paper', user.userId)
+    const providers = this.providers ?? new PaymentProviderRegistry([])
+    return resolvePrintReturnHold(this.prisma, id, 'release_paper', user.userId, (input) =>
+      queryRefundChannel(providers, this.prisma, input))
   }
 
   @Post('admin/orders/:id/print-return/close')
