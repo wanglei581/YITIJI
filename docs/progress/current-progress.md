@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-11-18：公开政策关键词一律先粗筛再只折英文字母（未推送）
+
+- 分支 `claude/policy-expiry-1117`。公开列表的关键词，不论有没有 `%`、`_`、`\`，都先用数据库粗筛（PostgreSQL 用 `mode: 'insensitive'`，SQLite 用 LIKE），再在内存里用只折 A–Z 的比较做精筛、计数和分页，分批取完。É 和 é 按字面。SQLite 与 PostgreSQL 5523（`en_US.UTF-8`）对 `École` / `école` / `ÉCOLE`、`É%`、`Cafe` / `cafe`、`O'Reilly` / `o'reilly`、`100%`、`A_B`、汉字命中同一组 id。
+- 到期门禁用手写的夹具 id 做断言，不再把比较函数又调用一遍当标准。
+- 没推送，没上线。
+
 ## 2026-11-18：到期下架并发改成两个服务实例（未推送）
 
 - 分支 `claude/policy-expiry-1117`。到期下架的并发用例改成两个独立的服务实例，各自一条数据库连接同时跑。只有一方把这一行改成功，`policy.auto_expire` 恰好一条。SQLite 上没抢到的一方是锁冲突，事务不提交，记为 0。SQLite 与临时 PostgreSQL（5523）都跑过。

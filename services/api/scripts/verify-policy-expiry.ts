@@ -20,7 +20,6 @@ import { PolicyExpiryTask } from '../src/policies/policy-expiry.task'
 import { PolicyChecklistService } from '../src/policies/policy-checklist.service'
 import { AssistantPolicyContextService } from '../src/ai/llm/assistant-policy-context'
 import { publicPolicyWhere } from '../src/policies/policy-public-visibility'
-import { policyKeywordIncludes } from '../src/policies/policy-keyword'
 import { policyDeadlineThreshold } from '../src/policies/policy-validity'
 import { checklistMetadata } from '../src/policies/policy-checklist-metadata'
 import { assertPiiScanned } from '../src/print-jobs/pii-scan-gate'
@@ -393,18 +392,12 @@ async function main(): Promise<void> {
     const percentUpper = await seedPublished(`比率AI%${caseMarker}`, '百分号大写')
     const percentLower = await seedPublished(`比率ai%${caseMarker}`, '百分号小写')
     const percentWild = await seedPublished(`比率AIX${caseMarker}`, '百分号不是通配')
+    // 应命中的 id 按规格手写。不调用比较函数：函数把 É 折掉，或普通词又跳过内存精筛，集合会对不上。
     const assertCaseFold = async (keyword: string, expected: string[]) => {
       const page = await literalPage(keyword)
       const got = page.data.map((row) => row.id).sort()
       assert.deepEqual(got, [...expected].sort(), `关键词 ${JSON.stringify(keyword)} 在 ${prisma.dbKind} 上的命中集合不对`)
       assert.equal(page.pagination.total, expected.length, `关键词 ${JSON.stringify(keyword)} 在 ${prisma.dbKind} 上的总数不对`)
-      const needle = keyword.trim()
-      for (const row of page.data) {
-        assert.ok(
-          policyKeywordIncludes(row.title, needle) || policyKeywordIncludes(row.summary ?? '', needle),
-          `${row.id} 的标题和摘要都不符合关键词口径 ${JSON.stringify(needle)}`,
-        )
-      }
     }
     const aiIds = [aiUpper, aiLower]
     await assertCaseFold(`AI${caseMarker}`, aiIds)
@@ -418,7 +411,28 @@ async function main(): Promise<void> {
     await assertCaseFold(`AI%${caseMarker}`, percentCaseIds)
     await assertCaseFold(`ai%${caseMarker}`, percentCaseIds)
     assert.equal((await literalPage(`AI%${caseMarker}`)).data.some((row) => row.id === percentWild), false, '含 % 的关键词不得把百分号当成通配')
-    console.log(`  PASS 关键词英文字母不分大小写（${prisma.dbKind}：AI/ai、O'Reilly/o'reilly、中文、含 %）`)
+
+    const ecoleUpper = await seedPublished(`学校École${caseMarker}`, '大写重音按字面')
+    const ecoleLower = await seedPublished(`学校école${caseMarker}`, '小写重音按字面')
+    const cafeUpper = await seedPublished(`店名Cafe${caseMarker}`, '普通词大写')
+    const cafeLower = await seedPublished(`店名cafe${caseMarker}`, '普通词小写')
+    const ePercentUpper = await seedPublished(`比率É%${caseMarker}`, '重音百分号大写')
+    const ePercentLower = await seedPublished(`比率é%${caseMarker}`, '重音百分号小写')
+    const abLower = await seedPublished(`标记a_b${caseMarker}`, '下划线小写')
+    // É 与 é 按字面。École 和 ÉCOLE 只差 A-Z，都只命中大写 É 那一条。école 只命中小写 é 那一条。
+    await assertCaseFold(`École${caseMarker}`, [ecoleUpper])
+    await assertCaseFold(`école${caseMarker}`, [ecoleLower])
+    await assertCaseFold(`ÉCOLE${caseMarker}`, [ecoleUpper])
+    await assertCaseFold(`É%${caseMarker}`, [ePercentUpper])
+    await assertCaseFold(`é%${caseMarker}`, [ePercentLower])
+    const cafeIds = [cafeUpper, cafeLower]
+    await assertCaseFold(`Cafe${caseMarker}`, cafeIds)
+    await assertCaseFold(`cafe${caseMarker}`, cafeIds)
+    // 上面的 A_B 断言发生在这条小写夹具写入之前，期望仍是当时那一条。这里两种写法都要命中两条。
+    await assertCaseFold('A_B', [ab, abLower])
+    await assertCaseFold('a_b', [ab, abLower])
+    await assertCaseFold('100%', [hundred])
+    console.log(`  PASS 关键词只折英文字母（${prisma.dbKind}：École/école/ÉCOLE、É%、Cafe/cafe、AI/ai、O'Reilly/o'reilly、A_B、100%、汉字）`)
 
     const stillPrintable = await seedPublished(`清单仍有效_${suffix}`, '可以打印')
     const expiredPrintable = await seedPublished(`清单已过期_${suffix}`, '不能打印', {

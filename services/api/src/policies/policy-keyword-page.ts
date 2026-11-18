@@ -3,10 +3,9 @@ import type { PrismaService } from '../prisma/prisma.service'
 import { policyKeywordIncludes } from './policy-keyword'
 
 /**
- * 含 LIKE 元字符时，数据库 contains 只做粗筛。
- * 这里按与公开列表相同的排序把粗筛结果分批取完，再用与数据库同一口径
- * （英文字母不分大小写，其余字符按字面）过滤，然后才分页和计数。
- * 一批不满就停，不许取到固定上限就截断。
+ * 任何关键词的数据库条件都只是粗筛，可能比「只折 A-Z」更宽。
+ * 这里按与公开列表相同的排序把粗筛结果分批取完，再用 policyKeywordIncludes
+ * 精筛，然后才分页和计数。一批不满就停，不许取到固定上限就截断。
  */
 const LITERAL_KEYWORD_BATCH = 200
 

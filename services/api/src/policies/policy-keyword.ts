@@ -5,27 +5,24 @@ import type { DbKind } from '../prisma/create-client'
 /** 公开列表关键词上限。按字符串长度计，一个汉字算一个字。 */
 export const POLICY_KEYWORD_MAX_LENGTH = 30
 
-/**
- * LIKE 元字符。Prisma 的 contains 会生成 LIKE，但两边的转义不一样：
- * SQLite 的 LIKE 没有默认转义字符（Prisma 也不加 ESCAPE），
- * PostgreSQL 默认用反斜杠转义。只转义一种写法会让一边按字面、另一边仍是通配。
- * 因此含这些字符时不靠 LIKE 转义，改成粗筛加内存比较。
- */
-const LIKE_META = /[%_\\]/
-
 export interface PolicyKeywordPlan {
-  /** 交给 Prisma 的条件。不含元字符时就是标题或摘要的 contains；含元字符时只按去掉元字符后的各段粗筛。 */
+  /**
+   * 交给 Prisma 的粗筛。可以比最终结果宽，但不能漏。
+   * PostgreSQL 用 mode: 'insensitive'（按库的区域设置，可能把 É 和 é 看成同一个字母）。
+   * SQLite 用 LIKE（默认只折 A-Z）。没有关键词时是空条件。
+   */
   where: Prisma.PolicyPostWhereInput
   /**
-   * 含 %、_ 或 \ 时，粗筛之后还要用这个字符串按同一口径比较，再分页、再计数。
-   * 不含则为 null，总数和分页仍走数据库。两种库的 contains 都已是英文字母不分大小写。
+   * 有关键词时必填。粗筛之后一律用这个字符串在内存里精筛、计数、分页。
+   * 口径只有一个：英文字母 A-Z 不分大小写，其余字符按字面。
+   * 没有关键词时为 null，调用方直接按数据库分页。
    */
   literal: string | null
 }
 
 /**
- * 英文字母 A-Z/a-z 折成小写，其余字符原样留下。
- * 和 SQLite 默认 LIKE、以及 PostgreSQL `mode: 'insensitive'` 对英文字母的行为对齐。
+ * 只把 A-Z 折成小写。É、é、汉字、撇号和 % 都原样留下。
+ * 这是命中与否的唯一口径。数据库 contains 只负责不漏，两边可以更宽，不能拿来当结果。
  */
 function foldEnglishLetters(value: string): string {
   return value.replace(/[A-Z]/g, (letter) => String.fromCharCode(letter.charCodeAt(0) + 32))
@@ -37,8 +34,9 @@ export function policyKeywordIncludes(haystack: string, needle: string): boolean
 }
 
 /**
+ * 粗筛只要求不漏，不要求刚好。
  * SQLite 的 LIKE 对英文字母不分大小写，不必再写 mode（SQLite 客户端也不认这个字段）。
- * PostgreSQL 的 contains 默认区分大小写，这里补上 mode，让两种库同一口径。
+ * PostgreSQL 补上 mode: 'insensitive'。它还会按库的区域设置折 É/é，所以比内存口径宽，漏不了 A-Z 的大小写。
  * 共享类型来自 SQLite 客户端，mode 只在 PostgreSQL 运行时的对象上。
  */
 function textContains(value: string, dbKind: DbKind): Prisma.StringFilter {
@@ -61,21 +59,13 @@ export function policyKeywordPlan(raw: string | undefined, dbKind: DbKind): Poli
       error: { code: 'POLICY_KEYWORD_TOO_LONG', message: '关键词最长 30 字' },
     })
   }
-  if (!LIKE_META.test(keyword)) {
-    return {
-      where: {
-        OR: [
-          { title: textContains(keyword, dbKind) },
-          { summary: textContains(keyword, dbKind) },
-        ],
-      },
-      literal: null,
-    }
-  }
-  // 连续的元字符切成空段，丢掉。剩下的每一段都不含通配符，contains 在两种库上都按同一大小写口径。
+  // 普通词和含 % _ \ 的词走同一条路：数据库只粗筛，literal 交给内存精筛。
+  // Prisma 的 contains 会生成 LIKE。SQLite 没有默认转义字符，PostgreSQL 默认用反斜杠。
+  // 这些字符不放进 contains，只拿去掉它们之后的各段做粗筛，避免一边按字面、另一边仍是通配。
+  // 连续元字符切成空段后丢掉。没有元字符时整词就是一段，不能在这里把 literal 留空。
   const segments = keyword.split(/[%_\\]+/).filter((segment) => segment.length > 0)
   if (segments.length === 0) {
-    // 关键词只有 % _ \。没法用 contains 缩小范围，调用方必须把粗筛结果整批取完再按同一口径筛。
+    // 关键词只有 % _ \。没法用 contains 缩小范围，调用方必须把公开列表整批取完再精筛。
     return { where: {}, literal: keyword }
   }
   const containsAll = (field: 'title' | 'summary'): Prisma.PolicyPostWhereInput => ({

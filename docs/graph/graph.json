@@ -30738,9 +30738,6 @@
       "services/api/scripts/verify-background-task-safety.ts",
       "services/api/scripts/verify-policy-expiry.ts"
     ],
-    "services/api/src/policies/policy-keyword.ts": [
-      "services/api/scripts/verify-policy-expiry.ts"
-    ],
     "services/api/src/policies/policy-public-visibility.ts": [
       "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-scope.ts"
@@ -46966,7 +46963,6 @@
           "services/api/src/policies/policy-checklist-metadata.ts",
           "services/api/src/policies/policy-checklist.service.ts",
           "services/api/src/policies/policy-expiry.task.ts",
-          "services/api/src/policies/policy-keyword.ts",
           "services/api/src/policies/policy-public-visibility.ts",
           "services/api/src/policies/policy-validity.ts",
           "services/api/src/print-jobs/pii-scan-gate.ts",
