@@ -353,6 +353,7 @@ function mountPanel({ demo = false, get } = {}) {
     './aiUsageDisplay': displayModule,
     './AiUsageBreakdownTable': breakdownModule,
     './AiQuotaUsagePanel': quotaPanel,
+    './AiQuotaLimitPanel': { AiQuotaLimitPanel: () => null },
   })
   assert.equal(typeof panel.AiUsagePanel, 'function', '面板必须具名导出 AiUsagePanel')
   return { view: runtime.mount(panel.AiUsagePanel), calls }

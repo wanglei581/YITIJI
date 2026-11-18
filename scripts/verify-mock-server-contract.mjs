@@ -415,6 +415,7 @@ function assertLiteralValuesReachable(mockValues, serverShape, opaqueRoots, bind
 const bindings = JSON.parse(readFileSync(bindingsPath, 'utf8'))
 assert.ok(Array.isArray(bindings.enforced), 'bindings.enforced 必须是数组')
 assert.ok(Array.isArray(bindings.deferred), 'bindings.deferred 必须是数组')
+assert.ok(Array.isArray(bindings.requiredIds), 'bindings.requiredIds 必须是数组')
 
 // 强制车道：资损 / 隐私 / AI / 硬件能力四条。其余登记进 deferred。
 //
@@ -441,6 +442,24 @@ check('绑定清单自身合法', () => {
     assert.ok(item.id && item.reason, 'deferred 每条必须写 id 和 reason')
     assert.ok(item.reason.length >= 20, `[${item.id}] deferred 的 reason 太短，必须写清为什么本轮不强制`)
   }
+})
+
+check('必需登记一条不少', () => {
+  assert.ok(bindings.requiredIds.length > 0, 'requiredIds 不得为空')
+  const requiredSeen = new Set()
+  for (const id of bindings.requiredIds) {
+    assert.equal(typeof id, 'string', 'requiredIds 里的每一项必须是字符串')
+    assert.ok(id.length > 0, 'requiredIds 不能有空 id')
+    assert.ok(!requiredSeen.has(id), `requiredIds 重复：${id}`)
+    requiredSeen.add(id)
+  }
+  const present = new Set(bindings.enforced.map((binding) => binding.id))
+  const missingRequired = bindings.requiredIds.filter((id) => !present.has(id))
+  assert.deepEqual(
+    missingRequired,
+    [],
+    `必需登记被删掉了：${missingRequired.join(', ')}。清单里少一条登记，门禁必须红。`,
+  )
 })
 
 for (const binding of bindings.enforced) {

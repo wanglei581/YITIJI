@@ -22,6 +22,21 @@ const OVERBROAD_BRACE_EXPANSION_HIGH = 'GHSA-mh99-v99m-4gvg'
 // GHSA-rgw5-rvv9-x895: "brace-expansion DoS via unbounded intermediate expansion"
 // patched upstream in >=1.1.18 / >=2.1.4 / >=5.0.9
 const INTERMEDIATE_BRACE_EXPANSION = 'GHSA-rgw5-rvv9-x895'
+// GitHub 已撤回、npm 审计接口还没同步掉的公告。撤回＝上游判定它不是有效漏洞，不是「我们接受风险」。
+// 只按「编号 + 包名」放行，并且到期自动失效：到期后 npm 若仍返回它，门禁照常转红，再去核 GitHub 是否真已撤回。
+// npm 同步撤回后这一条应当删掉。产品负责人 2026-11-19 同意（「加限期放行」）。
+// - GHSA-fc5q-39xc-vjpf（picomatch，标为 high、影响 <=4.0.7）：withdrawn_at 2026-11-18T15:38:56Z
+//   （`gh api /advisories/GHSA-fc5q-39xc-vjpf` 标题前缀「Withdrawn Advisory」）；没有修复版可升（最新 4.0.7 仍在区间内）。
+//   2026-11-18 合并车 B（PR #1653）两轮 CI 红在这里；同日查 npm bulk 审计接口仍返回它。
+const WITHDRAWN_ADVISORIES = [
+  { id: 'GHSA-fc5q-39xc-vjpf', module: 'picomatch', withdrawnAt: '2026-11-18T15:38:56Z', acceptUntil: '2026-12-18' },
+]
+
+function isWithdrawnAdvisory(id, moduleName, today = new Date().toISOString().slice(0, 10)) {
+  return WITHDRAWN_ADVISORIES.some(
+    (entry) => entry.id === id && entry.module === moduleName && today <= entry.acceptUntil
+  )
+}
 const FRONTENDS = ['admin', 'kiosk', 'partner']
 // No local patches required: upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH.
 const REQUIRED_BRACE_PATCHES = {}
@@ -469,6 +484,7 @@ function assertAuditAcceptable(label, auditJson) {
   const unexpected = []
   let acceptedRsc = 0
   let acceptedBrace = 0
+  let acceptedWithdrawn = 0
   for (const item of highs) {
     const id = advisoryId(item)
     if (id === ACCEPTED_UNREACHABLE_HIGH && item.module_name === 'react-router') {
@@ -477,6 +493,10 @@ function assertAuditAcceptable(label, auditJson) {
     }
     if (isRemediatedBraceExpansion(item)) {
       acceptedBrace += 1
+      continue
+    }
+    if (isWithdrawnAdvisory(id, item.module_name)) {
+      acceptedWithdrawn += 1
       continue
     }
     unexpected.push(`${item.severity} ${item.module_name} ${id || item.url || item.title}`)
@@ -519,7 +539,7 @@ function assertAuditAcceptable(label, auditJson) {
     )
   }
   console.log(
-    `OK: ${label} — unaccepted critical/high = 0; accepted-unreachable RSC (${ACCEPTED_UNREACHABLE_HIGH}) = ${acceptedRsc}; brace-expansion (${OVERBROAD_BRACE_EXPANSION_HIGH}/${INTERMEDIATE_BRACE_EXPANSION}) = ${acceptedBrace}`
+    `OK: ${label} — unaccepted critical/high = 0; accepted-unreachable RSC (${ACCEPTED_UNREACHABLE_HIGH}) = ${acceptedRsc}; brace-expansion (${OVERBROAD_BRACE_EXPANSION_HIGH}/${INTERMEDIATE_BRACE_EXPANSION}) = ${acceptedBrace}; withdrawn upstream (${WITHDRAWN_ADVISORIES.map((entry) => `${entry.id}/${entry.module} 至 ${entry.acceptUntil}`).join(', ')}) = ${acceptedWithdrawn}`
   )
 }
 

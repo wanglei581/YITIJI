@@ -153,6 +153,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
           pnpm --filter @ai-job-print/admin verify:admin-ai-usage-ui
           pnpm --filter @ai-job-print/admin verify:admin-ai-quota-ui
+          pnpm --filter @ai-job-print/admin verify:admin-ai-quota-limit-ui
           pnpm --filter @ai-job-print/admin verify:console-plain-copy
           pnpm --filter @ai-job-print/admin verify:admin-internal-accounts-ui
           pnpm --filter @ai-job-print/admin verify:admin-partner-contact-phone-ui
@@ -180,6 +181,8 @@ jobs:
           #    但没有任何 CI job 执行它们。全部只读取仓库源码/文档文本，
           #    不 import services/api/src、不碰 Prisma、不连 DB，故留在本步。
           pnpm --filter @ai-job-print/kiosk verify:advisor-provider-gate
+          # 小青 / 数字人 / 模拟面试「能不能用」与页面降级。纯读一体机源码并编译无依赖判定，不连库。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-availability
           pnpm --filter @ai-job-print/kiosk verify:public-screen-mask
           pnpm --filter @ai-job-print/kiosk verify:file-retention-ui
           pnpm --filter @ai-job-print/kiosk verify:home-narrow-visual-balance
@@ -672,6 +675,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-settings
           # 保存收费设置撞上改绑：绑定版本过期回 409，不把旧价写进新机构，也不关改绑之后才出现的待付单。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-binding-race
+          # 机构改成公共就业点位：名下终端价目清空、版本加一；改回非公共不复活旧价。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-public-reset
           # 一体机按次付款：收费机器建单、开始前占用、没做成退款；不收费的机器不建单。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-orders
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-orders-concurrency
@@ -709,6 +714,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-identity
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
+          pnpm --filter @ai-job-print/api verify:terminal-batch-activation
           pnpm --filter @ai-job-print/api verify:terminal-network-diagnostics
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           # SQLite 专用(拷 dev.db + sqlite3 CLI),不进 postgres-readiness job
@@ -739,6 +745,14 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-conversion
           # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
           pnpm --filter @ai-job-print/api verify:cjk-font
+          # 字体真加载回退、文件列表用途、清理定时元数据：node:test，不连库。
+          pnpm --filter @ai-job-print/api verify:cjk-font-fallback
+          pnpm --filter @ai-job-print/api verify:file-list-purpose
+          pnpm --filter @ai-job-print/api verify:file-cleanup-schedule
+          # 管理员手动删除与手动清理：审计写不进则不删。自建临时 SQLite。
+          pnpm --filter @ai-job-print/api verify:file-admin-delete-audit
+          # 告警自动刷新计时器：假时钟跑真实 hook，不打开浏览器。
+          pnpm --filter @ai-job-print/admin verify:admin-alert-auto-refresh
           # 包 D：服务端文档转换（Word → PDF）契约 / 超时 / 并发 / 归属 / 能力为假时 fail-closed（fake 引擎，不需要 LibreOffice）
           pnpm --filter @ai-job-print/api verify:document-conversion
           pnpm --filter @ai-job-print/api verify:miniapp-code
@@ -902,6 +916,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           pnpm --filter @ai-job-print/api verify:ai-quota
           pnpm --filter @ai-job-print/api verify:ai-quota-api
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-quota-admin
           # Q2 全入口登记：每个 @AiUse('generate'|'voice') 路由要么接入按人次数、要么写明不计次理由；
           # 运行时用例 import services/api/src 并写隔离库，所以放在「Prepare fresh SQLite db」之后。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-quota-coverage
@@ -934,6 +949,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-throttle-dimension
           # 一体机 AI 能力仪表：匿名可读、不调用计费 AI、15 个 key 全覆盖且响应不含密钥。
           pnpm --filter @ai-job-print/api verify:kiosk-ai-capabilities
+          # 探针与真实调用同一判断（小青文字、数字人、模拟面试）。临时目录配置，不连库、不调模型。
+          pnpm --filter @ai-job-print/api verify:ai-availability-alignment
           # 匿名公网 AI 端点（/assistant/chat、/resume/parse）的限流 + 日配额。
           pnpm --filter @ai-job-print/api verify:ai-public-quota
           # 简历解析首答丢失：持久意图、Redis 原子配额、单次模型调用及 HTTP 双头兼容。
@@ -1141,6 +1158,7 @@ jobs:
           pnpm verify:first-order-http:postgres
       - name: Terminal charge settings vs rebind race on isolated PostgreSQL
         # 保存与改绑撞在同一时刻（READ COMMITTED）：绑定版本过期必须 409、库里不写旧价。
+        # 同一条门禁还测读版本和第一次写终端之间的窗口：另一条事务先提交改绑，带版本条件的更新必须落空。
         # 门禁要求库名含 p1d_charge_verify，并自己 db push 建表，所以单独建一个库，不碰 ai_job_print_ci。
         working-directory: services/api
         env:
@@ -1151,6 +1169,7 @@ jobs:
         run: |
           createdb -h localhost -U ci p1d_charge_verify
           pnpm verify:terminal-charge-binding-race:postgres
+          pnpm verify:terminal-charge-public-reset:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
@@ -1228,6 +1247,7 @@ jobs:
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-quota:postgres
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-quota-admin:postgres
           # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
@@ -1319,6 +1339,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-credentials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
+          pnpm --filter @ai-job-print/api verify:terminal-batch-activation:postgres
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:scan-quiet-period
@@ -1561,6 +1582,14 @@ jobs:
         working-directory: apps/admin
         run: node scripts/run-e2e.mjs --config=playwright.users.config.ts
 
+      - name: Run Admin alerts auto-refresh browser E2E
+        # 告警自动刷新要数到真实 fetch，并让第二次失败。默认 mock 套件不收这套。
+        run: pnpm --filter @ai-job-print/admin verify:admin-alerts-refresh-e2e
+
+      - name: Run Admin files actions browser E2E
+        # 文件管理的删除与清理要看失败响应体。默认 mock 套件不收这套。
+        run: pnpm --filter @ai-job-print/admin verify:admin-files-actions-e2e
+
       - name: Run Partner data-screen browser E2E
         run: pnpm --filter @ai-job-print/partner test:e2e:screen
 
@@ -1616,6 +1645,8 @@ jobs:
             test-results/admin-screen-e2e/**
             test-results/admin-screen-e2e-report/**
             test-results/admin-users-e2e/**
+            test-results/admin-alerts-refresh-e2e/**
+            test-results/admin-files-actions-e2e/**
             test-results/partner-e2e/**
             test-results/partner-e2e-report/**
             test-results/partner-screen-e2e/**

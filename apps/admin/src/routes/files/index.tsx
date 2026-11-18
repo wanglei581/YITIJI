@@ -10,7 +10,6 @@ import {
   getFileSignedUrl,
   listFiles,
   type AdminFileLifecycleSummary,
-  type AdminFilePurpose,
   type AdminFileRecord,
 } from '../../services/api'
 import {
@@ -23,12 +22,13 @@ import { RETENTION_FILTERS } from './retentionMeta'
 import { RetentionSummary } from './RetentionSummary'
 import { FileTable } from './FileTable'
 
-const TYPE_TO_PURPOSE: Partial<Record<string, AdminFilePurpose>> = {
+const TYPE_TO_PURPOSE: Partial<Record<string, string>> = {
   简历上传: 'resume_upload',
   简历扫描: 'resume_scan',
   身份证: 'id_scan',
   打印文档: 'print_doc',
-  招聘会资料: 'fair_material',
+  // 列表上这两种用途都显示成「招聘会资料」，筛选必须一起查。
+  招聘会资料: 'fair_material,job_fair_material',
   求职信: 'cover_letter',
 }
 
@@ -67,7 +67,7 @@ export default function FilesPage() {
   const [files, setFiles] = useState<AdminFileRecord[]>([])
   const [summary, setSummary] = useState<AdminFileLifecycleSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [cleaning, setCleaning] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -96,7 +96,7 @@ export default function FilesPage() {
 
   const load = useCallback(() => {
     setLoading(true)
-    setError(false)
+    setError(null)
     Promise.all([
       listFiles({
         skip: (page - 1) * pageSize,
@@ -116,7 +116,10 @@ export default function FilesPage() {
         setSummary(lifecycle)
         setNow(Date.now())
       })
-      .catch(() => setError(true))
+      .catch((e: unknown) => {
+        const message = e instanceof Error && e.message.trim() ? e.message : '文件数据加载失败，请稍后重试'
+        setError(message)
+      })
       .finally(() => setLoading(false))
   }, [page, pageSize, search, deletedParam, typePurpose, sensitiveLevel, retentionPolicy, expiry])
 
@@ -134,7 +137,7 @@ export default function FilesPage() {
 
   const handleDelete = (id: string, name: string) => {
     if (busyId) return
-    if (!window.confirm(`确认删除文件「${name}」？此操作将物理删除文件并写入审计，不可撤销。`)) return
+    if (!window.confirm(`确认删除文件「${name}」？此操作将物理删除文件并写入审计，不可撤销。正在打印的文件会拒绝删除。`)) return
     setBusyId(id)
     setNotice(null)
     deleteFile(id, '管理员手动删除')
@@ -163,7 +166,7 @@ export default function FilesPage() {
 
   const handleCleanupExpired = () => {
     if (cleaning) return
-    if (!window.confirm('立即清理所有已过期文件？此操作会物理删除过期文件并写入审计，不可撤销。')) return
+    if (!window.confirm('立即清理已过期、且当前没有在打印的文件？会员数据导出不在这次清理里。此操作会物理删除清理到的文件并写入审计，不可撤销。')) return
     setCleaning(true)
     setNotice(null)
     cleanupExpiredFiles()
@@ -256,7 +259,7 @@ export default function FilesPage() {
         <p className="font-medium text-neutral-600">文件安全合规说明</p>
         <ul className="mt-1 list-inside list-disc space-y-0.5">
           <li>身份证、简历、求职信等敏感文件按保存策略自动清理；长期保存只适用于用户确认后的成果物</li>
-          <li>管理员「查看文件」走后端临时签名 URL（短有效期），「手动删除」「清理过期文件」均物理删除并写入日志审计，不可撤销</li>
+          <li>管理员「查看文件」走后端临时签名 URL（短有效期），并写入访问审计。「手动删除」物理删除并写入审计；正在打印的文件会拒绝删除。「清理过期文件」只清理已过期且当前没在打印的文件，会员数据导出不在这次清理里</li>
           <li>管理员只能查看生命周期状态，不能代替用户设置 6 个月或长期保存</li>
         </ul>
       </div>

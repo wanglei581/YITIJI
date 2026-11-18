@@ -60,6 +60,8 @@ import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
 import { ResumeReportExportController } from './resume-report-export.controller'
 import { DiagnosisReportPdfService } from './resume/diagnosis-report-pdf.service'
 import { KioskAiCapabilitiesController } from './kiosk-ai-capabilities.controller'
+import { AssistantAvailabilityController } from './assistant-availability.controller'
+import { AssistantChatAvailability } from './assistant-chat-availability.service'
 import { TerminalsModule } from '../terminals/terminals.module'
 import { ServiceOrderModule } from '../payment/service-order.module'
 import { ResumeDraftSourceService } from './resume/resume-draft-source.service'
@@ -71,9 +73,10 @@ import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
   // AiAccessModule：自我探索提交 / 打印在接口内按同一 AI 闸门判定（打分不被 AI 闸门拦）
   imports: [AiQuotaModule, AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule, ServiceOrderModule],
-  controllers: [AiController, ResumeLayoutAdjustController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController, AiSafetyLexiconController],
+  controllers: [AiController, AssistantAvailabilityController, ResumeLayoutAdjustController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController, AiSafetyLexiconController],
   providers: [
     AiService,
+    AssistantChatAvailability,
     AiLogService,
     AiSafetyLexiconService,
     // 匿名公网 AI 端点（/assistant/chat、/resume/parse）的日配额闸门。

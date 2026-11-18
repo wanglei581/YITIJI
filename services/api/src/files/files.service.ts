@@ -54,6 +54,12 @@ import { sniffDeclaredMimeMismatch } from './content-sniff'
 import { recognizeStoredPageCount } from './file-page-count.util'
 import { toMetadata } from './file-metadata'
 import {
+  commitAdminFileDelete,
+  commitManualCleanupAudit,
+  type AdminDeleteAuditWriter,
+  type ManualCleanupAuditWriter,
+} from './admin-required-audit'
+import {
   RetentionPolicyError,
   allowedPoliciesForFile,
   computeRetentionDecision,
@@ -62,6 +68,7 @@ import {
   ORDER_ONLY_INHERITING_DERIVATIONS,
   UPLOAD_SESSION_ORDER_ONLY_REASON,
 } from './retention-policy'
+import { filePurposeWhere } from './file-list-purpose'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
 import { parseContentFileId, PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from './signing'
 import { assertFileContentIntegrity, DIRECT_UPLOAD_COMPLETE_ACTION } from './file-content-integrity'
@@ -828,9 +835,7 @@ export class FilesService {
         : deleted === true
           ? { deletedAt: { not: null } }
           : { deletedAt: null }),
-      ...(args.purpose
-        ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
-        : { purpose: { not: 'contract_review_report' } }),
+      ...filePurposeWhere(args.purpose),
       ...(sensitiveLevel ? { sensitiveLevel } : {}),
       ...(retentionPolicy ? { retentionPolicy } : {}),
       ...(expiry === 'expired' ? { expiresAt: { lte: now } } : {}),
@@ -914,6 +919,44 @@ export class FilesService {
           ? `admin:${requester.userId}`
           : `user:${requester.userId}`
     return this._delete(fileId, deletedBy, reason)
+  }
+
+  /**
+   * 管理员手动删除。正在打印在事务前拒绝，不写审计。
+   * 墓碑与必达审计同一事务，提交后才删存储对象。
+   */
+  async deleteAsAdmin(
+    fileId: string,
+    requester: FileRequester,
+    reason: string,
+    writeAudit: AdminDeleteAuditWriter,
+  ): Promise<FileMetadata> {
+    if (requester.kind !== 'user' || requester.role !== 'admin') {
+      throw new ForbiddenException({
+        error: { code: 'FILE_ACCESS_DENIED', message: '无权删除此文件' },
+      })
+    }
+    const record = await this.requireDeletionRecord(fileId)
+    if (!canAccessFile(record, requester)) {
+      throw new ForbiddenException({
+        error: { code: 'FILE_ACCESS_DENIED', message: '无权删除此文件' },
+      })
+    }
+    if (!record.deletedAt && (await this.hasActivePrintTaskForFile(fileId))) {
+      throw new ConflictException({
+        error: { code: 'FILE_IN_USE', message: '文件正在打印中，暂时不能删除' },
+      })
+    }
+    return commitAdminFileDelete({
+      prisma: this.prisma,
+      storage: this.storage,
+      record,
+      deletedBy: `admin:${requester.userId}`,
+      reason,
+      writeAudit,
+      markStorageDeletePending: (id, errorType) => this.markStorageDeletePending(id, errorType),
+      markStorageDeleted: (id) => this.markStorageDeleted(id),
+    })
   }
 
   /** 服务端生命周期任务删除系统派生文件；不暴露给 controller。 */
@@ -1048,7 +1091,21 @@ export class FilesService {
 
   // ── cron / 手动:清理所有已过期文件 ─────────────────────────────────────
 
-  async cleanupExpired(triggeredBy: 'manual' | 'cron'): Promise<FileCleanupResponse> {
+  async cleanupExpired(
+    triggeredBy: 'manual' | 'cron',
+    requireAudit?: ManualCleanupAuditWriter,
+  ): Promise<FileCleanupResponse> {
+    if (triggeredBy === 'manual' && requireAudit) {
+      return commitManualCleanupAudit({
+        prisma: this.prisma,
+        storage: this.storage,
+        requireAudit,
+        isPrinting: (id) => this.hasActivePrintTaskForFile(id),
+        markStorageDeletePending: (id, errorType) => this.markStorageDeletePending(id, errorType),
+        markStorageDeleted: (id) => this.markStorageDeleted(id),
+        warn: (message) => this.logger.warn(message),
+      })
+    }
     const now = new Date()
     // 「当初做删除决定所依据的条件」必须是同一个对象，既用于选出候选，也在真正
     // 落删除时原样带回 where 做 compare-and-swap。

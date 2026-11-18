@@ -49,6 +49,37 @@ export function withoutLeadingIndex(line: string): string {
   return hit && !hit.keep ? hit.rest : line
 }
 
+/**
+ * 各行同一种标点、编号从 1 递增。中间可以夹「1.5倍」「1.0架构」这种点号后紧跟数字的行。
+ * 只用来判断「这栏是编号」，不决定哪一行可以剥。
+ */
+export function sequentialIndexColumn(lines: string[]): boolean {
+  const filled = lines.map((line) => line.trim()).filter(Boolean)
+  if (filled.length < 2) return false
+  const hits = filled.map((line) => classifyLeadingIndex(line))
+  if (hits.some((hit) => !hit)) return false
+  const kind = hits[0]?.kind
+  if (!kind || !hits.every((hit) => hit?.kind === kind)) return false
+  return hits.every((hit, index) => hit?.num === index + 1)
+}
+
+/**
+ * 只剥明确的行首编号（「1.」「2、」「3）」「（1）」）。
+ * 点号后紧跟数字的（「1.5倍」「1.0架构」「4.05亿」）原样留，避免把版本号或小数改掉。
+ */
+export function stripClearLeadingIndex(line: string): string {
+  const text = line.trim().replace(BULLET_RE, '').trim()
+  const bracket = /^(?:[（(]\s*\d{1,2}\s*[）)])\s*/u.exec(text)
+  if (bracket) {
+    const rest = text.slice(bracket[0].length).trim()
+    return rest || line
+  }
+  const hit = classifyLeadingIndex(text)
+  if (!hit || hit.maybe || hit.keep) return line
+  const rest = hit.rest.trim()
+  return rest || line
+}
+
 /** 点号后紧跟 1–3 位数字（「1.5倍」「1.3年」「1.0」「1.3D」）。四位年份不算。 */
 function ambiguousDigitTail(line: string): { num: number; rest: string } | null {
   const text = line.trim().replace(BULLET_RE, '').trim()
@@ -87,6 +118,38 @@ export function ambiguousColumnTail(line: string, column: string[]): string | nu
 export function omittedColumnText(raw: string, shown: string): string {
   if (ambiguousDigitTail(raw)) return strippedListLine(raw)
   return shown
+}
+
+/**
+ * 原稿各行是顿号或右括号的 1、2、3 整栏时，返回这种标点。
+ * 点号栏不在这里认：点号后可能是「1.5倍」「1.0架构」，不能按编号剥。
+ */
+function looseNumberedColumnKind(lines: string[]): 'dun' | 'paren' | null {
+  const filled = lines.map((line) => line.trim()).filter(Boolean)
+  if (filled.length < 2) return null
+  const hits = filled.map((line) => classifyLeadingIndex(line))
+  if (hits.some((hit) => !hit || hit.maybe)) return null
+  const kind = hits[0]?.kind
+  if (kind !== 'dun' && kind !== 'paren') return null
+  if (!hits.every((hit, index) => hit?.kind === kind && hit.num === index + 1)) return null
+  return kind
+}
+
+/**
+ * 原稿已是顿号或右括号整栏时，模型行即使被打乱、只剩一行，也去掉行首「1、」「2）」。
+ * 编号后紧跟数字（「1、05亿…」）同样剥。点号不走这里。
+ */
+function stripLooseColumnIndex(line: string, kind: 'dun' | 'paren'): string {
+  const text = line.trim().replace(BULLET_RE, '').trim()
+  const match = kind === 'dun'
+    ? /^(\d{1,2})\s*、/u.exec(text)
+    : /^(\d{1,2})\s*[)）]/u.exec(text)
+  const digits = match?.[1]
+  if (!match || digits === undefined) return line
+  const num = Number(digits)
+  if (!Number.isInteger(num) || num < 1) return line
+  const rest = text.slice(match[0].length).trim()
+  return rest || line
 }
 
 /**
@@ -222,7 +285,10 @@ export function alignOriginalList(
   options?: AlignOriginalListOptions,
 ): { list: string[]; missing: string[] } {
   const sourceLines = stripNumberedColumn(lines)
-  const sourceModel = stripNumberedColumn(model)
+  const looseKind = looseNumberedColumnKind(lines)
+  const sourceModel = stripNumberedColumn(model).map((line) => (
+    looseKind ? stripLooseColumnIndex(line, looseKind) : line
+  ))
   const norm = normalizeResumeStructureText
   const modules = (options?.modules ?? []).map((module) => ({ module, used: false }))
   const covered = new Set<string>()

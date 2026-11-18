@@ -77,6 +77,18 @@ export class ApiRouter {
     // 默认按「全部可用」应答，既有用例不因这条新请求中断，入口也不会被误停；
     // 要测某项能力关闭 / 降级 / 读不到的用例自行 respond 覆盖（见 ai-capabilities.ts）。
     this.respond('GET', KIOSK_AI_CAPABILITIES_PATH, { status: 200, json: kioskAiCapabilitiesResponse() })
+    // 练面试设置页开场前读 GET /mock-interviews/availability。默认按能用应答，既有「创建并开始练习」用例不中断；
+    // 要看没配、暂停或探不到的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/mock-interviews/availability', {
+      status: 200,
+      json: { success: true, data: { available: true } },
+    })
+    // 小青页进门就读 GET /assistant/availability。只有明确 available:false 才锁输入；
+    // 默认按能用应答，既有小青用例不中断。要看没配或探不到的用例自行 respond / abort 覆盖。
+    this.respond('GET', '/api/v1/assistant/availability', {
+      status: 200,
+      json: { success: true, data: { available: true } },
+    })
     // 3.14 本机构官方渠道：首页（页眉机构名与底部说明）、查政策页（官方渠道那一行）与 /official-channels 挂载时读（同一缓存）。
     // 默认按「本终端没有渠道」应答：首页底部不指向渠道、查政策页不出那一行，既有用例的栅格与文案一概不变；
     // 要看磁贴、渠道卡片或 b 版本「其他来源平台」的用例自行 respond 覆盖。

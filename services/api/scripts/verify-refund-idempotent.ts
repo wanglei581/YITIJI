@@ -42,7 +42,7 @@ import { ValidationPipe } from '@nestjs/common'
 import { AdminRefundDto } from '../src/payment/dto/order-action.dto'
 import { AdminPrintScanService } from '../src/admin-print-scan/admin-print-scan.service'
 import { PricingService } from '../src/payment/pricing.service'
-import { adoptDevPrintSeedPrices } from './support/terminal-charge-fixture'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
@@ -62,8 +62,8 @@ import { buildRealPdf } from './support/minimal-pdf'
 const SECRET = 'verify-refund-sandbox-secret-0001'
 let passed = 0
 const pass = (m: string): void => { passed += 1; console.log(`  PASS ${m}`) }
-const fail = (m: string): never => { console.error(`  FAIL ${m}`); process.exit(1) }
-const assert = (c: unknown, m: string): void => { c ? pass(m) : fail(m) }
+const fail = (m: string): never => { console.error(`  FAIL ${m}`); throw new Error(`FAIL_GATE: ${m}`) }
+const assert = (c: unknown, m: string): void => { if (c) pass(m); else fail(m) }
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
   try { await fn() } catch (e) {
     const msg = (e as Error)?.message ?? String(e)
@@ -457,6 +457,7 @@ async function main(): Promise<void> {
 
     console.log(`\n  ✅ verify:refund-idempotent 全部通过（${passed} checks）`)
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     if (priorSwitch) {
       await prisma.platformSetting.upsert({

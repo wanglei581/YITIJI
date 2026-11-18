@@ -99,7 +99,7 @@ export function useOptimizeLoad(opts: {
           setFailKind('outage')
           setFailMsg(res.failCode === 'AI_QUOTA_EXHAUSTED'
             ? AI_QUOTA_EXHAUSTED_RESUME_COPY
-            : 'AI 暂时不可用，你可以先按模板手动填写')
+            : 'AI 暂时不可用。自己填写并原样导出草稿，不经过模型')
         } else {
           const reason = resumeUserReason(res.failReason, '本次没有生成优化建议，可重试或返回重新解析')
           setFailKind(reason.includes('重新上传') ? 'expired' : 'retry')

@@ -78,6 +78,11 @@
   --qxt-seal-xl-inset: rgba(0, 0, 0, 0.2);
   --qxt-orb-a: #4ae8b5;
   --qxt-orb-ring: rgba(31, 158, 134, 0.35);
+  /* 首页「免费使用」标识。色值照 free-1112.js，页面 CSS 只引用令牌。 */
+  --qxt-free-a: #4ff0b9;
+  --qxt-free-b: #2ee6a8;
+  --qxt-free-c: #1fc794;
+  --qxt-free-ink: #06261d;
   --qxt-fs-ask: 48px;
   --qxt-fs-ask-c: 44px;
   --qxt-fs-task: 40px;

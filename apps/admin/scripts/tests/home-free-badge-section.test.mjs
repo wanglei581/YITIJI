@@ -368,6 +368,13 @@ function mountTerminalPage() {
       './printCompletionEvidence': 'src/routes/terminals/printCompletionEvidence.ts',
     }
     if (files[name]) return loadCached(files[name])
+    if (name === './TerminalBatchDialogs') {
+      return {
+        TerminalBatchCreateDialog: nullComponent('TerminalBatchCreateDialog'),
+        TerminalBatchCodeDialog: nullComponent('TerminalBatchCodeDialog'),
+        requestBatchCodes: async () => { throw new Error('这个用例不批量生成绑定码') },
+      }
+    }
     const stubs = {
       './TerminalDailyFreeSidesSection': 'TerminalDailyFreeSidesSection',
       './TerminalChargeSettingsSection': 'TerminalChargeSettingsSection',

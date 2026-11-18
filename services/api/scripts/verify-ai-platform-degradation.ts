@@ -11,7 +11,7 @@
  *   [A] 纯判定：evaluateAiPlatform / aiPlatformBlockFor / provider 选择 / 写标识处 fail-closed / OCR 选择器；
  *   [B] 启动接线：main.ts 把闸门返回值交给 registerAiPlatformDegradation，且在 NestFactory.create 之前；
  *       登记函数本身：降级打可搜索日志、不阻断 readiness；非生产什么都不登记；
- *   [C] 真起完整 AppModule 发 HTTP：开发态先做阳性对照（同一请求能拿到 mock 结果），
+ *   [C] 真起完整 AppModule 发 HTTP：开发态先做阳性对照（模型位没配时是 AI_NOT_CONFIGURED，不是平台闸门），
  *       再把进程切到生产口径的四种缺配置场景，逐个核对：AI 路由 503 + 错误码、没有 mock 回复、
  *       /health degraded + impact、/health/ready 200、一体机能力接口与顾问可用性如实报不可用；
  *   [D] impact 逐面实测：遍历 /health 运行时返回的 impact 键（不是写死清单），每个键必须有判据，
@@ -289,7 +289,9 @@ const SURFACE_PROBES: Record<string, SurfaceProbe> = {
     describe: '小青文字对话 POST /assistant/chat',
     run: async (base) => {
       const p = await request(base, 'POST', '/assistant/chat', { message: '你好' })
-      return { succeeded: workingNormally(p), detail: `→ ${p.status} ${p.code}` }
+      // 模型位没配是对话自己的 503 AI_NOT_CONFIGURED，不是平台闸门。平台闸门仍只认 AI_PROVIDER_NOT_CONFIGURED。
+      const slotUnconfigured = p.status === 503 && p.code === 'AI_NOT_CONFIGURED'
+      return { succeeded: workingNormally(p) || slotUnconfigured, detail: `→ ${p.status} ${p.code}` }
     },
   },
   'ai-file-export': {
@@ -362,11 +364,12 @@ async function realApp(): Promise<void> {
     await app.listen(0)
     const base = `${(await app.getUrl()).replace('[::1]', '127.0.0.1')}/api/v1`
 
-    // 阳性对照：开发口径下同一请求拿得到 mock 回复 —— 证明后面的 503 是本次闸门造成的，
-    // 也证明「不拦就会出 mock 结果」这件事是真的（否则「没出 mock」的断言测不出任何东西）。
+    // 阳性对照：模型位没配时对话拒绝，且拒绝码不是平台闸门。
+    // 配上密钥会走真实模型（本门禁不触网）。平台闸门另由下面四种缺配置核对错误码。
     const devChat = await request(base, 'POST', '/assistant/chat', { message: '你好' })
     const devReply = replyOf(devChat)
-    check('阳性对照：开发口径下 /assistant/chat 返回 mock 回复', devChat.status < 300 && typeof devReply === 'string' && devReply.length > 0,
+    check('阳性对照：开发口径下模型位没配时 /assistant/chat 返回 AI_NOT_CONFIGURED，且没有回复',
+      devChat.status === 503 && devChat.code === 'AI_NOT_CONFIGURED' && devReply === undefined,
       `→ ${devChat.status} ${devChat.code} ${JSON.stringify(devChat.body).slice(0, 200)}`)
     const devHealth = await request(base, 'GET', '/health')
     const devAi = ((devHealth.body as { data?: { degraded?: HealthState[] } } | null)?.data?.degraded ?? [])

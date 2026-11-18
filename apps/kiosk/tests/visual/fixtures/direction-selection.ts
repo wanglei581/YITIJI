@@ -109,14 +109,14 @@ export async function expectInterviewDirectionUnselected(page: Page): Promise<vo
   await expect(experience.getByRole('button', { pressed: true })).toHaveCount(0)
 }
 
-/** 触屏版设置分三步。岗位、行业、经验在第 1 步；面试官在第 2 步；「创建并开始练习」在第 3 步。 */
+/** 触屏版设置分三步。岗位、行业、经验在第 1 步；面试官在第 2 步；第 3 步才开场。开场按钮的字由探针决定，这里只确认到了核对页。 */
 export async function advanceInterviewSetupToStart(page: Page): Promise<void> {
   const next = page.getByRole('button', { name: '下一步', exact: true })
   await next.click()
   await expect(page.getByRole('button', { name: 'HR 面试', exact: true })).toBeVisible()
   await expect(page.getByText('HR 初筛')).toHaveCount(0)
   await next.click()
-  await expect(page.getByRole('button', { name: '创建并开始练习' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '核对一下，就开始' })).toBeVisible()
 }
 
 export async function chooseInterviewExperience(page: Page): Promise<void> {

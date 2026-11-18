@@ -3,6 +3,8 @@ import { FilesModule } from '../files/files.module'
 import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { TerminalsController } from './terminals.controller'
 import { AdminTerminalsController } from './admin-terminals.controller'
+import { AdminTerminalBatchController } from './admin-terminal-batch.controller'
+import { TerminalBatchService } from './terminal-batch.service'
 import { AdminPrintersController } from './admin-printers.controller'
 import { AdminToolboxController } from './admin-toolbox.controller'
 import { AdminKioskJobBoardController } from './admin-kiosk-job-board.controller'
@@ -28,6 +30,7 @@ import { AiAccessModule } from '../ai-access/ai-access.module'
   controllers: [
     TerminalsController,
     AdminTerminalsController,
+    AdminTerminalBatchController,
     AdminReleaseObservationController,
     AdminPrintersController,
     AdminToolboxController,
@@ -37,6 +40,7 @@ import { AiAccessModule } from '../ai-access/ai-access.module'
     TerminalAgentService,
     { provide: TERMINAL_TOKEN_VALIDATOR, useExisting: TerminalsService },
     TerminalCredentialSecurityService,
+    TerminalBatchService,
     TerminalScanDeletionAuditService,
     ReleaseObservationService,
     TerminalAdminService,

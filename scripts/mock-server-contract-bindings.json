@@ -22,7 +22,17 @@
     "  clientType  { file, name } —— 前端自己声明的响应类型；null 表示前端直接用 shared 类型。",
     "  mocks       [{ file, fn }] —— 返回该响应的 mock 函数；门禁读它的 return 对象字面量。",
     "  optionalOnServer  服务端可选、mock 允许不填的路径（默认由类型的 ? 推出，这里只做补充）。",
-    "  opaquePaths 显式声明「该子树不做逐字段比对」的路径 + 原因（例如服务端是 Record/any）。"
+    "  opaquePaths 显式声明「该子树不做逐字段比对」的路径 + 原因（例如服务端是 Record/any）。",
+    "  requiredIds 这些 id 必须出现在 enforced 里。删掉对应登记、id 还留在这张表，门禁变红。",
+    "              没列入的登记仍按原来的逐条检查，不必都标成必需。"
+  ],
+  "requiredIds": [
+    "admin.terminal-batch.created",
+    "admin.terminal-batch.created-row",
+    "admin.terminal-batch.bind-codes",
+    "admin.terminal-batch.issued-code",
+    "admin.terminal-batch.skipped",
+    "admin.terminal-batch.revoke"
   ],
   "enforced": [
     {
@@ -112,6 +122,108 @@
         { "file": "apps/kiosk/tests/visual/fusion-w2-print.spec.ts", "fn": "UNVERIFIED_CAPABILITIES" }
       ],
       "note": "补 #692 那条断言够不到的方向。#692 的 verify-print-color-duplex-capability.ts 里，12 个能力键和 5 个状态枚举都是 runtime import（活锚，不该动），但『桩字段集必须等于 TerminalCapabilityView』那条把 5 个字段名写成了硬编码字面量 —— TS interface 运行时被擦除，脚本反射不到。后果：往 TerminalCapabilityView 加一个新字段，桩不跟着加，那条断言照样绿（桩少字段它不管，只管桩多字段）。本条用类型检查器解析该 interface，加字段即红。#692 的三条断言一条不动。"
+    },
+    {
+      "id": "admin.terminal-batch.created",
+      "lane": "device",
+      "endpoint": "POST /api/v1/admin/terminals/batches",
+      "serverType": {
+        "file": "services/api/src/terminals/terminal-batch.service.ts",
+        "name": "TerminalBatchCreated"
+      },
+      "clientType": {
+        "file": "apps/admin/src/services/api/terminalBatch.ts",
+        "name": "TerminalBatchCreated"
+      },
+      "mocks": [
+        { "file": "apps/admin/src/services/api/adminDeviceMock.ts", "fn": "mockTerminalBatchCreated" }
+      ],
+      "note": "批量预建。行字段由 admin.terminal-batch.created-row 单独钉住；包装层的 terminals 是标识符，门禁读不到数组元素。"
+    },
+    {
+      "id": "admin.terminal-batch.created-row",
+      "lane": "device",
+      "endpoint": "POST /api/v1/admin/terminals/batches（terminals[]）",
+      "serverType": {
+        "file": "services/api/src/terminals/terminal-batch.service.ts",
+        "name": "TerminalBatchCreatedRow"
+      },
+      "clientType": {
+        "file": "apps/admin/src/services/api/terminalBatch.ts",
+        "name": "TerminalBatchCreatedRow"
+      },
+      "mocks": [
+        { "file": "apps/admin/src/services/api/adminDeviceMock.ts", "fn": "mockTerminalBatchCreatedRow" }
+      ],
+      "note": "批量预建每一行。与单台绑定码一样，mock 直接返回字段字面量。"
+    },
+    {
+      "id": "admin.terminal-batch.bind-codes",
+      "lane": "device",
+      "endpoint": "POST /api/v1/admin/terminals/batches/bind-codes 与 /reissue",
+      "serverType": {
+        "file": "services/api/src/terminals/terminal-batch.service.ts",
+        "name": "TerminalBatchBindCodeResult"
+      },
+      "clientType": {
+        "file": "apps/admin/src/services/api/terminalBatch.ts",
+        "name": "TerminalBatchBindCodeResult"
+      },
+      "mocks": [
+        { "file": "apps/admin/src/services/api/adminDeviceMock.ts", "fn": "mockTerminalBatchBindCodeResult" }
+      ],
+      "note": "批量发码与重新发码共用这一形状。issued / skipped 的元素另两条钉住。"
+    },
+    {
+      "id": "admin.terminal-batch.issued-code",
+      "lane": "device",
+      "endpoint": "POST /api/v1/admin/terminals/batches/bind-codes（issued[]）",
+      "serverType": {
+        "file": "services/api/src/terminals/terminal-batch.service.ts",
+        "name": "TerminalBatchIssuedCode"
+      },
+      "clientType": {
+        "file": "apps/admin/src/services/api/terminalBatch.ts",
+        "name": "TerminalBatchIssuedCode"
+      },
+      "mocks": [
+        { "file": "apps/admin/src/services/api/adminDeviceMock.ts", "fn": "mockTerminalBatchIssuedCode" }
+      ],
+      "note": "批量发出的绑定码行，字段与单台 createTerminalBindCode 的字面量同一写法，并带上名称和点位。"
+    },
+    {
+      "id": "admin.terminal-batch.skipped",
+      "lane": "device",
+      "endpoint": "POST /api/v1/admin/terminals/batches/bind-codes（skipped[]）",
+      "serverType": {
+        "file": "services/api/src/terminals/terminal-batch.service.ts",
+        "name": "TerminalBatchSkipped"
+      },
+      "clientType": {
+        "file": "apps/admin/src/services/api/terminalBatch.ts",
+        "name": "TerminalBatchSkipped"
+      },
+      "mocks": [
+        { "file": "apps/admin/src/services/api/adminDeviceMock.ts", "fn": "mockTerminalBatchSkipped" }
+      ],
+      "note": "批量发码时跳过的终端。"
+    },
+    {
+      "id": "admin.terminal-batch.revoke",
+      "lane": "device",
+      "endpoint": "POST /api/v1/admin/terminals/batches/bind-codes/revoke",
+      "serverType": {
+        "file": "services/api/src/terminals/terminal-batch.service.ts",
+        "name": "TerminalBatchRevokeResult"
+      },
+      "clientType": {
+        "file": "apps/admin/src/services/api/terminalBatch.ts",
+        "name": "TerminalBatchRevokeResult"
+      },
+      "mocks": [
+        { "file": "apps/admin/src/services/api/adminDeviceMock.ts", "fn": "mockTerminalBatchRevokeResult" }
+      ],
+      "note": "批量作废未用绑定码的计数。"
     }
   ],
   "deferred": [

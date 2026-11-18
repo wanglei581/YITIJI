@@ -11,7 +11,7 @@ import 'dotenv/config'
 import { randomUUID } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { PricingService } from '../src/payment/pricing.service'
-import { adoptDevPrintSeedPrices } from './support/terminal-charge-fixture'
+import { adoptDevPrintSeedPrices, restoreTerminalChargeFixture } from './support/terminal-charge-fixture'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { seedDevDefaultPriceConfig, DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION } from '../src/payment/price-config.seed'
 import { countPagesInRange } from '../src/print-jobs/page-range.util'
@@ -23,7 +23,7 @@ function pass(message: string): void {
 
 function fail(message: string): never {
   console.error(`  FAIL ${message}`)
-  process.exit(1)
+  throw new Error(`FAIL_GATE: ${message}`)
 }
 
 function assertPageCount(
@@ -71,7 +71,8 @@ async function assertThrows(label: string, fn: () => Promise<unknown>): Promise<
   try {
     await fn()
     fail(`${label} — expected fail-closed throw, but resolved`)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('FAIL_GATE:')) throw error
     pass(label)
   }
 }
@@ -292,6 +293,7 @@ async function main(): Promise<void> {
     }
     await seedDevDefaultPriceConfig(prisma) // 复位
   } finally {
+    await restoreTerminalChargeFixture(prisma)
     await cleanup()
     await prisma.onModuleDestroy()
   }

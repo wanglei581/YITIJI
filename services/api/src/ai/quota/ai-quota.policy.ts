@@ -17,14 +17,64 @@ export function quotaEnv(name: string, fallback: number): number {
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) ? parsed : fallback
 }
+
+const DAILY_LIMIT_ENV = {
+  ai_resume: ['AI_QUOTA_RESUME_DAILY', 20],
+  ai_assistant: ['AI_QUOTA_ASSISTANT_DAILY', 80],
+  ai_interview: ['AI_QUOTA_INTERVIEW_DAILY', 5],
+} as const
+
+/** 管理员在后台填写的上限。环境变量不受这个上限约束。 */
+export const AI_QUOTA_LIMIT_MAX = 1000
+/** 各进程读 Redis 后的缓存时间。写成功的进程会立刻清掉自己的缓存。 */
+export const AI_QUOTA_LIMIT_CACHE_MS = 30_000
+export const AI_QUOTA_LIMIT_TTL_SECONDS = 60 * 60 * 24 * 365
+
+export type AiQuotaLimitSource = 'admin' | 'env' | 'default'
+export interface PublishedDailyLimit {
+  bucket: AiQuotaBucket
+  effective: number
+  source: AiQuotaLimitSource
+  fallback: number
+}
+
+/**
+ * 没人发布快照时，dailyLimit 仍只读环境变量。
+ * 旧的 `new AiQuotaService(prisma)` 和「刚改环境变量就要生效」的门禁都靠这一点。
+ */
+let publishedDailyLimits: { buckets: PublishedDailyLimit[]; expiresAt: number } | null = null
+
+export function aiQuotaDailyLimitKey(bucket: AiQuotaBucket): string {
+  return `system:ai-quota-daily:${bucket}`
+}
+
+export function configuredDailyLimit(bucket: AiQuotaBucket): { value: number; source: 'env' | 'default'; fallback: number } {
+  const [name, fallback] = DAILY_LIMIT_ENV[bucket]
+  const raw = process.env[name]
+  if (raw && /^\d+$/.test(raw)) {
+    const parsed = Number(raw)
+    if (Number.isSafeInteger(parsed)) return { value: parsed, source: 'env', fallback }
+  }
+  return { value: fallback, source: 'default', fallback }
+}
+
+export function readPublishedDailyLimits(now = Date.now()): PublishedDailyLimit[] | null {
+  if (!publishedDailyLimits || publishedDailyLimits.expiresAt <= now) return null
+  return publishedDailyLimits.buckets
+}
+
+export function publishDailyLimits(buckets: PublishedDailyLimit[], now = Date.now()): void {
+  publishedDailyLimits = { buckets, expiresAt: now + AI_QUOTA_LIMIT_CACHE_MS }
+}
+
+export function clearDailyLimitCache(): void {
+  publishedDailyLimits = null
+}
+
 export function dailyLimit(bucket: AiQuotaBucket): number {
-  const config = {
-    ai_resume: ['AI_QUOTA_RESUME_DAILY', 20],
-    ai_assistant: ['AI_QUOTA_ASSISTANT_DAILY', 80],
-    ai_interview: ['AI_QUOTA_INTERVIEW_DAILY', 5],
-  } as const
-  const [name, fallback] = config[bucket]
-  return quotaEnv(name, fallback)
+  const cached = readPublishedDailyLimits()?.find((item) => item.bucket === bucket)
+  if (cached) return cached.effective
+  return configuredDailyLimit(bucket).value
 }
 export function quotaDay(now: Date): string {
   if (!Number.isFinite(now.getTime())) throw new BadRequestException('AI_QUOTA_DATE_INVALID')

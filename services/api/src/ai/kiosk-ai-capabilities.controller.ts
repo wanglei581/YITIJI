@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common'
+import { Controller, Get, Optional } from '@nestjs/common'
+import { AiAccessService } from '../ai-access/ai-access.service'
 import { AiUse } from '../ai-access/ai-access.decorator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
@@ -13,13 +14,16 @@ import { listKioskAiCapabilities, type KioskAiCapabilitiesResponse } from './kio
  */
 @Controller('kiosk/ai')
 export class KioskAiCapabilitiesController {
-  constructor(private readonly llmConfig: LlmConfigService) {}
+  constructor(
+    private readonly llmConfig: LlmConfigService,
+    @Optional() private readonly access?: AiAccessService,
+  ) {}
 
   @Get('capabilities')
   @TerminalScopedThrottle(30)
   @AiUse('read')
 
-  listCapabilities(): ApiResponse<KioskAiCapabilitiesResponse> {
-    return ApiResponse.ok(listKioskAiCapabilities(this.llmConfig))
+  async listCapabilities(): Promise<ApiResponse<KioskAiCapabilitiesResponse>> {
+    return ApiResponse.ok(await listKioskAiCapabilities(this.llmConfig, this.access))
   }
 }

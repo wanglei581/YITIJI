@@ -127,6 +127,8 @@ const MAINTENANCE_LABELS = {
   'POST /resume/self-assessment': '自我探索（提交',
   'POST /resume/self-assessment/:taskId/append': '追加作答',
   'POST /resume/self-assessment/:taskId/print': '打印）',
+  'POST /mock-interviews': '模拟面试（新建练习',
+  'POST /mock-interviews/:id/practice-sheet': '打印题目单）',
 }
 
 function* serverSourceFiles(dir) {
@@ -195,7 +197,7 @@ await check('A1 服务端事实：GET/PUT /admin/ai-access 只给 admin；档位
   assert.match(accessServiceSource, /code: 'REASON_REQUIRED'/, '服务端不再校验事由')
 })
 
-await check('A2 服务端事实：维护模式拦截的接口正好是面板列出的十一个', () => {
+await check('A2 服务端事实：维护模式拦截的接口正好是面板列出的十三个', () => {
   assert.deepEqual(
     maintenanceBlockedRoutes(),
     Object.keys(MAINTENANCE_LABELS).sort(),

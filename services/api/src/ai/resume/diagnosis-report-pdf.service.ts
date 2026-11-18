@@ -1,6 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
-import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { cjkFontCandidates, selectLoadableCjkFont, tryRegisterCjkFont, type CjkFontCandidate } from '../../common/pdf/cjk-font'
 import { PDFDocument as PdfLibDocument } from 'pdf-lib'
 import { formatBeijingDate } from '../../common/beijing-display-time'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
@@ -25,11 +25,6 @@ const TEXT_SOURCE_LABEL: Record<string, string> = {
 }
 const CONFIDENCE_LABEL: Record<string, string> = { high: '高', medium: '中', low: '低' }
 
-interface FontCandidate {
-  path: string
-  family?: string
-}
-
 interface DiagnosisReportPdfInput {
   taskId: string
   kind: ResumeReportExportKind
@@ -40,42 +35,13 @@ interface DiagnosisReportPdfInput {
 }
 
 interface RenderOptions {
-  fontCandidates?: FontCandidate[]
+  fontCandidates?: CjkFontCandidate[]
 }
 
 const PAGE_HEADER = 'AI 生成，仅供参考，请自行核对'
 const SEVERITY_RULE = '严重度按所属维度得分机械分档：不足五成为高，五成到不足八成为中，八成及以上为低；不是排名、通过率或录用结论。'
 const PAGE = { width: 595.28, height: 841.89 }
 const MARGIN = 52
-
-function defaultFontCandidates(): FontCandidate[] {
-  const envPath = process.env['RESUME_PDF_FONT_PATH']?.trim()
-  const envFamily = process.env['RESUME_PDF_FONT_FAMILY']?.trim() || undefined
-  const list: FontCandidate[] = []
-  if (envPath) list.push({ path: envPath, family: envFamily })
-  if (process.platform === 'win32') {
-    const winDir = process.env['WINDIR'] ?? 'C:\\Windows'
-    list.push(
-      { path: `${winDir}\\Fonts\\msyh.ttc`, family: 'Microsoft YaHei' },
-      { path: `${winDir}\\Fonts\\msyh.ttf` },
-      { path: `${winDir}\\Fonts\\simhei.ttf` },
-      { path: `${winDir}\\Fonts\\simsun.ttc`, family: 'SimSun' },
-    )
-  } else if (process.platform === 'darwin') {
-    list.push(
-      { path: '/System/Library/Fonts/PingFang.ttc', family: 'PingFangSC-Regular' },
-      { path: '/System/Library/Fonts/Hiragino Sans GB.ttc', family: 'HiraginoSansGB-W3' },
-      { path: '/System/Library/Fonts/STHeiti Light.ttc', family: 'STHeitiSC-Light' },
-      { path: '/System/Library/Fonts/Supplemental/Songti.ttc', family: 'STSongti-SC-Regular' },
-    )
-  } else {
-    list.push(
-      { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', family: 'NotoSansCJKsc-Regular' },
-      { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYi Micro Hei' },
-    )
-  }
-  return list
-}
 
 export function severityForDimension(
   report: ResumeReport,
@@ -116,19 +82,8 @@ export class DiagnosisReportPdfService {
       generatedAt: input.generatedAt,
     })
 
-    const candidates = options.fontCandidates ?? defaultFontCandidates()
-    const fontReady = candidates.some((candidate) => {
-      if (!existsSync(candidate.path)) return false
-      try {
-        if (candidate.family) doc.registerFont('cjk', candidate.path, candidate.family)
-        else doc.registerFont('cjk', candidate.path)
-        doc.font('cjk')
-        return true
-      } catch {
-        return false
-      }
-    })
-    if (!fontReady) {
+    const chosen = selectLoadableCjkFont(options.fontCandidates ?? cjkFontCandidates())
+    if (!chosen || !tryRegisterCjkFont(doc, chosen)) {
       doc.end()
       throw new ServiceUnavailableException({
         error: { code: 'RESUME_PDF_FONT_NOT_FOUND', message: '服务器缺少可用中文字体，暂时无法生成诊断报告 PDF' },

@@ -234,7 +234,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ## high — 仍被 CI / 门禁 / 包脚本引用（177）
 
-### 页面/组件（111）
+### 页面/组件（109）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -260,8 +260,6 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/auth/KioskCapabilityGuard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs |
 | `apps/kiosk/src/components/ComingSoonNotice.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs |
 | `apps/kiosk/src/components/KioskDeviceStatusPills.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-device-status-honest.mjs |
-| `apps/kiosk/src/hooks/kioskHomeFreeBadgeReader.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/home-free-badge.test.mjs |
-| `apps/kiosk/src/hooks/useKioskHomeFreeBadge.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/home-free-badge.test.mjs |
 | `apps/kiosk/src/hooks/useSmartCampusConfig.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、services/api/scripts/verify-terminal-device-config.ts |
 | `apps/kiosk/src/hooks/useToolboxConfig.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-home-toolbox-ui.mjs、apps/kiosk/scripts/verify-kiosk-parked-toolbox-campus.mjs、services/api/scripts/verify-terminal-device-config.ts |
 | `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-kiosk-parked-core4.mjs |
@@ -415,16 +413,18 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 | `apps/kiosk/src/styles/prototype-v1.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 
-### 测试（6）
+### 测试（8）
 
 | 路径 | 判定依据 |
 | --- | --- |
+| `apps/admin/src/routes/alerts/useAutoRefresh.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/components/recruitment/RecruitmentHostingNotice.test.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/verify-compliance-copy.mjs、services/api/scripts/verify-production-runtime-gates.ts |
 | `apps/admin/src/routes/member-benefits/grantFormModel.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/partners/licenseValidation.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/screensaver/terminalConfigState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/toolbox/toolboxActionState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
+| `apps/admin/src/services/api/terminalBatch.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 
 
 ──────────────────────────────────────────────────────────────────────

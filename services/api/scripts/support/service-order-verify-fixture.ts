@@ -328,7 +328,8 @@ export async function withServiceOrderFixture(run: (fx: ServiceOrderFixture) => 
   let scanCreates = 0
   const scans = {
     async previewCreate() {
-      return { scanTaskId: scanReturnId, controlToken: '', expiresAt: '', instructions: [] as string[] }
+      // 普通建会话没有重扫凭证。真服务这时返回空任务号；已经占上的单对不上就 409，不再建成一次。
+      return { scanTaskId: '', controlToken: '', expiresAt: new Date(0).toISOString(), instructions: [] as string[] }
     },
     async create() {
       if (scanMode === 'throw') throw new Error('scan down')
