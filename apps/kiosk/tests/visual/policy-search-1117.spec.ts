@@ -369,3 +369,18 @@ test('搜索结果只放类别和截止两签，信息签浅蓝、截止签陶�
   await expect(page.getByRole('heading', { level: 1, name: '1 条政策' })).toBeVisible()
   await expect(page.locator('.policy-min-card').getByText('有材料清单')).toBeVisible()
 })
+
+test('详情头图加高，摘录签浅蓝，展开后有箭头，材料框是蓝色 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  await routePolicies(page)
+  await page.goto('/renshi?policy=policy-startup')
+  await expect(page.locator('.policy-min-compact .qxt-band')).toHaveCSS('min-height', '410px')
+  const chip = page.getByTestId('policy-excerpt').locator('.policy-info-chip')
+  await expect(chip).toHaveText('以发布机构原文为准')
+  await expect(chip).toHaveCSS('background-color', 'rgb(230, 236, 246)')
+  const open = page.getByTestId('policy-excerpt-open')
+  await expect(open).toContainText('展开全文')
+  await expect(open.locator('.qxt-i')).toBeVisible()
+  const border = await page.locator('.policy-min-check li').first().evaluate((el) => getComputedStyle(el, '::before').borderTopColor)
+  expect(border).toBe('rgb(63, 104, 176)')
+})

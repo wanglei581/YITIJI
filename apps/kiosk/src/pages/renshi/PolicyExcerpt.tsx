@@ -25,7 +25,7 @@ export function PolicyReadSheet({ title, source, published, pageText, pageIndex,
             <span className="policy-read-rest" data-testid="policy-read-rest"> · {source}发布 · {published}</span>
           </p>
         </div>
-        <span className="policy-min-chip">以发布机构原文为准</span>
+        <span className="policy-info-chip">以发布机构原文为准</span>
       </div>
       <div className="policy-read" data-testid="policy-excerpt-page">{pageText}</div>
       <div className="policy-read-pager">
@@ -69,9 +69,9 @@ export function PolicyExcerpt({ content, title, source, published, onOverlay }: 
   return <section className="policy-min-section" data-testid="policy-excerpt">
     <div className="policy-excerpt-head">
       <h2><QxTouchIcon name="book" size={30} />原文摘录</h2>
-      <span className="policy-min-chip">以发布机构原文为准</span>
+      <span className="policy-info-chip">以发布机构原文为准</span>
       {!fits && <button type="button" className="policy-excerpt-open" data-testid="policy-excerpt-open"
-        onClick={() => { setPage(0); setOpen(true) }}>展开全文 · {policyExcerptAbout(text)}</button>}
+        onClick={() => { setPage(0); setOpen(true) }}>展开全文 · {policyExcerptAbout(text)}<QxTouchIcon name="chevR" size={26} strokeWidth={2.4} /></button>}
     </div>
     <p className={fits ? 'policy-excerpt' : 'policy-excerpt policy-excerpt-cut'}>{text}</p>
   </section>

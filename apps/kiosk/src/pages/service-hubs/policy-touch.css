@@ -57,7 +57,7 @@
 .qxt-screen[data-qx-page='policy-min'][data-qxt-state='withdrawn'] .policy-min-sample > div { flex: none; }
 .qxt-screen[data-qxt-state='empty'] .policy-min-section li { margin-top: 18px; }
 .qxt-screen[data-qxt-state='ready'][data-qx-page='policy-min'] .policy-min-body { justify-content: space-between; }
-.qxt-screen[data-qx-page='policy-min'].policy-min-compact .qxt-band { min-height: 330px; }
+.qxt-screen[data-qx-page='policy-min'].policy-min-compact .qxt-band { min-height: 410px; }
 /* 公告沿用旧件，在本屏仍守 20px / 64px。 */
 .qxt-screen[data-qx-page='policy-min'] .rq-item-main { min-height: 88px; }
 .qxt-screen[data-qx-page='policy-min'] .rq-note,
@@ -89,7 +89,7 @@
 .policy-min-body .policy-min-section ul { list-style: disc; padding-left: 28px; }
 .policy-min-body .policy-min-section li { font-size: 27px; line-height: 1.6; }
 .policy-min-body .policy-min-check li { list-style: none; position: relative; }
-.policy-min-body .policy-min-check li::before { content: ''; position: absolute; left: -30px; top: 12px; width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--qxt-ink-3); }
+.policy-min-body .policy-min-check li::before { content: ''; position: absolute; left: -30px; top: 12px; width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--qx-slate); }
 
 /* 11/17 搜索框：这一格本身就是输入框。系统键盘只认手指点它，页面不另画键盘。 */
 .policy-search { display: flex; flex-direction: column; gap: 12px; }
@@ -138,7 +138,7 @@
 .policy-excerpt-head h2 { margin: 0; }
 .policy-excerpt { margin: 0; font-size: 25px; line-height: 1.6; color: var(--qxt-ink-2); white-space: pre-wrap; word-break: break-all; }
 .policy-excerpt-cut { max-height: 80px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 40%, transparent); mask-image: linear-gradient(#000 40%, transparent); }
-.qxt-screen .policy-excerpt-open { margin-left: auto; min-height: 72px; padding: 0 16px 0 24px; border: 0; border-radius: 22px; background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); font-size: 24px; font-weight: 700; }
+.qxt-screen .policy-excerpt-open { margin-left: auto; min-height: 72px; padding: 0 16px 0 24px; border: 0; border-radius: 22px; background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); font-size: 24px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
 /* 阅读层：遮罩盖住整屏，纸页顶边在 250。收起不参与伸缩，避免把翻页挤到正文上。 */
 .qxt-screen .policy-read-layer { position: absolute; inset: 0; z-index: 40; background: rgba(7, 24, 20, .5); }
 .qxt-screen .policy-read-sheet { position: absolute; left: 0; right: 0; top: 250px; bottom: 0; z-index: 41; display: flex; flex-direction: column; gap: 16px; min-height: 0; margin: 0; padding: 18px 48px 34px; border-radius: 44px 44px 0 0; background: var(--qx-paper); box-shadow: 0 -16px 48px rgba(7, 24, 20, .28); }
@@ -149,7 +149,8 @@
 .qxt-screen .policy-read-sheet .policy-read-meta { display: flex; align-items: baseline; min-width: 0; max-width: 100%; margin: 6px 0 0; font-size: 22px; line-height: 1.4; color: var(--qxt-ink-3); white-space: nowrap; }
 .qxt-screen .policy-read-sheet .policy-read-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .qxt-screen .policy-read-sheet .policy-read-rest { flex: none; }
-.qxt-screen .policy-read-sheet .policy-min-chip { margin-top: 8px; flex: none; }
+.qxt-screen .policy-read-sheet .policy-min-chip,
+.qxt-screen .policy-read-sheet .policy-info-chip { margin-top: 8px; flex: none; }
 .policy-read { flex: 1; min-height: 0; overflow: hidden; padding: 24px 30px; border-radius: 24px; background: var(--qxt-card); border: 1.5px solid var(--qxt-line); font-size: 27px; line-height: 1.75; white-space: pre-wrap; word-break: break-all; }
 .policy-read-pager { display: flex; align-items: center; gap: 16px; flex: none; }
 .policy-read-pager span { min-width: 190px; text-align: center; font-size: 24px; font-weight: 700; }
