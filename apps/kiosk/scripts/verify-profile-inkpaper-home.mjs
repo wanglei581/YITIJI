@@ -495,6 +495,8 @@ const allowedPrintOrdersInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts',
   // S15c（2026-11-18）：手机待取单分区。只加白名单行，不改上面的行为断言。
   'apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx',
+  // S15c2（2026-11-19）：有待取单、没有打印任务时的两张出路卡。只加白名单行。
+  'apps/kiosk/src/pages/profile/me/printOrders/pendingPickupExits.ts',
 ])
 /** 2026-07-25：冻结项诚实文案 / 合规入口收口（允许主入口标签与 toast，不做视觉换装）。 */
 const allowedHonestCopyChanged = new Set([
