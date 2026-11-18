@@ -3536,6 +3536,7 @@
           "Order",
           "PaymentAttempt",
           "PrintTaskStatusLog",
+          "Refund",
           "Terminal"
         ],
         "path": "/api/v1/admin/orders",
@@ -3558,6 +3559,7 @@
           "Order",
           "PaymentAttempt",
           "PrintTaskStatusLog",
+          "Refund",
           "Terminal"
         ],
         "path": "/api/v1/admin/orders/:id",
@@ -14400,7 +14402,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 293,
+      "reachableFileCount": 294,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -15191,7 +15193,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 321
+      "sourceFileCount": 322
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -19891,6 +19893,8 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/payment/cancel-unclaimed-print-task.ts",
+          "services/api/src/payment/closed-window-unprinted.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/pending-refund-signal.ts",
@@ -20154,6 +20158,8 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/payment/cancel-unclaimed-print-task.ts",
+          "services/api/src/payment/closed-window-unprinted.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
           "services/api/src/payment/refund-notify-paper-guard.ts",
@@ -20251,13 +20257,16 @@
           "Order"
         ],
         "usedBy": [
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/payment/closed-window-unprinted.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
           "services/api/src/payment/print-return-disposition.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/payment/refund-notify-paper-guard.ts",
           "services/api/src/payment/refund-paper-exclusion.ts",
+          "services/api/src/payment/refund-remainder.ts",
           "services/api/src/payment/refund.service.ts",
           "services/api/src/payment/resolve-print-return-hold.ts",
           "services/api/src/payment/settled-collection-guard.ts",
