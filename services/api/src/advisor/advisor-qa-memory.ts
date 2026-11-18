@@ -106,6 +106,17 @@ export class AdvisorQaMemory {
     this.evictIfNeeded()
   }
 
+  /** 归属对得上才删。身份库故障时不能按作业号去清别人的。匿名作业对不上会员归属。 */
+  forgetIfOwner(sessionId: string, ownerKey: string): boolean {
+    const id = sessionId.trim()
+    if (!id || !ownerKey) return false
+    const entry = this.store.get(id)
+    const flight = this.inflight.get(id)
+    if (entry?.ownerKey !== ownerKey && flight?.ownerKey !== ownerKey) return false
+    this.drop(id)
+    return true
+  }
+
   /** 删掉这一次作业的问答内存。没有这条就当已经删过。在途写回同样作废。 */
   forget(sessionId: string): boolean {
     const id = sessionId.trim()

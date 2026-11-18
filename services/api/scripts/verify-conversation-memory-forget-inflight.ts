@@ -4,8 +4,10 @@
  * A 首次追问还没进内存时登出（Redis 成功 / 失败）；首次小青在途、内存里还没有这条时清场。
  *   归属查询回执挂起时删记录或登出、政策查询挂起时登出，放行后都不把原话写回。
  * B 容量淘汰本身作废在途回复；淘汰之后再登出 / forgetOwner 也不写回。
- * C 代次表挤满后，挤掉之前抓住的代次不能再对上；三个方法同样去掉会话号两端空白。
- * D 两个清场接口在身份查询 503 时，内存已清、在途作废，作业行仍在库里。
+ * C 代次表挤满后，挤掉之前抓住的代次不能再对上；没被清、也没被挤掉的仍能对上。
+ *   三个方法同样去掉会话号两端空白。同一条被挤掉后，新抓住的代次能对上，旧的不能。
+ * D 两个清场接口在身份查询 503 时，只清这个令牌自己的内存并作废在途，作业行仍在库里。
+ *   别人的会话号即使写在请求里也不动。
  */
 import { randomUUID } from 'node:crypto'
 import { HttpException, ValidationPipe } from '@nestjs/common'
@@ -267,8 +269,31 @@ function runEpochCases(check: InflightForgetContext['check']): void {
   epoch.invalidate('filler-a')
   epoch.invalidate('filler-b')
   check(!epoch.matches('target-job', captured), '场景 C：代次表挤掉这条之后，挤掉之前抓住的代次不能再写回')
+  const renewed = epoch.capture('target-job')
+  check(
+    renewed !== captured && epoch.matches('target-job', renewed) && !epoch.matches('target-job', captured),
+    '场景 C：同一条被挤掉之后，新抓住的代次能写回，挤掉前抓住的不能',
+  )
   const fresh = epoch.capture('fresh-job')
   check(epoch.matches('fresh-job', fresh), '场景 C 阳性：挤掉之后新抓住的代次仍能写回')
+
+  const room = new ConversationEpoch(2)
+  const kept = room.capture('kept-job')
+  room.invalidate('hot-job')
+  room.invalidate('hot-job')
+  room.invalidate('hot-job')
+  const hotLatest = room.capture('hot-job')
+  check(
+    kept === 0 && room.matches('kept-job', kept) && room.matches('hot-job', hotLatest),
+    '场景 C 阳性：反复作废同一条时，这条的最新代次和没被清的会话都能写回',
+  )
+  room.invalidate('other-a')
+  room.invalidate('other-b')
+  check(
+    room.matches('kept-job', kept),
+    '场景 C：代次表挤满时，没被清场也没被挤掉的会话，原先抓住的代次仍能写回',
+  )
+  check(!room.matches('hot-job', hotLatest), '场景 C：反复作废的那条被挤掉后，作废前抓住的代次不能再写回')
 
   const spaced = new ConversationEpoch()
   spaced.invalidate('job-1')
@@ -606,5 +631,77 @@ export async function runInflightForgetScenarios(ctx: InflightForgetContext): Pr
   } finally {
     hungPolicy.release()
     hungPolicy.restore()
+  }
+
+  const victim = `verify-d-victim-${randomUUID()}`
+  const attacker = `verify-d-attacker-${randomUUID()}`
+  await createUser(victim)
+  await createUser(attacker)
+  const ownerVictim = `u:${victim}`
+  const ownerAttacker = `u:${attacker}`
+  const victimChat = await chat.chat(
+    { message: textMark('受害者已有小青'), channel: 'kiosk' } as never,
+    undefined,
+    ownerVictim,
+  ) as { sessionId: string }
+  const attackerChat = await chat.chat(
+    { message: textMark('攻击者已有小青'), channel: 'kiosk' } as never,
+    undefined,
+    ownerAttacker,
+  ) as { sessionId: string }
+  const attackerToken = bearer(attacker)
+  const workVictim = `verify-work-d-victim-${randomUUID()}`
+  const artVictim = `verify-art-d-victim-${randomUUID()}`
+  await createQa(victim, workVictim, artVictim)
+  const markVictimQa = textMark('受害者作业原话')
+  await advisor.ask(workVictim, markVictimQa, { endUserId: victim, accessToken: null })
+  const workAttacker = `verify-work-d-attacker-${randomUUID()}`
+  await createQa(attacker, workAttacker, `verify-art-d-attacker-${randomUUID()}`)
+  const markAttackerQa = textMark('攻击者作业原话')
+  await advisor.ask(workAttacker, markAttackerQa, { endUserId: attacker, accessToken: null })
+  const originalGetCross = redis.get
+  try {
+    redis.get = async () => { throw new Error('redis down') }
+    resetRedisCooldownForTests()
+    const crossChat = await callForget(async () => controller.forget(
+      await forgetBody([victimChat.sessionId, attackerChat.sessionId]),
+      { headers: { authorization: `Bearer ${attackerToken}` }, ip: '10.20.3.3' },
+    ))
+    const victimLeft = transcriptOf(chat, victimChat.sessionId, ownerVictim)
+    const attackerLeft = transcriptOf(chat, attackerChat.sessionId, ownerAttacker)
+    check(
+      crossChat.status === 503
+        && crossChat.code === 'MEMBER_SESSION_STORE_UNAVAILABLE'
+        && crossChat.forgotten === null
+        && victimLeft.includes('受害者已有小青')
+        && attackerLeft.length === 0,
+      `场景 D：身份查询失败时只清令牌本人的小青，请求里别人的会话号不动（实际 ${crossChat.status}/${crossChat.code}）`,
+    )
+    const crossAdvisor = await callForget(() => advisorController.forget(
+      workVictim,
+      { headers: { authorization: `Bearer ${attackerToken}` } },
+    ))
+    const victimRow = await prisma.advisorSession.findUnique({ where: { id: workVictim } })
+    check(
+      crossAdvisor.status === 503
+        && crossAdvisor.code === 'MEMBER_SESSION_STORE_UNAVAILABLE'
+        && qaText(memory, workVictim).includes(markVictimQa)
+        && !!victimRow,
+      `场景 D：身份查询失败时不按作业号清别人的问答，库行仍在（实际 ${crossAdvisor.status}/${crossAdvisor.code}）`,
+    )
+    const ownAdvisor = await callForget(() => advisorController.forget(
+      workAttacker,
+      { headers: { authorization: `Bearer ${attackerToken}` } },
+    ))
+    const attackerRow = await prisma.advisorSession.findUnique({ where: { id: workAttacker } })
+    check(
+      ownAdvisor.status === 503
+        && !qaText(memory, workAttacker).includes(markAttackerQa)
+        && !!attackerRow,
+      '场景 D 阳性：同一个 503 仍清掉令牌本人的作业问答，并且不删库',
+    )
+  } finally {
+    redis.get = originalGetCross
+    resetRedisCooldownForTests()
   }
 }

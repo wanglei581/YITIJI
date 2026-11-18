@@ -5,7 +5,7 @@ import { JwtService } from '@nestjs/jwt'
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { isMemberLookupUnavailable, resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { isMemberLookupUnavailable, resolveOptionalEndUser, verifiedEndUserId } from '../common/auth/optional-end-user'
 import { AdvisorService } from './advisor.service'
 import { ADVISOR_SKILLS, EVIDENCE_LEVELS, type AdvisorSkill } from './advisor-skills'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -209,7 +209,10 @@ export class AdvisorController {
     try {
       requester = await this.requesterOf(req, true)
     } catch (error) {
-      if (isMemberLookupUnavailable(error)) this.service.discardQaMemory(sessionId)
+      if (isMemberLookupUnavailable(error)) {
+        const endUserId = verifiedEndUserId(headerOf(req, 'authorization') ?? undefined, this.jwt)
+        this.service.discardQaMemoryIfOwner(sessionId, endUserId ? `u:${endUserId}` : null)
+      }
       throw error
     }
     return this.service.forgetSession(sessionId, requester)

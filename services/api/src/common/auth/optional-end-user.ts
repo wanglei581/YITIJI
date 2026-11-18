@@ -34,6 +34,22 @@ function memberLookupUnavailable(): never {
   throw new ServiceUnavailableException(MEMBER_SESSION_STORE_UNAVAILABLE)
 }
 
+/**
+ * 只验签，不查 Redis、不查会员库。
+ * 身份库故障时，清场只能动这个令牌自己名下的会话，不能按请求里的号去清别人的。
+ */
+export function verifiedEndUserId(authorization: string | undefined, jwtService: JwtService): string | null {
+  if (!authorization || !authorization.toLowerCase().startsWith('bearer ')) return null
+  const token = authorization.slice(7).trim()
+  if (!token) return null
+  try {
+    const payload = jwtService.verify<EndUserJwtPayload>(token, { audience: 'enduser' })
+    return typeof payload.sub === 'string' && payload.sub.trim() ? payload.sub.trim() : null
+  } catch {
+    return null
+  }
+}
+
 /** 清场专用：身份库暂时查不了。其它错误不能当成这一条。 */
 export function isMemberLookupUnavailable(error: unknown): boolean {
   if (!(error instanceof ServiceUnavailableException)) return false
