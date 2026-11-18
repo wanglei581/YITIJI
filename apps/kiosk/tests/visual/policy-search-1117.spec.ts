@@ -132,7 +132,7 @@ test('点搜索框搜到政策，进详情展开原文翻页后收起并返回 @
   expect(page.url().includes('创业')).toBe(false)
   await expect(page.locator('mark.policy-kw', { hasText: '创业' }).first()).toBeVisible()
   await expect(page.getByText('示例人社局').first()).toBeVisible()
-  await expect(page.getByText('更新于 2026-09-01').first()).toBeVisible()
+  await expect(page.getByText('更新于 9 月 1 日').first()).toBeVisible()
   await expect(page.getByText('创业扶持').first()).toBeVisible()
   await expect(page.getByText('12 月 31 日截止').first()).toBeVisible()
   expect(browse).toEqual([])

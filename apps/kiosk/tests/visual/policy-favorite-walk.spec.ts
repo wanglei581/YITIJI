@@ -363,8 +363,8 @@ test('收藏的政策打开那一条，发布日期用确认发布时间 @kiosk'
   expect(state.detailLog).toContain('policy-fav')
   await expect(page.getByText('灵活就业社保补贴说明')).toHaveCount(0)
   await expect(page.getByText('毕业年度内有就业创业意愿的高校毕业生', { exact: true })).toBeVisible()
-  // 没填发布日期：用确认发布时间的日期部分；发布机构写在同一行。
-  await expect(policyEyebrow(page)).toHaveText('示例人社局发布 · 2026-09-29')
+  // 没填发布日期：用确认发布时间的北京时间日期；发布机构写在同一行。
+  await expect(policyEyebrow(page)).toHaveText('示例人社局发布 · 9 月 29 日')
   // 登录后的收藏状态读本人账号：收藏里有这一条。
   await expect(page.getByRole('button', { name: /已收藏 · 点此取消/ })).toBeVisible()
   await shot(page, 'W-49-policy-opened.png')
@@ -443,12 +443,12 @@ test('填写了发布日期时不用确认发布时间覆盖 @kiosk', async ({ p
   const state: PolicyRouteState = { broken: false, holdSlow: null }
   await routePolicies(page, state)
   await page.goto('/renshi?policy=policy-dated')
-  await expect(policyEyebrow(page)).toHaveText('示例人社局发布 · 2026-08-01')
+  await expect(policyEyebrow(page)).toHaveText('示例人社局发布 · 8 月 1 日')
   await expect(policyEyebrow(page)).not.toContainText('2026-09-29')
   // 类别列表上的「更新于」用同一个口径。
   await page.goto('/renshi?audience=general')
   const card = page.getByTestId('renshi-policy-list').locator('[data-policy-id="policy-dated"]')
-  await expect(card).toContainText('更新于 2026-08-01')
+  await expect(card).toContainText('更新于 8 月 1 日')
   await expect(card).not.toContainText('2026-09-29')
 })
 

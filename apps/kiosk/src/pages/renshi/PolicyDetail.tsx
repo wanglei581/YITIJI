@@ -18,7 +18,7 @@ import { PolicyExcerpt } from './PolicyExcerpt'
 import { PolicyReadState, PolicyTouchLayout } from './PolicyTouchLayout'
 import { PolicyUnavailable } from './PolicyUnavailable'
 import { policyFileSize, policyLines, policyPhoneExpiry, policyPrintButton, policySourceLink } from './policyModel'
-import { policyPublishedOn } from './policyFacts'
+import { policyPublishedLabel } from './policyFacts'
 import { policyDeadlineLabel, policyDeadlinePassed, policyGoneCopy } from './policySearchModel'
 
 const POLICY_REFRESH_MS = 30_000
@@ -161,7 +161,7 @@ export function PolicyDetail({ id }: { id: string }) {
   const printButton = policyPrintButton({ busy, printerReady: device.printerReady, printerLoading: device.loading, blocked: winding })
   return <PolicyTouchLayout compact ask={false} state={phase} title={title} overlay={overlay}
     eyebrow={ready
-      ? `${policy.sourceName || '发布机构未提供'}发布 · ${policyPublishedOn(policy) ?? '日期未提供'}${deadline ? ` · ${deadline}` : ''}`
+      ? `${policy.sourceName || '发布机构未提供'}发布 · ${policyPublishedLabel(policy) ?? '日期未提供'}${deadline ? ` · ${deadline}` : ''}`
       : gone?.eyebrow ?? '查政策'}
     primary={ready ? { ...printButton, onClick: () => { void printChecklist() }, testId: 'policy-checklist-print' } : undefined}
     alert={winding ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : undefined}>
@@ -177,7 +177,7 @@ export function PolicyDetail({ id }: { id: string }) {
         </div>
       </section>
       <PolicyExcerpt content={policy.content} title={policy.title} source={policy.sourceName || '发布机构未提供'}
-        published={policyPublishedOn(policy) ?? '日期未提供'} onOverlay={setOverlay} />
+        published={policyPublishedLabel(policy) ?? '日期未提供'} onOverlay={setOverlay} />
       <div className="policy-min-grid policy-min-actions">
         <QxTouchTile icon="sparkle" title={ai.state('assistant_chat') === 'available' ? '问小青这条' : '小青暂时不可用'}
           desc={ai.state('assistant_chat') === 'available' ? '按这条原文解释，不判断能不能领' : '条件、材料、打印、扫码照常'}

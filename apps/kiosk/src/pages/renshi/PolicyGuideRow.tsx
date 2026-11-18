@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { PolicyPostView } from '../../services/api/policies'
-import { policyPublishedOn } from './policyFacts'
+import { policyPublishedLabel } from './policyFacts'
 import { policyKeywordMarks } from './policySearchModel'
 
 function marked(text: string, keyword?: string): ReactNode {
@@ -23,7 +23,7 @@ export function PolicyGuideRow({ policy, onOpen, highlight, categoryLabel, deadl
     <span className="policy-min-summary">{marked(policy.summary || '发布机构没有提供摘要', highlight)}</span>
     <span className="policy-min-meta">
       <span>{policy.sourceName || '发布机构未提供'}</span>
-      <span>更新于 {policyPublishedOn(policy) ?? '日期未提供'}</span>
+      <span>更新于 {policyPublishedLabel(policy) ?? '日期未提供'}</span>
       {categoryLabel && <span className="policy-min-chip">{categoryLabel}</span>}
       {deadlineLabel && <span className="qxt-chip-clay policy-deadline">{deadlineLabel}</span>}
       {policy.requiredMaterials?.trim() && <span className="policy-min-chip">有材料清单</span>}

@@ -26,7 +26,7 @@ export function PolicyExcerpt({ content, title, source, published, onOverlay }: 
         <div className="policy-excerpt-head">
           <div>
             <h2>原文摘录</h2>
-            <p className="policy-min-fine">{title} · {source}发布 · {published}</p>
+            <p className="policy-min-fine policy-read-meta">{title} · {source}发布 · {published}</p>
           </div>
           <span className="policy-min-chip">以发布机构原文为准</span>
         </div>
