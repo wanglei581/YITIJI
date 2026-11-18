@@ -1,3 +1,4 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
@@ -54,6 +55,21 @@ function registerPrinterStatus(api: ApiRouter, current: { value: string }): void
   }))
 }
 
+async function shot(page: Page, name: string): Promise<void> {
+  const dir = process.env.S15C4_SBS
+  if (!dir) return
+  mkdirSync(dir, { recursive: true })
+  await page.screenshot({ path: `${dir}/${name}.png` })
+  const scrolls = await page.evaluate(() => {
+    const nodes = [...document.querySelectorAll('.qxt-body, .qx-scroll')]
+    return nodes.some((el) => el.scrollHeight > el.clientHeight + 1)
+  })
+  const notePath = `${dir}/scroll.json`
+  const current = existsSync(notePath) ? JSON.parse(readFileSync(notePath, 'utf8')) as Record<string, boolean> : {}
+  current[name] = scrolls
+  writeFileSync(notePath, JSON.stringify(current, null, 2))
+}
+
 async function openFailedJam(page: Page): Promise<void> {
   await page.goto('/print/done')
   await setReactRouterState(page, '/print/done', flowState)
@@ -79,12 +95,14 @@ test('confirmed paper jam keeps the title after the printer reports ready @w2', 
   await expect(heading).toHaveText('打印机卡纸')
   await expect(page.getByText('可能卡纸')).toHaveCount(0)
   await expect(page.getByText('打印机卡纸，当前无法打印。')).toBeVisible()
+  await shot(page, '真卡纸')
 
   printer.value = 'ready'
   await advancePrinterPoll(page)
   await expect(heading).toHaveText('打印机卡纸')
   await expect(page.getByText('可能卡纸')).toHaveCount(0)
   await expect(page.getByText('工作人员')).toHaveCount(0)
+  await shot(page, '真卡纸-确认后仍保持')
 })
 
 test('a fault that was never paper jam stays the unconfirmed title after the printer is ready @w2', async ({ page, api }) => {
@@ -239,9 +257,21 @@ async function exitCardGeometry(page: Page): Promise<Array<{ x: number; h: numbe
   }))
 }
 
-function expectCardsAligned(boxes: Array<{ x: number; h: number }>): void {
+function expectCardsAligned(boxes: Array<{ x: number; h: number }>, name: string): void {
   expect(Math.abs(boxes[0].x - boxes[1].x)).toBeLessThanOrEqual(4)
   expect(Math.abs(boxes[0].h - boxes[1].h)).toBeLessThanOrEqual(4)
+  const dir = process.env.S15C4_SBS
+  if (!dir) return
+  mkdirSync(dir, { recursive: true })
+  const notePath = `${dir}/geometry.json`
+  const current = existsSync(notePath) ? JSON.parse(readFileSync(notePath, 'utf8')) as Record<string, unknown> : {}
+  current[name] = {
+    x: boxes.map((box) => box.x),
+    h: boxes.map((box) => box.h),
+    dx: Math.abs(boxes[0].x - boxes[1].x),
+    dh: Math.abs(boxes[0].h - boxes[1].h),
+  }
+  writeFileSync(notePath, JSON.stringify(current, null, 2))
 }
 
 test('print order exit cards share title inset and height across the four states @w2', async ({ page, api }) => {
@@ -254,8 +284,9 @@ test('print order exit cards share title inset and height across the four states
 
   await loginThroughVisibleUi(page, '/me/print-orders')
   await expect(page.getByTestId('pending-pickup-exits')).toBeVisible()
-  expectCardsAligned(await exitCardGeometry(page))
+  expectCardsAligned(await exitCardGeometry(page), '有待取单-无任务')
   await expect(page.getByText('工作人员')).toHaveCount(0)
+  await shot(page, '有待取单-无任务')
 
   api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([{
     ...PENDING_ROW,
@@ -264,13 +295,15 @@ test('print order exit cards share title inset and height across the four states
   }]))
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByText('去哪台取')).toBeVisible()
-  expectCardsAligned(await exitCardGeometry(page))
+  expectCardsAligned(await exitCardGeometry(page), '走错机器')
+  await shot(page, '走错机器')
 
   api.respond('GET', '/api/v1/me/print-orders', ordersOf([oneOrder('order-1', '求职简历.pdf')]))
   api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([]))
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByText('求职简历.pdf')).toBeVisible()
-  expectCardsAligned(await exitCardGeometry(page))
+  expectCardsAligned(await exitCardGeometry(page), '有任务')
+  await shot(page, '有任务')
 
   api.respond('GET', '/api/v1/me/print-orders', ordersOf([
     oneOrder('order-1', '求职简历.pdf'),
@@ -280,6 +313,72 @@ test('print order exit cards share title inset and height across the four states
   api.respond('GET', '/api/v1/me/print-orders/timeline', { status: 500, json: { error: { code: 'INTERNAL', message: 'boom' } } })
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByTestId('pending-pickup-error')).toBeVisible()
-  expectCardsAligned(await exitCardGeometry(page))
+  expectCardsAligned(await exitCardGeometry(page), '读失败')
   await expect(page.getByText('工作人员')).toHaveCount(0)
+  await shot(page, '读失败')
+})
+
+test('failure screens keep one service phone and can be shot for the blank-band check @w2', async ({ page, api }) => {
+  test.setTimeout(120_000)
+  const scenes: Array<{
+    name: string
+    errorCode: 'PAPER_EMPTY' | 'PRINTER_ERROR' | 'PRINTER_OFFLINE'
+    reason: string
+    amountCents: number
+    canRetry: boolean
+    printerStatus: string
+    testId: string
+  }> = [
+    { name: '缺纸', errorCode: 'PAPER_EMPTY', reason: '打印机缺纸，当前无法打印。', amountCents: 200, canRetry: false, printerStatus: 'paper_empty', testId: 'print-fulfill-state-out-of-paper' },
+    { name: '离线', errorCode: 'PRINTER_OFFLINE', reason: '打印机离线，当前无法打印。', amountCents: 200, canRetry: false, printerStatus: 'offline', testId: 'print-fulfill-state-offline' },
+    { name: '卡纸免费', errorCode: 'PRINTER_ERROR', reason: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。', amountCents: 0, canRetry: false, printerStatus: 'error', testId: 'print-fulfill-state-paper-jam' },
+    { name: '卡纸已付', errorCode: 'PRINTER_ERROR', reason: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。', amountCents: 200, canRetry: false, printerStatus: 'error', testId: 'print-fulfill-state-paper-jam' },
+    { name: '缺纸-能重新提交', errorCode: 'PAPER_EMPTY', reason: '打印机缺纸，当前无法打印。', amountCents: 0, canRetry: true, printerStatus: 'paper_empty', testId: 'print-fulfill-state-out-of-paper' },
+    { name: '卡纸-能重新提交', errorCode: 'PRINTER_ERROR', reason: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。', amountCents: 0, canRetry: true, printerStatus: 'error', testId: 'print-fulfill-state-paper-jam' },
+    { name: '离线-能重新提交', errorCode: 'PRINTER_OFFLINE', reason: '打印机离线，当前无法打印。', amountCents: 0, canRetry: true, printerStatus: 'offline', testId: 'print-fulfill-state-offline' },
+  ]
+
+  for (const scene of scenes) {
+    registerShell(api)
+    registerPrinterStatus(api, { value: scene.printerStatus })
+    api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+      status: 200,
+      json: {
+        taskId: W2_ORDER.taskId,
+        status: 'failed',
+        errorCode: scene.errorCode,
+        failureReasonForUser: scene.reason,
+      },
+    })
+    api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+      status: 200,
+      json: {
+        signedUrl: '/api/v1/files/signed/takeaway-demo',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        filename: W2_FILE.name,
+        mimeType: 'application/pdf',
+        sizeBytes: 128,
+        orderId: W2_ORDER.orderId,
+        orderNo: W2_ORDER.orderNo,
+        payStatus: 'paid',
+        amountCents: scene.amountCents,
+        canRetry: scene.canRetry,
+      },
+    })
+    await page.goto('/print/done')
+    await setReactRouterState(page, '/print/done', { ...flowState, amountCents: scene.amountCents })
+    const root = page.locator(`[data-testid="${scene.testId}"]`)
+    await expect(root).toBeVisible()
+    await expect(root.getByText('文件带走')).toBeVisible()
+    const phones = await root.evaluate((el) => (el.innerText.match(/服务电话/g) ?? []).length)
+    expect(phones).toBe(1)
+    const step3 = root.locator('ol li').nth(2)
+    await expect(step3).toContainText('服务电话')
+    if (scene.canRetry) {
+      await expect(root.getByRole('button', { name: '重新提交打印' })).toBeVisible()
+      await expect(step3).toContainText('重新提交打印')
+    }
+    await expect(page.getByText('工作人员')).toHaveCount(0)
+    await shot(page, scene.name)
+  }
 })
