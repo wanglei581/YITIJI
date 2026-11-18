@@ -36,7 +36,7 @@ import {
 } from './payment-provider.types'
 import { SandboxPaymentProvider } from './providers/sandbox-payment.provider'
 import { rejectSettledChannelCollection } from './settled-collection-guard'
-import { settleStaleRepricedCollection } from './stale-attempt-collection'
+import { settleUnfulfillableCallback } from './same-amount-expired-collection'
 import { settleServiceOrderCallback } from './service-order.payment'
 import { ONLINE_PAYMENT_CHANNELS, type PaymentAttemptStatus, type PaymentChannel } from './payment.types'
 
@@ -706,23 +706,22 @@ export class OnlinePaymentService {
     // 必须在补写 prepayId 之前完成，避免金额不对的签名报文先污染标识。
     if (attempt.amountCents !== event.amountCents) throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
     const order = attempt.order
-    if (order.amountCents !== event.amountCents) {
-      // 只有过期尝试的成功回调才按实扣金额原路退。失败回调不记成已收款。
-      const settled = await settleStaleRepricedCollection(this.prisma, this.registry, {
-        orderId: order.id,
-        orderNo: order.orderNo,
-        payStatus: order.payStatus,
-        attemptId: attempt.id,
-        attemptStatus: attempt.status,
-        attemptAmountCents: attempt.amountCents,
-        orderAmountCents: order.amountCents,
-        channel,
-        channelTxnNo: event.channelTxnNo,
-        result: event.result,
-      })
-      if (settled) return { ok: true, idempotent: true, ack }
-      throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
-    }
+    const parked = await settleUnfulfillableCallback(this.prisma, this.registry, {
+      orderId: order.id,
+      orderNo: order.orderNo,
+      payStatus: order.payStatus,
+      attemptId: attempt.id,
+      attemptStatus: attempt.status,
+      attemptAmountCents: attempt.amountCents,
+      orderAmountCents: order.amountCents,
+      channel,
+      channelTxnNo: event.channelTxnNo,
+      result: event.result,
+      pickupStatus: order.pickupStatus, pickupCodeExpiresAt: order.pickupCodeExpiresAt,
+      printTaskId: order.printTaskId, pickupClaimedAt: order.pickupClaimedAt,
+    })
+    if (parked === 'settled') return { ok: true, idempotent: true, ack }
+    if (parked === 'mismatch') throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
     await this.bindCallbackIdentifiersIfMissing(attempt, event.prepayId)
 
     if (event.result === 'success') {

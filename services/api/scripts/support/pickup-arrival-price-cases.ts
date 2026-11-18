@@ -37,6 +37,7 @@ import { runNoPaperAllowlistCases } from './pickup-arrival-no-paper-allowlist-ca
 import { runArrivalDispositionCases } from './pickup-arrival-disposition-cases'
 import { runQueueSweepRefundCases } from './pickup-arrival-queue-sweep-cases'
 import { runRefundPaperGuardCases } from './pickup-arrival-refund-guard-cases'
+import { runP2b4Cases } from './pickup-arrival-p2b4-cases'
 import {
   restoreTerminalChargeFixture,
   setTerminalUserPrintPrices,
@@ -521,6 +522,14 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
       taskIds,
     })
     await runRefundPaperGuardCases(db, tag)
+    await runP2b4Cases(db, {
+      tag,
+      orgId,
+      pricedTerminalId,
+      publicTerminalId,
+      orderIds,
+      taskIds,
+    })
 
     await db.platformSetting.upsert({
       where: { key: PERSONAL_CHARGE_SETTING_KEY },
@@ -568,11 +577,11 @@ export async function runPickupArrivalPriceCases(db: PrismaService, tag: string)
     await db.printTask.deleteMany({ where: { id: { in: taskIds } } })
     await db.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
     await db.terminalHeartbeat.deleteMany({
-      where: { terminalId: { in: [pricedTerminalId, zeroTerminalId, publicTerminalId, otherTerminalId] } },
+      where: { terminalId: { in: [pricedTerminalId, zeroTerminalId, publicTerminalId, otherTerminalId, `term_p2b4_${tag}`] } },
     })
     await restoreTerminalChargeFixture(db)
     await db.terminal.deleteMany({
-      where: { id: { in: [pricedTerminalId, zeroTerminalId, publicTerminalId, otherTerminalId] } },
+      where: { id: { in: [pricedTerminalId, zeroTerminalId, publicTerminalId, otherTerminalId, `term_p2b4_${tag}`] } },
     })
     await db.organization.deleteMany({ where: { id: { in: [orgId, publicOrgId] } } })
   }

@@ -69,10 +69,19 @@ export async function settleStaleRepricedCollection(
   if (input.attemptAmountCents === input.orderAmountCents) return false
   if (input.result !== 'success') return input.attemptStatus === 'expired'
   if (input.attemptStatus !== 'expired' && input.attemptStatus !== 'success') return false
+  await refundExpiredAttemptCollection(db, registry, input)
+  return true
+}
 
+/** 按尝试金额退一笔已经不能入账的过期收款。不改订单的支付状态。 */
+export async function refundExpiredAttemptCollection(
+  db: PrismaService,
+  registry: PaymentProviderRegistry,
+  input: StaleAttemptCallback,
+): Promise<void> {
   const refundNo = staleAttemptRefundNo(input.attemptId)
   const existing = await db.refund.findUnique({ where: { refundNo } })
-  if (existing?.status === 'success') return true
+  if (existing?.status === 'success') return
 
   if (!input.channelTxnNo) {
     await rememberAudit(db, input, refundNo)
@@ -89,7 +98,7 @@ export async function settleStaleRepricedCollection(
       })
     }
     await notifyPrintReturnHold(db, input.orderId)
-    return true
+    return
   }
 
   try {
@@ -99,10 +108,10 @@ export async function settleStaleRepricedCollection(
     })
     if (marked.count === 0) {
       const fresh = await db.paymentAttempt.findUnique({ where: { id: input.attemptId } })
-      if (fresh?.status !== 'success' || fresh.channelTxnNo !== input.channelTxnNo) return true
+      if (fresh?.status !== 'success' || fresh.channelTxnNo !== input.channelTxnNo) return
     }
   } catch (error) {
-    if ((error as { code?: string }).code === 'P2002') return true
+    if ((error as { code?: string }).code === 'P2002') return
     throw error
   }
 
@@ -124,7 +133,7 @@ export async function settleStaleRepricedCollection(
       data: { status: 'failed' },
     })
     await notifyPrintReturnHold(db, input.orderId)
-    return true
+    return
   }
   try {
     const executed = await provider.refund({
@@ -142,7 +151,7 @@ export async function settleStaleRepricedCollection(
         data: { status: 'success', channelRefundNo: executed.channelRefundNo },
       })
       await clearCollectedSignal(db, input.orderId)
-      return true
+      return
     }
     if (executed.status === 'failed') {
       await db.refund.update({
@@ -150,20 +159,19 @@ export async function settleStaleRepricedCollection(
         data: { status: 'failed', channelRefundNo: executed.channelRefundNo },
       })
       await notifyPrintReturnHold(db, input.orderId)
-      return true
+      return
     }
     await db.refund.update({
       where: { id: refund.id },
       data: { channelRefundNo: executed.channelRefundNo },
     })
     await notifyPrintReturnHold(db, input.orderId)
-    return true
+    return
   } catch {
     await db.refund.update({
       where: { id: refund.id },
       data: { status: 'failed' },
     })
     await notifyPrintReturnHold(db, input.orderId)
-    return true
   }
 }
