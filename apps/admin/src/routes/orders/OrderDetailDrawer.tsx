@@ -5,6 +5,7 @@ import { colorModeText, copiesText, duplexText, NET_PAID_UNRECORDED, recordedCen
 import { printErrorText } from '../../lib/printErrorText'
 import { OrderAftercare } from './OrderAftercare'
 import { OrderPaymentActions } from './OrderPaymentActions'
+import { PrintReturnHoldActions } from './PrintReturnHoldActions'
 
 function Info({ label, value, title }: { label: string; value: string; title?: string }) {
   return <div><p className="text-xs font-bold text-neutral-500">{label}</p><p title={title} className="mt-1 break-words text-sm font-semibold text-neutral-900">{value}</p></div>
@@ -71,8 +72,8 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
                   <Info label="原因" value={detail.printRefundReason ?? '—'} />
                   <Info label="退款单号" value={detail.refundLedgerNo ?? '—'} />
                   <Info label="退款金额" value={recordedCentsText(detail.refundLedgerCents, detail.currency)} />
-                  {detail.refundStatus === 'manual_review' ? (
-                    <p className="col-span-2 text-xs font-semibold text-neutral-600">这笔退款待人工核对。订单还在退款处理中时不要再发起一笔，避免同一单出两次钱。</p>
+                  {detail.refundLedgerNo ? (
+                    <p className="col-span-2 text-xs font-semibold text-neutral-600">这笔待人工处理。可以确认已经退成、改为出纸，或关闭这张单。做完只剩一种状态。</p>
                   ) : null}
                 </>
               ) : null}
@@ -102,6 +103,7 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
             )}
 
       <OrderPaymentActions controls={controls} />
+      <PrintReturnHoldActions controls={controls} />
       </>)}
     </Drawer>
   )

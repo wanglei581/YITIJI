@@ -3,14 +3,12 @@
  * pending、failed、manual_review 之后都可能收到渠道的成功通知。
  */
 import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
+import { findBlockingRefund } from './refund-paper-exclusion'
 
 type HoldDb = PrismaService | PrismaTransactionClient
 
 export const OPEN_REFUND_STATUSES = ['pending', 'failed', 'manual_review'] as const
 
 export async function findOpenRefund(db: HoldDb, orderId: string): Promise<{ id: string } | null> {
-  return db.refund.findFirst({
-    where: { orderId, status: { in: [...OPEN_REFUND_STATUSES] } },
-    select: { id: true },
-  })
+  return findBlockingRefund(db, orderId)
 }

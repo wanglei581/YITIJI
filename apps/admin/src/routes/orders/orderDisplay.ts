@@ -126,6 +126,18 @@ export function fmt(iso: string | null): string {
   return formatDateTime(iso)
 }
 
+/** 任务已领取、打印中、已完成，或订单已标成领取中、打印中，或已经核对为出纸。 */
+export function orderPaperReleased(detail: {
+  printOutcome: string | null
+  taskStatus: string
+  print: { status: string } | null
+}): boolean {
+  if (detail.printOutcome === 'printed') return true
+  if (detail.taskStatus === 'claimed' || detail.taskStatus === 'printing') return true
+  const status = detail.print?.status
+  return status === 'claimed' || status === 'printing' || status === 'completed'
+}
+
 export function amountText(amountCents: number, currency: string): string {
   // 0 元 ≠ 未计费。系统里存在合法的 0 元单：会员权益抵扣、0 元活动、
   // paymentSource === 'free' 的免费单 —— 它们是「已定价为 0」，不是「还没定价」。

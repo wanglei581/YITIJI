@@ -3,9 +3,11 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { Roles } from '../common/decorators/roles.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
+import { PrismaService } from '../prisma/prisma.service'
 import { AdminMarkPaidDto, AdminRefundDto } from './dto/order-action.dto'
 import { OrderStatusService } from './order-status.service'
 import { RefundService } from './refund.service'
+import { resolvePrintReturnHold } from './resolve-print-return-hold'
 
 // Admin 端点只放行线下/人工确认；free 只由 0 元建单自动产生，绝不经 Admin 手动置 free；
 // wechat/alipay/benefit 为未来扩展，禁止写入。
@@ -25,6 +27,7 @@ export class AdminOrderActionsController {
   constructor(
     private readonly orderStatus: OrderStatusService,
     private readonly refundService: RefundService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('admin/orders/:id/mark-paid')
@@ -67,5 +70,34 @@ export class AdminOrderActionsController {
     @CurrentUser() user: AuthedUser,
   ) {
     return this.refundService.refund(id, { reason: body.refundReason, operatorId: user.userId })
+  }
+
+  @Post('admin/orders/:id/print-return/confirm-refunded')
+  confirmRefunded(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
+    return resolvePrintReturnHold(this.prisma, id, 'confirm_refunded', user.userId)
+  }
+
+  @Post('admin/orders/:id/print-return/release-paper')
+  releasePaper(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
+    return resolvePrintReturnHold(this.prisma, id, 'release_paper', user.userId)
+  }
+
+  @Post('admin/orders/:id/print-return/close')
+  closeHeldOrder(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
+    return resolvePrintReturnHold(this.prisma, id, 'close_order', user.userId)
+  }
+
+  /** 纸已经放行之后的单独路径。退款服务记下人工核对，再按实付开退款。 */
+  @Post('admin/orders/:id/refund-after-paper-check')
+  refundAfterPaperCheck(
+    @Param('id') id: string,
+    @Body() body: AdminRefundDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.refundService.refund(id, {
+      reason: body.refundReason,
+      operatorId: user.userId,
+      verifiedAfterPaper: true,
+    })
   }
 }

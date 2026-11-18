@@ -39,7 +39,9 @@ import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provi
 import { settleServiceRefundNotify } from './service-order.payment'
 import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput, type RefundExecuteResult } from './payment-provider.types'
 import { notifyPrintReturnHold } from './print-return-alert'
+import { assertCanOpenRefund } from './refund-paper-exclusion'
 import { convergeNotifiedRefundSuccess } from './refund-notify-paper-guard'
+import { stageNewRefund } from './stage-order-refund'
 import {
   holdMismatchedChannelRefund,
   isWholeOrderRefundAmount,
@@ -78,16 +80,6 @@ export interface RefundResultView {
   order: { orderNo: string; payStatus: string; refundedAmountCents: number; refundedAt: string | null }
   /** 幂等命中（重复 refundNo）时为 true —— 未重复出款/审计。 */
   idempotent: boolean
-}
-
-/** 判断是否为 refundNo 唯一约束冲突（Prisma P2002）。 */
-function isRefundNoConflict(e: unknown): boolean {
-  const err = e as { code?: string; meta?: { target?: unknown } }
-  if (err?.code !== 'P2002') return false
-  const target = err.meta?.target
-  if (typeof target === 'string') return target.includes('refundNo')
-  if (Array.isArray(target)) return target.some((t) => String(t).includes('refundNo'))
-  return true
 }
 
 /**
@@ -262,7 +254,7 @@ export class RefundService {
    */
   async refund(
     orderId: string,
-    opts: { refundNo?: string; reason: string; operatorId?: string; unreleasedOnly?: boolean },
+    opts: { refundNo?: string; reason: string; operatorId?: string; unreleasedOnly?: boolean; verifiedAfterPaper?: boolean },
   ): Promise<RefundResultView> {
     const reason = opts.reason?.trim()
     if (!reason) throw new BadRequestException('REFUND_REASON_REQUIRED')
@@ -311,17 +303,6 @@ export class RefundService {
       return this.toView(existing, await this.requireOrder(existing.orderId), true)
     }
 
-    // ②′ 现场已确认出纸：禁止退款。只读 PrintTask.printOutcome，不改任务状态。
-    if (order.printTaskId) {
-      const printTask = await this.prisma.printTask.findUnique({
-        where: { id: order.printTaskId },
-        select: { printOutcome: true },
-      })
-      if (printTask?.printOutcome === 'printed') {
-        throw new BadRequestException('PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN')
-      }
-    }
-
     const collected = isOnlineCollectedPendingRefund(order)
     let channel: string
     let amountCents: number
@@ -342,60 +323,33 @@ export class RefundService {
       amountCents = Math.max(0, order.amountCents - order.discountCents)
     }
 
-    // ③ 阶段一：CAS unpaid/paying/closed 或 paid → refunding + 建 Refund(pending)。refundNo 唯一兜底并发幂等。
-    let refund: RefundRecord
-    try {
-      const staged = await this.prisma.$transaction(async (tx) => {
-        const cas = collected
-          ? await tx.order.updateMany({
-              where: {
-                id: orderId,
-                payStatus: { in: [...ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES] },
-                refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
-                paymentSource: null,
-                paidAt: null,
-                pickupCode: null,
-                taskStatus: { notIn: [...ACTIVE_PRINT_TASK_STATES] },
-              },
-              data: { payStatus: 'refunding' },
-            })
-          : await tx.order.updateMany({
-              where: {
-                id: orderId,
-                payStatus: 'paid',
-                taskStatus: { notIn: [...ACTIVE_PRINT_TASK_STATES] },
-                // 到期未取自动退只退还没核销、没挂打印任务的单。人工退款不带这个限制。
-                ...(opts.unreleasedOnly
-                  ? { printTaskId: null, pickupStatus: { in: ['pending', 'expired'] } }
-                  : {}),
-              },
-              data: { payStatus: 'refunding' },
-            })
-        if (cas.count === 0) {
-          // 同 refundNo 并发竞态（第二轮审查 M2 修复）：先发方可能刚过①闸建好同号记录 ——
-          // 幂等返回既有记录，而不是对合法重试方报 ORDER_ALREADY_REFUNDED。
-          const raced = await tx.refund.findUnique({ where: { refundNo } })
-          if (raced) return { record: raced, raced: true as const }
-          const fresh = await tx.order.findUnique({ where: { id: orderId } })
-          if (fresh && ACTIVE_PRINT_TASK_STATES.has(fresh.taskStatus)) {
-            throw new BadRequestException('ORDER_TASK_IN_PROGRESS')
-          }
-          if (fresh && ALREADY_REFUND_STATES.has(fresh.payStatus)) throw new BadRequestException('ORDER_ALREADY_REFUNDED')
-          throw new BadRequestException('ORDER_INVALID_TRANSITION')
-        }
-        const record = await tx.refund.create({
-          data: { orderId, refundNo, amountCents, status: 'pending', reason, channel, operatorId: opts.operatorId ?? null },
-        })
-        return { record, raced: false as const }
+    // 同一事务里先看有没有在办的退款、纸有没有放行，再改成退款中。
+    const staged = await stageNewRefund(this.prisma, {
+      orderId,
+      refundNo,
+      reason,
+      channel,
+      amountCents,
+      operatorId: opts.operatorId ?? null,
+      collected,
+      unreleasedOnly: opts.unreleasedOnly === true,
+      verifiedAfterPaper: opts.verifiedAfterPaper === true,
+    })
+    if (staged.idempotent) return this.toView(staged.record, await this.requireOrder(orderId), true)
+    const refund = staged.record
+    if (opts.verifiedAfterPaper) {
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'admin',
+        action: 'refund.paper_checked',
+        targetType: 'order',
+        targetId: orderId,
+        payload: {
+          refundNo: refund.refundNo,
+          operatorId: opts.operatorId ?? null,
+          detail: '核对后仍退款，纸可能已经出去',
+        },
       })
-      if (staged.raced) return this.toView(staged.record, await this.requireOrder(orderId), true)
-      refund = staged.record
-    } catch (e) {
-      if (isRefundNoConflict(e)) {
-        const ex = await this.prisma.refund.findUnique({ where: { refundNo } })
-        if (ex) return this.toView(ex, await this.requireOrder(orderId), true)
-      }
-      throw e
     }
 
     // ④ 阶段二：provider 通道执行渠道退款（三分法）；非 provider 通道直接完成。
@@ -690,6 +644,7 @@ export class RefundService {
    * 渠道幂等保证与「其实已出款」的极端错判也不会二次出款。
    */
   private async retryFailedRefund(refund: RefundRecord, operatorId?: string): Promise<RefundResultView> {
+    await assertCanOpenRefund(this.prisma, refund.orderId, { refundNo: refund.refundNo, verifiedAfterPaper: false })
     const order = await this.requireOrder(refund.orderId)
     const collectedRetry = isOnlineCollectedRefundLock(order) && isOnlineCollectedPendingRefund(order)
     if (!collectedRetry && order.payStatus !== 'paid') {

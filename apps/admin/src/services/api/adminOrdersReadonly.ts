@@ -140,6 +140,15 @@ export interface AdminOrderMarkPaidResult {
   paidAt: string | null
 }
 
+export interface PrintReturnResolutionResult {
+  orderId: string
+  payStatus: string
+  refundStatus: string
+  taskStatus: string
+  refundNo: string
+  amountCents: number
+}
+
 export interface AdminOrderRefundResult {
   refund: {
     refundNo: string
@@ -158,6 +167,8 @@ interface AdminOrdersReadonlyService {
   list(params: ListAdminOrdersReadonlyParams): Promise<AdminOrderReadonlyPage>
   getById(id: string): Promise<AdminOrderReadonlyDetail>
   refundOrder(id: string, refundReason: string): Promise<AdminOrderRefundResult>
+  resolvePrintReturnHold(id: string, action: 'confirm-refunded' | 'release-paper' | 'close'): Promise<PrintReturnResolutionResult>
+  refundAfterPaperCheck(id: string, refundReason: string): Promise<AdminOrderRefundResult>
   /** 线下 / 人工确认收款入账；仅 `payStatus==='unpaid'` 的订单可成功，其余由后端拒绝并回错误码。 */
   markPaidOrder(id: string, paymentSource: AdminOrderMarkPaidSource): Promise<AdminOrderMarkPaidResult>
   retryServiceRefund(id: string): Promise<AdminOrderReadonlyDetail>
@@ -235,6 +246,10 @@ const httpAdapter: AdminOrdersReadonlyService = {
   refundServiceOrder: (id) => post<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}/refund-service`, { confirm: true }),
   refundOrder: (id, refundReason) =>
     post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund`, { refundReason }),
+  resolvePrintReturnHold: (id, action) =>
+    post<PrintReturnResolutionResult>(`/admin/orders/${encodeURIComponent(id)}/print-return/${action}`, {}),
+  refundAfterPaperCheck: (id, refundReason) =>
+    post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund-after-paper-check`, { refundReason }),
   markPaidOrder: (id, paymentSource) =>
     post<AdminOrderMarkPaidResult>(`/admin/orders/${encodeURIComponent(id)}/mark-paid`, { paymentSource }),
 }
@@ -656,6 +671,32 @@ const mockAdapter: AdminOrdersReadonlyService = {
       order: { orderNo: MOCK_DETAIL.orderNo, payStatus: 'refunded', refundedAmountCents: 0, refundedAt },
       idempotent: false,
     }
+  },
+  async resolvePrintReturnHold(id, action) {
+    if (!mockDetailState.refundLedgerNo) {
+      throw new ApiHttpError('REFUND_HOLD_NOT_FOUND', '没有待人工处理的退款，不能做这一步。', 400)
+    }
+    const payStatus = action === 'confirm-refunded' ? 'refunded' : action === 'close' ? 'closed' : 'paid'
+    const refundStatus = action === 'confirm-refunded' ? 'success' : action === 'close' ? 'closed' : 'withdrawn'
+    mockDetailState = {
+      ...mockDetailState,
+      payStatus,
+      refundStatus,
+      refundEligible: false,
+      printRefundDisposition: null,
+      updatedAt: now(),
+    }
+    return {
+      orderId: id,
+      payStatus,
+      refundStatus,
+      taskStatus: action === 'release-paper' ? 'pending' : 'cancelled',
+      refundNo: mockDetailState.refundLedgerNo ?? '',
+      amountCents: mockDetailState.refundLedgerCents ?? 0,
+    }
+  },
+  async refundAfterPaperCheck(_id, refundReason) {
+    return mockAdapter.refundOrder(_id, refundReason)
   },
 }
 

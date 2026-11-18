@@ -29,6 +29,8 @@ import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../payment/pending-refund-signal'
+import { STALE_ATTEMPT_REFUND_REASON } from '../payment/print-no-paper-refund.constants'
+import { recordBlockedClaimReason, rejectClaimForRefund } from '../payment/refund-paper-exclusion'
 import { settleExplicitNoPaperFromReportedFailure, settleReportedTaskFailures } from '../payment/print-no-paper-refund'
 import {
   claimableFreshnessFilter,
@@ -470,19 +472,9 @@ export class TerminalAgentService implements OnModuleInit {
     const limit = Math.min(dto.maxTasks, 1) // Phase 8.2A: max 1 per cycle
 
     const claimedPayloads: Array<Omit<ClaimTaskResponse, 'attempt'>> = []
+    await recordBlockedClaimReason(this.prisma, terminalId)
 
-    // 出纸的唯一前置条件：这一单已经付过钱。
-    //
-    // 这里曾经是一个 env 开关（PRINT_REQUIRE_PAID_BEFORE_CLAIM），默认关闭，
-    // 关闭时 unpaid / paying / closed / expired 全都能被领走真实出纸。免费单
-    // （amountCents=0）与线下收款（Admin mark-paid）本来就落成 payStatus='paid'，
-    // 所以那个开关没有任何合法用途，只是一条可以被配置打开的资损旁路，已删除。
-    //
-    // 无关联订单的任务同样不再放行：真实业务流两条建单路径都在同一事务内把
-    // PrintTask 与 Order 绑定，能匹配「无订单」的只剩孤儿数据（手工 SQL / 缺陷 /
-    // 迁移残留），那正是绕过付费的形状。
-    // dev 播种任务（ptask_seed_001）不受影响：它建出来 terminalId 为 null，
-    // 而本查询一直带终端过滤，本改动前后都匹配不上任何终端的领取请求。
+    // 已付才能领。退款在办或已按实付退成的不领。过期付款退成不挡住后来的新付款。
     const claimableWhere = {
       status: 'pending' as const,
       terminalId,
@@ -494,6 +486,16 @@ export class TerminalAgentService implements OnModuleInit {
             { refundReason: null },
             { refundReason: { not: PAID_UNFULFILLED_PENDING_REFUND_REASON } },
           ],
+          NOT: {
+            refunds: {
+              some: {
+                OR: [
+                  { status: { in: ['pending', 'failed', 'manual_review'] } },
+                  { status: 'success', reason: { not: STALE_ATTEMPT_REFUND_REASON } },
+                ],
+              },
+            },
+          },
         },
       },
       // 已知不可用的现代文件不应卡住后面的合法任务；事务内仍会再次读取
@@ -524,7 +526,6 @@ export class TerminalAgentService implements OnModuleInit {
             data: { lifecycleStatus: 'active' },
           })
           if (activeLock.count !== 1) return null
-          // 与领取同一事务：跳过失效文件时写下待退款标记。不建 Refund、不出纸。
           await parkPaidOrdersWithUnprintableFiles(tx, terminalId, now)
           const task = await tx.printTask.findFirst({
             where: claimableWhere,
@@ -545,10 +546,9 @@ export class TerminalAgentService implements OnModuleInit {
             }
           }
 
-          // 订单必须存在（claimableWhere 已要求），并以 CAS 再确认一次仍是 paid+pending：
-          // findFirst 与 updateMany 之间存在退款/关单的时间窗，只靠前置查询会漏。
           const order = await tx.order.findFirst({ where: { printTaskId: task.id }, select: { id: true } })
           if (!order) return null
+          if (await rejectClaimForRefund(tx, order.id, task.id)) return null
           const claimedOrder = await tx.order.updateMany({
             where: { id: order.id, taskStatus: 'pending', payStatus: 'paid' },
             data: { taskStatus: 'claimed', terminalId },

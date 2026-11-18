@@ -1,5 +1,5 @@
 import type { OrderDetailControls } from './useOrderDetail'
-import { PAY_STATUS_MAP, MARK_PAID_SOURCES, markPaidSourceLabel, amountText, fmt } from './orderDisplay'
+import { PAY_STATUS_MAP, MARK_PAID_SOURCES, markPaidSourceLabel, amountText, fmt, orderPaperReleased } from './orderDisplay'
 
 export function OrderPaymentActions({ controls }: { controls: OrderDetailControls }) {
   const { detail, markPaidResult, setMarkPaidResult, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidError, setMarkPaidError, markPaidSubmitting, handleMarkPaid, refundOpen, setRefundOpen, refundReason, setRefundReason, refundError, setRefundError, refundSubmitting, handleRefund, adminRefundOpen, setAdminRefundOpen, adminRefundSubmitting, adminRefundError, setAdminRefundError, handleAdminServiceRefund } = controls
@@ -195,7 +195,11 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
               </p>
             )}
             {detail.refundEligible && detail.amountCents !== 0 && (
-              <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
+              orderPaperReleased(detail) ? (
+                <p className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5 text-[13px] text-neutral-700">
+                  这单已经放行出纸或已经出纸，这一页的普通退款不能用。请用下面的「核对后仍退款」。
+                </p>
+              ) : <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
                 {!refundOpen ? (
                   <div className="flex items-center justify-between">
                     <div>
@@ -205,7 +209,7 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
                       <p className="mt-0.5 text-xs text-neutral-500">
                         {detail.refundRequired
                           ? `${detail.refundReason === 'ONLINE_PAID_PENDING_REFUND' ? '渠道已收款但订单未转已支付' : '已付款未出纸'}。系统不会自动出款；只有管理员点确认后才会向支付渠道发起。金额以本页服务端金额为准。`
-                          : `退款 ${amountText(detail.amountCents, detail.currency)}，操作不可撤销，仅管理员可执行`}
+                          : `退款 ${amountText(Math.max(0, detail.amountCents - detail.discountCents), detail.currency)}，操作不可撤销，仅管理员可执行`}
                       </p>
                     </div>
                     <button

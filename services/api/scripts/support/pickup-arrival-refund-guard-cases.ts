@@ -1,9 +1,11 @@
 /**
- * 退款曾经失败之后，又收到渠道成功通知。
- * 打印任务还没失败：不能把订单改成已退款。
- * 打印任务已经失败：可以收敛成退款成功。
+ * 渠道退款成功通知。
+ * 任务已领取：不能记成退款成功，停在待人工，原因写明已经放行出纸。
+ * 任务还是待打印、先前失败：记成退款成功，任务保持待打印，终端不能再领。
+ * 任务已领取且退款还在处理：整笔成功通知也不能记成已退。
+ * 管理员关单之后渠道又通知退成：退款行回到待人工，订单保持关闭，不抛错。
  * 渠道少退：详情必须是待人工，不能是空。
- * 三条都走 processWechatRefundNotify，停掉服务里的调用这里会红。
+ * 都走 processWechatRefundNotify，停掉服务里的调用这里会红。
  */
 import assert from 'node:assert/strict'
 import { createSign, generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto'
@@ -21,6 +23,9 @@ import {
   WechatPayProvider,
 } from '../../src/payment/providers/wechat-pay.provider'
 import { explainPrintRefund } from '../../src/payment/print-return-disposition'
+import { CLAIM_BLOCKED_BY_REFUND_AUDIT, CLAIM_BLOCKED_BY_REFUND_REASON } from '../../src/payment/refund-paper-exclusion'
+import { resolvePrintReturnHold } from '../../src/payment/resolve-print-return-hold'
+import { TerminalAgentService } from '../../src/terminals/terminals-agent.service'
 import { PAID_NO_PAPER_AUTO_REASON } from '../../src/payment/print-no-paper-refund.constants'
 import { RefundService } from '../../src/payment/refund.service'
 import type { PrismaService } from '../../src/prisma/prisma.service'
@@ -159,7 +164,10 @@ export async function runRefundPaperGuardCases(db: PrismaService, tag: string): 
       return { orderId, refundNo }
     }
 
-    const held = await seed('held', 'pending', 'failed', 'paid')
+    const agent = new TerminalAgentService(db, new AuditService(db), { validateTerminalToken: async () => undefined } as never)
+    const claimCount = async () => (await agent.claimTasks(terminalId, { maxTasks: 1 }, 'Bearer test')).length
+
+    const held = await seed('held', 'claimed', 'failed', 'paid')
     const heldNotify = buildRefundNotify({
       mchid: '1900000001',
       out_trade_no: `pa_${held.orderId}`,
@@ -172,7 +180,7 @@ export async function runRefundPaperGuardCases(db: PrismaService, tag: string): 
     assert.equal(heldResult.ok, true)
     assert.equal((await db.refund.findUnique({ where: { refundNo: held.refundNo } }))?.status, 'manual_review')
     assert.equal((await db.order.findUnique({ where: { id: held.orderId } }))?.payStatus, 'paid')
-    assert.equal((await db.printTask.findUnique({ where: { id: `pt_${held.orderId}` } }))?.status, 'pending')
+    assert.equal((await db.printTask.findUnique({ where: { id: `pt_${held.orderId}` } }))?.status, 'claimed')
     const heldView = await explainPrintRefund(db, held.orderId)
     assert.equal(heldView.disposition, 'manual')
     assert.equal(heldView.refundStatus, 'manual_review')
@@ -213,11 +221,64 @@ export async function runRefundPaperGuardCases(db: PrismaService, tag: string): 
     assert.equal(shortDetail.refundLedgerNo, short.refundNo)
     assert.equal(shortDetail.refundLedgerCents, 137)
     assert.equal((await collectPrintReturnAlerts(db)).some((alert) => alert.subjectId === short.orderId), true)
+
+    const opened = await seed('open', 'pending', 'failed', 'paid')
+    assert.equal(await claimCount(), 0, '退款失败时不能出纸')
+    const blockedAudit = await db.auditLog.findFirst({
+      where: { targetId: opened.orderId, action: CLAIM_BLOCKED_BY_REFUND_AUDIT },
+    })
+    assert.match(blockedAudit?.payloadJson ?? '', new RegExp(CLAIM_BLOCKED_BY_REFUND_REASON))
+    const openNotify = buildRefundNotify({
+      mchid: '1900000001',
+      out_trade_no: `pa_${opened.orderId}`,
+      out_refund_no: opened.refundNo,
+      refund_id: `wx_${tag}_open`,
+      refund_status: 'SUCCESS',
+      amount: { refund: 137, total: 137 },
+    }, apiV3Key, platformKeys.privateKey, serial)
+    await refunds.processWechatRefundNotify(openNotify.rawBody, openNotify.headers)
+    assert.equal((await db.refund.findUnique({ where: { refundNo: opened.refundNo } }))?.status, 'success')
+    assert.equal((await db.order.findUnique({ where: { id: opened.orderId } }))?.payStatus, 'refunded')
+    assert.equal((await db.printTask.findUnique({ where: { id: `pt_${opened.orderId}` } }))?.status, 'pending')
+    assert.equal(await claimCount(), 0, '退款成功后不能出纸')
+
+    const latePaper = await seed('late', 'claimed', 'pending', 'refunding')
+    const lateNotify = buildRefundNotify({
+      mchid: '1900000001',
+      out_trade_no: `pa_${latePaper.orderId}`,
+      out_refund_no: latePaper.refundNo,
+      refund_id: `wx_${tag}_late`,
+      refund_status: 'SUCCESS',
+      amount: { refund: 137, total: 137 },
+    }, apiV3Key, platformKeys.privateKey, serial)
+    await refunds.processWechatRefundNotify(lateNotify.rawBody, lateNotify.headers)
+    assert.equal((await db.refund.findUnique({ where: { refundNo: latePaper.refundNo } }))?.status, 'manual_review')
+    assert.equal((await db.order.findUnique({ where: { id: latePaper.orderId } }))?.payStatus, 'paid')
+    assert.notEqual((await db.order.findUnique({ where: { id: latePaper.orderId } }))?.payStatus, 'refunded')
+    assert.equal((await db.printTask.findUnique({ where: { id: `pt_${latePaper.orderId}` } }))?.status, 'claimed')
+
+    const shut = await seed('shut', 'cancelled', 'closed', 'closed')
+    const shutNotify = buildRefundNotify({
+      mchid: '1900000001',
+      out_trade_no: `pa_${shut.orderId}`,
+      out_refund_no: shut.refundNo,
+      refund_id: `wx_${tag}_shut`,
+      refund_status: 'SUCCESS',
+      amount: { refund: 137, total: 137 },
+    }, apiV3Key, platformKeys.privateKey, serial)
+    const shutResult = await refunds.processWechatRefundNotify(shutNotify.rawBody, shutNotify.headers)
+    assert.equal(shutResult.ok, true)
+    assert.equal((await db.refund.findUnique({ where: { refundNo: shut.refundNo } }))?.status, 'manual_review')
+    assert.equal((await db.order.findUnique({ where: { id: shut.orderId } }))?.payStatus, 'closed')
+    const shutResolved = await resolvePrintReturnHold(db, shut.orderId, 'confirm_refunded', 'admin-test')
+    assert.equal(shutResolved.refundStatus, 'success')
+    assert.equal(shutResolved.payStatus, 'closed')
   } finally {
     await db.refund.deleteMany({ where: { orderId: { in: orderIds } } })
     await db.paymentAttempt.deleteMany({ where: { orderId: { in: orderIds } } })
     await db.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
     await db.order.deleteMany({ where: { id: { in: orderIds } } })
+    await db.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await db.printTask.deleteMany({ where: { id: { in: taskIds } } })
     await db.terminal.deleteMany({ where: { id: terminalId } })
   }

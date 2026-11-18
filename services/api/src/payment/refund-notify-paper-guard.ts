@@ -1,14 +1,14 @@
 /**
  * 渠道退款成功通知的收敛。
  *
- * 同一单不许既出纸又退款。退款曾经失败、订单回到已付款之后，取件可以建出打印任务；
- * 渠道随后又通知 SUCCESS 时，不能把这单改成已退款。退款行改成待人工，订单停在已付款。
- * 打印任务已经失败（纸没有出去）时仍允许收敛为退款成功，否则没出纸的退款在渠道先失败、后补成功时退不掉。
- * 退款还是 pending、任务也还是 pending 的旧路径保持原样：那不是「失败之后又放行」。
+ * 同一单不许既出纸又退款。任务已领取、打印中、已完成，或订单已标成领取中、打印中，
+ * 或已经核对为出纸，都算已经放行。这时无论退款原先是待确认还是失败，都不能记成退款成功。
+ * 任务还是待打印、纸也没出去：迟到的成功通知记成退款成功。打印任务状态不在这里改。
  */
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import type { PrismaTransactionClient } from '../prisma/prisma.service'
 import { REFUND_STATUS_MANUAL_REVIEW } from './refund-amount-hold'
+import { paperAlreadyReleased } from './refund-paper-exclusion'
 import {
   ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES,
   ONLINE_PAID_PENDING_REFUND_REASON,
@@ -29,7 +29,7 @@ export async function convergeNotifiedRefundSuccess(
 ): Promise<'completed' | 'blocked' | 'idempotent'> {
   const order = await tx.order.findUnique({
     where: { id: input.orderId },
-    select: { printTaskId: true },
+    select: { printTaskId: true, taskStatus: true },
   })
   if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
   const task = order.printTaskId
@@ -38,13 +38,15 @@ export async function convergeNotifiedRefundSuccess(
       select: { status: true, printOutcome: true },
     })
     : null
-  // 任务还没失败、也没取消，就还能出纸。printOutcome 为空的 pending 也算已经放行。
-  // 任务已经失败才视为没出纸，迟到的成功通知仍可记成退款成功。
-  const printable = task != null && task.status !== 'failed' && task.status !== 'cancelled'
-  const alreadyPrinted = task?.printOutcome === 'printed'
-  if (input.priorStatus === 'failed' && (printable || alreadyPrinted)) {
+  const released = paperAlreadyReleased({
+    taskStatus: task?.status ?? null,
+    orderTaskStatus: order.taskStatus,
+    printOutcome: task?.printOutcome ?? null,
+  })
+  const canBlock = input.priorStatus === 'failed' || input.priorStatus === 'pending' || input.priorStatus === 'withdrawn'
+  if (canBlock && released) {
     const held = await tx.refund.updateMany({
-      where: { id: input.refundId, status: { in: ['pending', 'failed'] } },
+      where: { id: input.refundId, status: { in: ['pending', 'failed', 'withdrawn'] } },
       data: {
         status: REFUND_STATUS_MANUAL_REVIEW,
         ...(input.channelRefundNo ? { channelRefundNo: input.channelRefundNo } : {}),
@@ -73,8 +75,37 @@ export async function convergeNotifiedRefundSuccess(
     return 'blocked'
   }
 
+  // 管理员已经关单。渠道事后又通知退成时不能抛错（渠道会重试），也不能自动改成已退。
+  // 退款行回到待人工，订单保持关闭。
+  if (input.priorStatus === 'closed') {
+    const reopened = await tx.refund.updateMany({
+      where: { id: input.refundId, status: 'closed' },
+      data: {
+        status: REFUND_STATUS_MANUAL_REVIEW,
+        ...(input.channelRefundNo ? { channelRefundNo: input.channelRefundNo } : {}),
+      },
+    })
+    if (reopened.count === 0) return 'idempotent'
+    await tx.auditLog.create({
+      data: {
+        actorId: null,
+        actorRole: 'system',
+        action: PAPER_ALREADY_RELEASED_AUDIT,
+        targetType: 'order',
+        targetId: input.orderId,
+        payloadJson: JSON.stringify({
+          refundNo: input.refundId,
+          amountCents: input.amountCents,
+          reason: input.reason,
+          detail: '订单已经关闭，渠道又通知退成，改回待人工。订单保持关闭',
+        }),
+      },
+    })
+    return 'blocked'
+  }
+
   const casRefund = await tx.refund.updateMany({
-    where: { id: input.refundId, status: { in: ['pending', 'failed'] } },
+    where: { id: input.refundId, status: { in: ['pending', 'failed', 'withdrawn'] } },
     data: {
       status: 'success',
       ...(input.channelRefundNo ? { channelRefundNo: input.channelRefundNo } : {}),

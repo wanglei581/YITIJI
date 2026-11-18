@@ -288,8 +288,13 @@ export class AdminOrdersReadonlyService {
         })
       : []
 
+    const blocksAnotherRefund = printRefund.refundStatus === 'pending'
+      || printRefund.refundStatus === 'failed'
+      || printRefund.refundStatus === 'manual_review'
+      || printRefund.refundStatus === 'success'
     return {
       ...item,
+      refundEligible: item.refundEligible && !blocksAnotherRefund,
       refundedAt: row.refundedAt ? row.refundedAt.toISOString() : null,
       refundReason: row.refundReason,
       discountCents: row.discountCents,
