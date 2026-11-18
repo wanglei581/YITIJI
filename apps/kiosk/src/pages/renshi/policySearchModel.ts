@@ -147,8 +147,8 @@ export function policyExcerptAbout(content: string): string {
   return `约 ${(Math.round(count / 10) * 10).toLocaleString('zh-CN')} 字`
 }
 
-/** 阅读框大约能放 23 行，留一行，避免末行被裁。 */
-export const POLICY_READ_VISUAL_LINES = 22
+/** 阅读层顶边在 250，大约能放 25 行。留一行，避免末行被裁，所以一页 24 行。 */
+export const POLICY_READ_VISUAL_LINES = 24
 
 /**
  * 按屏高翻。一行放不下就换页；比一整页还长的一行按字切开，不插入换行。

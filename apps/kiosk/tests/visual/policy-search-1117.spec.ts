@@ -4,7 +4,7 @@ import { expect, test } from '../fixtures/kiosk-test'
 import { registerW4Api } from '../fixtures/fusion-w4-api'
 
 const LONG = [
-  ...Array.from({ length: 22 }, (_, index) => `第${index + 1}行正文，占满阅读层的这一页。`),
+  ...Array.from({ length: 24 }, (_, index) => `第${index + 1}行正文，占满阅读层的这一页。`),
   '第二页这一句只在翻页后出现，网址 https://hrss.example.gov.cn/policy 只当文字。',
 ].join('\n')
 
@@ -36,6 +36,8 @@ interface RouteOptions {
   holdKeyword?: string
   failOnceKeyword?: string
   tooLongKeyword?: string
+  /** 按引用每次请求读取，方便同一条用例里先放 4 条再补第 5 条。 */
+  extra?: Array<typeof HIT>
 }
 
 async function routePolicies(page: Page, options: RouteOptions = {}): Promise<{ release: () => void }> {
@@ -52,7 +54,8 @@ async function routePolicies(page: Page, options: RouteOptions = {}): Promise<{ 
     const detail = url.pathname.match(DETAIL_PATH)
     if (detail) {
       const id = decodeURIComponent(detail[1] ?? '')
-      const found = GUIDES.find((item) => item.id === id) ?? (id === NOTICE.id ? NOTICE : undefined)
+      const guides = [...GUIDES, ...(options.extra ?? [])]
+      const found = guides.find((item) => item.id === id) ?? (id === NOTICE.id ? NOTICE : undefined)
       if (!found) {
         await fulfill(route, 404, { error: { code: 'POLICY_NOT_FOUND' } })
         return
@@ -79,7 +82,7 @@ async function routePolicies(page: Page, options: RouteOptions = {}): Promise<{ 
     const audience = url.searchParams.get('audience')
     const pageNo = Math.max(1, Number(url.searchParams.get('page')) || 1)
     const pageSize = Math.max(1, Number(url.searchParams.get('pageSize')) || 200)
-    let feed = kind === 'notice' ? [NOTICE] : kind === 'policy_guide' ? GUIDES : []
+    let feed = kind === 'notice' ? [NOTICE] : kind === 'policy_guide' ? [...GUIDES, ...(options.extra ?? [])] : []
     if (audience) feed = feed.filter((item) => item.audience === audience)
     if (keyword) feed = feed.filter((item) => item.title.includes(keyword) || (item.summary ?? '').includes(keyword))
     await fulfill(route, 200, {
@@ -250,4 +253,26 @@ test('没绑定机构且一条没有时写本机还没有运营机构发布的�
   await expect(page.getByTestId('policy-search-input')).toHaveCount(0)
   await expect(page.getByText('这里还没有发布的政策')).toHaveCount(0)
   await expect(page.getByText('工作人员')).toHaveCount(0)
+})
+
+test('阅读层顶边在 250，日期整段留下，第 24 行仍在第 1 页 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  const title = '高校毕业生一次性创业补贴申请办法及办理说明全文标题用来验证只截标题不截日期'
+  await routePolicies(page, {
+    extra: [{ ...HIT, id: 'policy-long-title', title, publishedDate: '2026-11-05' }],
+  })
+  await page.goto('/renshi?policy=policy-long-title')
+  await page.getByTestId('policy-excerpt-open').click()
+  const sheet = page.locator('.policy-read-sheet')
+  await expect(sheet).toBeVisible()
+  await expect(sheet).toHaveCSS('top', '250px')
+  await expect(sheet.locator('.qxt-grab')).toBeVisible()
+  const rest = page.getByTestId('policy-read-rest')
+  await expect(rest).toHaveText(' · 示例人社局发布 · 11 月 5 日')
+  const restFit = await rest.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
+  expect(restFit).toBe(true)
+  const titleFit = await page.getByTestId('policy-read-title').evaluate((el) => el.scrollWidth > el.clientWidth)
+  expect(titleFit).toBe(true)
+  await expect(page.getByTestId('policy-excerpt-page')).toContainText('第24行正文')
+  await expect(page.getByTestId('policy-excerpt-page')).not.toContainText('第二页这一句只在翻页后出现')
 })

@@ -80,7 +80,7 @@ const session = await import(sessionUrl)
 const { PolicyKeywordTooLongError } = await import(policiesUrl)
 const { PolicySearchFieldView } = await import(fieldUrl)
 const { PolicyGuideRow } = await import(rowUrl)
-const { PolicyExcerpt } = await import(excerptUrl)
+const { PolicyExcerpt, PolicyReadSheet } = await import(excerptUrl)
 const { PolicyUnavailable } = await import(goneUrl)
 
 const noop = () => {}
@@ -251,12 +251,29 @@ test('原文两行放得下就整段放下，放不下才给展开全文', () =>
   assert.equal(oneLine[1], '第二行见习说明。')
   assert.equal(oneLine[2] + oneLine[3], '第三行创业说明，见 https://hrss.example.gov.cn/policy')
   assert.equal(oneLine[2].includes('\n'), false)
-  const wide = '字'.repeat(34 * 22 + 5)
+  const wide = '字'.repeat(34 * 24 + 5)
   const paged = model.policyExcerptPages(wide)
   assert.equal(paged.length, 2)
-  assert.equal(Array.from(paged[0]).length, 34 * 22)
+  assert.equal(Array.from(paged[0]).length, 34 * 24)
   assert.equal(paged[0].includes('\n'), false)
   assert.equal(paged.join(''), wide)
+})
+
+test('阅读层把发布和日期留在不收缩的后半段，并画出拖动条', () => {
+  const title = '高校毕业生一次性创业补贴申请办法全文标题很长'
+  const html = renderToStaticMarkup(createElement(PolicyReadSheet, {
+    title, source: '示例人社局', published: '11 月 5 日', pageText: '第一页正文',
+    pageIndex: 0, pageCount: 2, onPrev: noop, onNext: noop, onClose: noop,
+  }))
+  assert.match(html, /class="qxt-grab"/)
+  assert.match(html, /data-testid="policy-read-title"[^>]*>高校毕业生一次性创业补贴申请办法全文标题很长</)
+  assert.match(html, /data-testid="policy-read-rest"[^>]*> · 示例人社局发布 · 11 月 5 日</)
+  assert.equal(html.includes('全文标题很长发布'), false)
+  const lines = Array.from({ length: 24 }, (_, index) => `第${index + 1}行`)
+  const pages = model.policyExcerptPages([...lines, '第二页这一句'].join('\n'))
+  assert.equal(pages.length, 2)
+  assert.equal(pages[0], lines.join('\n'))
+  assert.equal(pages[1], '第二页这一句')
 })
 
 test('打开时 404 和正在看时过了截止日期是两句不同的话', () => {
