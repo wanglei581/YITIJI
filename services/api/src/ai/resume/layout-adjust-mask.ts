@@ -1,10 +1,15 @@
 /**
- * 排版调整出站：三段先完整遮盖，再在不切开占位符、也不留下数字前缀的位置截断原文。
+ * 排版调整出站：三段先完整遮盖，再把仍然连在一起的 11 位及以上数字换成可还原占位符，
+ * 最后在不切开占位符、也不留下数字前缀的位置截断原文。
  * 任一段超过遮盖入口上限就明确失败，不把后半段静默截掉。
+ *
+ * 残留的长数字走兜底遮盖，不走失败关闭。合同断言会把简历里的日期轴误判成残留，
+ * 这里若因 strict 为 false 就回 503，没有证件号的简历也会排不了版。
+ * 兜底只认连续数字，占位符仍走同一套还原。
  */
 import { ServiceUnavailableException } from '@nestjs/common'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextsForLlmReversible } from '../../common/pii/llm-input-mask'
-import { llmMaskPlaceholderPattern } from '../../common/pii/mask-placeholder'
+import { LLM_MASK_LONG_DIGIT_CATEGORY, llmMaskPlaceholderPattern } from '../../common/pii/mask-placeholder'
 
 export const AI_LAYOUT_ADJUST_TOO_LONG = 'AI_LAYOUT_ADJUST_TOO_LONG'
 export const AI_LAYOUT_ADJUST_TOO_LONG_MESSAGE =
@@ -27,19 +32,26 @@ export function separateGluedIdNumbers(text: string, breakWith = '\n'): string {
     .replace(GLUED_PHONE_AFTER, (hit) => `${hit}${breakWith}`)
 }
 
-const JSON_GLUE_BREAK = '|'
+/**
+ * 只作遮盖前的边界，出站前会删掉。
+ * 不用换行：换行写进 JSON 再序列化是反斜杠加字母 n。
+ * 实测第二段 18 位号仍会被遮住，但身份证规则的前边界认字母，类别落到银行卡。
+ * 这个字符不是数字也不是字母，序列化后还在，两段按各自的号类遮。
+ */
+const GLUE_SENTINEL = '\uE000'
+const LONG_DIGIT_RUN = /\d{11,}[Xx]?/gu
 
 function separateGluedJsonStrings(json: string): string {
   if (!json) return json
   try {
     return JSON.stringify(mapJsonStrings(JSON.parse(json) as unknown))
   } catch {
-    return separateGluedIdNumbers(json, JSON_GLUE_BREAK)
+    return separateGluedIdNumbers(json, GLUE_SENTINEL)
   }
 }
 
 function mapJsonStrings(value: unknown): unknown {
-  if (typeof value === 'string') return separateGluedIdNumbers(value, JSON_GLUE_BREAK)
+  if (typeof value === 'string') return separateGluedIdNumbers(value, GLUE_SENTINEL)
   if (Array.isArray(value)) return value.map((item) => mapJsonStrings(item))
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
@@ -49,6 +61,34 @@ function mapJsonStrings(value: unknown): unknown {
     return out
   }
   return value
+}
+
+function stripGlue(text: string): string {
+  return text.split(GLUE_SENTINEL).join('')
+}
+
+/** 拆分没覆盖到的长数字。同一串在三段里共用一个占位符，还原才对得上。 */
+function maskLongDigitRuns(text: string, extra: Map<string, string>, byValue: Map<string, string>): string {
+  return text.replace(LONG_DIGIT_RUN, (hit) => {
+    const known = byValue.get(hit)
+    if (known) return known
+    const token = `[${LLM_MASK_LONG_DIGIT_CATEGORY}_${extra.size + 1}]`
+    extra.set(token, hit)
+    byValue.set(hit, token)
+    return token
+  })
+}
+
+function withLongDigits(
+  engineRestore: (value: string) => string,
+  extra: ReadonlyMap<string, string>,
+): (value: string) => string {
+  if (extra.size === 0) return engineRestore
+  return (value: string): string => {
+    const restored = engineRestore(value)
+    if (typeof restored !== 'string' || restored.length === 0) return restored
+    return restored.replace(llmMaskPlaceholderPattern('gu'), (token) => extra.get(token) ?? token)
+  }
 }
 
 function tooLong(): never {
@@ -84,10 +124,8 @@ export function maskLayoutAdjustOutbound(input: {
   maskedResumeJson: string
   restore: (value: string) => string
 } {
-  const originalText = separateGluedIdNumbers(input.originalText)
-  const resumeValues = separateGluedIdNumbers(input.resumeValues)
-  // 换行写进 JSON 字符串再序列化会变成 \n，字母 n 贴着下一号，遮盖规则仍认不出。
-  // 字符串值里改用竖线，序列化后还是非数字边界。
+  const originalText = separateGluedIdNumbers(input.originalText, GLUE_SENTINEL)
+  const resumeValues = separateGluedIdNumbers(input.resumeValues, GLUE_SENTINEL)
   const resumeJson = separateGluedJsonStrings(input.resumeJson)
   if (
     originalText.length > LLM_MASK_INPUT_LIMIT
@@ -100,11 +138,14 @@ export function maskLayoutAdjustOutbound(input: {
     [originalText, resumeValues, resumeJson],
     'resume_layout_adjust',
   )
+  const extra = new Map<string, string>()
+  const byValue = new Map<string, string>()
+  const cover = (text: string) => maskLongDigitRuns(stripGlue(text), extra, byValue)
   const [maskedOriginal = '', maskedResumeValues = '', maskedResumeJson = ''] = masked.texts
   return {
-    maskedOriginal: cutMaskedLayoutText(maskedOriginal, input.maxOriginalChars),
-    maskedResumeValues,
-    maskedResumeJson,
-    restore: masked.restore,
+    maskedOriginal: cutMaskedLayoutText(cover(maskedOriginal), input.maxOriginalChars),
+    maskedResumeValues: cover(maskedResumeValues),
+    maskedResumeJson: cover(maskedResumeJson),
+    restore: withLongDigits(masked.restore, extra),
   }
 }
