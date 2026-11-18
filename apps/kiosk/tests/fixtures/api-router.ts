@@ -107,6 +107,16 @@ export class ApiRouter {
       status: 200,
       json: { available: true, providerLabel: null, reason: null, degradedCapabilities: [], disclaimer: '' },
     })
+    // 清场会发这两条忘掉小青对话 / 作业内存的请求。默认回 0，免得老用例撞「没登记的请求」。
+    // 作业号在路径里，requestKey 把它们收成同一条。
+    this.respond('POST', '/api/v1/assistant/sessions/forget', {
+      status: 200,
+      json: { forgotten: 0 },
+    })
+    this.respond('POST', '/api/v1/advisor/sessions/:sessionId/forget', {
+      status: 200,
+      json: { forgotten: 0 },
+    })
     // 无人值守服务联系方式。默认给出公示号码与服务时间，两个布尔都是假：
     // 单点位不出现「换一台机器」，小程序未发布不出现「手机上能看到 / 用手机继续」。
     // 要看换机、小程序已发布或 404 的用例自行 respond 覆盖。
@@ -290,5 +300,10 @@ function requestKey(method: string, path: string): string {
     throw new Error(`ApiRouter path must not include a query string or fragment: ${path}`)
   }
 
-  return `${normalizedMethod} ${path}`
+  // 清场按作业号逐个发 forget。登记和计数都收成这一条，真实路径仍原样发出。
+  const canonical = path.replace(
+    /^\/api\/v1\/advisor\/sessions\/[^/]+\/forget$/,
+    '/api/v1/advisor/sessions/:sessionId/forget',
+  )
+  return `${normalizedMethod} ${canonical}`
 }

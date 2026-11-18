@@ -132,7 +132,7 @@ export class MemberAssetsController {
     const result = await this.assets.deleteQaRecord(user.endUserId, id)
     await this.audit.write({
       actorId: null, actorRole: 'enduser', action: 'member.qa_record_delete',
-      targetType: 'advisor_artifact', targetId: id, payload: { endUserId: user.endUserId },
+      targetType: 'advisor_artifact', targetId: id, payload: { endUserId: user.endUserId, sessionDeleted: true },
       ipAddress: ipOf(req), userAgent: uaOf(req), requestId: req.requestId ?? null,
     })
     return ApiResponse.ok(result)

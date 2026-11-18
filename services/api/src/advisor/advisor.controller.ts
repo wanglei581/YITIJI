@@ -5,7 +5,7 @@ import { JwtService } from '@nestjs/jwt'
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { isMemberLookupUnavailable, resolveOptionalEndUser, verifiedEndUserId } from '../common/auth/optional-end-user'
 import { AdvisorService } from './advisor.service'
 import { ADVISOR_SKILLS, EVIDENCE_LEVELS, type AdvisorSkill } from './advisor-skills'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -79,10 +79,21 @@ export class AdvisorController {
     private readonly prisma: PrismaService,
   ) {}
 
-  private async requesterOf(req: ReqLike) {
-    const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
-    if (member) return { endUserId: member.endUserId, accessToken: null }
-    return { endUserId: null, accessToken: headerOf(req, 'x-advisor-access-token') }
+  private async requesterOf(req: ReqLike, strict = false) {
+    const member = await resolveOptionalEndUser(
+      headerOf(req, 'authorization') ?? undefined,
+      this.jwt,
+      this.redis,
+      this.prisma,
+      strict ? { strict: true } : undefined,
+    )
+    // 其它接口认出会员后不再看游客令牌。清场（strict）两种都留下：
+    // 会员作业看会员，游客作业看这个令牌，各自核归属。
+    if (member && !strict) return { endUserId: member.endUserId, accessToken: null }
+    return {
+      endUserId: member?.endUserId ?? null,
+      accessToken: headerOf(req, 'x-advisor-access-token'),
+    }
   }
 
   /**
@@ -187,5 +198,23 @@ export class AdvisorController {
     @Req() req: ReqLike,
   ) {
     return this.service.printArtifact(sessionId, artifactId, await this.requesterOf(req))
+  }
+
+  /** 一体机清场：丢掉这一次作业的问答内存。不删库里的作业。找不到或不是本人都当已经清掉。 */
+  @Post('sessions/:sessionId/forget')
+  @AiUseExempt('清场时丢掉这一次作业的问答内存，不调模型；AI 暂停期间也必须能删')
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  async forget(@Param('sessionId') sessionId: string, @Req() req: ReqLike) {
+    let requester: Awaited<ReturnType<AdvisorController['requesterOf']>>
+    try {
+      requester = await this.requesterOf(req, true)
+    } catch (error) {
+      if (isMemberLookupUnavailable(error)) {
+        const endUserId = verifiedEndUserId(headerOf(req, 'authorization') ?? undefined, this.jwt)
+        this.service.discardQaMemoryIfOwner(sessionId, endUserId ? `u:${endUserId}` : null)
+      }
+      throw error
+    }
+    return this.service.forgetSession(sessionId, requester)
   }
 }

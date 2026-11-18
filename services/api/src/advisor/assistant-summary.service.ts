@@ -48,13 +48,14 @@ export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
 import { AiQuotaService } from '../ai/quota/ai-quota.service'
 import { quotaSequence, runWithAiQuota } from '../ai/quota/ai-quota-run'
 import { AdvisorArtifactService } from './advisor-artifact.service'
-import { ADVISOR_DISCLAIMER } from './advisor-skills'
+import { ADVISOR_DISCLAIMER, ASSISTANT_SUMMARY_SKILL_REASON, ASSISTANT_SUMMARY_TOPIC } from './advisor-skills'
 import type { QaPinsPayload } from './advisor-artifact.types'
 
 // ============================================================
 // 小青助手「本次要点」：把内存中的 assistant 会话浓缩成可打印 qa_pins。
 //
 // 不改 Prisma 模型：AdvisorSession.slotsJson.source = 'assistant' 标记来源。
+// 开场原话不落库：topic 只存固定标签，slotsJson 只留来源；AI 整理的要点照旧保存。
 // 匿名一律 404，不泄露「需要登录」。产物走既有 AdvisorArtifact.print。
 // 日志 / 审计只写元数据，不含对话正文或转写文本。
 // ============================================================
@@ -150,7 +151,7 @@ export class AssistantSummaryService {
     // 顾问记录再结算；模型报错等服务端确认的失败归还。操作号由服务端签发。
     let stored: SavedSummary | null = null
     const persist = async (value: { highlights: string[]; todos: string[] }): Promise<string> => {
-      stored = await this.persistSummary(value, userTurns[0]!.content, endUserId)
+      stored = await this.persistSummary(value, endUserId)
       return stored.row.id
     }
     const parsed = this.quota
@@ -201,10 +202,8 @@ export class AssistantSummaryService {
   /** 把浓缩后的要点存成本人的顾问记录与 qa_pins 产物，写审计。结算只在这之后。 */
   private async persistSummary(
     parsed: { highlights: string[]; todos: string[] },
-    firstUserText: string,
     endUserId: string,
   ): Promise<SavedSummary> {
-    const firstUser = firstUserText.trim().slice(0, 600)
     const nowIso = new Date().toISOString()
     const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000)
     const row = await this.prisma.advisorSession.create({
@@ -213,12 +212,11 @@ export class AssistantSummaryService {
         accessTokenHash: null,
         skill: 'qa',
         status: 'completed',
-        topic: firstUser || '小青对话要点',
-        skillReason: '由小青助手本次对话浓缩',
+        topic: ASSISTANT_SUMMARY_TOPIC,
+        skillReason: ASSISTANT_SUMMARY_SKILL_REASON,
         skillSource: 'llm',
         slotsJson: JSON.stringify({
           source: { value: 'assistant', filledAt: nowIso },
-          question: { value: firstUser, filledAt: nowIso },
         }),
         expiresAt,
       },

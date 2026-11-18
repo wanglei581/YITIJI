@@ -63,7 +63,7 @@ flowchart TD
 | **AdPlaylistItem** | 8 | AdAsset、AdPlaylist | 1 个文件<br/>`content/content.service.ts` |
 | **AdvisorArtifact** | 11 | AdvisorSession | 6 个文件<br/>`advisor/advisor-artifact.service.ts`<br/>`advisor/advisor-retention.task.ts`<br/>`advisor/advisor.service.ts`<br/>… |
 | **AdvisorPin** | 8 | AdvisorSession | 2 个文件<br/>`advisor/advisor.service.ts`<br/>`member-privacy/member-closure.service.ts` |
-| **AdvisorSession** | 14 | AdvisorArtifact、AdvisorPin | 3 个文件<br/>`advisor/advisor-retention.task.ts`<br/>`advisor/advisor.service.ts`<br/>`advisor/assistant-summary.service.ts` |
+| **AdvisorSession** | 14 | AdvisorArtifact、AdvisorPin | 4 个文件<br/>`advisor/advisor-retention.task.ts`<br/>`advisor/advisor.service.ts`<br/>`advisor/assistant-summary.service.ts`<br/>… |
 | **AgentReleaseArtifact** | 11 | AgentReleasePlan | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **AgentReleasePlan** | 18 | ActiveReleaseObservationAssignment、AgentReleaseArtifact、AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **AgentReleaseTarget** | 10 | ActiveReleaseObservationAssignment、AgentReleasePlan、Terminal、TerminalReleaseObservation | 1 个文件<br/>`terminals/release-observation.service.ts` |

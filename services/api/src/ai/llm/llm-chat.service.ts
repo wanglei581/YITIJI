@@ -9,7 +9,10 @@
 // ============================================================
 
 import { createHash, randomBytes } from 'crypto'
-import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common'
+import { Cron, CronExpression } from '@nestjs/schedule'
+import { ConversationEpoch } from '../../common/conversation-epoch'
+import { ConversationMemoryBridge } from '../../common/conversation-memory-bridge'
 import { AssistantPolicyContextService, appendAssistantPolicyContext, policyUnavailableResult } from './assistant-policy-context'
 import type {
   AssistantAction,
@@ -241,12 +244,13 @@ function safeLogValue(value: unknown, maxChars = 80): string {
  * 送模型前遮盖用户说的话（本轮 + 历史），只遮高置信项：手机号 / 证件号 / 银行卡 / 邮箱 / 带标签的住址。
  * **姓名不遮**（keepNames）：称呼被遮掉，对话就接不上了。
  *
- * 会话里存的是原话，只在发出去的那一刻遮 —— 二选一选这个，理由：
- *   - 会话转写会交还给本人：「小青本次要点」（advisor/assistant-summary.service.ts）
- *     拿它的第一句原话当记录标题存进本人的练习记录；存成遮盖后的，用户会在自己的记录里
- *     看到「[手机号_1]」。那条链路送模型前自己会再遮一次，不受影响。
+ * 内存里的会话转写存的是原话（不落库），只在发出去的那一刻遮 —— 二选一选这个，理由：
  *   - 历史整体一起遮，占位符编号跨轮一致（第 1 轮和第 3 轮的同一个手机号都是 [手机号_1]），
  *     模型仍能看懂「用户前后说的是同一个号码」。
+ *   - 「小青本次要点」（advisor/assistant-summary.service.ts）读这份转写来浓缩要点，
+ *     送模型前自己会再遮一次；它不把任何一句原话写进数据库（记录标题是固定文字）。
+ *     2026-10-09 之前它会把历史里第一条用户原话存进会话 topic 和 question 槽（列表标题一直用产物自己的标题），「存成遮盖后的会让用户在自己的
+ *     记录里看到占位符」那条旧理由已不成立。
  * 小青自己的回复不遮：模型只见过遮盖后的文本，回复里不会有用户的原始号码。
  */
 function maskUserTurnsForLlm(messages: readonly ChatMessage[]): ChatMessage[] {
@@ -274,8 +278,18 @@ function classifyIntent(message: string): AssistantIntent {
 export class LlmChatService {
   private readonly logger = new Logger(LlmChatService.name)
   private readonly sessions = new Map<string, SessionEntry>()
+  /** 忘掉之后加一。在途回复写回前核对，对不上就不再放进内存。 */
+  private readonly epoch = new ConversationEpoch()
+  /** 还在等模型的对话。内存里可以还没有这段，清的时候也要作废。 */
+  private readonly inflight = new Map<string, { ownerKey: string; n: number }>()
 
-  constructor(private readonly config: LlmConfigService, @Optional() private readonly policyContext?: AssistantPolicyContextService) {}
+  constructor(
+    private readonly config: LlmConfigService,
+    @Optional() @Inject(ConversationMemoryBridge) bridge?: ConversationMemoryBridge,
+    @Optional() private readonly policyContext?: AssistantPolicyContextService,
+  ) {
+    bridge?.bindChatOwner((ownerKey) => this.forgetOwner(ownerKey))
+  }
 
   readPolicyContext(policyId: string): Promise<string | null> {
     return this.policyContext?.read(policyId) ?? Promise.resolve(null)
@@ -283,8 +297,26 @@ export class LlmChatService {
 
   private pruneSessions(now: number): void {
     for (const [id, s] of this.sessions) {
-      if (now - s.updatedAt > SESSION_TTL_MS) this.sessions.delete(id)
+      if (now - s.updatedAt > SESSION_TTL_MS) this.dropSession(id)
     }
+  }
+
+  /** 从内存拿掉，并让还在路上的回复不能再写回这一段。 */
+  private dropSession(id: string): void {
+    this.sessions.delete(id)
+    this.epoch.invalidate(id)
+  }
+
+  /**
+   * 模型回来了才落内存。代次已经变过（清场、登出、删记录、空闲清扫）就整段丢掉。
+   * 调用方仍拿到这一轮回复：人还在等，失败会看起来像模型坏了。
+   */
+  private writeBack(sessionId: string, session: SessionEntry, captured: number): void {
+    if (!this.epoch.matches(sessionId, captured)) {
+      if (this.sessions.get(sessionId) === session) this.sessions.delete(sessionId)
+      return
+    }
+    this.sessions.set(sessionId, session)
   }
 
   private evictOldest(ownerKey?: string): void {
@@ -297,7 +329,7 @@ export class LlmChatService {
         oldestId = id
       }
     }
-    if (oldestId) this.sessions.delete(oldestId)
+    if (oldestId) this.dropSession(oldestId)
   }
 
   private ownerSessionCount(ownerKey: string): number {
@@ -336,6 +368,65 @@ export class LlmChatService {
       .map((message) => ({ role: message.role, content: message.content }))
   }
 
+  /** 请求一进来就登记，在任何 await 之前。请求结束（答完或抛错）后注销。 */
+  private noteInflight(sessionId: string, ownerKey: string): void {
+    const id = sessionId.trim()
+    if (!id) return
+    const current = this.inflight.get(id)
+    if (current) current.n += 1
+    else this.inflight.set(id, { ownerKey, n: 1 })
+  }
+
+  private endInflight(sessionId: string): void {
+    const id = sessionId.trim()
+    const current = id ? this.inflight.get(id) : undefined
+    if (!current) return
+    current.n -= 1
+    if (current.n <= 0) this.inflight.delete(id)
+  }
+
+  /** 归属对得上才删这一段对话。内存里还没有、但在途请求是这个人的，同样作废。 */
+  forgetSession(sessionId: string, ownerKey: string): boolean {
+    const id = sessionId.trim()
+    if (!id || !ownerKey) return false
+    const session = this.sessions.get(id)
+    const flight = this.inflight.get(id)
+    if (session?.ownerKey === ownerKey) {
+      this.dropSession(id)
+      return true
+    }
+    if (flight?.ownerKey === ownerKey) {
+      this.epoch.invalidate(id)
+      return true
+    }
+    return false
+  }
+
+  /** 删掉这个归属下的全部小青对话，返回删了几段。在途的也作废，不计入删了几段。 */
+  forgetOwner(ownerKey: string): number {
+    if (!ownerKey) return 0
+    for (const [id, flight] of this.inflight) {
+      if (flight.ownerKey === ownerKey) this.epoch.invalidate(id)
+    }
+    let removed = 0
+    for (const [id, session] of this.sessions) {
+      if (session.ownerKey !== ownerKey) continue
+      this.dropSession(id)
+      removed += 1
+    }
+    return removed
+  }
+
+  /** 空闲超过 SESSION_TTL_MS 的会话立刻丢掉。每分钟扫，不等下一次对话。 */
+  @Cron(CronExpression.EVERY_MINUTE)
+  sweep(now = Date.now()): number {
+    const before = this.sessions.size
+    this.pruneSessions(now)
+    const removed = before - this.sessions.size
+    if (removed > 0) this.logger.log(`assistant.session_swept removed=${removed}`)
+    return removed
+  }
+
   async chat(
     input: ChatInput,
     /**
@@ -346,8 +437,6 @@ export class LlmChatService {
     ownerKey = 'anon',
     policyPrompt?: string,
   ): Promise<ChatOutput> {
-    const currentPolicy = policyPrompt ?? (input.policyId === undefined ? undefined : await this.readPolicyContext(input.policyId))
-    if (currentPolicy === null) return policyUnavailableResult()
     const apiKey = this.config.getApiKey('assistant_chat')
     const cfg = this.config.getConfig('assistant_chat')
 
@@ -362,6 +451,7 @@ export class LlmChatService {
     const existing = requestedId ? this.sessions.get(requestedId) : undefined
     let sessionId: string
     let session: SessionEntry
+    let created = false
     if (existing && existing.ownerKey === ownerKey) {
       sessionId = requestedId
       session = existing
@@ -375,9 +465,21 @@ export class LlmChatService {
       if (this.sessions.size >= MAX_ASSISTANT_SESSIONS) this.evictOldest()
       sessionId = randomBytes(16).toString('hex')
       session = { messages: [], updatedAt: now, ownerKey }
+      created = true
       this.sessions.set(sessionId, session)
     }
+    // 政策查询是第一次 await。先登记并抓住代次，查询挂起期间的登出和清场才作废得了这次写回。
+    const capturedEpoch = this.epoch.capture(sessionId)
+    this.noteInflight(sessionId, ownerKey)
     const channel = resolveAssistantChannel(input.channel)
+    try {
+    const currentPolicy = policyPrompt ?? (input.policyId === undefined ? undefined : await this.readPolicyContext(input.policyId))
+    if (currentPolicy === null) {
+      if (created && this.sessions.get(sessionId) === session && session.messages.length === 0) {
+        this.sessions.delete(sessionId)
+      }
+      return policyUnavailableResult()
+    }
     // 切换/取消政策后不再把上一条政策的对话作为本轮依据。
     if (session.policyId !== input.policyId) {
       session.messages = []
@@ -399,7 +501,8 @@ export class LlmChatService {
       }
     }
     session.deviceFaultJustAnswered = false
-    session.messages.push({ role: 'user', content: input.message })
+    const userTurn = { role: 'user' as const, content: input.message }
+    session.messages.push(userTurn)
     const skill = input.skill
     const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
     const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()
@@ -416,11 +519,15 @@ export class LlmChatService {
       if (error instanceof AiContentBlockedError) {
         const reply = refusalMessage(error.category)
         // 被拦的原话不能留在会话历史里：下一轮会带着整段历史再发给模型，检查点会再次命中，
-        // 这个会话之后每句话都会被拒答。输出侧命中时用户原话没问题，保留它，把拒答记进历史。
-        if (error.direction === 'input') session.messages.pop()
-        else session.messages.push({ role: 'assistant', content: reply })
+        // 这个会话之后每句话都会被拒答。按这一条消息本身删，不能 pop：同会话并发时
+        // 后到的正常问题会排在末尾，pop 会把它弹掉、被拦原话留下。
+        // 输出侧命中时用户原话没问题，保留它，把拒答记进历史。
+        if (error.direction === 'input') {
+          const index = session.messages.lastIndexOf(userTurn)
+          if (index >= 0) session.messages.splice(index, 1)
+        } else session.messages.push({ role: 'assistant', content: reply })
         session.updatedAt = Date.now()
-        this.sessions.set(sessionId, session)
+        this.writeBack(sessionId, session, capturedEpoch)
         return { sessionId, reply, intent: classifyIntent(input.message), actions: [] }
       }
       throw error
@@ -452,7 +559,7 @@ export class LlmChatService {
     if (session.messages.length > MAX_HISTORY) {
       session.messages = session.messages.slice(-MAX_HISTORY)
     }
-    this.sessions.set(sessionId, session)
+    this.writeBack(sessionId, session, capturedEpoch)
 
     return {
       sessionId,
@@ -460,6 +567,9 @@ export class LlmChatService {
       intent,
       actions,
       ...(fixedNotice ? { fixedNotice: true } : {}),
+    }
+    } finally {
+      this.endInflight(sessionId)
     }
   }
 

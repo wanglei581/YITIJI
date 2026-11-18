@@ -8,6 +8,7 @@ import {
 import { isKioskClearNoOp } from './kioskClearScope'
 import { KioskClearingOverlay } from './KioskClearingOverlay'
 import { clearKioskSensitiveSession } from './kioskSensitiveSession'
+import { noteAiForgetPageGone } from '../services/api/aiSessionForget'
 import { useKioskClearHold } from './useKioskClearHold'
 import {
   KioskSessionControlProvider,
@@ -217,10 +218,13 @@ function pushSanitizedDestination(
   }
   try {
     window.history.pushState(sanitizedState, '', destination.path)
+    // 重载会截断还在睡的重试。先记下页面要拆，再重载。正常路径上这时请求已经有结果。
+    noteAiForgetPageGone()
     window.location.reload()
   } catch {
     // pushState 极端失败时仍遮罩并硬到受限目的地；持久 boundary 会拦截旧历史。
     window.history.replaceState(sanitizedState, '', destination.path)
+    noteAiForgetPageGone()
     window.location.replace(destination.path)
   }
 }
@@ -364,8 +368,9 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
          * 60 秒未确认回收器收不到它，Agent 的 current-lease 看得见它，它会一直可投递到
          * 自然过期 —— 下一位在面板上按下扫描，文件投给已经走掉的上一位（scanCleanupGate）。
          *
-         * hold() 在收尾已经结束时是同步的，所以「本来就没有扫描会话」那条最常见的路径
-         * 一帧都不会多等；真要等的时候，遮罩会如实说在等什么、试了几次、最迟等到什么时候。 */
+         * hold() 在扫描收尾结束、也没有在途清场时是同步的，所以「本来就没有扫描会话」
+         * 那条最常见的路径一帧都不会多等。清对话还在重试时要等有结果再重载，上限 8 秒
+         * （aiSessionForget 的 AI_FORGET_DEADLINE_MS）。到点仍失败只记诊断，遮罩不说已清。 */
         hold(() => scheduleSanitizedDestination(nextBoundary, destination))
       },
     }, options)

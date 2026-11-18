@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { AdvisorQaMemory } from '../advisor/advisor-qa-memory'
+import { LlmChatService } from '../ai/llm/llm-chat.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 import type {
@@ -129,7 +131,11 @@ interface ResumeDraftMeta {
 
 @Injectable()
 export class MemberAssetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject(AdvisorQaMemory) private readonly qaMemory?: AdvisorQaMemory,
+    @Optional() @Inject(LlmChatService) private readonly chat?: LlmChatService,
+  ) {}
 
   /** 我的简历：本人 parse（上传诊断，附「是否已生成优化版」）+ generate（AI 生成）列表。 */
   async listResumes(
@@ -312,7 +318,6 @@ export class MemberAssetsService {
           fileId: true,
           createdAt: true,
           expiresAt: true,
-          session: { select: { topic: true } },
         },
       }),
       this.prisma.advisorArtifact.count({ where: qaWhere }),
@@ -352,7 +357,7 @@ export class MemberAssetsService {
       sessionId: row.sessionId,
       artifactId: row.id,
       kind: 'qa_pins',
-      title: qaTitleOf(row.payloadJson, row.session.topic),
+      title: qaTitleOf(row.payloadJson),
       createdAt: row.createdAt.toISOString(),
       expiresAt: row.expiresAt.toISOString(),
       fileId: row.fileId,
@@ -361,12 +366,17 @@ export class MemberAssetsService {
     return { ...list, items: list.items.filter((row) => visibleIds.has(row.id)), qaRecords: qaList.items, qaNextCursor: qaList.nextCursor, qaTotal }
   }
 
-  /** 只删除本人这份小青作业；已导出的文件仍可在「我的文档」单独管理。 */
+  /** 删除本人问答记录所在会话，级联删钉住条目与全部产物；已导出的文件仍在「我的文档」。 */
   async deleteQaRecord(endUserId: string, artifactId: string): Promise<{ deleted: true }> {
-    const result = await this.prisma.advisorArtifact.deleteMany({
+    const artifact = await this.prisma.advisorArtifact.findFirst({
       where: { id: artifactId, kind: 'qa_pins', session: { endUserId } },
+      select: { sessionId: true },
     })
+    if (!artifact) throw new NotFoundException({ error: { code: 'MEMBER_RECORD_NOT_FOUND', message: '小青作业不存在或已删除' } })
+    const result = await this.prisma.advisorSession.deleteMany({ where: { id: artifact.sessionId, endUserId } })
     if (!result.count) throw new NotFoundException({ error: { code: 'MEMBER_RECORD_NOT_FOUND', message: '小青作业不存在或已删除' } })
+    this.qaMemory?.forget(artifact.sessionId)
+    this.chat?.forgetOwner(`u:${endUserId}`)
     return { deleted: true }
   }
 
@@ -584,17 +594,17 @@ function classifyStorageObjectState(
   return 'unknown'
 }
 
-function qaTitleOf(payloadJson: string, topic: string): string {
+function qaTitleOf(payloadJson: string): string {
   try {
     const payload = JSON.parse(payloadJson) as { kind?: unknown; title?: unknown }
     if (payload.kind === 'qa_pins' && typeof payload.title === 'string' && payload.title.trim()) {
       return payload.title.trim().slice(0, 80)
     }
   } catch {
-    // 损坏 payload 不进列表正文，只用会话主题兜底
+    // 损坏 payload 不进列表正文，使用固定标题兜底。
   }
-  const fallback = topic.trim()
-  return fallback ? fallback.slice(0, 80) : '问答要点'
+  // 存量行的 topic 还是用户原话，列表不能再把它显示成标题。
+  return '问答要点'
 }
 
 /** 只抽出 basedOn.fairId / fairName，任何其它 payload 字段都不外露。 */

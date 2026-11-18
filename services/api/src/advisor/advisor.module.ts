@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { AiModule } from '../ai/ai.module'
+import { ConversationMemoryModule } from '../common/conversation-memory.module'
 import { FilesModule } from '../files/files.module'
 import { AdvisorController } from './advisor.controller'
 import { AdvisorService } from './advisor.service'
@@ -25,6 +26,7 @@ import { LlmAdvisorService } from './llm-advisor.service'
 @Module({
   imports: [
     AiModule,
+    ConversationMemoryModule,
     FilesModule,
     JwtModule.registerAsync({
       useFactory: () => {
@@ -47,5 +49,6 @@ import { LlmAdvisorService } from './llm-advisor.service'
     // 顶层的 ScheduleModule.forRoot() 驱动。
     AdvisorRetentionTask,
   ],
+  exports: [ConversationMemoryModule],
 })
 export class AdvisorModule {}

@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
+import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import { AiQuotaService } from '../ai/quota/ai-quota.service'
 import { quotaSequence, runWithAiQuota, type QuotaAbortRequest } from '../ai/quota/ai-quota-run'
 import { LlmAdvisorService } from './llm-advisor.service'
@@ -10,8 +11,12 @@ import { AdvisorArtifactService } from './advisor-artifact.service'
 import { AdvisorQaMemory } from './advisor-qa-memory'
 import {
   ADVISOR_DISCLAIMER,
+  ADVISOR_SESSION_TOPIC,
+  ASSISTANT_SUMMARY_TOPIC,
   COMPARE_LIMITS,
   SKILL_SPECS,
+  displayedSkillReason,
+  switchSkillReason,
   SLOT_DRAFT_BLANK_POLICY,
   deriveStatus,
   isEvidenceLevel,
@@ -42,6 +47,7 @@ export const MAX_ADVISOR_PINS = 40
 // 与 MockInterviewSession / AiResumeResult 同口径；拒绝一律 NOT_FOUND，不泄露会话是否存在。
 //
 // ⚠️ 对话不落库：QA 多轮上下文只在本进程内存里按 TTL 保留（见 QaMemory）。
+// 开场诉求只用于判型，同样不落库。
 // 这是设计页对用户的明文承诺，不要为了排查方便改成落表。
 // ============================================================
 
@@ -61,6 +67,13 @@ function tokenMatches(token: string | null, expectedHash: string | null): boolea
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
+/** 只认作业归属失败这一个码。别的错误（例如库不可用）必须原样抛出去。 */
+function isAdvisorSessionMissing(error: unknown): boolean {
+  if (!(error instanceof NotFoundException)) return false
+  const body = error.getResponse() as { error?: { code?: string } }
+  return body.error?.code === 'ADVISOR_SESSION_NOT_FOUND'
+}
+
 export interface AdvisorRequester {
   endUserId: string | null
   accessToken: string | null
@@ -69,7 +82,7 @@ export interface AdvisorRequester {
 @Injectable()
 export class AdvisorService {
   /** 进程内存，不落库。重启即失 —— 这是刻意的，不是缺陷，理由见 advisor-qa-memory.ts。 */
-  private readonly qaMemory = new AdvisorQaMemory()
+  private readonly qaMemory: AdvisorQaMemory
 
   constructor(
     private readonly prisma: PrismaService,
@@ -78,7 +91,10 @@ export class AdvisorService {
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
     @Optional() private readonly quota?: AiQuotaService,
-  ) {}
+    @Optional() @Inject(AdvisorQaMemory) qaMemory?: AdvisorQaMemory,
+  ) {
+    this.qaMemory = qaMemory ?? new AdvisorQaMemory()
+  }
 
   /**
    * 可用性探针。
@@ -112,23 +128,18 @@ export class AdvisorService {
 
     const isAnonymous = !requester.endUserId
     const accessToken = isAnonymous ? randomBytes(24).toString('hex') : undefined
-    const trimmedTopic = topic.trim().slice(0, 600)
-    // 用户的开场诉求**就是**问答型的那一槽 —— 不预填的话，问答型会话会卡在
-    // 「必填项没答完」而永远出不了活（问答走 /ask，本来就不会再填一次 question 槽）。
-    // 槽位按全局 slotKey 存，所以这里无条件预填：后来改判成问答型时同样能直接开工。
-    const seededSlots: StoredSlots = {
-      question: { value: trimmedTopic.slice(0, slotSpecOf('question')!.maxChars), filledAt: new Date().toISOString() },
-    }
+    // 开场诉求只用于上面的判型；会话只存固定标签，输入槽由用户后续主动填写。
+    // 问答型没有必填槽，空槽也能直接开工（追问走 /ask，不靠预填 question）。
     const row = await this.prisma.advisorSession.create({
       data: {
         endUserId: requester.endUserId,
         accessTokenHash: accessToken ? hashToken(accessToken) : null,
         skill: classification.skill,
-        status: deriveStatus(classification.skill, seededSlots, false),
-        topic: trimmedTopic,
+        status: deriveStatus(classification.skill, {}, false),
+        topic: ADVISOR_SESSION_TOPIC,
         skillReason: classification.reason,
         skillSource: classification.source,
-        slotsJson: JSON.stringify(seededSlots),
+        slotsJson: JSON.stringify({}),
         expiresAt: new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000),
       },
     })
@@ -165,7 +176,7 @@ export class AdvisorService {
       data: {
         skill,
         skillSource: 'user_override',
-        skillReason: `你把作业型改成了「${SKILL_SPECS[skill].label}」——已填的内容都还在。`,
+        skillReason: switchSkillReason(skill),
         status: deriveStatus(skill, slots, await this.hasArtifact(row.id, skill)),
       },
     })
@@ -322,77 +333,92 @@ export class AdvisorService {
    *（设计页的「那超过半年呢」），而不是每次都当成一个新问题。
    */
   async ask(sessionId: string, question: string, requester: AdvisorRequester, req?: QuotaAbortRequest) {
-    const row = await this.loadOwned(sessionId, requester)
-    if (this.skillOf(row) !== 'qa') {
-      throw new BadRequestException({
-        error: { code: 'ADVISOR_ASK_WRONG_SKILL', message: '当前作业型不是问答型，请先切换作业型' },
-      })
-    }
-    const memory = this.qaMemory.read(sessionId)
-    // 作业面请求里没有渠道。小程序只读会话和本次要点，不走 ask()，所以固定用一体机那段。
-    if (isDeviceFaultQuestion(question)) {
+    // 归属查询是第一次 await。先登记在途并抓住代次，查询挂起期间的登出、删记录、清场、淘汰才作废得了这次写回。
+    const ownerKeyHint = requester.endUserId ? `u:${requester.endUserId}` : null
+    const capturedEpoch = this.qaMemory.begin(sessionId, ownerKeyHint)
+    try {
+      const row = await this.loadOwned(sessionId, requester)
+      if (this.skillOf(row) !== 'qa') {
+        throw new BadRequestException({
+          error: { code: 'ADVISOR_ASK_WRONG_SKILL', message: '当前作业型不是问答型，请先切换作业型' },
+        })
+      }
+      const memory = this.qaMemory.read(sessionId)
+      const ownerKey = row.endUserId ? `u:${row.endUserId}` : null
+      // 作业面请求里没有渠道。小程序只读会话和本次要点，不走 ask()，所以固定用一体机那段。
+      if (isDeviceFaultQuestion(question)) {
+        return {
+          sessionId,
+          answer: deviceFaultReply('kiosk'),
+          evidenceLevel: 'E3' as const,
+          sourceNote: DEVICE_FAULT_SOURCE_NOTE,
+          disclaimer: ADVISOR_DISCLAIMER,
+          canPin: false,
+          persistence: 'not_saved' as const,
+          providerLabel: this.llm.providerLabel(),
+          fixedNotice: true as const,
+        }
+      }
+      const usage = new AiUsageAccumulator()
+      const startedAt = Date.now()
+      let fixedNotice = false
+      const produce = async () => {
+        try {
+          const value = await this.llm.answer(question, memory, { onLlmCall: usage.add })
+          // 模型已经答完才发现含动手指导：换成固定的话。这一轮调过模型，照常结算。
+          if (hasHandsOnMachineInstruction(value.answer) && !isAboutJobContent(question)) {
+            fixedNotice = true
+            return {
+              ...value,
+              answer: deviceFaultReply('kiosk'),
+              sourceNote: DEVICE_FAULT_SOURCE_NOTE,
+              evidenceLevel: 'E3' as const,
+            }
+          }
+          return value
+        } catch (error) {
+          this.recordAiLog(usage, startedAt, 'failed', row.endUserId, aiErrorCodeOf(error, 'ADVISOR_ANSWER_FAILED'))
+          throw error
+        }
+      }
+      const persist = async (value: Awaited<ReturnType<AdvisorService['llm']['answer']>>) => {
+        this.recordAiLog(usage, startedAt, 'success', row.endUserId)
+        // 内存不留原话。场景名与这一问发给模型时相同；模型回答只见过遮盖后的文本，照旧存。
+        this.qaMemory.append(
+          sessionId,
+          maskUserTextForLlmText(question.trim(), 'advisor_qa').slice(0, 600),
+          value.answer,
+          ownerKey,
+          capturedEpoch,
+        )
+        return sessionId
+      }
+      // 没有账本或没有登录身份时不预占。操作号只在这里签发，不读客户端传来的号。
+      // 进模型前就认出的设备故障在上面已经返回，不计次。
+      const answer = this.quota && row.endUserId
+        ? await runWithAiQuota({
+          quota: this.quota,
+          bucket: 'ai_assistant',
+          operationKey: `advisor-ask:${quotaSequence()}`,
+          endUserId: row.endUserId,
+          req,
+        }, produce, persist)
+        : await produce().then(async (value) => {
+          await persist(value)
+          return value
+        })
       return {
         sessionId,
-        answer: deviceFaultReply('kiosk'),
-        evidenceLevel: 'E3' as const,
-        sourceNote: DEVICE_FAULT_SOURCE_NOTE,
-        disclaimer: ADVISOR_DISCLAIMER,
-        canPin: false,
+        ...answer,
+        /** 前端据此决定「钉住这条」按钮是否可用；钉住才是唯一会留下的动作 */
+        canPin: !fixedNotice,
+        /** 如实告知：这一轮问答本身不会被保存 */
         persistence: 'not_saved' as const,
         providerLabel: this.llm.providerLabel(),
-        fixedNotice: true as const,
+        ...(fixedNotice ? { fixedNotice: true as const } : {}),
       }
-    }
-    const usage = new AiUsageAccumulator()
-    const startedAt = Date.now()
-    let fixedNotice = false
-    const produce = async () => {
-      try {
-        const value = await this.llm.answer(question, memory, { onLlmCall: usage.add })
-        // 模型已经答完才发现含动手指导：换成固定的话。这一轮调过模型，照常结算。
-        if (hasHandsOnMachineInstruction(value.answer) && !isAboutJobContent(question)) {
-          fixedNotice = true
-          return {
-            ...value,
-            answer: deviceFaultReply('kiosk'),
-            sourceNote: DEVICE_FAULT_SOURCE_NOTE,
-            evidenceLevel: 'E3' as const,
-          }
-        }
-        return value
-      } catch (error) {
-        this.recordAiLog(usage, startedAt, 'failed', row.endUserId, aiErrorCodeOf(error, 'ADVISOR_ANSWER_FAILED'))
-        throw error
-      }
-    }
-    const persist = async (value: Awaited<ReturnType<AdvisorService['llm']['answer']>>) => {
-      this.recordAiLog(usage, startedAt, 'success', row.endUserId)
-      this.qaMemory.append(sessionId, question.trim().slice(0, 600), value.answer)
-      return sessionId
-    }
-    // 没有账本或没有登录身份时不预占。操作号只在这里签发，不读客户端传来的号。
-    // 进模型前就认出的设备故障在上面已经返回，不计次。
-    const answer = this.quota && row.endUserId
-      ? await runWithAiQuota({
-        quota: this.quota,
-        bucket: 'ai_assistant',
-        operationKey: `advisor-ask:${quotaSequence()}`,
-        endUserId: row.endUserId,
-        req,
-      }, produce, persist)
-      : await produce().then(async (value) => {
-        await persist(value)
-        return value
-      })
-    return {
-      sessionId,
-      ...answer,
-      /** 前端据此决定「钉住这条」按钮是否可用；钉住才是唯一会留下的动作 */
-      canPin: !fixedNotice,
-      /** 如实告知：这一轮问答本身不会被保存 */
-      persistence: 'not_saved' as const,
-      providerLabel: this.llm.providerLabel(),
-      ...(fixedNotice ? { fixedNotice: true as const } : {}),
+    } finally {
+      this.qaMemory.end(sessionId)
     }
   }
 
@@ -446,6 +472,26 @@ export class AdvisorService {
   async printArtifact(sessionId: string, artifactId: string, requester: AdvisorRequester) {
     const row = await this.loadOwned(sessionId, requester)
     return this.artifacts.print(artifactId, row.id, { endUserId: row.endUserId })
+  }
+
+  /**
+   * 一体机清场：归属对得上才丢掉这一次作业的问答内存。
+   * 找不到、过期、不是本人都当已经清掉。不删库里的作业。
+   */
+  async forgetSession(sessionId: string, requester: AdvisorRequester): Promise<{ forgotten: number }> {
+    try {
+      await this.loadOwned(sessionId, requester)
+    } catch (error: unknown) {
+      if (isAdvisorSessionMissing(error)) return { forgotten: 0 }
+      throw error
+    }
+    return { forgotten: this.qaMemory.forget(sessionId) ? 1 : 0 }
+  }
+
+  /** 身份暂时核验不了时，只丢掉这个会员自己的这份作业问答。不删库，也不动别人的。 */
+  discardQaMemoryIfOwner(sessionId: string, ownerKey: string | null): void {
+    if (!ownerKey) return
+    this.qaMemory.forgetIfOwner(sessionId, ownerKey)
   }
 
   // ── 内部 ──────────────────────────────────────────────────
@@ -520,11 +566,12 @@ export class AdvisorService {
       skill,
       skillLabel: spec.label,
       skillTagline: spec.tagline,
-      skillReason: row.skillReason,
+      skillReason: displayedSkillReason(skill, row.skillReason),
       /** llm / fallback / user_override —— fallback 时前端应说明「这次按关键词判的型」 */
       skillSource: row.skillSource,
       status: deriveStatus(skill, slots, artifacts.length > 0),
-      topic: row.topic,
+      // 存量 topic 可能含开场原话；只回传固定标签，旧值仍按到期策略清理。
+      topic: row.topic === ASSISTANT_SUMMARY_TOPIC ? ASSISTANT_SUMMARY_TOPIC : ADVISOR_SESSION_TOPIC,
       slots: slotViews(skill, slots),
       missingSlotKeys: missing,
       nextSlotKey: nextSlotKey(skill, slots),

@@ -52,7 +52,7 @@
     "verify:kiosk-brand-display": "node scripts/verify-kiosk-brand-display.mjs",
     "verify:kiosk-license-gate": "node --test scripts/tests/kiosk-license-gate.test.mjs",
     "verify:kiosk-unattended-copy": "node scripts/verify-kiosk-unattended-copy.mjs",
-    "verify:kiosk-end-use": "node scripts/verify-kiosk-end-use.mjs && node --test scripts/tests/kiosk-end-use.test.mjs",
+    "verify:kiosk-end-use": "node scripts/verify-kiosk-end-use.mjs && node --test scripts/tests/kiosk-end-use.test.mjs && node --test scripts/tests/ai-session-forget.test.mjs",
     "verify:p39-print-hub-fidelity": "node scripts/verify-p39-print-hub-fidelity.mjs",
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",
     "verify:pii-redaction-contract": "node --experimental-strip-types scripts/verify-pii-redaction-contract.mjs && node --test scripts/tests/print-manual-ack.test.mjs",
