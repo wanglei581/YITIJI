@@ -73,7 +73,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2241 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2243 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2376,7 +2376,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 156 个文件</summary>
+<summary><code>services/api/scripts/</code> — 157 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2496,6 +2496,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/verify-kiosk-cashier-ui.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-kiosk-job-board-switch.ts` | `verify-terminal-device-config.ts` |
 | `services/api/scripts/verify-legacy-pending-print-task-disposition.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-mask-outbound-harness.ts` | `verify-layout-mask-truncate.ts`<br/>`verify-mask-before-truncate.ts` |
 | `services/api/scripts/verify-member-assets.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-member-data-request-truth.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-member-step-up-adversarial.ts` | `verify-member-step-up.ts` |
@@ -2540,7 +2541,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 719 个文件</summary>
+<summary><code>services/api/src/</code> — 720 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2605,7 +2606,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/dto/resume-parse.dto.ts` | `verify-guest-file-proof.ts`<br/>`verify-resume-diagnosis-context.ts` |
 | `services/api/src/ai/dto/resume-voice.dto.ts` | `verify-resume-voice-generate.ts` |
 | `services/api/src/ai/fair-visit-plan.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-fair-visit-plan.ts` |
-| `services/api/src/ai/interfaces/ai-provider.interface.ts` | `verify-ai-contract-mirror.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-mask-before-truncate.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-parse-intent-runner.ts`<br/>`verify-resume-radical-fold.ts`<br/>`verify-resume-radical-font-fold.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
+| `services/api/src/ai/interfaces/ai-provider.interface.ts` | `verify-ai-contract-mirror.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-layout-mask-truncate.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-mask-before-truncate.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-parse-intent-runner.ts`<br/>`verify-resume-radical-fold.ts`<br/>`verify-resume-radical-font-fold.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
 | `services/api/src/ai/job-fit.controller.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-governed-job-fit.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-fit-print.ts`<br/>`verify-job-fit.ts`<br/>`verify-kiosk-job-board-switch.ts` |
 | `services/api/src/ai/kiosk-ai-capabilities.controller.ts` | `verify-ai-access.ts`<br/>`verify-kiosk-ai-capabilities.ts`<br/>`verify-throttle-dimension.ts` |
 | `services/api/src/ai/kiosk-ai-capabilities.ts` | `verify-kiosk-ai-capabilities.ts` |
@@ -2617,7 +2618,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/llm/deepseek-thinking.ts` | `verify-llm-thinking-off.ts` |
 | `services/api/src/ai/llm/llm-base-url.ts` | `verify-ai-config.ts` |
 | `services/api/src/ai/llm/llm-chat.service.ts` | `verify-ai-config.ts`<br/>`verify-ai-content-moderation.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-assistant-device-fault-intercept.ts`<br/>`verify-assistant-device-fault.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-conversation-epoch-ttl.ts`<br/>`verify-conversation-memory-forget-inflight.ts`<br/>`verify-conversation-memory-forget-logout-switch.ts`<br/>`verify-conversation-memory-forget.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
-| `services/api/src/ai/llm/llm-config.service.ts` | `verify-ai-config.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-conversation-memory-forget.ts`<br/>`verify-kiosk-ai-capabilities.ts`<br/>`verify-llm-connectivity.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-mask-before-truncate.ts`<br/>`verify-print-param-suggestion.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
+| `services/api/src/ai/llm/llm-config.service.ts` | `verify-ai-config.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-assistant-policy-context.ts`<br/>`verify-conversation-memory-forget.ts`<br/>`verify-kiosk-ai-capabilities.ts`<br/>`verify-llm-connectivity.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-mask-outbound-harness.ts`<br/>`verify-print-param-suggestion.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/ai/llm/llm-failure.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-llm-account-unavailable.ts` |
 | `services/api/src/ai/llm/llm-guard.ts` | `verify-ai-content-moderation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-assistant-device-fault.ts`<br/>`verify-llm-guard.ts` |
 | `services/api/src/ai/llm/llm-http.ts` | `verify-ai-content-moderation.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-llm-timeout-concurrency.ts` |
@@ -2656,13 +2657,14 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/job-fit-hosting.ts` | `verify-job-fit.ts`<br/>`verify-kiosk-job-board-switch.ts` |
 | `services/api/src/ai/resume/job-fit-pdf.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-aigc-pdf-metadata.ts`<br/>`verify-cjk-font.ts`<br/>`verify-job-fit-print.ts`<br/>`verify-miniapp-review-backend.ts` |
 | `services/api/src/ai/resume/job-fit.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-beijing-display-time.ts`<br/>`verify-governed-job-fit.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-fit-print.ts`<br/>`verify-job-fit.ts`<br/>`verify-member-qa-records.ts` |
-| `services/api/src/ai/resume/layout-adjust-mask.ts` | `verify-mask-before-truncate.ts` |
+| `services/api/src/ai/resume/layout-adjust-digit-cover.ts` | `verify-layout-mask-truncate.ts`<br/>`verify-resume-layout-adjust.ts` |
+| `services/api/src/ai/resume/layout-adjust-mask.ts` | `verify-layout-mask-truncate.ts`<br/>`verify-layout-outbound-realistic.ts` |
 | `services/api/src/ai/resume/llm-career-plan.service.ts` | `verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-career-plan.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mask-before-truncate.ts` |
 | `services/api/src/ai/resume/llm-fair-visit-plan.service.ts` | `verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-fair-visit-plan.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mask-before-truncate.ts` |
 | `services/api/src/ai/resume/llm-job-fit.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-fit.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mask-before-truncate.ts`<br/>`verify-miniapp-review-backend.ts` |
 | `services/api/src/ai/resume/llm-resume-evidence.ts` | `verify-resume-diagnosis-context.ts` |
 | `services/api/src/ai/resume/llm-resume-generate.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-optimize.ts` |
-| `services/api/src/ai/resume/llm-resume-optimize.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mask-before-truncate.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-optimize-live-gate.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-radical-fold.ts`<br/>`verify-resume-radical-font-fold.ts` |
+| `services/api/src/ai/resume/llm-resume-optimize.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-quota-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-layout-mask-truncate.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mask-before-truncate.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-optimize-live-gate.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-radical-fold.ts`<br/>`verify-resume-radical-font-fold.ts` |
 | `services/api/src/ai/resume/llm-resume.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mask-before-truncate.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-optimize.ts` |
 | `services/api/src/ai/resume/llm-self-assessment.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/resume/ocr/baidu-ocr.provider.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-resume-extraction.ts` |
@@ -2782,8 +2784,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/pdf/cjk-radical-font-fold.ts` | `verify-resume-radical-font-fold.ts` |
 | `services/api/src/common/pdf/pdfjs-document.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-mock-interview.ts`<br/>`verify-pdf-cmap.ts`<br/>`verify-pdfjs-engine.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-policy-checklist.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-radical-font-fold.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/common/pickup-code.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-free-print-quota.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-idempotency.ts` |
-| `services/api/src/common/pii/llm-input-mask.ts` | `verify-advisor-qa-history-mask.ts`<br/>`verify-conversation-memory-forget.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-mask-before-truncate.ts` |
-| `services/api/src/common/pii/mask-placeholder.ts` | `verify-mask-before-truncate.ts` |
+| `services/api/src/common/pii/llm-input-mask.ts` | `verify-advisor-qa-history-mask.ts`<br/>`verify-conversation-memory-forget.ts`<br/>`verify-layout-mask-truncate.ts`<br/>`verify-llm-input-pii-mask.ts` |
+| `services/api/src/common/pii/mask-placeholder.ts` | `verify-layout-mask-truncate.ts` |
 | `services/api/src/common/pii/pii-masker.ts` | `verify-llm-input-pii-mask.ts` |
 | `services/api/src/common/prisma/postgres-busy.ts` | `verify-pg-lock-timeout-postgres.ts` |
 | `services/api/src/common/prisma/serialization-conflict.ts` | `verify-pg-serialization-conflict.ts` |
