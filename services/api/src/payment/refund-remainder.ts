@@ -50,10 +50,11 @@ export async function settlementAfterSuccess(
   const added = refund.reason === STALE_ATTEMPT_REFUND_REASON ? 0 : refund.amountCents
   const total = prior + added
   const payable = payableCents(order)
-  const fully = prior === 0 || payable <= 0 || total >= payable
+  // 第一次退款 prior 也是 0。不能因为没有更早的成功记录，就把 50 分记成整单已退。
+  const fully = payable <= 0 || total >= payable
   return {
     payStatus: fully ? 'refunded' : 'partial_refunded',
-    refundedAmountCents: prior === 0 ? refund.amountCents : total,
+    refundedAmountCents: total,
     refundReason: refund.reason,
   }
 }
