@@ -82,3 +82,51 @@ test('搜索结果行最低 220、内边距 26/34、间距 10，四条和页脚�
   await page.goto('/renshi?audience=startup')
   await expect(page.locator('.policy-min-list:not(.policy-search-list) .policy-min-card').first()).toHaveCSS('min-height', '252px')
 })
+
+test('有原文摘录时详情收紧，去哪办压到一枚域名小签，两张卡在底栏之上 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  const verified = {
+    ...BASE,
+    id: 'policy-verified',
+    externalUrl: 'https://hrss.example.gov.cn/policy',
+    externalUrlVerified: true,
+    content: LONG,
+  }
+  const bare = { ...verified, id: 'policy-bare', title: '没有正文的补贴', content: '  ' }
+  await routePolicies(page, [verified, bare])
+  await page.goto('/renshi?policy=policy-verified')
+  await expect(page.getByRole('heading', { level: 1, name: '高校毕业生创业补贴' })).toBeVisible()
+  const body = page.locator('.policy-detail-excerpt')
+  await expect(body).toHaveCSS('row-gap', '14px')
+  const section = body.locator('.policy-min-section').first()
+  await expect(section).toHaveCSS('padding-top', '24px')
+  await expect(section).toHaveCSS('padding-right', '32px')
+  await expect(section).toHaveCSS('padding-bottom', '24px')
+  await expect(section).toHaveCSS('padding-left', '32px')
+  await expect(section.locator('li').first()).toHaveCSS('line-height', '40.5px')
+  const source = page.locator('.policy-min-source')
+  const sourceBox = await source.boundingBox()
+  expect(sourceBox).toBeTruthy()
+  expect(sourceBox!.height).toBeGreaterThanOrEqual(240)
+  expect(sourceBox!.height).toBeLessThanOrEqual(330)
+  const qr = page.locator('.policy-min-qr')
+  await expect(qr.locator('.policy-info-chip')).toHaveText('hrss.example.gov.cn')
+  await expect(qr.locator('svg')).toHaveCount(1)
+  await expect(page.getByText('扫码打开原文')).toHaveCount(0)
+  const tiles = page.locator('.policy-min-actions .qxt-tile')
+  await expect(tiles).toHaveCount(2)
+  await expect(tiles.first()).toHaveCSS('min-height', '116px')
+  await expect(tiles.first()).toHaveCSS('padding-top', '14px')
+  await expect(tiles.nth(1)).toHaveCSS('min-height', '116px')
+  const fit = await page.evaluate(() => {
+    const dock = document.querySelector('.qxt-dock')!.getBoundingClientRect()
+    const cards = [...document.querySelectorAll('.policy-min-actions .qxt-tile')].map((el) => el.getBoundingClientRect())
+    return { dockTop: dock.top, bottoms: cards.map((card) => card.bottom) }
+  })
+  expect(Math.max(...fit.bottoms)).toBeLessThanOrEqual(fit.dockTop)
+  await page.goto('/renshi?policy=policy-bare')
+  await expect(page.getByRole('heading', { level: 1, name: '没有正文的补贴' })).toBeVisible()
+  await expect(page.locator('.policy-detail-excerpt')).toHaveCount(0)
+  await expect(page.locator('.policy-min-actions .qxt-tile').first()).toHaveCSS('min-height', '132px')
+  await expect(page.locator('.policy-min-qr .policy-info-chip')).toHaveText('hrss.example.gov.cn')
+})

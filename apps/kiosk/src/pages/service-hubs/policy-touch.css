@@ -36,11 +36,16 @@
 .policy-min-pagination { display: flex; align-items: center; justify-content: center; gap: 20px; font-size: 22px; }
 .policy-min-source { display: flex; align-items: center; gap: 26px; }
 .policy-min-source > div:first-child { flex: 1; min-width: 0; }
-.policy-min-qr { width: 250px; flex: none; display: flex; align-items: center; flex-direction: column; }
+.policy-min-qr { width: 250px; flex: none; display: flex; align-items: center; flex-direction: column; gap: 6px; }
+.policy-min-qr > div { padding: 0; border: 0; background: transparent; }
 .policy-min-qr p,
 .policy-min-qr span { font-size: 20px; line-height: 1.45; text-align: center; overflow-wrap: anywhere; }
 .policy-min-phone { display: flex; align-items: center; gap: 26px; }
-.qxt-screen .policy-min-actions .qxt-tile { min-height: 174px; }
+.qxt-screen .policy-min-actions .qxt-tile { min-height: 132px; }
+.policy-min-body.policy-detail-excerpt { gap: 14px; }
+.policy-min-body.policy-detail-excerpt .policy-min-section { padding: 24px 32px; }
+.policy-min-body.policy-detail-excerpt .policy-min-section li { line-height: 1.5; }
+.qxt-screen .policy-detail-excerpt .policy-min-actions .qxt-tile { min-height: 116px; padding-top: 14px; padding-bottom: 14px; }
 .qxt-screen .policy-min-actions .qxt-tx b { font-size: 28px; }
 .qxt-screen .policy-min-actions .qxt-tx small { font-size: 22px; }
 .qxt-screen[data-qx-page='policy-min'] .qxt-dock { flex-wrap: wrap; }

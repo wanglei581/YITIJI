@@ -365,7 +365,7 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
 
     // 4. 官方入口：原文链接核对过属于发布机构登记的官方网站，详情里直接画原文二维码并写出目标域名。
     const official = page.locator('.policy-min-qr')
-    await expect(official, '政策详情缺少原文二维码').toContainText('扫码打开原文', { timeout: 5000 })
+    await expect(official.locator('.policy-info-chip'), '政策详情原文二维码下要写出发布机构域名').toHaveText(new URL(POLICY_ENTRY_URL).host, { timeout: 5000 })
     await expect(official).toContainText(new URL(POLICY_ENTRY_URL).host)
     await expect(official.locator('svg'), '原文二维码必须真画出来').toHaveCount(1)
     await step(page, s, 'policy-official-entry')

@@ -160,6 +160,7 @@ export function PolicyDetail({ id }: { id: string }) {
   const title = ready ? policy.title : gone ? gone.title : phase === 'failed' ? '这次没读到' : '正在读取这条政策'
   const printButton = policyPrintButton({ busy, printerReady: device.printerReady, printerLoading: device.loading, blocked: winding })
   return <PolicyTouchLayout compact ask={false} state={phase} title={title} overlay={overlay}
+    bodyClass={ready && policy.content?.trim() ? 'policy-detail-excerpt' : undefined}
     eyebrow={ready
       ? `${policy.sourceName || '发布机构未提供'}发布 · ${policyPublishedLabel(policy) ?? '日期未提供'}${deadline ? ` · ${deadline}` : ''}`
       : gone?.eyebrow ?? '查政策'}
@@ -172,7 +173,7 @@ export function PolicyDetail({ id }: { id: string }) {
         <div><h2><QxTouchIcon name="landmark" size={30} />去哪办、看原文</h2><ul>{policyLines(policy.whereToApply).map((line, index) => <li key={index}>{line}</li>)}</ul></div>
         <div className="policy-min-qr">
           {source?.kind === 'verified' ? <><SourceUrlQr value={source.url} size={200} />
-            <p>扫码打开原文 · 链接发布时已核对属于发布机构登记的官方网站</p><span>{source.host}</span></>
+            <span className="policy-info-chip">{source.host}</span></>
             : <p>{source && 'message' in source ? source.message : ''}</p>}
         </div>
       </section>

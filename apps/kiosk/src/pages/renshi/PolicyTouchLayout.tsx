@@ -12,7 +12,7 @@ import { POLICY_ASK_HOME } from './policyModel'
 import '../service-hubs/policy-touch.css'
 
 export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home = false, compact = false,
-  ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, nav = true, primary, alert, overlay }: {
+  ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, nav = true, primary, alert, overlay, bodyClass }: {
   title: string; eyebrow: string; sub?: string; state: string; children: ReactNode
   home?: boolean; compact?: boolean; ask?: boolean; askPrompt?: { label: string; draft: string }
   path?: readonly string[]; pathLabel?: string
@@ -21,6 +21,8 @@ export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home =
   primary?: QxTouchPrimary; alert?: ReactNode
   /** 盖住这一屏的阅读层。有它时，下面的政策页不再接收点击。 */
   overlay?: ReactNode
+  /** 有原文摘录时收紧详情，两张出路卡才能回到首屏。 */
+  bodyClass?: string
 }) {
   const navigate = useNavigate()
   const capabilities = useInterviewAiCapabilities()
@@ -38,7 +40,7 @@ export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home =
         primary={primary} alert={alert} />}
       nav={nav ? <QxTouchNav onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} /> : undefined}
       overlay={overlay}>
-      <div className="policy-min-body">
+      <div className={bodyClass ? `policy-min-body ${bodyClass}` : 'policy-min-body'}>
         {IS_MOCK_MODE && <p className="policy-min-fine" role="note">演示数据 · 当前为演示模式</p>}
         {children}
       </div>

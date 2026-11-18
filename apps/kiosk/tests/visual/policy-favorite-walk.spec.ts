@@ -89,8 +89,8 @@ const NOTICE_LATE: PolicyFixture = {
 const GUIDE_LIST = [OTHER, FAV, DATED]
 const NOTICE_FEED = [NOTICE_LIST, NOTICE_NEXT]
 
-/** 详情里原文二维码旁的那句：只有原文链接核对过属于发布机构登记的官方网站才出现。 */
-const QR_NOTE = '扫码打开原文 · 链接发布时已核对属于发布机构登记的官方网站'
+/** 核对过的原文链接：二维码下只留这一枚域名小签。没核对过或撤下后不再出现。 */
+const QR_NOTE = 'hrss.example.gov.cn'
 
 function shot(page: Page, name: string) {
   const dir = process.env.WALK_FIX_DIR
