@@ -182,7 +182,7 @@ async function priceVersion(tx: PrismaTransactionClient, terminalId: string): Pr
   return version
 }
 
-/** 行数对不上就整单失败，不能只改主表。折扣字段留着，不在改价时抹掉。 */
+/** 行数对不上就整单失败，不能只改主表。到机按本机价重算时清掉旧抵扣，应付额等于本机价。 */
 export async function applyArrivalReprice(
   tx: PrismaTransactionClient,
   current: OrderRow,
@@ -201,6 +201,7 @@ export async function applyArrivalReprice(
   const nextAmount = quote.amountCents
   const data: Prisma.OrderUpdateManyMutationInput = {
     amountCents: nextAmount,
+    discountCents: 0,
     itemsJson: JSON.stringify(quote.lines),
   }
   if (reason === 'free_paid_must_pay') {
@@ -233,7 +234,8 @@ export async function applyArrivalReprice(
     terminalId,
     fromAmountCents: current.amountCents,
     toAmountCents: nextAmount,
-    discountCents: current.discountCents,
+    fromDiscountCents: current.discountCents,
+    toDiscountCents: 0,
     paymentSourceBefore: current.paymentSource,
     reason,
     priceReason: prices.prices.print_bw_page.reason,
@@ -388,6 +390,7 @@ async function settlePickupArrivalOnce(
         data: {
           terminalId: input.terminalId,
           amountCents: 0,
+          discountCents: 0,
           itemsJson: '[]',
           payStatus: 'paid',
           paymentSource: 'free',
@@ -407,7 +410,8 @@ async function settlePickupArrivalOnce(
         terminalId: input.terminalId,
         fromAmountCents: current.amountCents,
         toAmountCents: 0,
-        discountCents: current.discountCents,
+        fromDiscountCents: current.discountCents,
+        toDiscountCents: 0,
         paymentSourceBefore: current.paymentSource,
         reason: 'arrival_price_zero',
         priceReason: prices.prices.print_bw_page.reason,
@@ -436,7 +440,7 @@ async function settlePickupArrivalOnce(
 
     if (current.payStatus === 'unpaid' || current.payStatus === 'paying') {
       let repriced = false
-      if (quote.amountCents !== current.amountCents) {
+      if (quote.amountCents !== current.amountCents || current.discountCents !== 0) {
         const applied = await applyArrivalReprice(tx, current, input.terminalId, quote, 'unpaid_reprice', prices, factors)
         if (!applied) return lost()
         repriced = true

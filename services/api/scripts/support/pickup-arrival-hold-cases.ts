@@ -1,5 +1,5 @@
 /**
- * 看价不占终端、本机价 0 免费放行、非法价拒绝、改价不抹折扣、
+ * 看价不占终端、本机价 0 免费放行、非法价拒绝、到机重算清掉旧抵扣、
  * 行数对不上不写、过期尝试的迟到扣款按尝试金额原路退。
  */
 import assert from 'node:assert/strict'
@@ -126,17 +126,19 @@ export async function runArrivalHoldCases(
   assert.equal(discounted.arrivalCents, 200)
   const discountRow = await db.order.findUniqueOrThrow({ where: { id: discountId } })
   assert.equal(discountRow.amountCents, 200)
-  assert.equal(discountRow.discountCents, 40, '改价不能把已有减免抹掉')
+  assert.equal(discountRow.discountCents, 0, '到机按本机价重算时清掉旧抵扣，应付额等于本机价')
   const discountAudit = JSON.parse(
     (await db.auditLog.findFirstOrThrow({ where: { targetId: discountId, action: ARRIVAL_REPRICE_AUDIT } })).payloadJson ?? '{}',
   ) as {
-    discountCents?: number
+    fromDiscountCents?: number
+    toDiscountCents?: number
     terminalId?: string
     priceReason?: string
     priceUpdatedAt?: { print_bw_page?: string }
     factors?: Array<{ colorMode?: string; billablePages?: number; copies?: number; unitCents?: number }>
   }
-  assert.equal(discountAudit.discountCents, 40)
+  assert.equal(discountAudit.fromDiscountCents, 40)
+  assert.equal(discountAudit.toDiscountCents, 0)
   assert.equal(discountAudit.terminalId, input.pricedTerminalId)
   assert.equal(discountAudit.priceReason, 'user_pays')
   assert.equal(typeof discountAudit.priceUpdatedAt?.print_bw_page, 'string')
