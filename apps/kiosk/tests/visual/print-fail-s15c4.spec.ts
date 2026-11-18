@@ -192,6 +192,14 @@ function registerMemberLogin(api: ApiRouter): void {
   api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
 }
 
+/** 会员登录只在内存里。整页刷新会掉登录，所以切到文档再切回订单，让这一页重新挂载并重读。 */
+async function remountPrintOrders(page: Page): Promise<void> {
+  await page.getByTestId('member-assets-tab-documents').click()
+  await page.waitForURL((url) => url.pathname === '/me/documents')
+  await page.getByTestId('member-assets-tab-orders').click()
+  await page.waitForURL((url) => url.pathname === '/me/print-orders')
+}
+
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
@@ -279,11 +287,24 @@ test('print order exit cards share title inset and height across the four states
   registerShell(api)
   registerMemberLogin(api)
   registerPrinterStatus(api, { value: 'ready' })
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone: '18369161921',
+        serviceHours: '工作日 9:00–18:00',
+        otherOnlineTerminalNearby: false,
+        miniappPublished: true,
+      },
+    },
+  })
   api.respond('GET', '/api/v1/me/print-orders', ordersOf([]))
   api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([PENDING_ROW]))
 
   await loginThroughVisibleUi(page, '/me/print-orders')
   await expect(page.getByTestId('pending-pickup-exits')).toBeVisible()
+  await expect(page.getByText('去我的文档', { exact: true })).toBeVisible()
   expectCardsAligned(await exitCardGeometry(page), '有待取单-无任务')
   await expect(page.getByText('工作人员')).toHaveCount(0)
   await shot(page, '有待取单-无任务')
@@ -293,14 +314,14 @@ test('print order exit cards share title inset and height across the four states
     claimableHere: false,
     terminal: { displayName: 'KSK-001', locationLabel: '就业服务大厅' },
   }]))
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await remountPrintOrders(page)
   await expect(page.getByText('去哪台取')).toBeVisible()
   expectCardsAligned(await exitCardGeometry(page), '走错机器')
   await shot(page, '走错机器')
 
   api.respond('GET', '/api/v1/me/print-orders', ordersOf([oneOrder('order-1', '求职简历.pdf')]))
   api.respond('GET', '/api/v1/me/print-orders/timeline', timelineOf([]))
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await remountPrintOrders(page)
   await expect(page.getByText('求职简历.pdf')).toBeVisible()
   expectCardsAligned(await exitCardGeometry(page), '有任务')
   await shot(page, '有任务')
@@ -311,7 +332,7 @@ test('print order exit cards share title inset and height across the four states
     oneOrder('order-3', '成绩单.pdf'),
   ]))
   api.respond('GET', '/api/v1/me/print-orders/timeline', { status: 500, json: { error: { code: 'INTERNAL', message: 'boom' } } })
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await remountPrintOrders(page)
   await expect(page.getByTestId('pending-pickup-error')).toBeVisible()
   expectCardsAligned(await exitCardGeometry(page), '读失败')
   await expect(page.getByText('工作人员')).toHaveCount(0)
