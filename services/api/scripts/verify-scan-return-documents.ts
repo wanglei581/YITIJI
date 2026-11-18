@@ -22,6 +22,8 @@ process.env['JWT_SECRET'] ||= 'ci-only-jwt-secret-0123456789abcdef'
 process.env['SECRET_ENCRYPTION_KEY'] ||= 'ci-only-encryption-key-0123456789abcdef'
 process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS'] = '0'
 process.env['FILE_STORAGE_DRIVER'] = 'local'
+// 本用例不碰招聘内容，取值与 CI 作业环境一致；托管声明门禁逐个文件查，要显式写出。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS

@@ -25,6 +25,9 @@ import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { MemberAuthService } from '../src/member-auth/member-auth.service'
 import type { PrismaService } from '../src/prisma/prisma.service'
 
+// 与父门禁 verify-conversation-memory-forget.ts 同值。托管声明门禁逐个文件查，拆出来的文件也要写一遍。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+
 interface ModelGate {
   wait: () => Promise<void>
   entered: () => void
