@@ -266,6 +266,7 @@
     "verify:resume-draft-versions": "node -r @swc-node/register scripts/verify-resume-draft-versions.ts",
     "verify:resume-layout-export": "node -r @swc-node/register scripts/verify-resume-layout-export.ts",
     "verify:resume-layout-adjust": "node -r @swc-node/register scripts/verify-resume-layout-adjust.ts",
+    "verify:resume-layout-adjust-consent": "node -r @swc-node/register scripts/verify-resume-layout-adjust-consent.ts",
     "verify:resume-template-fill": "node -r @swc-node/register scripts/verify-resume-template-fill.ts",
     "verify:resume-voice-generate": "node -r @swc-node/register scripts/verify-resume-voice-generate.ts && pnpm run verify:assistant-voice",
     "verify:assistant-voice": "node -r @swc-node/register scripts/verify-assistant-voice.ts",

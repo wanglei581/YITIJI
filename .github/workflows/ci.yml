@@ -824,6 +824,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:resume-export-draft-source
           pnpm --filter @ai-job-print/api verify:resume-layout-export
           pnpm --filter @ai-job-print/api verify:resume-layout-adjust
+          pnpm --filter @ai-job-print/api verify:resume-layout-adjust-consent
           pnpm --filter @ai-job-print/api verify:resume-template-fill
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify-real-resume-diagnosis
@@ -1217,6 +1218,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:resume-export-draft-source
           pnpm --filter @ai-job-print/api verify:resume-layout-export
           pnpm --filter @ai-job-print/api verify:resume-layout-adjust
+          pnpm --filter @ai-job-print/api verify:resume-layout-adjust-consent
           pnpm --filter @ai-job-print/api verify:resume-template-fill
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify:job-fit
