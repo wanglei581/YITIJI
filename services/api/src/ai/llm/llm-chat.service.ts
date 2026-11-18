@@ -477,9 +477,10 @@ export class LlmChatService {
     }
     // 政策查询是第一次 await。先登记并抓住代次，查询挂起期间的登出和清场才作废得了这次写回。
     const capturedEpoch = this.epoch.capture(sessionId)
+    this.epoch.hold(sessionId)
+    try {
     this.noteInflight(sessionId, ownerKey)
     const channel = resolveAssistantChannel(input.channel)
-    try {
     const currentPolicy = policyPrompt ?? (input.policyId === undefined ? undefined : await this.readPolicyContext(input.policyId))
     if (currentPolicy === null) {
       if (created && this.sessions.get(sessionId) === session && session.messages.length === 0) {
@@ -576,6 +577,7 @@ export class LlmChatService {
       ...(fixedNotice ? { fixedNotice: true } : {}),
     }
     } finally {
+      this.epoch.release(sessionId)
       this.endInflight(sessionId)
     }
   }

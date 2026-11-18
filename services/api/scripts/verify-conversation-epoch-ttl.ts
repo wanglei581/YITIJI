@@ -4,6 +4,8 @@
  *
  * 运行：pnpm --filter @ai-job-print/api verify:conversation-epoch-ttl
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   CONVERSATION_EPOCH_MODEL_BUDGET_MS,
   CONVERSATION_EPOCH_TOMBSTONE_MARGIN_MS,
@@ -84,6 +86,47 @@ function main(): void {
   const flood = new ConversationEpoch(2, () => now)
   for (let i = 0; i < 8; i += 1) flood.invalidate(`flood-${i}`)
   check(flood.size() <= 4, '活表与墓碑合计不超过两倍容量')
+
+  const pinned = new ConversationEpoch(2, () => now)
+  const pinnedEpoch = pinned.capture('slow')
+  pinned.hold('slow')
+  pinned.hold('slow')
+  pinned.capture('slow-a')
+  pinned.capture('slow-b')
+  pinned.capture('slow-c')
+  check(pinned.matches('slow', pinnedEpoch), '两次在途叠在同一会话上，后来的会话挤不掉')
+  pinned.release('slow')
+  pinned.capture('slow-d')
+  check(pinned.matches('slow', pinnedEpoch), '还有一次在途时，放开其中一次仍挤不掉')
+  pinned.release('slow')
+  pinned.capture('slow-e')
+  pinned.capture('slow-f')
+  check(!pinned.matches('slow', pinnedEpoch), '在途都结束之后，后来的会话可以挤掉，旧号不能写回')
+
+  const cleared = new ConversationEpoch(2, () => now)
+  const clearedEpoch = cleared.capture('cleared')
+  cleared.hold('cleared')
+  cleared.invalidate('cleared')
+  cleared.capture('cleared-a')
+  cleared.capture('cleared-b')
+  check(!cleared.matches('cleared', clearedEpoch), '钉住期间清场，旧代次不能写回')
+  const clearedNext = cleared.capture('cleared')
+  check(
+    clearedNext !== clearedEpoch && cleared.matches('cleared', clearedNext),
+    '钉住期间清场后，新代次可以写回',
+  )
+  cleared.release('cleared')
+
+  const chatSrc = readFileSync(join(__dirname, '../src/ai/llm/llm-chat.service.ts'), 'utf8')
+  const advisorSrc = readFileSync(join(__dirname, '../src/advisor/advisor-qa-memory.ts'), 'utf8')
+  check(
+    chatSrc.includes('this.epoch.hold(sessionId)') && chatSrc.includes('this.epoch.release(sessionId)'),
+    '小青在途钉住代次，结束时放开',
+  )
+  check(
+    advisorSrc.includes('this.epoch.hold(id)') && advisorSrc.includes('this.epoch.release(id)'),
+    '作业追问在途钉住代次，结束时放开',
+  )
 
   console.log(`verify:conversation-epoch-ttl ${passCount} PASS`)
 }

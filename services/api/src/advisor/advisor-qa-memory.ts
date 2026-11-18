@@ -60,12 +60,14 @@ export class AdvisorQaMemory {
    */
   begin(sessionId: string, ownerKey: string | null): number {
     const id = sessionId.trim()
+    const captured = this.epoch.capture(id)
     if (id) {
       const current = this.inflight.get(id)
       if (current) current.n += 1
       else this.inflight.set(id, { ownerKey, n: 1 })
+      this.epoch.hold(id)
     }
-    return this.epoch.capture(id)
+    return captured
   }
 
   /** 这一次请求结束（答完、抛错、设备故障早退）后注销登记。 */
@@ -75,6 +77,7 @@ export class AdvisorQaMemory {
     if (!current) return
     current.n -= 1
     if (current.n <= 0) this.inflight.delete(id)
+    this.epoch.release(id)
   }
 
   /** 读上下文。过期的当作没有 —— 不返回陈旧上下文，也不报错。 */
