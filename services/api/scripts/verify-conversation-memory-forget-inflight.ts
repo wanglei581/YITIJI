@@ -19,7 +19,7 @@ import { LlmChatService, MAX_ASSISTANT_SESSIONS_PER_OWNER } from '../src/ai/llm/
 import { AdvisorController } from '../src/advisor/advisor.controller'
 import { AdvisorQaMemory } from '../src/advisor/advisor-qa-memory'
 import { AdvisorService } from '../src/advisor/advisor.service'
-import { ConversationEpoch } from '../src/common/conversation-epoch'
+import { CONVERSATION_EPOCH_TOMBSTONE_TTL_MS, ConversationEpoch } from '../src/common/conversation-epoch'
 import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { MemberAuthService } from '../src/member-auth/member-auth.service'
@@ -278,23 +278,30 @@ function runEpochCases(check: InflightForgetContext['check']): void {
   const fresh = epoch.capture('fresh-job')
   check(epoch.matches('fresh-job', fresh), '场景 C 阳性：挤掉之后新抓住的代次仍能写回')
 
-  const room = new ConversationEpoch(2)
+  const room = new ConversationEpoch(4)
   const kept = room.capture('kept-job')
   room.invalidate('hot-job')
   room.invalidate('hot-job')
   room.invalidate('hot-job')
   const hotLatest = room.capture('hot-job')
-  check(
-    kept === 0 && room.matches('kept-job', kept) && room.matches('hot-job', hotLatest),
-    '场景 C 阳性：反复作废同一条时，这条的最新代次和没被清的会话都能写回',
-  )
   room.invalidate('other-a')
   room.invalidate('other-b')
   check(
-    room.matches('kept-job', kept),
-    '场景 C：代次表挤满时，没被清场也没被挤掉的会话，原先抓住的代次仍能写回',
+    kept !== 0 && room.matches('kept-job', kept) && room.matches('hot-job', hotLatest),
+    '场景 C 阳性：反复作废同一条时，这条的最新代次和没被清的会话都能写回',
   )
-  check(!room.matches('hot-job', hotLatest), '场景 C：反复作废的那条被挤掉后，作废前抓住的代次不能再写回')
+  check(
+    room.matches('kept-job', kept),
+    '场景 C：代次表还有空位时，没被清场也没被挤掉的会话，原先抓住的代次仍能写回',
+  )
+  const tight = new ConversationEpoch(2)
+  tight.invalidate('hot-job')
+  tight.invalidate('hot-job')
+  tight.invalidate('hot-job')
+  const hotEvicted = tight.capture('hot-job')
+  tight.invalidate('other-a')
+  tight.invalidate('other-b')
+  check(!tight.matches('hot-job', hotEvicted), '场景 C：反复作废的那条被挤掉后，作废前抓住的代次不能再写回')
 
   const spaced = new ConversationEpoch()
   spaced.invalidate('job-1')
@@ -765,5 +772,52 @@ export async function runInflightForgetScenarios(ctx: InflightForgetContext): Pr
     releaseFetch()
     cfg.forbiddenWords = previousWords
     globalThis.fetch = previousFetch
+  }
+
+  const userTtl = `verify-ttl-${randomUUID()}`
+  await createUser(userTtl)
+  const ownerTtl = `u:${userTtl}`
+  const markTtl = textMark('查库挂起超过墓碑期限的原话')
+  const hungTtl = hangPolicyRead(chat, ownerTtl, markTtl)
+  const epoch = (chat as unknown as { epoch: ConversationEpoch }).epoch
+  try {
+    await waitFor(hungTtl.entered, '模型前查库挂起超过墓碑期限')
+    const sessionId = emptyShellId(chat, ownerTtl) ?? ''
+    check(sessionId.length === 32, '场景 B 阳性：查库还挂着，会话壳已经在')
+    check(chat.forgetSession(sessionId, ownerTtl), '场景 B 阳性：清场作废这一条')
+    for (let i = 0; i < 8192; i += 1) epoch.capture(`ttl-fill-${i}`)
+    // 代次的时钟在构造时就绑成当时的 Date.now，事后改全局 Date.now 拨不到。
+    // 填槽结束后再拨过墓碑期限，保证循环里记下的墓碑都早于清扫线。
+    const epochClock = epoch as unknown as { now: () => number }
+    const epochNow = epochClock.now
+    const afterFill = epochNow()
+    epochClock.now = () => afterFill + CONVERSATION_EPOCH_TOMBSTONE_TTL_MS + 5_000
+    try {
+      chat.sweep()
+    } finally {
+      epochClock.now = epochNow
+    }
+    check(!epoch.wasRetired(sessionId), '场景 B 阳性：超过墓碑期限并清扫后，这块墓碑已经不在')
+    hungTtl.release()
+    const answered = await hungTtl.pending
+    check(
+      answered.reply.length > 0
+        && !transcriptOf(chat, sessionId, ownerTtl).includes(markTtl)
+        && !ownerHasMark(chat, ownerTtl, markTtl),
+      '场景 B：模型前查库挂起超过墓碑期限，清场后放行，不写回原话',
+    )
+    const fresh = textMark('墓碑清掉后的新一句')
+    const again = await chat.chat(
+      { message: fresh, channel: 'kiosk', sessionId } as never,
+      undefined,
+      ownerTtl,
+    ) as { sessionId: string }
+    check(
+      again.sessionId === sessionId && transcriptOf(chat, sessionId, ownerTtl).includes(fresh),
+      '场景 B：墓碑清掉之后，同一会话号新抓住的代次可以写回',
+    )
+  } finally {
+    hungTtl.release()
+    hungTtl.restore()
   }
 }
