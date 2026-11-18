@@ -107,7 +107,7 @@ const TESTID_BY_VARIANT: Record<FailureVariant, string> = {
   offline: 'print-fulfill-state-offline',
 }
 
-/** 带走链接过期时的一句话（标准求助句由调用方拼进 expiredLine）。 */
+/** 带走链接过期时的一句话。三态不带服务电话；普通失败仍由文案函数接上求助句。 */
 export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: string }) {
   const { variant, copy, rows, free, retry, takeaway, canReportIssue, isLoggedIn } = props
   return (

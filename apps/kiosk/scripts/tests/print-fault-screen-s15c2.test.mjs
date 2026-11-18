@@ -336,6 +336,39 @@ test('缺纸胶囊和卡纸、离线同一写法，写成前缀加打印机缺�
   assert.doesNotMatch(paper.pill, /工作人员/)
 })
 
+test('缺纸、卡纸、离线的带走链接过期句不带服务电话，普通失败仍带', async () => {
+  const unattended = await import(unattendedUrl)
+  unattended.bindSupportContactPeek(() => ({
+    servicePhone: '18369161921',
+    serviceHours: '工作日 9:00–18:00',
+    otherOnlineTerminalNearby: false,
+    miniappPublished: false,
+    selfNoteTab: false,
+  }))
+  for (const variant of ['out-of-paper', 'paper-jam', 'offline']) {
+    const line = failedModel.faultScreenTakeawayExpired(variant)
+    assert.equal(line, '手机带走链接已过期，不影响这笔订单。')
+    assert.equal((line.match(/服务电话/g) ?? []).length, 0, `${variant} 过期句不带服务电话`)
+    const copy = failedModel.failureCopy({
+      variant,
+      confirmedJam: false,
+      money,
+      orderNo: 'ORD-EXP',
+      canRetry: false,
+    })
+    const screen = [screenText(copy), line].join('\n')
+    assert.equal((screen.match(/服务电话/g) ?? []).length, 1, `${variant} 过期后整屏服务电话仍只有第 3 步那一次`)
+    assert.doesNotMatch(screen, /工作人员/)
+  }
+  const ordinary = failedModel.faultScreenTakeawayExpired('failed')
+  assert.match(ordinary, /^带走链接已过期。/)
+  assert.match(ordinary, /服务电话/)
+  assert.doesNotMatch(ordinary, /工作人员/)
+  const page = readFileSync(join(kioskRoot, 'src/pages/print/PrintDonePage.tsx'), 'utf8')
+  assert.match(page, /expiredLine=\{faultScreenTakeawayExpired\(variant\)\}/)
+  assert.doesNotMatch(page, /带走链接已过期。\$\{printProblemLine\(\)\}/)
+})
+
 test('失败文案注释放在各自函数上方', () => {
   const source = readFileSync(join(kioskRoot, 'src/pages/print/components/printDoneFailedModel.ts'), 'utf8')
   const sitsOn = (marker, fnName) => {

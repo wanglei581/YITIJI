@@ -106,3 +106,52 @@ test('a fault that was never paper jam stays the unconfirmed title after the pri
   await expect(page.getByRole('heading', { level: 1, name: '打印机卡纸', exact: true })).toHaveCount(0)
   await expect(page.getByText('工作人员')).toHaveCount(0)
 })
+
+test('out-of-paper takeaway expiry does not add a second service phone @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  await page.clock.install({ time: new Date('2026-11-19T08:00:00+08:00') })
+  registerShell(api)
+  api.respondWith('GET', PRINTER_STATUS_PATH, () => ({
+    status: 200,
+    json: { printerStatus: 'paper_empty', paperLevel: 'empty', isOnline: true },
+  }))
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      errorCode: 'PAPER_EMPTY',
+      failureReasonForUser: '打印机缺纸，当前无法打印。',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: '2026-11-19T08:00:03+08:00',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: 0,
+      canRetry: true,
+    },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', flowState)
+  const paper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
+  await expect(paper).toBeVisible()
+  await expect(paper.getByText('文件带走')).toBeVisible()
+  await expect(paper.getByRole('button', { name: '重新提交打印' })).toBeVisible()
+  const phoneHits = () => paper.evaluate((el) => (el.innerText.match(/服务电话/g) ?? []).length)
+  expect(await phoneHits()).toBe(1)
+
+  await page.clock.runFor(4_000)
+  await expect(paper.getByText('手机带走链接已过期，不影响这笔订单。')).toBeVisible()
+  await expect(paper.getByText('文件带走')).toHaveCount(0)
+  expect(await phoneHits()).toBe(1)
+  await expect(paper.getByText('工作人员')).toHaveCount(0)
+})

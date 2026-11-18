@@ -316,6 +316,14 @@ export function faultScreenTakeawayMiss(visual: string): string {
   return `带走链接没取到。${printProblemLine()}`
 }
 
+/** 带走链接过期。三态与「没取到」同一口径，不接服务电话。普通失败仍接「打印有问题」。 */
+export function faultScreenTakeawayExpired(visual: string): string {
+  if (visual === 'paper-jam' || visual === 'out-of-paper' || visual === 'offline') {
+    return '手机带走链接已过期，不影响这笔订单。'
+  }
+  return `带走链接已过期。${printProblemLine()}`
+}
+
 /**
  * 公开打印机状态是不是卡纸。
  * useTerminalDeviceStatus 的 mapTerminalPrinterStatus：心跳在线且 printerStatus 为 paper_jam 或别名 jam 时，

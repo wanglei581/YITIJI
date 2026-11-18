@@ -28,7 +28,7 @@ import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { PrintDoneUnverified } from './components/PrintDoneUnverified'
 import { UNKNOWN_NO_TASK_SUBTITLE, UNKNOWN_TASK_SUBTITLE } from './components/printDoneUnverifiedCopy'
 import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
-import { failureCopy, failureSummaryRows, faultScreenTakeawayMiss, feeInfoCopy, paymentRow, printerJamConfirmed, retryBlockedReason, shownFailureReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
+import { failureCopy, failureSummaryRows, faultScreenTakeawayExpired, faultScreenTakeawayMiss, feeInfoCopy, paymentRow, printerJamConfirmed, retryBlockedReason, shownFailureReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
 import { rememberConfirmedJam } from './printDoneJamLatch'
 import { CONTACT_ENTRY_LABEL, PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
@@ -581,7 +581,7 @@ export function PrintDonePage() {
           expired: Boolean(takeaway && takeawayExpired),
           error: takeawayError && takeawayError !== printProblemLine() ? takeawayError : null,
         }}
-        expiredLine={`带走链接已过期。${printProblemLine()}`}
+        expiredLine={faultScreenTakeawayExpired(variant)}
         canReportIssue={canReportIssue}
         isLoggedIn={isLoggedIn}
         onFeeInfo={() => setFeeInfoOpen(true)}
