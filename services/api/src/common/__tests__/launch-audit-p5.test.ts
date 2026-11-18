@@ -233,15 +233,37 @@ test('API-30 TRTC exposes random stop capability and preserves it when stop fail
       if (shouldFail) throw new Error('provider unavailable')
     },
   }
-  const controller = new TrtcController(trtc as never, redis as never)
-  const request = { headers: {}, ip: '127.0.0.1' } as Request
-  const started = await controller.startSession({ userId: 'u' }, request, 'terminal-1')
-  assert.notEqual(started.taskId, 'tencent-task')
-  assert.equal(values.get(`trtc:owner:${started.taskId}`), 'tencent-task')
-  await assert.rejects(() => controller.stopSession({ taskId: started.taskId }, request, 'terminal-1'))
-  assert.equal(values.has(`trtc:owner:${started.taskId}`), true)
-  shouldFail = false
-  await controller.stopSession({ taskId: started.taskId }, request, 'terminal-1')
-  assert.equal(stopTaskId, 'tencent-task')
-  assert.equal(values.has(`trtc:owner:${started.taskId}`), false)
+  // 建会话开场前先走数字人可用判断（与能力表同一个，含音视频凭证缺口），
+  // 本用例只测停止令牌，所以给齐一套假凭证，用完原样还原（写法同 verify-trtc-ownership.ts）。
+  const trtcFixture: Record<string, string> = {
+    TRTC_SDK_APP_ID: '1400000001',
+    TRTC_SDK_SECRET_KEY: 'p5-trtc-sdk-key-not-real',
+    TENCENT_SECRET_ID: 'p5-tencent-id-not-real',
+    TENCENT_SECRET_KEY: 'p5-tencent-key-not-real',
+    TRTC_LLM_API_KEY: 'p5-trtc-llm-key-not-real',
+    TRTC_TTS_CONFIG_JSON: '{"TTSType":"tencent"}',
+  }
+  const savedEnv = new Map<string, string | undefined>()
+  for (const [key, value] of Object.entries(trtcFixture)) {
+    savedEnv.set(key, process.env[key])
+    process.env[key] = value
+  }
+  try {
+    const controller = new TrtcController(trtc as never, redis as never)
+    const request = { headers: {}, ip: '127.0.0.1' } as Request
+    const started = await controller.startSession({ userId: 'u' }, request, 'terminal-1')
+    assert.notEqual(started.taskId, 'tencent-task')
+    assert.equal(values.get(`trtc:owner:${started.taskId}`), 'tencent-task')
+    await assert.rejects(() => controller.stopSession({ taskId: started.taskId }, request, 'terminal-1'))
+    assert.equal(values.has(`trtc:owner:${started.taskId}`), true)
+    shouldFail = false
+    await controller.stopSession({ taskId: started.taskId }, request, 'terminal-1')
+    assert.equal(stopTaskId, 'tencent-task')
+    assert.equal(values.has(`trtc:owner:${started.taskId}`), false)
+  } finally {
+    for (const [key, value] of savedEnv) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
 })
