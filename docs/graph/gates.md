@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2214 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2216 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -445,7 +445,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 668 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 670 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -831,6 +831,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/renshi/PolicyNotices.tsx` | `verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/PolicyPanel.tsx` | `verify-kiosk-parked-policy.mjs`<br/>`verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/PolicyTouchLayout.tsx` | `verify-fusion-w4.mjs`<br/>`verify-renshi-policy-ui.mjs` |
+| `apps/kiosk/src/pages/renshi/PolicyUnavailable.tsx` | `verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/RegisterPanel.tsx` | `verify-kiosk-parked-policy.mjs`<br/>`verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/RenshiPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-kiosk-parked-policy.mjs`<br/>`verify-policy-eligibility-ui.mjs`<br/>`verify-renshi-policy-ui.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/pages/renshi/SocialPanel.tsx` | `verify-kiosk-parked-policy.mjs`<br/>`verify-renshi-policy-ui.mjs` |
@@ -839,6 +840,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/renshi/eligibilityOutcome.ts` | `verify-kiosk-parked-policy.mjs`<br/>`verify-policy-eligibility-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/policyFocus.tsx` | `verify-kiosk-parked-policy.mjs` |
 | `apps/kiosk/src/pages/renshi/policyModel.ts` | `verify-kiosk-parked-policy.mjs`<br/>`verify-renshi-policy-ui.mjs` |
+| `apps/kiosk/src/pages/renshi/policySearchModel.ts` | `verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css` | `verify-kiosk-parked-policy.mjs`<br/>`verify-policy-eligibility-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/renshi-narrow-qx.css` | `verify-kiosk-parked-policy.mjs` |
 | `apps/kiosk/src/pages/renshi/renshi-touch.css` | `verify-fusion-w5.mjs` |
