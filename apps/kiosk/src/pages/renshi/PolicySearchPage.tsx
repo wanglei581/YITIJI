@@ -109,6 +109,7 @@ export function PolicySearchPage() {
       <div className="policy-min-list" data-testid="policy-search-list">
         {found.items.map((policy) => <PolicyGuideRow key={policy.id} policy={policy} highlight={word}
           categoryLabel={categoryLabel(policy.audience)} deadlineLabel={policyDeadlineLabel(policy.validThrough)}
+          showHandling={false}
           onOpen={() => navigate(`/renshi?policy=${encodeURIComponent(policy.id)}`)} />)}
       </div>
       {paging && (paging.previous || paging.next) && <div className="policy-min-pagination">

@@ -58,10 +58,11 @@ const fieldUrl = toDataUrl(withReact(retarget(retarget(
   transpile('src/pages/renshi/PolicySearchField.tsx'),
   './policySearchModel', searchModelUrl,
 ), './policyKeywordSession', sessionUrl)))
-const rowUrl = toDataUrl(withReact(retarget(retarget(
+const rowUrl = toDataUrl(withReact(retarget(retarget(retarget(
   transpile('src/pages/renshi/PolicyGuideRow.tsx'),
   './policyFacts', factsUrl,
-), './policySearchModel', searchModelUrl)))
+), './policySearchModel', searchModelUrl),
+  '../../components/qingxu/touch/QxTouchIcon', iconUrl)))
 const excerptUrl = toDataUrl(withReact(retarget(retarget(
   transpile('src/pages/renshi/PolicyExcerpt.tsx'),
   '../../components/qingxu/touch/QxTouchIcon', iconUrl,
@@ -226,6 +227,22 @@ test('有截止日期才写出陶土签，没有就不写、也不写已过期',
   assert.equal(model.policyDeadlinePassed('2026-11-16', BEIJING_NOON), true)
   assert.equal(model.policyDeadlinePassed(undefined, BEIJING_NOON), false)
   assert.equal(model.policyDeadlineLabel('不是日期'), undefined)
+})
+
+test('搜索行只留类别和截止，机构名前有地标', () => {
+  const searched = rowHtml(policy({
+    requiredMaterials: '身份证', externalUrlVerified: true, validThrough: '2026-12-31',
+  }), { highlight: '创业', categoryLabel: '创业扶持', showHandling: false })
+  assert.equal(searched.includes('有材料清单'), false)
+  assert.equal(searched.includes('可扫码看原文'), false)
+  assert.match(searched, /创业扶持/)
+  assert.match(searched, /policy-info-chip/)
+  assert.match(searched, /12 月 31 日截止/)
+  assert.match(searched, /class="policy-min-org"/)
+  assert.match(searched, /class="qxt-i"/)
+  const listed = rowHtml(policy({ requiredMaterials: '身份证', externalUrlVerified: true }))
+  assert.match(listed, /有材料清单/)
+  assert.match(listed, /可扫码看原文/)
 })
 
 test('原文两行放得下就整段放下，放不下才给展开全文', () => {
