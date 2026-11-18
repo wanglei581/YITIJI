@@ -4,8 +4,9 @@ import path from 'node:path'
 import { test } from 'node:test'
 import { builtinCjkFontCandidates, selectLoadableCjkFont } from '../cjk-font'
 
-const require = createRequire(__filename)
-const pdfjsRoot = path.dirname(require.resolve('pdfjs-dist/package.json'))
+// 不能叫 require：API 按 CommonJS 编译，`tsc`（带产物）把顶层 require 当保留名报 TS2441（`tsc --noEmit` 不报）。
+const localRequire = createRequire(__filename)
+const pdfjsRoot = path.dirname(localRequire.resolve('pdfjs-dist/package.json'))
 // 随依赖安装的真字体。不依赖本机是否有苹方或文泉驿。
 const LOADABLE = path.join(pdfjsRoot, 'standard_fonts', 'LiberationSans-Regular.ttf')
 
