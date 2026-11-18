@@ -206,16 +206,9 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
     orderBy: { createdAt: 'desc' },
     select: { action: true, payloadJson: true },
   })
-  const success = refunds.find((refund) => refund.status === 'success' && refund.reason != null && AUTO_REASONS.has(refund.reason))
-  if (success || (order.payStatus === 'refunded' && order.refundReason === PAID_NO_PAPER_AUTO_REASON)) {
-    const stale = success?.reason === STALE_ATTEMPT_REFUND_REASON
-    return viewOf(
-      'auto_success',
-      success,
-      stale && success ? staleCollectedRefundReason(success.amountCents) : null,
-      success?.status ?? 'success',
-    )
-  }
+  const printed = order.printTask?.printOutcome === 'printed'
+  const payable = payableCents(order)
+  // 还没结清的退款优先于更早的一笔成功，避免旧的过期退款把后来的失败盖住。
   const manualReview = refunds.find((refund) => refund.status === 'manual_review')
   if (manualReview) return viewOf('manual', manualReview, manualReviewReason(manualReview, audits))
   const failedAuto = refunds.find((refund) => refund.status === 'failed' && refund.reason != null && AUTO_REASONS.has(refund.reason))
@@ -223,27 +216,54 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
   if (failedAuto || failedAudit) {
     return viewOf('auto_failed', failedAuto, autoRefundFailureReason(audits), failedAuto?.status ?? 'failed')
   }
-  const pending = refunds.find((refund) => refund.status === 'pending' && refund.reason != null && AUTO_REASONS.has(refund.reason))
-  if (pending) return viewOf('manual', pending, CHANNEL_UNCONFIRMED_REFUND_REASON)
-  const printed = order.printTask?.printOutcome === 'printed'
+  const pendingAuto = refunds.find((refund) => refund.status === 'pending' && refund.reason != null && AUTO_REASONS.has(refund.reason))
+  if (pendingAuto) return viewOf('manual', pendingAuto, CHANNEL_UNCONFIRMED_REFUND_REASON)
+  const failedOther = refunds.find((refund) => refund.status === 'failed')
+  if (failedOther) return viewOf('manual', failedOther, '退款没有成功，待人工处理')
+  const pendingOther = refunds.find((refund) => refund.status === 'pending')
+  if (pendingOther) return viewOf('manual', pendingOther, '退款还在处理，待人工核对')
+  const autoSuccess = refunds.find((refund) => refund.status === 'success' && refund.reason != null && AUTO_REASONS.has(refund.reason))
+  if (autoSuccess || (order.payStatus === 'refunded' && order.refundReason === PAID_NO_PAPER_AUTO_REASON)) {
+    const stale = autoSuccess?.reason === STALE_ATTEMPT_REFUND_REASON
+    return viewOf(
+      'auto_success',
+      autoSuccess,
+      stale && autoSuccess ? staleCollectedRefundReason(autoSuccess.amountCents) : null,
+      autoSuccess?.status ?? 'success',
+    )
+  }
+  const fullSuccess = refunds.find((refund) => refund.status === 'success' && (
+    order.payStatus === 'refunded' || (payable > 0 && refund.amountCents >= payable)
+  ))
+  if (fullSuccess) return viewOf('auto_success', fullSuccess, null)
+  if (!printed && (order.payStatus === 'partial_refunded' || refunds.some((refund) => refund.status === 'success' && payable > 0 && refund.amountCents < payable))) {
+    const partial = refunds.find((refund) => refund.status === 'success')
+    return viewOf('manual', partial, '只退了一部分，纸没有出，待人工核对')
+  }
+  if (printed || payable <= 0) return EMPTY_VIEW
   const manualDetail = manualReasonFromAudit(audits)
-  // 开关关着仍用待退款信号。缺纸和说不准不写那条信号，只靠待人工审计认。
-  const manual = order.payStatus === 'paid'
+  const signaled = order.payStatus === 'paid'
     && order.taskStatus === 'failed'
-    && !printed
-    && payableCents(order) > 0
     && (
       order.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON
       || (order.refundReason == null && manualDetail != null)
     )
-  if (!manual) return EMPTY_VIEW
-  const itemCount = await db.orderItem.count({ where: { orderId } })
-  const completedItemCount = await db.orderItem.count({ where: { orderId, status: 'completed' } })
-  return viewOf('manual', undefined, manualDetail ?? manualHoldReason({
-    errorCode: order.printTask?.errorCode ?? null,
-    completedItemCount,
-    itemCount,
-  }))
+  if (signaled) {
+    const itemCount = await db.orderItem.count({ where: { orderId } })
+    const completedItemCount = await db.orderItem.count({ where: { orderId, status: 'completed' } })
+    return viewOf('manual', undefined, manualDetail ?? manualHoldReason({
+      errorCode: order.printTask?.errorCode ?? null,
+      completedItemCount,
+      itemCount,
+    }))
+  }
+  if (order.payStatus === 'paid' && order.taskStatus === 'failed' && refunds.length === 0) {
+    return viewOf('manual', undefined, '已付款，打印失败，没有退款记录，待人工处理')
+  }
+  if (order.payStatus === 'refunding' && refunds.length === 0) {
+    return viewOf('manual', undefined, '订单停在退款中，但没有退款记录，待人工处理')
+  }
+  return EMPTY_VIEW
 }
 
 export interface PrintReturnHold {
@@ -262,7 +282,7 @@ const HOLD_AUDIT_ACTIONS = [
 ] as const
 
 export async function listPrintReturnHolds(db: PrismaService): Promise<PrintReturnHold[]> {
-  const [openRefunds, audits, signaled] = await Promise.all([
+  const [openRefunds, audits, signaled, stuck] = await Promise.all([
     db.refund.findMany({
       where: { status: { in: ['failed', 'pending', 'manual_review'] } },
       select: { orderId: true },
@@ -275,11 +295,23 @@ export async function listPrintReturnHolds(db: PrismaService): Promise<PrintRetu
       where: { refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON },
       select: { id: true },
     }),
+    db.order.findMany({
+      where: {
+        OR: [
+          { payStatus: 'refunding' },
+          { payStatus: 'partial_refunded' },
+          { payStatus: 'paid', taskStatus: 'failed', amountCents: { gt: 0 } },
+          { payStatus: 'paid', amountCents: { gt: 0 }, refunds: { some: { status: 'success' } } },
+        ],
+      },
+      select: { id: true },
+    }),
   ])
   const orderIds = [...new Set([
     ...openRefunds.map((row) => row.orderId),
     ...audits.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
     ...signaled.map((row) => row.id),
+    ...stuck.map((row) => row.id),
   ])]
   const holds: PrintReturnHold[] = []
   for (const orderId of orderIds) {
