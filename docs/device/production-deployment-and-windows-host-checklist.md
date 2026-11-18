@@ -224,8 +224,11 @@
 >
 > **为什么**：手改的键若触发生产启动闸门，故障会推迟到下次发布的 PM2 重启那一步才爆 —— 那是最糟的失败位置（新代码已落盘、旧进程已死）。干跑把它提前一整个发布周期暴露。
 > **干跑结论的有效期**：应用闸门代码自已部署 SHA 起零变更时才可沿用，用 `git diff --stat <已部署SHA> <目标SHA> -- services/api/src/config/production-runtime-gates.ts` 为空来确认。发布 helper 自 2026-09-17 起属于工作流控制面，取自工作流自身提交而非待部署目标；它会在任何目标构建、备份或迁移前，比对 `.github/scripts/deploy-api-release.sh` 的生产闸门清单与目标 `production-runtime-gates.ts`，不一致即中止。
-> **手改的键能否在发布中存活**：`rsync` 排除 `services/api/.env`，发布步骤 3b 逐行 awk 只改 `PRINT_REQUIRE_PII_SCAN`，其余键原样透传 —— 2026-09-07 核实。
+> **手改的键能否在发布中存活**：`rsync` 排除 `services/api/.env`。发布步骤 3b 会把 `REQUIRED_PRODUCTION_GATES` 里的键写成 true，并把 `DEPLOYMENT_OWNERSHIP` 固定写成 `vendor_cloud`；其余键原样透传。
 
+- 我方生产 `DEPLOYMENT_OWNERSHIP` 由发布脚本固定写成 `vendor_cloud`（认不出也按我方云）。
+- 生产不许打开招聘内容托管（`RECRUITMENT_CONTENT_HOSTING_ENABLED` 为 1/true/yes/on 即拒绝启动，发布预检同样失败）。
+- 招聘锁上线后，发布脚本只接受带锁的提交；要回到更早的版本，先在主干做 revert 提交再走发布，不能直接部署旧提交号。
 
 以 `.env.example` 为清单逐项核对生产 `.env`：
 

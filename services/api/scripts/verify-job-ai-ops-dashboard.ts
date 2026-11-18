@@ -178,6 +178,63 @@ async function verifyJobQualitySummaryRuntime(): Promise<void> {
   }
 }
 
+const PARTNER_QUALITY_FIELDS = [
+  'sourceOrgId',
+  'sourceId',
+  'totalJobs',
+  'readyJobs',
+  'partialJobs',
+  'insufficientJobs',
+  'staleJobs',
+  'brokenSourceUrlJobs',
+  'lastCheckedAt',
+] as const
+
+async function verifyPartnerQualitySummaryHosting(): Promise<void> {
+  const { partnerJobQualitySummary } = await import('../src/job-ai/partner-quality-summary')
+  let queries = 0
+  const jobQuality = {
+    getSourceQualitySummary: async () => {
+      queries += 1
+      return [{
+        sourceOrgId: 'org-a',
+        sourceId: 'source-a',
+        totalJobs: 2,
+        readyJobs: 1,
+        partialJobs: 1,
+        insufficientJobs: 0,
+        staleJobs: 1,
+        brokenSourceUrlJobs: 1,
+        lastCheckedAt: '2026-06-02T10:00:00.000Z',
+      }]
+    },
+  }
+
+  const previousHosting = process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']
+  try {
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+    const closed = await partnerJobQualitySummary(jobQuality, 'org-a')
+    if (closed.length === 0 && queries === 0) {
+      pass('运行时:托管关时机构端质量汇总为空且不查快照')
+    } else {
+      fail(`运行时:托管关时机构端质量汇总应为空且不查库 length=${closed.length} queries=${queries}`)
+    }
+
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
+    const open = await partnerJobQualitySummary(jobQuality, 'org-a')
+    const item = open[0]
+    const missing = PARTNER_QUALITY_FIELDS.filter((field) => !item || !(field in item))
+    if (open.length === 1 && item?.totalJobs === 2 && missing.length === 0 && queries === 1) {
+      pass('运行时:托管开时机构端质量汇总有数，字段与 SourceQualitySummaryItem 一致')
+    } else {
+      fail(`运行时:托管开时机构端质量汇总异常 length=${open.length} queries=${queries} missing=${missing.join(',')}`)
+    }
+  } finally {
+    if (previousHosting === undefined) delete process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']
+    else process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = previousHosting
+  }
+}
+
 async function main(): Promise<void> {
   console.log('\n=== 岗位 AI Admin/Partner 运营看板门禁 ===')
 
@@ -254,8 +311,19 @@ async function main(): Promise<void> {
   mustContain(packageJson, ['"verify:job-ai-ops-dashboard"'], 'package.json 注册 verify:job-ai-ops-dashboard')
   mustContain(ci, ['verify:job-ai-ops-dashboard'], 'CI 接入岗位 AI 运营看板门禁')
 
+  const partnerQuality = read('src/job-ai/partner-quality-summary.ts')
+  mustContain(partnerQuality, [
+    'isRecruitmentContentHostingEnabled',
+    'getSourceQualitySummary',
+    'return []',
+  ], '机构端质量汇总复用托管开关，关闭时回空数组且不在本文件另写解析')
+  mustContain(jobsController, [
+    'partnerJobQualitySummary',
+  ], 'Partner quality-summary 走机构端包装，不直接把托管判断写进共用摘要')
+
   await verifyAiUsageRuntime()
   await verifyJobQualitySummaryRuntime()
+  await verifyPartnerQualitySummaryHosting()
   console.log('✅ ALL PASS — 岗位 AI Admin/Partner 运营看板门禁一致')
 }
 
