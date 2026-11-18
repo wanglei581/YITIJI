@@ -73,7 +73,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2240 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2241 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -453,7 +453,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 669 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 670 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -546,6 +546,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/assistant/assistant-qingxu-input.css` | `verify-assistant-trtc-guard.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/assistant-qingxu.css` | `verify-lightflow-k2a-ai-career.mjs`<br/>`verify-profile-feedback-inkpaper.mjs` |
 | `apps/kiosk/src/pages/assistant/assistant-touch.css` | `verify-advisor-provider-gate.mjs` |
+| `apps/kiosk/src/pages/assistant/assistantSessionClear.ts` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/auth/LoginPage.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-qr-login-ui.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-user-center-wave0.mjs` |
 | `apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx` | `verify-fusion-shell.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-qr-login-ui.mjs` |
 | `apps/kiosk/src/pages/auth/ScanQrLoginPanel.tsx` | `verify-lightflow-k1-public-entry.mjs`<br/>`verify-qr-login-ui.mjs` |

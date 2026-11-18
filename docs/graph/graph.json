@@ -22054,6 +22054,9 @@
     "apps/kiosk/src/pages/assistant/assistant-touch.css": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs"
     ],
+    "apps/kiosk/src/pages/assistant/assistantSessionClear.ts": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
     "apps/kiosk/src/pages/auth/LoginPage.tsx": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -33884,6 +33887,7 @@
           "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx",
+          "apps/kiosk/src/pages/assistant/assistantSessionClear.ts",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
