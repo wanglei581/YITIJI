@@ -37,7 +37,8 @@ assert.equal(otherKept, '打印超时，请稍后重试')
 const otherFallback = presentScreenFailure({ errorCode: 'PRINT_TIMEOUT', failureReasonForUser: '打印超时，请联系工作人员' })
 assert.match(String(otherFallback), /打印有问题？/)
 assert.equal(String(otherFallback).includes('工作人员'), false)
-assert.match(errorCodeToMessage('PRINTER_OFFLINE'), /^打印机离线，请稍后重试。/)
+// S15c2：离线失败屏第 3 步已写「请稍后再来」，对照表基句不再写「请稍后重试」。服务端那句不改，这三态不用接口句。
+assert.match(errorCodeToMessage('PRINTER_OFFLINE'), /^打印机离线，当前无法打印。/)
 assert.match(errorCodeToMessage('PAPER_EMPTY'), /^打印机缺纸，当前无法打印。/)
 assert.match(errorCodeToMessage('PRINTER_ERROR'), /^打印机可能卡纸或发生设备故障，当前暂时无法继续使用。/)
 // 其它错误码仍先用接口文案。这三条改口之后，这条约定不能一起放宽。
