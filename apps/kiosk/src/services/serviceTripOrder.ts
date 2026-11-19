@@ -27,8 +27,10 @@ const defaultDeps: OpenServiceTripDeps = {
 }
 
 /**
- * 开这一趟的一张新单并记到本机。会话还没落库时最多再建一次。
- * 失败原样抛出（ApiHttpError），由调用方按错误码出句子；这里不记任何东西。
+ * 开这一趟的一张新单。会话还没落库时最多再建一次。
+ * 失败原样抛出（ApiHttpError），由调用方按错误码出句子。
+ * 这里不记单：调用方确认自己还在（没离开、没换成更新的一次）再 rememberServiceTrip，
+ * 否则晚到的旧结果会盖掉新记的单。
  */
 export async function openServiceTripOrder(
   input: { serviceKey: ServiceOrderKey; pathname: string; endUserId?: string | null },
@@ -44,9 +46,12 @@ export async function openServiceTripOrder(
     kioskSessionId = await deps.ready(input.pathname)
     view = await deps.create({ serviceKey: input.serviceKey, kioskSessionId, endUserId: input.endUserId })
   }
-  const trip = { serviceKey: input.serviceKey, orderId: view.id, kioskSessionId }
-  rememberServiceTrip(trip)
-  return { view, trip: { ...trip, savedAt: Date.now() } }
+  return { view, trip: { serviceKey: input.serviceKey, orderId: view.id, kioskSessionId, savedAt: Date.now() } }
+}
+
+/** 记下这一趟的单（调用方确认这次结果仍有效之后）。 */
+export function keepServiceTripOrder(trip: ServiceTrip): void {
+  rememberServiceTrip({ serviceKey: trip.serviceKey, orderId: trip.orderId, kioskSessionId: trip.kioskSessionId }, trip.savedAt)
 }
 
 /**
