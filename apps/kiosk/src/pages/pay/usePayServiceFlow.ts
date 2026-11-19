@@ -83,7 +83,10 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
 
   const applyView = useCallback((view: ServiceOrderView, fromRefresh: boolean) => {
     orderRef.current = view
-    const phase = serviceOrderPhase(view, Date.now())
+    const now = Date.now()
+    // 剩余时间按这一刻算：进屏到出码之间隔了一两秒，沿用挂载时的时刻会多写一秒（5:01）。
+    setNowMs(now)
+    const phase = serviceOrderPhase(view, now)
     setState((prev) => {
       let checking = false
       if (phase === 'checking') checking = true
