@@ -8,6 +8,7 @@ import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.se
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { STALE_ATTEMPT_REFUND_REASON } from './print-no-paper-refund.constants'
 import { wholeOrderPayableCents } from './refund-amount-hold'
+import { refundMayStillBeAtChannel } from './refund-channel-acceptance'
 
 type HoldDb = PrismaService | PrismaTransactionClient
 
@@ -216,14 +217,29 @@ export async function rejectClaimForRefund(db: HoldDb, orderId: string, taskId: 
   return true
 }
 
-const NOT_STALE_REASON = {
-  OR: [
-    { reason: null },
-    { reason: { not: STALE_ATTEMPT_REFUND_REASON } },
-  ],
+type VerifyRefundRow = {
+  status: string
+  reason: string | null
+  channel: string
+  refundNo: string
+  channelRefundNo: string | null
 }
 
-/** 已在退或已退成（原因是空也算）。过期付款的退款不挡住后来这一笔。 */
+/** 过期付款的退款不挡。处理中、已退成，以及渠道还没明确失败的，挡住核验。 */
+function refundBlocksVerifiedOutcome(row: VerifyRefundRow): boolean {
+  if (row.reason === STALE_ATTEMPT_REFUND_REASON) return false
+  if (row.status === 'pending' || row.status === 'success') return true
+  return refundMayStillBeAtChannel(row)
+}
+
+/** 渠道没受理过的待人工。核验已出纸时撤回，未出纸不动。 */
+function withdrawOnVerifiedPaper(row: VerifyRefundRow): boolean {
+  if (refundMayStillBeAtChannel(row)) return false
+  if (row.status !== 'manual_review') return false
+  return true
+}
+
+/** 已在退或已退成（原因是空也算）。过期付款的退款不挡住后来这一笔。渠道受理过、还没失败的待人工也挡住。 */
 export async function orderRefundBlocksOutcome(
   db: HoldDb,
   orderId: string,
@@ -236,15 +252,24 @@ export async function orderRefundBlocksOutcome(
   if (order.taskStatus === 'claimed' || order.taskStatus === 'printing' || order.taskStatus === 'completed') {
     return true
   }
-  const row = await db.refund.findFirst({
-    where: {
-      orderId,
-      status: { in: ['pending', 'success'] },
-      ...NOT_STALE_REASON,
-    },
-    select: { id: true },
+  const rows = await db.refund.findMany({
+    where: { orderId },
+    select: { status: true, reason: true, channel: true, refundNo: true, channelRefundNo: true },
   })
-  return row != null
+  return rows.some((row) => refundBlocksVerifiedOutcome(row))
+}
+
+/** 先锁订单行。拿到锁之后再用新语句读退款，避免和核验出纸看同一张旧快照。 */
+export async function lockOrderRow(
+  tx: PrismaTransactionClient,
+  dbKind: DbKind,
+  orderId: string,
+): Promise<void> {
+  if (dbKind === 'postgres') {
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`
+    return
+  }
+  await tx.order.updateMany({ where: { id: orderId }, data: { updatedAt: new Date() } })
 }
 
 export interface UnreleasedRefundMark {
@@ -343,43 +368,75 @@ export async function markOrderIfPaperUnreleased(
   return marked.count === 1
 }
 
+const VERIFY_PAPER_WITHDRAW_REASON = '核验已出纸'
+
+async function lockPaidUnreleasedOrder(
+  tx: PrismaTransactionClient,
+  dbKind: DbKind,
+  orderId: string,
+): Promise<boolean> {
+  if (dbKind === 'postgres') {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT o."id"
+      FROM "Order" o
+      WHERE o."id" = ${orderId}
+        AND o."payStatus" = 'paid'
+        AND o."taskStatus" NOT IN ('claimed', 'printing', 'completed')
+      FOR UPDATE
+    `
+    return rows.length === 1
+  }
+  const locked = await tx.order.updateMany({
+    where: {
+      id: orderId,
+      payStatus: 'paid',
+      taskStatus: { notIn: ['claimed', 'printing', 'completed'] },
+    },
+    data: { updatedAt: new Date() },
+  })
+  return locked.count === 1
+}
+
 /**
- * 核验出纸写 printOutcome。同一条语句先锁订单：已在退、已退成，或纸已经放行，就不写。
+ * 核验出纸写 printOutcome。
+ * 先只锁订单行，拿到锁后再读退款。同一条语句里的 NOT EXISTS 会用等锁前的快照。
+ * 渠道没受理过的待人工，核验已出纸时在这个事务里撤回。
  */
 export async function writePrintOutcomeIfRefundClear(
   tx: PrismaTransactionClient,
   dbKind: DbKind,
   input: { taskId: string; orderId: string; outcome: string; unconfirmedErrorCode: string },
 ): Promise<boolean> {
-  if (dbKind === 'postgres') {
-    const rows = await tx.$queryRaw<Array<{ id: string }>>`
-      WITH locked_order AS MATERIALIZED (
-        SELECT o."id"
-        FROM "Order" o
-        WHERE o."id" = ${input.orderId}
-          AND o."payStatus" = 'paid'
-          AND o."taskStatus" NOT IN ('claimed', 'printing', 'completed')
-          AND NOT EXISTS (
-            SELECT 1 FROM "Refund" r
-            WHERE r."orderId" = o."id"
-              AND r."status" IN ('pending', 'success')
-              AND (r."reason" IS NULL OR r."reason" <> ${STALE_ATTEMPT_REFUND_REASON})
-          )
-        FOR UPDATE
-      )
-      UPDATE "PrintTask" t
-      SET "printOutcome" = ${input.outcome},
-          "updatedAt" = CURRENT_TIMESTAMP
-      WHERE t."id" = ${input.taskId}
-        AND t."status" = 'failed'
-        AND t."errorCode" = ${input.unconfirmedErrorCode}
-        AND t."printOutcome" IS NULL
-        AND EXISTS (SELECT 1 FROM locked_order)
-      RETURNING t."id"
-    `
-    return rows.length === 1
+  const locked = await lockPaidUnreleasedOrder(tx, dbKind, input.orderId)
+  if (!locked) return false
+  const rows = await tx.refund.findMany({
+    where: { orderId: input.orderId },
+    select: { id: true, refundNo: true, status: true, reason: true, channel: true, channelRefundNo: true },
+  })
+  if (rows.some((row) => refundBlocksVerifiedOutcome(row))) return false
+  if (input.outcome === 'printed') {
+    for (const row of rows) {
+      if (!withdrawOnVerifiedPaper(row)) continue
+      const withdrawn = await tx.refund.updateMany({
+        where: { id: row.id, status: 'manual_review' },
+        data: { status: 'withdrawn', reason: VERIFY_PAPER_WITHDRAW_REASON },
+      })
+      if (withdrawn.count !== 1) return false
+      await tx.auditLog.create({
+        data: {
+          actorId: null,
+          actorRole: 'admin',
+          action: 'refund.hold_resolved',
+          targetType: 'order',
+          targetId: input.orderId,
+          payloadJson: JSON.stringify({
+            refundNo: row.refundNo,
+            detail: VERIFY_PAPER_WITHDRAW_REASON,
+          }),
+        },
+      })
+    }
   }
-  if (await orderRefundBlocksOutcome(tx, input.orderId)) return false
   const cas = await tx.printTask.updateMany({
     where: {
       id: input.taskId,

@@ -4,7 +4,7 @@
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 import { ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES, ONLINE_PAID_PENDING_REFUND_REASON } from './pending-refund-signal'
-import { assertCanOpenRefund } from './refund-paper-exclusion'
+import { assertCanOpenRefund, lockOrderRow } from './refund-paper-exclusion'
 
 const ACTIVE_PRINT_TASK_STATES = ['claimed', 'printing'] as const
 const ALREADY_REFUND_STATES = new Set(['refunding', 'refunded', 'partial_refunded'])
@@ -37,6 +37,7 @@ export async function stageNewRefund(
 ): Promise<{ record: RefundRow; idempotent: boolean }> {
   try {
     return await db.$transaction(async (tx) => {
+      await lockOrderRow(tx, db.dbKind, input.orderId)
       await assertCanOpenRefund(tx, input.orderId, {
         refundNo: input.refundNo,
         verifiedAfterPaper: input.verifiedAfterPaper,

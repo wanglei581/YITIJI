@@ -40,7 +40,7 @@ import { payableCents } from './pending-refund-signal'
 import { settleServiceRefundNotify } from './service-order.payment'
 import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput, type RefundExecuteResult } from './payment-provider.types'
 import { notifyPrintReturnHold } from './print-return-alert'
-import { assertCanOpenRefund } from './refund-paper-exclusion'
+import { assertCanOpenRefund, lockOrderRow } from './refund-paper-exclusion'
 import { convergeNotifiedRefundSuccess } from './refund-notify-paper-guard'
 import { cancelUnclaimedPrintTasks } from './cancel-unclaimed-print-task'
 import { nonStaleSuccessCents, payStatusAfterRefundFailure, remainderAmountCents, settlementAfterSuccess } from './refund-remainder'
@@ -659,7 +659,6 @@ export class RefundService {
    * 渠道幂等保证与「其实已出款」的极端错判也不会二次出款。
    */
   private async retryFailedRefund(refund: RefundRecord, operatorId?: string): Promise<RefundResultView> {
-    await assertCanOpenRefund(this.prisma, refund.orderId, { refundNo: refund.refundNo, verifiedAfterPaper: false })
     const order = await this.requireOrder(refund.orderId)
     const collectedRetry = isOnlineCollectedRefundLock(order) && isOnlineCollectedPendingRefund(order)
     if (!collectedRetry && order.payStatus !== 'paid') {
@@ -668,6 +667,8 @@ export class RefundService {
     }
     // CAS：订单 paid/closed→refunding + 记录 failed→pending，同事务；任一未命中即并发竞态，放弃本次重试。
     const reopened = await this.prisma.$transaction(async (tx) => {
+      await lockOrderRow(tx, this.prisma.dbKind, refund.orderId)
+      await assertCanOpenRefund(tx, refund.orderId, { refundNo: refund.refundNo, verifiedAfterPaper: false })
       const casOrder = collectedRetry
         ? await tx.order.updateMany({
             where: {
