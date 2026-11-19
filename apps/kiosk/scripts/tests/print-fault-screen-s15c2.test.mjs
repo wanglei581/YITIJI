@@ -132,7 +132,10 @@ test('离线副题与卡纸同结构，同一屏不再混用请稍后重试和�
       : /你的订单还在。打印机没连上，我们已经收到提醒，会尽快处理/)
     assert.doesNotMatch(copy.subtitle, /打印机离线/)
     assert.doesNotMatch(text, /请稍后重试/)
-    assert.match(copy.steps[2].detail, /请稍后再来/)
+    // 定稿第 3 条：全屏只用「稍后再来」，不再写「请稍后再来」。
+    assert.match(copy.steps[1].detail, /稍后再来/)
+    assert.doesNotMatch(text, /请稍后再来/)
+    assert.doesNotMatch(text, /这台机器暂时打不了/)
     assert.doesNotMatch(text, /工作人员/)
   }
   const deviceLine = progress.errorCodeToMessage('PRINTER_OFFLINE')
@@ -163,9 +166,10 @@ test('三态失败页上服务电话只出现一次，设备上报和带走失�
     const miss = failedModel.faultScreenTakeawayMiss(variant)
     const text = [screenText(copy), ...rows.map((row) => `${row.label}${row.value}`), miss].join('\n')
     assert.equal((text.match(/服务电话/g) ?? []).length, 1, `${variant} 服务电话应只出现一次`)
-    assert.match(copy.steps[2].detail, /服务电话/)
+    assert.match(copy.steps[2].title, /需要帮助？拨打服务电话/)
+    assert.doesNotMatch(copy.steps[2].detail, /服务电话/)
     assert.doesNotMatch(reason, /服务电话|这台机器暂时打不了|打印有问题/)
-    assert.equal(miss, '手机带走链接这次没取到，不影响这笔订单')
+    assert.equal(miss, '手机带走链接这次没取到，不影响这笔订单。')
     assert.doesNotMatch(text, /工作人员/)
   }
   const retryCopy = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-PHONE', canRetry: true })
@@ -173,7 +177,8 @@ test('三态失败页上服务电话只出现一次，设备上报和带走失�
   const retryRows = failedModel.failureSummaryRows({ orderNo: 'ORD-PHONE', file: null, params: null, money, reason: retryReason })
   const retryText = [screenText(retryCopy), ...retryRows.map((row) => row.value), failedModel.faultScreenTakeawayMiss('out-of-paper')].join('\n')
   assert.equal((retryText.match(/服务电话/g) ?? []).length, 1, '缺纸能重提时，服务电话只出现一次')
-  assert.match(retryCopy.steps[2].detail, /服务电话/, '能重提时服务电话接在第 3 步说明末尾')
+  assert.match(retryCopy.steps[2].title, /需要帮助？拨打服务电话/, '能重提时服务电话也在第 3 步标题')
+  assert.equal(retryCopy.steps[2].detail, '服务时间：工作日 9:00–18:00')
   assert.doesNotMatch(retryCopy.fine, /服务电话/)
   assert.match(failedModel.faultScreenTakeawayMiss('failed'), /打印有问题？/)
   const page = readFileSync(join(kioskRoot, 'src/pages/print/PrintDonePage.tsx'), 'utf8')
@@ -290,10 +295,10 @@ test('缺纸、卡纸、离线不论能否重提，服务电话都只在第 3 �
       assert.equal(phoneCount(step3), 1, `${variant}/canRetry=${canRetry} 第 3 步应有且只有一次服务电话`)
       assert.equal(phoneCount(elsewhere), 0, `${variant}/canRetry=${canRetry} 第 3 步以外不应再出现服务电话`)
       assert.doesNotMatch(`${step3}\n${elsewhere}`, /工作人员/)
-      if (canRetry) {
-        assert.equal(copy.steps[2].title, '机器恢复后可点下方「重新提交打印」')
-        assert.match(copy.steps[2].detail, /打印有问题？/)
-      }
+      assert.equal(copy.steps[2].title, '需要帮助？拨打服务电话 18369161921，报这一单的订单号')
+      assert.equal(copy.steps[2].detail, '服务时间：工作日 9:00–18:00')
+      assert.doesNotMatch(step3, /重新提交打印|打印有问题|这台机器暂时打不了/)
+      if (canRetry) assert.match(copy.steps[1].detail, /重新提交打印/)
     }
   }
 })
@@ -502,6 +507,38 @@ test('S15c7 第 2 步一律请不要重新下单，重新提交打印写在这�
   }
 })
 
+test('S15c7 第 3 步一律是需要帮助，能不能重新提交都一样', async () => {
+  const unattended = await import(unattendedUrl)
+  const phone = {
+    servicePhone: '18369161921',
+    serviceHours: '工作日 9:00–18:00',
+    otherOnlineTerminalNearby: false,
+    miniappPublished: false,
+    selfNoteTab: false,
+  }
+  unattended.bindSupportContactPeek(() => phone)
+  try {
+    for (const variant of ['out-of-paper', 'paper-jam', 'offline']) {
+      const off = failedModel.failureCopy({ variant, money, orderNo: 'ORD-HELP', canRetry: false })
+      const on = failedModel.failureCopy({ variant, money, orderNo: 'ORD-HELP', canRetry: true })
+      assert.deepEqual(on.steps[2], off.steps[2], `${variant} 第 3 步不随能否重提改变`)
+      assert.equal(off.steps[2].title, '需要帮助？拨打服务电话 18369161921，报这一单的订单号')
+      assert.equal(off.steps[2].detail, '服务时间：工作日 9:00–18:00')
+      assert.doesNotMatch(off.steps[2].title, /机器恢复后可点下方|记下订单号|订单号 ORD-/)
+      const text = screenText(on)
+      assert.equal((text.match(/服务电话/g) ?? []).length, 1)
+      assert.doesNotMatch(text, /请稍后再来|这台机器暂时打不了|打印有问题？/)
+    }
+    unattended.bindSupportContactPeek(() => ({ ...phone, servicePhone: null, serviceHours: null }))
+    const bare = failedModel.failureCopy({ variant: 'offline', money, orderNo: 'ORD-HELP', canRetry: true })
+    assert.equal(bare.steps[2].title, '需要帮助？查看《隐私政策》里的联系方式')
+    assert.equal(bare.steps[2].detail, '')
+    assert.equal((screenText(bare).match(/服务电话/g) ?? []).length, 0)
+  } finally {
+    unattended.bindSupportContactPeek(() => phone)
+  }
+})
+
 test('缺纸、卡纸、离线的带走链接过期句不带服务电话，普通失败仍带', async () => {
   const unattended = await import(unattendedUrl)
   unattended.bindSupportContactPeek(() => ({
@@ -533,6 +570,41 @@ test('缺纸、卡纸、离线的带走链接过期句不带服务电话，普�
   const page = readFileSync(join(kioskRoot, 'src/pages/print/PrintDonePage.tsx'), 'utf8')
   assert.match(page, /expiredLine=\{faultScreenTakeawayExpired\(variant\)\}/)
   assert.doesNotMatch(page, /带走链接已过期。\$\{printProblemLine\(\)\}/)
+})
+
+test('S15c7 置灰原因只说为什么和何时亮，带走链接与小字照定稿', () => {
+  const tail = '机器恢复后，这个按钮会自己亮起。'
+  const dev = (over) => ({ loading: false, printerReady: false, kind: 'error', printer: {}, ...over })
+  const reasons = {
+    paper: failedModel.retryBlockedReason(dev({ printer: { errorCode: 'paperEmpty' } })),
+    jam: failedModel.retryBlockedReason(dev({ printer: { errorCode: 'paperJam' } })),
+    fault: failedModel.retryBlockedReason(dev({ printer: { errorCode: 'hardwareError' } })),
+    offline: failedModel.retryBlockedReason(dev({ kind: 'offline', printer: {} })),
+  }
+  assert.equal(reasons.paper, `打印机现在还缺纸，暂时不能重新提交；${tail}`)
+  assert.equal(reasons.jam, `打印机现在还卡着纸，暂时不能重新提交；${tail}`)
+  assert.equal(reasons.fault, `打印机现在还有故障，暂时不能重新提交；${tail}`)
+  assert.equal(reasons.offline, `这台机器的打印机现在离线，暂时不能重新提交；${tail}`)
+  for (const reason of Object.values(reasons)) {
+    assert.doesNotMatch(reason, /订单还在|请不要重新下单|。机器恢复后/)
+  }
+  for (const variant of ['out-of-paper', 'paper-jam', 'offline']) {
+    assert.equal(failedModel.faultScreenTakeawayMiss(variant), '手机带走链接这次没取到，不影响这笔订单。')
+    assert.equal(failedModel.faultScreenTakeawayExpired(variant), '手机带走链接已过期，不影响这笔订单。')
+    const freeCopy = failedModel.failureCopy({ variant, money: { fact: 'free', amountCents: 0 }, orderNo: 'ORD-FINE', canRetry: false })
+    const paidCopy = failedModel.failureCopy({ variant, money: { fact: 'paid', amountCents: 200 }, orderNo: 'ORD-FINE', canRetry: true })
+    assert.equal(freeCopy.fine, '订单记录保留着，不会因为这次失败消失。')
+    assert.equal(paidCopy.fine, '订单和已付金额都保留着，不会因为这次失败消失。')
+    assert.doesNotMatch(`${freeCopy.fine}\n${paidCopy.fine}`, /退款|别硬拉纸|不会重复收费|服务电话/)
+  }
+  const css = readFileSync(join(kioskRoot, 'src/pages/print/styles/print-fail-touch.css'), 'utf8')
+  assert.match(css, /\.pft-fail-exits:has\(\.pft-fail-retry\)\s*\{[^}]*grid-template-columns:\s*1fr 1fr 1fr/)
+  assert.doesNotMatch(css, /\.pft-fail-retry\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/)
+  const view = readFileSync(join(kioskRoot, 'src/pages/print/components/PrintDoneFailed.tsx'), 'utf8')
+  const exitsAt = view.indexOf('pft-fail-exits')
+  const closeAt = view.indexOf('</div>', exitsAt)
+  assert.equal(view.slice(exitsAt, closeAt).includes('pft-fail-why'), false, '置灰原因不放进出口按钮那一排')
+  assert.match(view.slice(closeAt, closeAt + 280), /retry\.available && retry\.blockedReason/)
 })
 
 test('失败文案注释放在各自函数上方', () => {

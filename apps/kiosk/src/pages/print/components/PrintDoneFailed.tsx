@@ -158,9 +158,6 @@ export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: str
               >
                 {retry.busy ? '正在重新提交…' : '重新提交打印'}
               </button>
-              {retry.blockedReason ? (
-                <p id={RETRY_WHY_ID} className="pft-fail-why" data-testid="print-retry-blocked-reason" role="status">{retry.blockedReason}</p>
-              ) : null}
             </>
           ) : null}
           {props.onContact ? (
@@ -169,6 +166,9 @@ export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: str
             </button>
           ) : null}
         </div>
+        {retry.available && retry.blockedReason ? (
+          <p id={RETRY_WHY_ID} className="pft-fail-why" data-testid="print-retry-blocked-reason" role="status">{retry.blockedReason}</p>
+        ) : null}
         <TakeawayCard takeaway={takeaway} expiredLine={props.expiredLine} />
         {isLoggedIn ? <OrdersRowLink onOrders={props.onOrders} /> : null}
         {copy.resumeLine ? (

@@ -79,20 +79,28 @@
   overflow-wrap: anywhere;
 }
 
+:is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail .qxt-step small {
+  white-space: pre-line;
+}
+
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits .qxt-btn-exit {
-  height: 88px;
-  min-height: 88px;
-  font-size: 28px;
+  height: 80px;
+  min-height: 80px;
+  font-size: 26px;
   font-weight: 700;
 }
 
-/* 重新提交打印独占一行；重提被拒的提示在它上面一行，不滚动就能看到 */
+/* 重新提交打印和另外两颗并排；只有一颗出口时才拉满一行 */
+:is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits:has(.pft-fail-retry) {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits .qxt-btn-exit:only-child {
   grid-column: 1 / -1;
 }
 
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits .pft-fail-retry {
-  grid-column: 1 / -1;
+  grid-column: auto;
   background: var(--qxt-teal-wash);
   color: var(--qxt-teal-ink);
   border-color: var(--qxt-teal-ink);
@@ -124,15 +132,14 @@
   cursor: default;
 }
 
-:is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits .pft-fail-why {
-  grid-column: 1 / -1;
+:is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail > .pft-fail-why {
   margin: 0;
-  padding: 12px 20px;
-  border-radius: 20px;
-  background: var(--qxt-clay-wash);
+  padding: 0;
+  background: transparent;
   color: var(--qxt-clay-ink);
   font-size: 22px;
   line-height: 1.45;
+  font-weight: 600;
   text-align: left;
 }
 

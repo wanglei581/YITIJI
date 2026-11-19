@@ -506,7 +506,10 @@ test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保
     assert.match(freeText, /免费试运营/)
     assert.doesNotMatch(freeText, /报价|价格|费用|付款|收费|收款|扣费|抵扣|权益|internal-task/)
     const paidText = copyText(failedModel.failureCopy({ ...base, money: { fact: 'paid', amountCents: 200 } }))
-    assert.match(paidText, /不会重复收费/)
+    // 定稿第 6 条：小字只说金额还在。能重打时第 2 步写「不再收费」，不再写「不会重复收费」。
+    assert.match(paidText, /订单和已付金额都保留着，不会因为这次失败消失/)
+    if (canRetry) assert.match(paidText, /不再收费/)
+    assert.doesNotMatch(paidText, /不会重复收费|退款/)
   }
 })
 
@@ -516,10 +519,15 @@ test('缺纸页不承诺补纸后自动续打，重打只在 canRetry 时出现�
   const withRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-20261003-PAPER', canRetry: true })
   assert.equal(noRetry.steps.length, 3)
   assert.match(noRetry.steps[0].detail, /本机不知道出了几页/)
-  assert.match(noRetry.steps[2].title, /订单号 ORD-20261003-PAPER/)
-  assert.match(withRetry.steps[2].detail, /整份重打/)
+  // 定稿第 4 条：没配服务电话时第 3 步改去隐私政策，具体订单号仍在摘要。
+  assert.equal(noRetry.steps[2].title, '需要帮助？查看《隐私政策》里的联系方式')
+  assert.equal(
+    failedModel.failureSummaryRows({ orderNo: 'ORD-20261003-PAPER', file: null, params: null, money, reason: '' }).find((row) => row.key === 'order').value,
+    'ORD-20261003-PAPER',
+  )
+  assert.match(withRetry.steps[1].detail, /整份重打/)
   for (const copy of [noRetry, withRetry]) {
-    assert.match(copyText(copy), /不会在加纸后自动继续/)
+    assert.match(copyText(copy), /加纸后也不会自动续打/)
     assert.doesNotMatch(copyText(copy), /加纸后可以继续|加纸后可继续打印|剩下没打的部分会在加纸后继续|不需要重新下单|已出 1|等待加纸|退款|自动续打后/)
   }
 })
@@ -529,9 +537,23 @@ test('卡纸三步不提收款', () => {
     const copy = failedModel.failureCopy({ variant: 'paper-jam', money: { fact, amountCents: fact === 'paid' ? 200 : fact === 'free' ? 0 : null }, orderNo: 'ORD-20261003-JAM', canRetry: false })
     const text = stepsText(copy)
     assert.equal(copy.stepsLabel, '处理之前先做这三件')
-    assert.match(text, /别硬拉纸/)
-    assert.match(text, /订单号 ORD-20261003-JAM/)
-    assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)
+    assert.match(text, /不要拽纸/)
+    assert.match(text, /撕在里面更难取/)
+    assert.equal(copy.steps[2].title, '需要帮助？查看《隐私政策》里的联系方式')
+    assert.equal(
+      failedModel.failureSummaryRows({
+        orderNo: 'ORD-20261003-JAM',
+        file: null,
+        params: null,
+        money: { fact, amountCents: fact === 'paid' ? 200 : fact === 'free' ? 0 : null },
+        reason: '',
+      }).find((row) => row.key === 'order').value,
+      'ORD-20261003-JAM',
+    )
+    const stepsOnly = copy.steps.flatMap((step) => [step.title, step.detail]).join('\n')
+    assert.doesNotMatch(stepsOnly, /已付金额|已支付|支付|报价|价格|收费/)
+    if (fact === 'paid') assert.equal(copy.fine, '订单和已付金额都保留着，不会因为这次失败消失。')
+    else assert.equal(copy.fine, '订单记录保留着，不会因为这次失败消失。')
   }
 })
 
@@ -559,8 +581,9 @@ test('离线失败屏用离线标题和稍后再来，不叫人找工作人员',
   const copy = failedModel.failureCopy({ variant: 'offline', money: { fact: 'free', amountCents: 0 }, orderNo: 'ORD-20261118-OFF', canRetry: false })
   assert.equal(copy.title, '打印机离线')
   assert.match(copy.subtitle, /你的订单还在。打印机没连上，我们已经收到提醒，会尽快处理/)
-  assert.match(copy.steps[2].detail, /请稍后再来/)
-  assert.match(copy.steps[2].detail, /这台机器暂时打不了/)
+  assert.match(copy.steps[1].detail, /你可以稍后再来/)
+  assert.match(copy.steps[2].title, /需要帮助？查看《隐私政策》里的联系方式/)
+  assert.doesNotMatch(copyText(copy), /请稍后再来|这台机器暂时打不了/)
   assert.doesNotMatch(copyText(copy), /工作人员/)
   assert.doesNotMatch(copyText(copy), /打印有问题/)
 })
@@ -602,15 +625,13 @@ test('I-11 缺纸、卡纸的下一步不等人「加完纸」「处理好」，
   for (const copy of [jam, noRetry, withRetry]) {
     assert.doesNotMatch(copyText(copy), /加完纸|处理好后|加纸之后|等人|工作人员/)
   }
-  // 卡纸、缺纸（没有重提出口）的第三步用「机器暂时打不了」的标准句：我们已收到提醒、请稍后再来、怎么找到我们。
-  for (const copy of [jam, noRetry]) {
-    assert.match(copy.steps[2].detail, /这台机器暂时打不了。请稍后再来；需要帮助请/)
-    assert.doesNotMatch(copy.steps[2].detail, /我们已经收到提醒/)
-    assert.match(copy.steps[2].title, /订单号 ORD-2026102/)
+  // 定稿第 4 条：第 3 步固定是求助，不写「这台机器暂时打不了」。稍后再来在第 2 步。
+  for (const copy of [jam, noRetry, withRetry]) {
+    assert.equal(copy.steps[2].title, '需要帮助？查看《隐私政策》里的联系方式')
+    assert.doesNotMatch(`${copy.steps[2].title}\n${copy.steps[2].detail}`, /我们已经收到提醒|这台机器暂时打不了|请稍后再来|重新提交打印/)
   }
-  // 有重提出口：第三步说清是机器恢复后才点，整份重打。
-  assert.equal(withRetry.steps[2].title, '机器恢复后可点下方「重新提交打印」')
-  assert.match(withRetry.steps[2].detail, /整份重打/)
+  assert.match(noRetry.steps[1].detail, /你可以稍后再来/)
+  assert.match(withRetry.steps[1].detail, /整份重打/)
 })
 
 test('到机码失败屏只在后端还允许续打时说出同码续打，不按价格', () => {

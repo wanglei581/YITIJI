@@ -10,7 +10,7 @@
  */
 
 import type { PrintJobParams } from '@ai-job-print/shared'
-import { helpNeededLine, printProblemLine, resolveSupportContact, servicePhoneLine } from '../../../copy/unattendedCopy'
+import { helpNeededLine, printProblemLine, resolveSupportContact } from '../../../copy/unattendedCopy'
 import { MINIAPP_DISPLAY_NAME } from '../../../copy/miniappLinkCopy'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_CARD } from '../../../lib/fileName'
 import { jamOrderKeptLine, jobSubline, orderKeptFaultLine, paidLabelOf, sameCodeResumeLine, type OutOfPaperMoney } from '../printProgressModel'
@@ -45,7 +45,11 @@ export interface SummaryRow {
 
 const STEPS_LABEL = '处理之前先做这三件'
 
-const PAPER_HELP_FINE = '卡纸、缺纸、没出全？别硬拉纸。'
+/** 三态小字。收费点位写已付金额还在，不写退款。 */
+function keptFine(money: OutOfPaperMoney): string {
+  const head = money.fact === 'paid' ? '订单和已付金额都保留着' : '订单记录保留着'
+  return `${head}，不会因为这次失败消失。`
+}
 
 function orderRefOf(orderNo: string | null): string {
   return orderNo ? `订单号 ${orderNo}` : '这一单'
@@ -63,13 +67,19 @@ function outOfPaperKeptLine(fact: OutOfPaperMoney['fact']): string {
   return `${kept}。机器缺纸，加纸后也不会自动续打，我们已经收到提醒，会尽快处理`
 }
 
-/** 三态失败页第 3 步。订单还在、已经收到提醒只留在副题，这里只说机器暂时打不了、请稍后再来和怎么找到我们。 */
-function faultNextStep(): string {
+/**
+ * 定稿第 3 步，和「结果未确认」同一句。能不能重新提交都一样。
+ * 服务电话只出现在标题里；服务时间另起一行。读不到号码时改去隐私政策。
+ */
+function helpStep(): FailureStep {
   const ctx = resolveSupportContact()
-  const next = ctx.otherOnlineTerminalNearby
-    ? '你可以换一台机器继续，或稍后再来；'
-    : '请稍后再来；'
-  return `这台机器暂时打不了。${next}需要帮助请${servicePhoneLine(ctx)}。`
+  if (!ctx.servicePhone) {
+    return { title: '需要帮助？查看《隐私政策》里的联系方式', detail: '' }
+  }
+  return {
+    title: `需要帮助？拨打服务电话 ${ctx.servicePhone}，报这一单的订单号`,
+    detail: ctx.serviceHours ? `服务时间：${ctx.serviceHours}` : '',
+  }
 }
 
 /**
@@ -144,7 +154,6 @@ export function failureCopy(input: {
     reprintRemaining: input.reprintRemaining,
   })
   const orderRef = orderRefOf(orderNo)
-  const free = money.fact === 'free'
   const paid = money.fact === 'paid'
   const help = printProblemLine()
 
@@ -159,12 +168,9 @@ export function failureCopy(input: {
       steps: [
         jamStep(confirmed),
         reorderStep('paper-jam', money, canRetry),
-        // 能重提时电话接在「重新提交打印」说明末尾。不能重提时，这一步只说暂时打不了、请稍后再来、怎么找到我们。
-        canRetry
-          ? retryStep(money, help)
-          : { title: `记下${orderRef}`, detail: faultNextStep() },
+        helpStep(),
       ],
-      fine: PAPER_HELP_FINE,
+      fine: keptFine(money),
       resumeLine,
     }
   }
@@ -178,26 +184,14 @@ export function failureCopy(input: {
       steps: [
         LOOK_AT_TRAY,
         reorderStep('offline', money, canRetry),
-        canRetry
-          ? retryStep(money, help)
-          : { title: `记下${orderRef}`, detail: faultNextStep() },
+        helpStep(),
       ],
-      fine: `${paid ? '订单和支付记录保留着' : '订单记录保留着'}，不会因为这次失败消失。`,
+      fine: keptFine(money),
       resumeLine,
     }
   }
 
   if (variant === 'out-of-paper') {
-    const next = faultNextStep()
-    const third: FailureStep = canRetry
-      ? retryStep(money, help)
-      : free
-        ? { title: `记下${orderRef}，请不要重新下单`, detail: next }
-        : { title: `记下${orderRef}，不要重新下单再打一次`, detail: `那会变成两笔费用。${next}` }
-    const kept = paid ? '订单和已付金额都保留着' : '订单记录保留着'
-    const money2 = free
-      ? '是否补打，以订单记录为准。'
-      : '是否处理费用、处理多少，以订单记录为准，本机不承诺自动处理。'
     return {
       title: '打印机缺纸',
       subtitle: outOfPaperKeptLine(money.fact),
@@ -206,9 +200,9 @@ export function failureCopy(input: {
       steps: [
         LOOK_AT_TRAY,
         reorderStep('out-of-paper', money, canRetry),
-        third,
+        helpStep(),
       ],
-      fine: `纸匣已空，这次打印不会在加纸后自动继续。${kept}；只有本页出现「重新提交打印」按钮时，才能自己重打一次${free ? '。' : '，且不会重复收费。'}${money2}`,
+      fine: keptFine(money),
       resumeLine,
     }
   }
@@ -347,7 +341,7 @@ export function shownFailureReason(
 /** 带走链接取不到。三态写明不影响这笔订单，不再接服务电话。普通失败仍接「打印有问题」。 */
 export function faultScreenTakeawayMiss(visual: string): string {
   if (visual === 'paper-jam' || visual === 'out-of-paper' || visual === 'offline') {
-    return '手机带走链接这次没取到，不影响这笔订单'
+    return '手机带走链接这次没取到，不影响这笔订单。'
   }
   return `带走链接没取到。${printProblemLine()}`
 }
@@ -389,17 +383,17 @@ export function retryBlockedReason(device: {
   if (device.loading) return '正在确认这台机器的打印机状态…'
   if (device.printerNotice) return device.printerNotice
   const tail = '机器恢复后，这个按钮会自己亮起。'
-  if (device.kind === 'offline') return `这台机器的打印机现在离线，暂时不能重新提交。${tail}`
+  if (device.kind === 'offline') return `这台机器的打印机现在离线，暂时不能重新提交；${tail}`
   if (device.kind === 'error') {
     if (device.printer.errorCode === 'paperEmpty') {
-      return `打印机现在还缺纸，暂时不能重新提交。${tail}`
+      return `打印机现在还缺纸，暂时不能重新提交；${tail}`
     }
     if (device.printer.errorCode === 'paperJam') {
-      return `打印机现在还卡着纸，暂时不能重新提交。${tail}`
+      return `打印机现在还卡着纸，暂时不能重新提交；${tail}`
     }
-    return `打印机现在还有故障，暂时不能重新提交。${tail}`
+    return `打印机现在还有故障，暂时不能重新提交；${tail}`
   }
-  return `暂时读不到打印机状态，先不能重新提交。${tail}`
+  return `暂时读不到打印机状态，先不能重新提交；${tail}`
 }
 
 /**
