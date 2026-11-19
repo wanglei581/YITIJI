@@ -28,7 +28,7 @@ function normalizeDateSpan(foldedSpan: string): string {
     .replace(/[·•・．.]/gu, '-')
     .replace(/[‐‑–—﹣－/／]/gu, '-')
     .replace(/：/gu, ':')
-    .replace(/[ \t\n\r 　]/gu, '')
+    .replace(/[ \t\n\r\u00A0\u3000]/gu, '')
 }
 
 /** 读出来的一个日期。没写到的月、日记 0。compact 是没有分隔的 8 位年月日。 */
