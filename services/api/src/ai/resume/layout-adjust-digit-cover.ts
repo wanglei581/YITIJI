@@ -5,9 +5,9 @@
  * 数字段之间可以隔空格、制表符、各种短横和点、零宽字符，也可以把一段用括号包住。
  * 括号里面可以再夹空格。连续多个空格、空格包住的短横，同样把两边接成一串。
  * 合计达到 11 位的按一整串遮。
- * 斜线、换行、回车不进这张通用表，只在分段对得上号码时才接：
- * 手机 3-4-4、身份证 6-8-4、银行卡每组 4 位、固话区号 3 到 4 位再加 7 到 8 位。
- * JSON 字符串里写成反斜杠加 n、r、t 的，也按这个规律认。
+ * 斜线、全角斜线、换行、回车不进这张通用表。它们把数字切成 1 到 8 位的段、
+ * 合起来 11 位及以上时，按一整串遮。和通用分隔混用也一样。
+ * JSON 字符串里写成反斜杠加 n、r、t、斜线的，也按分隔符认。
  * 简历 JSON 再按字段对齐：相邻字符串值或数值拼起来够 11 位的，各换成自己的占位符。
  * 占位符是本次请求的标记，用户原文里写不出同样的一串。
  * 年月日期轴、中文日期和时间段不是号码，原样留下，排版还要看见时间。
@@ -16,7 +16,7 @@ import { randomBytes } from 'node:crypto'
 import {
   extendCheckDigit,
   isDigit,
-  matchStructuredNumber,
+  matchExtendedSegments,
   numberSpanStart,
   readJoinedDigits,
   skipSeparators,
@@ -118,20 +118,15 @@ export function coverRealisticNumbers(text: string, book: LayoutDigitBook): stri
     }
     const runStart = index
     const joined = readJoinedDigits(folded, index)
-    const structuredEnd = matchStructuredNumber(folded, index)
-    if (structuredEnd !== null && structuredEnd > joined.end) {
-      const end = extendCheckDigit(folded, structuredEnd)
-      if (!isDateAxis(folded.slice(runStart, end))) spans.push([numberSpanStart(text, folded, runStart, end), end])
-      index = end
-      continue
-    }
-    const digits = joined.digits
-    index = joined.end
-    const end = extendCheckDigit(folded, index)
-    if (digits >= 11 && !isDateAxis(folded.slice(runStart, end))) {
+    const extended = matchExtendedSegments(folded, index)
+    const chosen = extended !== null && extended.end > joined.end ? extended : null
+    const rawEnd = chosen === null ? joined.end : chosen.end
+    const digitCount = chosen === null ? joined.digits : chosen.digits
+    const end = extendCheckDigit(folded, rawEnd)
+    if (digitCount >= 11 && !isDateAxis(folded.slice(runStart, end))) {
       spans.push([numberSpanStart(text, folded, runStart, end), end])
     }
-    index = Math.max(index, end)
+    index = end
   }
   return replaceSpans(text, spans, book)
 }
@@ -302,7 +297,9 @@ function isJoinableNumber(raw: string): boolean {
   }
   if (!isDigit(folded[index] ?? '')) return false
   const joined = readJoinedDigits(folded, index)
-  let end = extendCheckDigit(folded, joined.end)
+  const extended = matchExtendedSegments(folded, index)
+  const chosen = extended !== null && extended.end > joined.end ? extended : null
+  let end = extendCheckDigit(folded, chosen === null ? joined.end : chosen.end)
   const saved = end
   end = skipSeparators(folded, end)
   const close = folded[end] ?? ''

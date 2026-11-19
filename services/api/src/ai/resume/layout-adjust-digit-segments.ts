@@ -2,10 +2,10 @@
  * 排版出站怎么把数字段接起来。
  *
  * 通用分隔符是空格、制表符、各种短横和点、零宽字符，括号里面可以再夹空格。
- * 斜线、换行、回车不进通用表，否则 2020/09 - 2024/06 会被收成占位符。
- * 它们只在分段对得上号码时才接：手机 3-4-4、身份证 6-8-4、
- * 银行卡每组 4 位、固话区号 3 到 4 位再加 7 到 8 位。
- * JSON 里的反斜杠加 n、r、t 也按分隔符读。
+ * 斜线、全角斜线、真实换行和回车不进通用表，否则年月区间会被收成占位符。
+ * 扩展分隔（半角斜线、全角斜线、换行、回车，以及 JSON 里的反斜杠加 n、r、t、斜线）
+ * 把数字切成段时，每段 1 到 8 位、合起来 11 位及以上，就按一个号码读完。
+ * 和通用分隔混在同一串里也成立。不再按手机、身份证、银行卡的固定组数逐条列举。
  */
 
 /**
@@ -36,21 +36,6 @@ const SEPARATOR_CHARS = new Set<string>([
   '\uFEFF',
   '\u2060',
 ])
-
-/**
- * 斜线或换行两侧的数字段。对得上才遮，避免把年月区间收进去。
- * 银行卡常见 16 位四组，或 19 位再加最后 3 位。固话是区号加本地号。
- */
-const STRUCTURED_GROUPS: ReadonlyArray<readonly number[]> = [
-  [3, 4, 4],
-  [6, 8, 4],
-  [4, 4, 4, 4],
-  [4, 4, 4, 4, 3],
-  [3, 8],
-  [3, 7],
-  [4, 8],
-  [4, 7],
-]
 
 export function isDigit(char: string): boolean {
   return char >= '0' && char <= '9'
@@ -96,59 +81,59 @@ export function numberSpanStart(text: string, folded: string, runStart: number, 
   return runStart
 }
 
-/** 从这一位数字起，找对得上分段规律、并且比通用分隔符接得更远的那一串。 */
-export function matchStructuredNumber(folded: string, start: number): number | null {
-  let best: number | null = null
-  for (const groups of STRUCTURED_GROUPS) {
-    const end = matchGroups(folded, start, groups)
-    if (end !== null && (best === null || end > best)) best = end
+/**
+ * 从这一位数字起，顺着扩展分隔把后段接上。
+ * 每一段都是 1 到 8 位。没跨过扩展分隔时返回空，交给通用分隔那条路。
+ * 下一段超过 8 位就停在上一段末尾，不把超长的一段吞进来。
+ */
+export function matchExtendedSegments(folded: string, start: number): { end: number; digits: number } | null {
+  const first = segmentLength(folded, start)
+  if (first < 1 || first > 8) return null
+  let cursor = start + first
+  let digits = first
+  let sawExtended = false
+  while (cursor < folded.length) {
+    const bridge = bridgeAcross(folded, cursor, true)
+    if (bridge === null) break
+    const length = segmentLength(folded, bridge.next)
+    if (length < 1 || length > 8) break
+    if (bridge.sawExtended) sawExtended = true
+    digits += length
+    cursor = bridge.next + length
   }
-  const idTail = matchGroups(folded, start, [6, 8, 3])
-  if (idTail !== null) {
-    const tail = folded[idTail] ?? ''
-    if ((tail === 'X' || tail === 'x') && (best === null || idTail + 1 > best)) best = idTail + 1
-  }
-  return best
+  if (!sawExtended) return null
+  return { end: cursor, digits }
 }
 
-function matchGroups(folded: string, start: number, groups: readonly number[]): number | null {
-  let cursor = start
-  for (let group = 0; group < groups.length; group += 1) {
-    const size = groups[group] ?? 0
-    if (!hasExactDigits(folded, cursor, size)) return null
-    cursor += size
-    if (group === groups.length - 1) break
-    const next = bridgeStructured(folded, cursor)
-    if (next === null) return null
-    cursor = next
-  }
-  return cursor
-}
-
-function hasExactDigits(folded: string, index: number, count: number): boolean {
-  for (let offset = 0; offset < count; offset += 1) {
-    if (!isDigit(folded[index + offset] ?? '')) return false
-  }
-  return !isDigit(folded[index + count] ?? '')
+function segmentLength(folded: string, index: number): number {
+  let length = 0
+  while (isDigit(folded[index + length] ?? '')) length += 1
+  return length
 }
 
 function bridgeToNextDigit(folded: string, index: number): number | null {
-  return bridgeAcross(folded, index, false)
+  const bridge = bridgeAcross(folded, index, false)
+  return bridge === null ? null : bridge.next
 }
 
-function bridgeStructured(folded: string, index: number): number | null {
-  return bridgeAcross(folded, index, true)
-}
-
-/** 括号里面可以夹空格。斜线、换行、回车只在 extended 时才算分隔。 */
-function bridgeAcross(folded: string, index: number, extended: boolean): number | null {
+/**
+ * 括号里面可以夹空格。斜线、全角斜线、换行、回车只在 extended 时才算分隔。
+ * sawExtended 只在真的跨过这些扩展分隔时为真，通用分隔和括号不算。
+ */
+function bridgeAcross(
+  folded: string,
+  index: number,
+  extended: boolean,
+): { next: number; sawExtended: boolean } | null {
   let cursor = index
   let saw = false
+  let sawExtended = false
   let closed = false
   let opened = false
   while (cursor < folded.length) {
     const length = extended ? extendedSeparatorLength(folded, cursor) : separatorLength(folded, cursor)
     if (length > 0) {
+      if (extended && separatorLength(folded, cursor) === 0) sawExtended = true
       cursor += length
       saw = true
       continue
@@ -169,7 +154,7 @@ function bridgeAcross(folded: string, index: number, extended: boolean): number 
     break
   }
   if (!saw || !isDigit(folded[cursor] ?? '')) return null
-  return cursor
+  return { next: cursor, sawExtended }
 }
 
 function separatorLength(folded: string, index: number): number {
@@ -185,10 +170,6 @@ function extendedSeparatorLength(folded: string, index: number): number {
   const basic = separatorLength(folded, index)
   if (basic > 0) return basic
   const char = folded[index] ?? ''
-  if (char === '\\') {
-    const next = folded[index + 1] ?? ''
-    if (next === 'n' || next === 'r' || next === '/') return 2
-  }
-  if (char === '/' || char === '\n' || char === '\r') return 1
+  if (char === '/' || char === '\uFF0F' || char === '\n' || char === '\r') return 1
   return 0
 }

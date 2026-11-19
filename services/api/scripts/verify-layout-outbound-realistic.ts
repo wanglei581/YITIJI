@@ -3,7 +3,8 @@
  *
  * 全角数字先折成半角再检测。分段可以隔空格、制表符、各种短横和点、零宽字符，
  * 也可以用括号包住一段，括号里面可以再夹空格。合计达到 11 位的，按一整串遮。
- * 斜线、换行、回车（含 JSON 里的反斜杠加 n、r、t）只在分段对得上号码时才接。
+ * 斜线、全角斜线、换行、回车（含 JSON 里的反斜杠加 n、r、t）把 1 到 8 位的数字段接起来，
+ * 合起来不少于 11 位就遮。和通用分隔混用也遮。
  * 简历 JSON 里相邻的数字字段拼起来再遮。括号里的区号单独成字段时也接。
  * 占位符用本次请求才有的标记，用户原文里的形似占位符原样保留。
  * 出站正文去掉这些分隔符、折成半角之后，拼不出原号码。还原与原文逐字一致。
@@ -11,6 +12,7 @@
  * 运行：pnpm --filter @ai-job-print/api verify:layout-outbound-realistic
  */
 import { maskLayoutAdjustOutbound } from '../src/ai/resume/layout-adjust-mask'
+import { runExtendedSegmentCases } from './verify-layout-outbound-realistic-extra'
 
 let passCount = 0
 
@@ -235,6 +237,7 @@ function main(): void {
   assertJsonKept('点开的年月不拼', '{"from":"2015.09","to":"2019.06"}', '2015.09')
   assertJsonKept('中间夹了文字就断开', '{"mobilePrefix":"138","note":"备注","mobileBody":"00138000"}', '138')
 
+  runExtendedSegmentCases(assertCovered)
   assertPlaceholderCollision()
   assertPrivateUseKept()
   assertTruncationHoleDoesNotCrossWire()
