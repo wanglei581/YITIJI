@@ -5,6 +5,7 @@ import { TerminalsModule } from '../terminals/terminals.module'
 import { InvoiceRequestsService } from './invoice-requests.service'
 import { InvoiceSessionsService } from './invoice-sessions.service'
 import { KioskInvoiceSessionsController } from './kiosk-invoice-sessions.controller'
+import { MemberInvoiceController } from './member-invoice.controller'
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { KioskInvoiceSessionsController } from './kiosk-invoice-sessions.control
       },
     }),
   ],
-  controllers: [KioskInvoiceSessionsController],
+  controllers: [KioskInvoiceSessionsController, MemberInvoiceController],
   providers: [InvoiceRequestsService, InvoiceSessionsService, EndUserAuthGuard],
   exports: [InvoiceRequestsService, InvoiceSessionsService],
 })

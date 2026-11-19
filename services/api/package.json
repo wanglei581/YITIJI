@@ -408,6 +408,7 @@
     "verify:support-contact": "node -r @swc-node/register scripts/verify-support-contact.ts",
     "verify:invoice-eligibility": "node -r @swc-node/register --test src/invoices/invoice-eligibility.test.ts",
     "verify:invoice-sessions": "node -r @swc-node/register --test src/invoices/invoice-sessions.test.ts",
+    "verify:invoice-member": "node -r @swc-node/register --test src/invoices/member-invoice.test.ts",
     "verify:branding": "node -r @swc-node/register scripts/verify-brand-logo-image.ts && node -r @swc-node/register scripts/verify-branding.ts",
     "verify:license": "node -r @swc-node/register scripts/verify-license-state.ts && node -r @swc-node/register scripts/verify-license.ts && node -r @swc-node/register scripts/verify-license-writes.ts && node -r @swc-node/register scripts/verify-license-runtime.ts",
     "verify:branding-license-migrations": "node -r @swc-node/register scripts/verify-branding-license-migrations.ts",
