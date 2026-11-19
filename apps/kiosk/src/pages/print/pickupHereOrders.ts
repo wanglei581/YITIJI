@@ -107,17 +107,28 @@ function cleanPlace(value: string | null | undefined): string | null {
   return trimmed || null
 }
 
+const HAN = /\p{Script=Han}/u
+const HALF_WIDTH = /[0-9A-Za-z]/
+
+/** 拼句子时，汉字和半角字母、数字直接相接的地方空一格（稿「二楼服务区的 2 号机」）。名字里原有的写法不动。 */
+function joinPlaceText(left: string, right: string): string {
+  const a = left.slice(-1)
+  const b = right.charAt(0)
+  const boundary = (HAN.test(a) && HALF_WIDTH.test(b)) || (HALF_WIDTH.test(a) && HAN.test(b))
+  return boundary ? `${left} ${right}` : `${left}${right}`
+}
+
 /** 有网点名或机器名就用来指路。两者都有且不同，写成「网点的机器」。 */
 export function pendingPickupPlace(item: PickupHereSource): string | null {
   const name = cleanPlace(item.terminal?.displayName)
   const location = cleanPlace(item.terminal?.locationLabel)
-  if (location && name && location !== name) return `${location}的${name}`
+  if (location && name && location !== name) return joinPlaceText(joinPlaceText(location, '的'), name)
   return location ?? name
 }
 
 export function pendingPickupElsewhere(place: string | null): string {
   if (!place) return PICKUP_HERE_OTHER_MACHINE
-  return `这笔订单不在这台机器取件，请到${place}领取`
+  return joinPlaceText(joinPlaceText('这笔订单不在这台机器取件，请到', place), '领取')
 }
 
 /**
