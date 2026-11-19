@@ -44,11 +44,13 @@ export function PolicyTouchHub() {
     return () => { active = false }
   }, [attempt])
   const empty = data?.latest.total === 0 && data.notices.total === 0
+  const unboundEmpty = empty && data !== null && [...data.categories, data.latest, data.notices].some((list) => list.scope === 'unbound' || list.scope === 'missing')
+  const emptyTitle = unboundEmpty ? '本机还没有运营机构发布的政策' : '这里还没有发布的政策'
   const latest = data?.latest.items[0]
   const spec = SERVICE_HUB_SPECS.policy
   const channelsRow = channelCount > 0 ? <button type="button" className="policy-min-row" data-testid="policy-official-channels" disabled={winding}
     onClick={() => navigate('/official-channels')}>本机构官方渠道 · {channelCount} 个 · 扫码到官网或官方账号</button> : null
-  return <PolicyTouchLayout home title={empty ? '这里还没有发布的政策' : spec.title}
+  return <PolicyTouchLayout home title={empty ? emptyTitle : spec.title}
     eyebrow={empty ? '查政策' : spec.eyebrow}
     path={empty ? ['机构在后台发布', '这里按类别列出', '打印清单或扫码看原文'] : undefined}
     pathLabel={empty ? '有政策以后' : undefined} sub={empty

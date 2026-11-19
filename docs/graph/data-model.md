@@ -140,7 +140,7 @@ flowchart TD
 | **PlatformQualification** | 19 | FileObject | 1 个文件<br/>`common/recruitment-capability.ts` |
 | **PlatformSetting** | 4 | — | 9 个文件<br/>`branding/brand-logo.service.ts`<br/>`branding/branding.service.ts`<br/>`orgs/partner-stats.service.ts`<br/>… |
 | **PolicyEligibilityRule** | 10 | PolicyPost | 1 个文件<br/>`policies/policy-eligibility.service.ts` |
-| **PolicyPost** | 29 | Organization、PolicyEligibilityRule | 15 个文件<br/>`activity/activity.service.ts`<br/>`ai/llm/assistant-policy-context.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
+| **PolicyPost** | 30 | Organization、PolicyEligibilityRule | 17 个文件<br/>`activity/activity.service.ts`<br/>`ai/llm/assistant-policy-context.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 4 个文件<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>… |
 | **PrintMaterialPack** | 9 | — | **无代码读写** |
 | **PrintTask** | 22 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 42 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-print-scan/admin-fulfillment-lists.ts`<br/>… |

@@ -9,11 +9,12 @@ import { PolicyScopeService } from './policy-scope.service'
 import { FilesModule } from '../files/files.module'
 import { PolicyChecklistService } from './policy-checklist.service'
 import { PolicyChecklistController } from './policy-checklist.controller'
+import { PolicyExpiryTask } from './policy-expiry.task'
 
 @Module({
   // AuthModule:导出 JwtAuthGuard / RolesGuard;AuditService 为 @Global 直接注入
   imports:     [PrismaModule, AuthModule, TerminalsModule, FilesModule],
-  providers:   [PoliciesService, PolicyEligibilityService, PolicyScopeService, PolicyChecklistService],
+  providers:   [PoliciesService, PolicyEligibilityService, PolicyScopeService, PolicyChecklistService, PolicyExpiryTask],
   controllers: [PoliciesController, PolicyChecklistController],
   exports:     [PoliciesService, PolicyEligibilityService, PolicyScopeService],
 })

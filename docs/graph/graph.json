@@ -18445,7 +18445,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 102,
+      "reachableFileCount": 103,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -18969,7 +18969,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 105
+      "sourceFileCount": 106
     }
   },
   "dataModel": {
@@ -20226,7 +20226,7 @@
         ]
       },
       {
-        "fieldCount": 29,
+        "fieldCount": 30,
         "name": "PolicyPost",
         "relations": [
           "Organization",
@@ -20247,6 +20247,8 @@
           "services/api/src/policies/policy-checklist-metadata.ts",
           "services/api/src/policies/policy-checklist.service.ts",
           "services/api/src/policies/policy-eligibility.service.ts",
+          "services/api/src/policies/policy-expiry.task.ts",
+          "services/api/src/policies/policy-keyword-page.ts",
           "services/api/src/recruitment-hosting/recruitment-emergency.service.ts"
         ]
       },
@@ -27016,6 +27018,7 @@
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-policy-checklist.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-completion-evidence.ts",
@@ -27105,6 +27108,7 @@
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-publish-gates.ts"
     ],
     "services/api/scripts/support/recruitment-wave2-full-inventory.ts": [
@@ -27908,6 +27912,7 @@
     ],
     "services/api/src/ai/llm/assistant-policy-context.ts": [
       "services/api/scripts/verify-assistant-policy-context.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/ai/llm/deepseek-thinking.ts": [
@@ -28645,6 +28650,7 @@
       "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-completion-evidence.ts",
@@ -28860,7 +28866,8 @@
       "services/api/scripts/verify-admin-login-hardening.ts"
     ],
     "services/api/src/common/beijing-display-time.ts": [
-      "services/api/scripts/verify-beijing-display-time.ts"
+      "services/api/scripts/verify-beijing-display-time.ts",
+      "services/api/scripts/verify-policy-expiry.ts"
     ],
     "services/api/src/common/boot/ai-platform-degradation.ts": [
       "services/api/scripts/verify-ai-platform-degradation.ts"
@@ -28968,6 +28975,7 @@
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts"
@@ -29278,6 +29286,7 @@
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-q22b-manual-interview-http.ts",
@@ -29326,6 +29335,7 @@
     "services/api/src/community/community.service.ts": [
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-policies.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/companies/companies.controller.ts": [
@@ -31172,6 +31182,7 @@
       "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policies.module.ts": [
+      "services/api/scripts/verify-background-task-safety.ts",
       "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policies.service.ts": [
@@ -31182,6 +31193,7 @@
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts"
@@ -31190,6 +31202,7 @@
       "services/api/scripts/verify-policy-checklist.ts"
     ],
     "services/api/src/policies/policy-checklist-metadata.ts": [
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policy-checklist-pdf.ts": [
@@ -31201,6 +31214,7 @@
     ],
     "services/api/src/policies/policy-checklist.service.ts": [
       "services/api/scripts/verify-policy-checklist.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policy-eligibility.engine.ts": [
@@ -31216,7 +31230,12 @@
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts"
     ],
+    "services/api/src/policies/policy-expiry.task.ts": [
+      "services/api/scripts/verify-background-task-safety.ts",
+      "services/api/scripts/verify-policy-expiry.ts"
+    ],
     "services/api/src/policies/policy-public-visibility.ts": [
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-scope.ts"
     ],
     "services/api/src/policies/policy-save-and-publish.ts": [
@@ -31227,6 +31246,9 @@
     ],
     "services/api/src/policies/policy-source-link.ts": [
       "services/api/scripts/verify-policy-publish-gates.ts"
+    ],
+    "services/api/src/policies/policy-validity.ts": [
+      "services/api/scripts/verify-policy-expiry.ts"
     ],
     "services/api/src/print-conversion/print-conversion.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -31330,7 +31352,8 @@
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
-      "services/api/scripts/verify-policy-checklist.ts"
+      "services/api/scripts/verify-policy-checklist.ts",
+      "services/api/scripts/verify-policy-expiry.ts"
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -31452,6 +31475,7 @@
       "services/api/scripts/verify-branding-license-migrations.ts",
       "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-member-closure.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-production-db-guard.ts",
       "services/api/scripts/verify-scan-return-documents.ts",
       "services/api/scripts/verify-scan-tasks.ts"
@@ -31616,6 +31640,7 @@
       "services/api/scripts/verify-policy-checklist.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-policy-publish-gates.ts",
       "services/api/scripts/verify-policy-scope.ts",
       "services/api/scripts/verify-pricing.ts",
@@ -31726,6 +31751,7 @@
       "services/api/scripts/verify-recruitment-emergency-scope.ts"
     ],
     "services/api/src/recruitment-hosting/recruitment-hosting.ts": [
+      "services/api/scripts/verify-policy-expiry.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/release-provenance/release-activation.ts": [
@@ -42157,6 +42183,8 @@
         "dirs": [],
         "files": [
           "services/api/src/common/process/background-task.ts",
+          "services/api/src/policies/policies.module.ts",
+          "services/api/src/policies/policy-expiry.task.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ],
         "missing": []
@@ -47750,6 +47778,41 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:policy-eligibility"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/policy-publish-fixture.ts",
+          "services/api/src/ai/llm/assistant-policy-context.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/beijing-display-time.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/community/community.service.ts",
+          "services/api/src/policies/policies.service.ts",
+          "services/api/src/policies/policy-checklist-metadata.ts",
+          "services/api/src/policies/policy-checklist.service.ts",
+          "services/api/src/policies/policy-expiry.task.ts",
+          "services/api/src/policies/policy-public-visibility.ts",
+          "services/api/src/policies/policy-validity.ts",
+          "services/api/src/print-jobs/pii-scan-gate.ts",
+          "services/api/src/prisma/create-client.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/recruitment-hosting/recruitment-hosting.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-policy-expiry.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:policy-expiry"
       ],
       "wired": true
     },

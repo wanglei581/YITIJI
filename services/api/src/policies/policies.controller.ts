@@ -117,12 +117,13 @@ export class PoliciesController {
     @Query('kind') kind?: string,
     @Query('audience') audience?: string,
     @Query('category') category?: string,
+    @Query('keyword') keyword?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Headers('x-terminal-id') terminalId?: string,
     @Headers('x-terminal-session-token') sessionToken?: string,
   ) {
-    return resolvePolicyScope(this.policyScope, { headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } }).then((scope) => this.policies.getPublishedPolicies({ kind, audience, category, page, pageSize, scope }))
+    return resolvePolicyScope(this.policyScope, { headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } }).then((scope) => this.policies.getPublishedPolicies({ kind, audience, category, keyword, page, pageSize, scope }))
   }
 
   /**

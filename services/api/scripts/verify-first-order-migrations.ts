@@ -162,6 +162,17 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     const interviewBack = await client.mockInterviewSession.findUnique({ where: { id: interview.id } })
     if (interviewBack?.deadlineAt?.toISOString() !== deadlineAt.toISOString()) throw new Error(`${kind}: interview deadline column must round-trip`)
     console.log(`PASS ${kind}: mock interview deadline column is writable`)
+
+    // 政策截止日期（20261117155000）。当前客户端读 PolicyPost 会带上 validThrough，必须在这之前执行。
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261117155000_add_policy_valid_through/migration.sql')])
+    const deadlineColumn = kind === 'sqlite'
+      ? await client.$queryRawUnsafe<Array<{ name: string; notnull: number | bigint }>>(`SELECT "name", "notnull" FROM pragma_table_info('PolicyPost') WHERE "name" = 'validThrough'`)
+      : await client.$queryRawUnsafe<Array<{ name: string; notnull: string }>>(`SELECT column_name AS name, is_nullable AS notnull FROM information_schema.columns WHERE table_name = 'PolicyPost' AND column_name = 'validThrough'`)
+    const deadline = deadlineColumn[0]
+    if (!deadline) throw new Error(`${kind}: PolicyPost.validThrough missing after upgrade`)
+    const nullable = kind === 'sqlite' ? Number(deadline.notnull) === 0 : deadline.notnull === 'YES'
+    if (!nullable) throw new Error(`${kind}: PolicyPost.validThrough must stay nullable`)
+    console.log(`PASS ${kind}: PolicyPost.validThrough exists and is nullable after upgrade`)
   } finally { await client.$disconnect() }
 }
 
