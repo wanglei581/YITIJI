@@ -123,7 +123,7 @@ async function blockingRefund(
       orderId,
       ...(exceptRefundNo ? { refundNo: { not: exceptRefundNo } } : {}),
     },
-    select: { status: true, reason: true, amountCents: true },
+    select: { id: true, status: true, reason: true, amountCents: true },
   })
   if (rows.some((row) => refundBlocksPaper({
     status: row.status,
@@ -230,7 +230,7 @@ export async function recordBlockedClaimReason(db: PrismaService, terminalId: st
 
 /** 事务内再看一次。先锁订单，再读退款合计。返回 true 表示这单不能领。 */
 export async function rejectClaimForRefund(
-  db: HoldDb,
+  db: PrismaTransactionClient,
   dbKind: DbKind,
   orderId: string,
   taskId: string,

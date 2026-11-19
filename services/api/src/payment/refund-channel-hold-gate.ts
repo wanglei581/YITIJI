@@ -148,5 +148,5 @@ export async function resolveChannelBeforeHold(
     }
     return 'confirm_refunded'
   }
-  await rejectUnconfirmed(db, orderId, action, operatorId, verdict, BLOCKED_MESSAGE)
+  return rejectUnconfirmed(db, orderId, action, operatorId, verdict, BLOCKED_MESSAGE)
 }
