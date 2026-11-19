@@ -19064,6 +19064,7 @@
           "services/api/src/payment/print-return-settlement-fault.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
+          "services/api/src/payment/refund-channel-hold-gate.ts",
           "services/api/src/payment/refund-channel-query.ts",
           "services/api/src/payment/refund-notify-paper-guard.ts",
           "services/api/src/payment/refund-paper-exclusion.ts",
@@ -19895,6 +19896,7 @@
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/payment/cancel-unclaimed-print-task.ts",
+          "services/api/src/payment/close-order-if-unreleased.ts",
           "services/api/src/payment/closed-window-unprinted.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/order-status.service.ts",
@@ -19906,6 +19908,7 @@
           "services/api/src/payment/print-return-settlement-fault.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
+          "services/api/src/payment/refund-channel-hold-gate.ts",
           "services/api/src/payment/refund-notify-paper-guard.ts",
           "services/api/src/payment/refund-paper-exclusion.ts",
           "services/api/src/payment/refund.service.ts",
@@ -20161,6 +20164,7 @@
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/cancel-unclaimed-print-task.ts",
+          "services/api/src/payment/close-order-if-unreleased.ts",
           "services/api/src/payment/closed-window-unprinted.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
@@ -20266,7 +20270,7 @@
           "services/api/src/payment/print-return-disposition.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
-          "services/api/src/payment/refund-channel-query.ts",
+          "services/api/src/payment/refund-channel-hold-gate.ts",
           "services/api/src/payment/refund-notify-paper-guard.ts",
           "services/api/src/payment/refund-paper-exclusion.ts",
           "services/api/src/payment/refund-remainder.ts",
@@ -26919,6 +26923,38 @@
     ],
     "services/api/scripts/support/payment-callback-race-cases.ts": [
       "services/api/scripts/verify-payment-flow.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-channel-business-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-channel-fault-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-channel-steps-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-close-race-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-fault-text-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-release-outcome-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-sum-claim-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-verify-race-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
     ],
     "services/api/scripts/support/pickup-arrival-price-cases.ts": [
       "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
@@ -46767,6 +46803,14 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-business-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-fault-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-steps-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-close-race-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-fault-text-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-release-outcome-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-sum-claim-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-verify-race-cases.ts",
           "services/api/scripts/support/pickup-arrival-price-cases.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -46787,6 +46831,14 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-business-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-fault-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-steps-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-close-race-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-fault-text-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-release-outcome-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-sum-claim-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-verify-race-cases.ts",
           "services/api/scripts/support/pickup-arrival-price-cases.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
