@@ -15,6 +15,7 @@ import {
   STALE_ATTEMPT_REFUND_REASON,
 } from './print-no-paper-refund.constants'
 import type { PrismaService } from '../prisma/prisma.service'
+import { CHANNEL_ABNORMAL_AUDIT, CHANNEL_ABNORMAL_DETAIL } from './refund-abnormal'
 
 export const PRINT_NO_PAPER_MANUAL_AUDIT = 'print_order.no_paper_manual'
 export const PRINT_NO_PAPER_AUTO_FAILED_AUDIT = 'print_order.auto_return_failed'
@@ -119,6 +120,7 @@ const REASON_ACTIONS = [
   PRINT_NO_PAPER_MANUAL_AUDIT,
   'refund.notify_amount_mismatch',
   'refund.notify_paper_already_released',
+  CHANNEL_ABNORMAL_AUDIT,
 ] as const
 
 const AUTO_REASONS = new Set<string>([PAID_NO_PAPER_AUTO_REASON, STALE_ATTEMPT_REFUND_REASON])
@@ -217,6 +219,12 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
   const forThisPayment = (refund: RefundFact): boolean =>
     !(paymentOpen && refund.reason === STALE_ATTEMPT_REFUND_REASON)
   const thisPaymentRefunds = refunds.filter(forThisPayment)
+  // 渠道说退款异常、还没落定的那一笔：待人工，诊断写明资金在渠道中间账户。
+  const abnormalNos = new Set(audits
+    .filter((audit) => audit.action === CHANNEL_ABNORMAL_AUDIT)
+    .map((audit) => (readPayload(audit.payloadJson) as { refundNo?: unknown }).refundNo))
+  const abnormal = refunds.find((refund) => (refund.status === 'pending' || refund.status === 'manual_review') && abnormalNos.has(refund.refundNo))
+  if (abnormal) return viewOf('manual', abnormal, CHANNEL_ABNORMAL_DETAIL)
   // 还没结清的退款优先于更早的一笔成功，避免旧的过期退款把后来的失败盖住。
   const manualReview = refunds.find((refund) => refund.status === 'manual_review')
   if (manualReview) return viewOf('manual', manualReview, manualReviewReason(manualReview, audits))

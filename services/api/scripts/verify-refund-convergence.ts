@@ -5,7 +5,8 @@
  * 再直接调 RefundService.convergeStalePendingRefunds，断言：
  * - 批量扫 pending → 渠道查证 SUCCESS → 补完成 refunded（幂等，refund.created 恰 1 条）。
  * - 仍 PROCESSING 的单保持 pending，不被误判失败。
- * - 明确失败（ABNORMAL）的单回滚 paid 计 failed，不阻断其它笔。
+ * - 明确失败（CLOSED）的单回滚 paid 计 failed，不阻断其它笔。
+ * - 退款异常（ABNORMAL，钱停在渠道中间账户）不当失败：保持 pending+refunding，记诊断审计，计 stillPending。
  * - 只处理 wechat/alipay（sandbox 同步完成不留 pending，不进批处理）。
  * - 收敛复用与人工重复退款同一路径：不二次出款（渠道请求次数受控）。
  * - cron 任务 env 门控（源码断言 REFUND_AUTO_CONVERGE_ENABLED）。
@@ -154,13 +155,18 @@ async function main(): Promise<void> {
     const noDone = `RFD-CONV-${suffix}-done`
     const noStill = `RFD-CONV-${suffix}-still`
     const noFail = `RFD-CONV-${suffix}-fail`
+    const noAbn = `RFD-CONV-${suffix}-abn`
     await makePendingRefund('done', noDone)
     await makePendingRefund('still', noStill)
     await makePendingRefund('fail', noFail)
-    // 渠道账本：done→SUCCESS，still→PROCESSING，fail→ABNORMAL
+    await makePendingRefund('abn', noAbn)
+    // 渠道账本：done→SUCCESS，still→PROCESSING，fail→CLOSED（明确没退成），abn→ABNORMAL（退款异常）。
+    // P2b9 第 5 条：原来 fail 用 ABNORMAL 当明确失败，官方文档写的是钱停在退款中间账户，改用 CLOSED 守住回滚这条路，
+    // ABNORMAL 另起一单断言「不当失败」。
     refundQueryByNo.set(noDone, { status: 'SUCCESS', refund_id: `wxrfd_${suffix}_done` })
     refundQueryByNo.set(noStill, { status: 'PROCESSING' })
-    refundQueryByNo.set(noFail, { status: 'ABNORMAL' })
+    refundQueryByNo.set(noFail, { status: 'CLOSED' })
+    refundQueryByNo.set(noAbn, { status: 'ABNORMAL', refund_id: `wxrfd_${suffix}_abn` })
 
     const res = await refundService.convergeStalePendingRefunds({ limit: 100 })
     // 全库可能有其它 pending，断言只针对我们造的三笔结果状态
@@ -183,11 +189,25 @@ async function main(): Promise<void> {
       fail(`still mishandled: ${stillRow?.status}`)
     }
     if (failRow?.status === 'failed' && (await orderOf(noFail)) === 'paid') {
-      pass('ABNORMAL 单：回滚 paid 计 failed（不阻断其它笔）')
+      pass('CLOSED 单：回滚 paid 计 failed（不阻断其它笔）')
     } else {
       fail(`fail mishandled: ${failRow?.status}`)
     }
-    if (res.scanned >= 3 && res.refunded >= 1 && res.stillPending >= 1 && res.failed >= 1) {
+    const abnRow = await prisma.refund.findUnique({ where: { refundNo: noAbn } })
+    const abnAudit = abnRow
+      ? await prisma.auditLog.findFirst({ where: { targetId: abnRow.orderId, action: 'refund.channel_abnormal' } })
+      : null
+    if (
+      abnRow?.status === 'pending' &&
+      (await orderOf(noAbn)) === 'refunding' &&
+      abnRow.channelRefundNo === `wxrfd_${suffix}_abn` &&
+      (abnAudit?.payloadJson ?? '').includes('中间账户')
+    ) {
+      pass('ABNORMAL 单：不当失败，保持 pending+refunding，诊断写明资金在渠道中间账户')
+    } else {
+      fail(`abnormal mishandled: ${JSON.stringify({ status: abnRow?.status, audit: abnAudit?.payloadJson ?? null })}`)
+    }
+    if (res.scanned >= 4 && res.refunded >= 1 && res.stillPending >= 2 && res.failed >= 1) {
       pass(`批处理统计合理：scanned=${res.scanned} refunded=${res.refunded} stillPending=${res.stillPending} failed=${res.failed}`)
     } else {
       fail(`batch stats mismatch: ${JSON.stringify(res)}`)

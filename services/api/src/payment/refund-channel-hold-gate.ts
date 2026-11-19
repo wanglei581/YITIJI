@@ -7,6 +7,7 @@
  */
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
+import { CHANNEL_ABNORMAL_DETAIL, parkAbnormalChannelRefund } from './refund-abnormal'
 import { recordChannelAnswers, type DefinitiveChannelAnswer } from './refund-channel-answer'
 import { refundMayStillBeAtChannel } from './refund-channel-acceptance'
 import { parkChannelQueryFault } from './refund-channel-query'
@@ -15,6 +16,7 @@ import type { PendingRefundChannelQuery, PrintReturnResolution, RefundChannelVer
 const OPEN_STATUSES = ['pending', 'manual_review'] as const
 const BLOCKED_MESSAGE = '退款还在渠道处理中，结果出来前不能处置。'
 const AMOUNT_UNKNOWN_MESSAGE = '渠道说已经退成，但没有回报退款金额，核对前不能处置。'
+const ABNORMAL_MESSAGE = `${CHANNEL_ABNORMAL_DETAIL}结果出来前不能处置。`
 
 function deny(code: string, message: string): BadRequestException {
   return new BadRequestException({ error: { code, message } })
@@ -66,7 +68,7 @@ async function rejectUnconfirmed(
   throw deny(code, message)
 }
 
-type InFlightRefund = { refundNo: string; status: string; channel: string; channelSubmittedAt: Date | null }
+type InFlightRefund = { id: string; refundNo: string; status: string; channel: string; channelSubmittedAt: Date | null }
 type ChannelAnswer = {
   refund: InFlightRefund
   verdict: RefundChannelVerdict
@@ -108,6 +110,7 @@ export async function resolveChannelBeforeHold(
     where: { orderId, status: { in: [...OPEN_STATUSES] } },
     orderBy: { createdAt: 'asc' },
     select: {
+      id: true,
       refundNo: true,
       status: true,
       channel: true,
@@ -122,6 +125,18 @@ export async function resolveChannelBeforeHold(
   for (const refund of inFlight) answers.push(await askChannel(channelQuery, refund, orderId))
   const fault = answers.find((answer) => answer.verdict === 'fault')
   if (fault) await parkChannelQueryFault(db, orderId, fault.refund.refundNo, fault.error)
+  // 退款异常：钱停在渠道中间账户，记诊断、告警，照样不能处置。
+  const abnormal = answers.find((answer) => answer.verdict === 'abnormal')
+  if (abnormal) {
+    await parkAbnormalChannelRefund(db, {
+      refundId: abnormal.refund.id,
+      refundNo: abnormal.refund.refundNo,
+      orderId,
+      channelRefundNo: null,
+      source: 'hold',
+    })
+    return rejectUnconfirmed(db, orderId, action, operatorId, 'abnormal', ABNORMAL_MESSAGE, abnormal.refund.refundNo)
+  }
   const open = answers.find((answer) => answer.verdict !== 'success' && answer.verdict !== 'failed')
   if (open) return rejectUnconfirmed(db, orderId, action, operatorId, open.verdict, BLOCKED_MESSAGE, open.refund.refundNo)
   const unpriced = answers.find((answer) => answer.verdict === 'success' && answer.amountCents === null)

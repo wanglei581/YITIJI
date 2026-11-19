@@ -26,16 +26,16 @@ export type ChannelQuerySuccess = { verdict: 'success'; refundAmountCents: numbe
  *   https://pay.weixin.qq.com/doc/v3/partner/4013080623
  * - RESOURCE_NOT_EXISTS：受理失败，退款单不存在。原单原参数重试不会重复出款。
  *   https://pay.weixin.qq.com/doc/v3/partner/4014960215
- * ABNORMAL 是原路到银行卡失败后要人工处理，文档没有写钱已经确定没退出去，不当失败。
- * https://pay.weixin.qq.com/doc/v3/merchant/4012791884
+ * ABNORMAL 是退款异常：原路到银行卡失败，资金停在渠道中间账户，要人工按异常退款处理。不当失败，单独归成 abnormal。
+ * https://pay.weixin.qq.com/doc/v3/merchant/4012791884 、https://pay.weixin.qq.com/doc/v3/merchant/4013071031
  * 支付宝没返回 refund_status 时写的是「未收到或者退款失败」，两种可能，也不当失败。
  * https://opendocs.alipay.com/open-v3/b9ef37bd_alipay.trade.fastpay.refund.query
  */
 export function classifyChannelRefundStatus(
   queried: Pick<RefundQueryResult, 'status' | 'refundState'>,
-): 'success' | 'processing' | 'failed' | 'unknown' {
+): 'success' | 'processing' | 'failed' | 'unknown' | 'abnormal' {
   if (queried.refundState === 'RESOURCE_NOT_EXISTS' || queried.refundState === 'CLOSED') return 'failed'
-  if (queried.refundState === 'ABNORMAL') return 'unknown'
+  if (queried.refundState === 'ABNORMAL') return 'abnormal'
   if (
     queried.status === 'success'
     || queried.status === 'processing'

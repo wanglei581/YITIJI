@@ -137,7 +137,8 @@ export async function runP2b8ChannelBusinessCases(
       db,
       { channel: 'wechat', refundNo: abnormalNo, orderId: abnormalId },
     )
-    assert.equal(abnormalVerdict, 'unknown')
+    // P2b9 第 5 条：退款异常单独归成 abnormal（钱停在渠道中间账户），不再混在 unknown 里；照样不能处置。
+    assert.equal(abnormalVerdict, 'abnormal')
     const abnormalCode = await resolvePrintReturnHold(
       db,
       abnormalId,

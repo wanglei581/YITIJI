@@ -9,6 +9,7 @@ import type { PrismaService } from '../prisma/prisma.service'
 import type { PaymentProviderRegistry } from './payment-provider.factory'
 import { ONLINE_PAID_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { notifyPrintReturnHold } from './print-return-alert'
+import { isChannelAbnormal, parkAbnormalChannelRefund } from './refund-abnormal'
 import { REFUND_STATUS_MANUAL_REVIEW } from './refund-amount-hold'
 import { STALE_ATTEMPT_REFUND_REASON, staleAttemptRefundNo } from './print-no-paper-refund.constants'
 
@@ -156,6 +157,11 @@ export async function refundExpiredAttemptCollection(
         data: { status: 'success', channelRefundNo: executed.channelRefundNo },
       })
       await clearCollectedSignal(db, input.orderId)
+      return
+    }
+    if (isChannelAbnormal(executed)) {
+      // 退款异常：钱停在渠道中间账户，保持处理中，记诊断并告警。
+      await parkAbnormalChannelRefund(db, { refundId: refund.id, refundNo, orderId: input.orderId, channelRefundNo: executed.channelRefundNo, source: 'refund' })
       return
     }
     if (executed.status === 'failed') {

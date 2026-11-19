@@ -17,7 +17,7 @@ import { markOrderIfPaperUnreleased, paperAlreadyReleased } from './refund-paper
 import { settlementAfterSuccess } from './refund-remainder'
 
 export type PrintReturnResolution = 'confirm_refunded' | 'release_paper' | 'close_order'
-export type RefundChannelVerdict = 'success' | 'processing' | 'failed' | 'unknown' | 'unsupported' | 'fault'
+export type RefundChannelVerdict = 'success' | 'processing' | 'failed' | 'unknown' | 'unsupported' | 'fault' | 'abnormal'
 export type PendingRefundChannelQuery = (input: {
   channel: string
   refundNo: string

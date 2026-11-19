@@ -12,8 +12,9 @@
  *   审计 refund.processing；重复调用经 queryRefund 收敛——仍受理中原样返回、
  *   SUCCESS 补完成（refund.created 带 convergedFromProcessing）、再重复幂等。
  * - 渠道结果三分法（双模型审查 H1 修复）：
- *   · 明确拒绝（ABNORMAL / 4xx 业务码）→ failed + 回滚 paid + refund.channel_error 审计，
+ *   · 明确拒绝（CLOSED / 4xx 业务码）→ failed + 回滚 paid + refund.channel_error 审计，
  *     且可**同号重试**（H2 修复：refund.retried 审计 + 重新走渠道，渠道幂等兜底）；
+ *   · 退款异常（ABNORMAL，钱停在渠道中间账户）→ 不当失败：保持 pending+refunding、记诊断审计，不抛渠道失败；
  *   · 结果不可知（HTTP 5xx/超时）→ 保持 pending+refunding + refund.channel_ambiguous 审计，
  *     **绝不判失败**；查证 unknown（渠道查无此单）时**同号重发**收敛到 refunded。
  * - 前置守卫 fail-closed（refund.blocked 审计）：缺 success 尝试 REFUND_SOURCE_ATTEMPT_MISSING /
@@ -471,9 +472,27 @@ async function main(): Promise<void> {
       fail('post-convergence repeat not idempotent')
     }
 
-    // ── (W3) wechat 渠道明确拒绝（ABNORMAL）→ 回滚 → 同号重试成功（H2 修复）──
-    const W3 = await makePaidOrder('w3', 'wechat')
+    // ── (W3a) wechat 退款异常（ABNORMAL）：P2b9 第 5 条，钱停在渠道中间账户，不当失败、不回滚 ──
+    const W3A = await makePaidOrder('w3a', 'wechat')
     wechatRefundCreateResponse = { body: { status: 'ABNORMAL', refund_id: 'wxrfd_abn' } }
+    const w3aView = await refundService.refund(W3A.orderId, { reason: '用户申请退款' })
+    const w3aRefund = await refundRow(`RFD-${W3A.orderNo}`)
+    if (
+      w3aView.refund.status === 'pending' &&
+      (await orderState(W3A.orderId)).payStatus === 'refunding' &&
+      w3aRefund?.status === 'pending' &&
+      w3aRefund.channelRefundNo === 'wxrfd_abn' &&
+      (await auditCount('refund.channel_abnormal', W3A.orderId)) === 1
+    ) {
+      pass('渠道退款异常：保持 pending+refunding（不当失败、不回滚）+ refund.channel_abnormal 诊断')
+    } else {
+      fail(`wechat abnormal mishandled: ${JSON.stringify({ view: w3aView.refund.status, refund: w3aRefund?.status })}`)
+    }
+
+    // ── (W3) wechat 渠道明确拒绝（CLOSED）→ 回滚 → 同号重试成功（H2 修复）──
+    // P2b9 第 5 条：原来用 ABNORMAL 当明确拒绝，官方文档写的是钱停在退款中间账户；改用 CLOSED 守住这条回滚与重试的路。
+    const W3 = await makePaidOrder('w3', 'wechat')
+    wechatRefundCreateResponse = { body: { status: 'CLOSED', refund_id: 'wxrfd_closed' } }
     await expectCode('wechat 渠道拒绝 → REFUND_CHANNEL_FAILED', 'REFUND_CHANNEL_FAILED', () =>
       refundService.refund(W3.orderId, { reason: '用户申请退款' }),
     )

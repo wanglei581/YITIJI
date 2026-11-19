@@ -13,7 +13,7 @@
  *   待退单的渠道与金额只来自该单唯一 success PaymentAttempt，不接受客户端输入。
  * - 渠道结果三分法（W-B 审查 H1 根因修复）：
  *   · **明确成功** → refunded；
- *   · **明确拒绝**（渠道业务错误码 / 4xx / ABNORMAL）→ Refund failed + 订单回 paid
+ *   · **明确拒绝**（渠道业务错误码 / 4xx / CLOSED）→ Refund failed + 订单回 paid
  *     （迟到回调待退回 closed，不得写成 paid），可经同号重试路径重新发起；
  *   · **结果不可知**（超时 / 5xx / 网络异常 / 响应验签失败 / 受理中 PROCESSING）→
  *     Refund 保持 pending + 订单保持 refunding，**绝不判失败也绝不假报成功**，
@@ -46,6 +46,7 @@ import { cancelUnclaimedPrintTasks } from './cancel-unclaimed-print-task'
 import { nonStaleSuccessCents, payStatusAfterRefundFailure, remainderAmountCents, settlementAfterSuccess } from './refund-remainder'
 import { stageNewRefund } from './stage-order-refund'
 import { isDefinitiveChannelRejection, UNAUTHORIZED_NOTIFY_CODES } from './refund-channel-errors'
+import { isChannelAbnormal, parkAbnormalChannelRefund } from './refund-abnormal'
 import {
   holdMismatchedChannelRefund,
   isWholeOrderRefundAmount,
@@ -107,8 +108,9 @@ export class RefundService {
    *   若本地曾错判 failed（渠道账本为准）→ 修复为 success（审计带 repairedFromFailed）；
    *   已经失败过、并且打印任务还能出纸时不记成退款成功，退款行改待人工；
    *   已 success → 幂等返回，不重复副作用/审计。
-   * - CLOSED/ABNORMAL：pending→failed + 订单回 paid（可同号重试）；已 failed 幂等；
+   * - CLOSED：pending→failed + 订单回 paid（可同号重试）；已 failed 幂等；
    *   **已 success 绝不回退**（冲突拒绝）。
+   * - ABNORMAL（退款异常，钱停在渠道中间账户）：不记 failed、不回滚，记诊断并告警，等渠道答复（refund-abnormal.ts）。
    * - 未知 out_refund_no：拒绝，不改任何订单。
    * - 只读打印任务，用来拦住「曾经退款失败、后来又放行出纸」的迟到成功通知；不改任务状态。
    */
@@ -197,8 +199,12 @@ export class RefundService {
       return { ok: true }
     }
 
-    // CLOSED / ABNORMAL：渠道明确不会再退。
+    // CLOSED：渠道明确不会再退。ABNORMAL：钱停在渠道中间账户，不当失败，记诊断、告警、等渠道答复。
     if (refund.status === 'success') throw new BadRequestException('REFUND_NOTIFY_STATE_CONFLICT') // 绝不回退已退款
+    if (isChannelAbnormal(event)) {
+      await parkAbnormalChannelRefund(this.prisma, { refundId: refund.id, refundNo: refund.refundNo, orderId: refund.orderId, channelRefundNo: event.channelRefundNo, source: 'notify' })
+      return { ok: true }
+    }
     if (refund.status === 'failed') return { ok: true, idempotent: true }
     await this.rollbackRefundFailure(refund.id, refund.orderId, event.channelRefundNo)
     await this.audit.write({
@@ -408,6 +414,11 @@ export class RefundService {
       return this.toView(pendingRefund ?? refund, await this.requireOrder(refund.orderId), false)
     }
 
+    if (isChannelAbnormal(res)) {
+      // 退款异常：钱停在渠道中间账户，保持 pending+refunding，绝不回滚成失败。
+      await parkAbnormalChannelRefund(this.prisma, { refundId: refund.id, refundNo: refund.refundNo, orderId: refund.orderId, channelRefundNo: res.channelRefundNo, source: 'refund' })
+      return this.toView(await this.prisma.refund.findUnique({ where: { id: refund.id } }) ?? refund, await this.requireOrder(refund.orderId), false)
+    }
     if (res.status === 'failed') {
       await this.rollbackRefundFailure(refund.id, refund.orderId, res.channelRefundNo)
       throw new BadRequestException('REFUND_CHANNEL_FAILED')
@@ -573,7 +584,7 @@ export class RefundService {
   /**
    * 真实渠道 pending 退款收敛（同 refundNo 重复请求触发）。向渠道 queryRefund 查证：
    * - success → 补完成（唯一完成路径，CAS 幂等）；
-   * - failed（明确 ABNORMAL/CLOSED）→ 回滚 paid 可重试；
+   * - failed（明确 CLOSED）→ 回滚 paid 可重试；ABNORMAL 退款异常不回滚，保持 pending、记诊断告警；
    * - processing → 原样返回；
    * - unknown（渠道查无此单——原请求可能从未到达，审查 M4）→ **同号重发** provider.refund
    *   （渠道以 out_refund_no/out_request_no 幂等，重发绝不二次出款）；
@@ -593,6 +604,10 @@ export class RefundService {
       .catch(() => null) // 查证网络异常：保持现状，下次再收敛
     if (!q || q.status === 'processing') {
       return this.toView(refund, order, true)
+    }
+    if (isChannelAbnormal(q)) {
+      await parkAbnormalChannelRefund(this.prisma, { refundId: refund.id, refundNo: refund.refundNo, orderId: refund.orderId, channelRefundNo: q.channelRefundNo, source: 'query' })
+      return this.toView(await this.prisma.refund.findUnique({ where: { id: refund.id } }) ?? refund, order, true)
     }
     if (q.status === 'failed') {
       await this.rollbackRefundFailure(refund.id, refund.orderId, q.channelRefundNo)
