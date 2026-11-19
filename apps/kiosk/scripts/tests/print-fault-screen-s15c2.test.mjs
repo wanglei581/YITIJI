@@ -607,6 +607,23 @@ test('S15c7 置灰原因只说为什么和何时亮，带走链接与小字照�
   assert.match(view.slice(closeAt, closeAt + 280), /retry\.available && retry\.blockedReason/)
 })
 
+test('S15c8 失败页胶囊贴着时钟，用常规字号，不再拉满', () => {
+  const css = readFileSync(join(kioskRoot, 'src/pages/print/styles/print-fail-touch.css'), 'utf8')
+  const right = css.match(/:has\(\.pft-fail-status\) \.qxt-hdr-right \{([^}]+)\}/)
+  const pill = css.match(/\.qxt-status\.pft-fail-status \{([^}]+)\}/)
+  assert.ok(right && pill, '失败页顶栏规则还在')
+  assert.match(right[1], /flex:\s*none/)
+  assert.match(right[1], /margin-left:\s*auto/)
+  assert.doesNotMatch(right[1], /flex:\s*1\s+1\s+auto/)
+  assert.match(pill[1], /flex:\s*none/)
+  assert.match(pill[1], /white-space:\s*nowrap/)
+  assert.match(pill[1], /font-size:\s*var\(--qxt-fs-rail\)/)
+  assert.match(pill[1], /height:\s*46px/)
+  assert.doesNotMatch(pill[1], /font-size:\s*18px|white-space:\s*normal|flex:\s*1\s+1\s+auto/)
+  assert.match(css, /:has\(\.pft-fail-status\) \.qxt-brand b[\s\S]*white-space:\s*nowrap/)
+  assert.match(css, /:has\(\.pft-fail-status\) \.qxt-clock[\s\S]*white-space:\s*nowrap/)
+})
+
 test('失败文案注释放在各自函数上方', () => {
   const source = readFileSync(join(kioskRoot, 'src/pages/print/components/printDoneFailedModel.ts'), 'utf8')
   const sitsOn = (marker, fnName) => {

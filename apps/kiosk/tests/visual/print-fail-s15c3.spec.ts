@@ -99,9 +99,21 @@ test('free paper-jam header keeps brand and clock on one line while the long pil
     clientWidth: el.clientWidth,
     scrollHeight: el.scrollHeight,
     clientHeight: el.clientHeight,
+    fontSize: getComputedStyle(el).fontSize,
+    whiteSpace: getComputedStyle(el).whiteSpace,
   }))
   expect(pillFit.scrollWidth).toBeLessThanOrEqual(pillFit.clientWidth + 1)
   expect(pillFit.scrollHeight).toBeLessThanOrEqual(pillFit.clientHeight + 1)
+  expect(pillFit.fontSize).toBe('21px')
+  expect(pillFit.whiteSpace).toBe('nowrap')
+  const brandBlock = await page.locator('[data-qx-page="print-done"] .qxt-brand').boundingBox()
+  const pillBox = await pill.boundingBox()
+  const clockBox = await page.locator('[data-qx-page="print-done"] .qxt-clock').boundingBox()
+  expect(brandBlock && pillBox && clockBox).toBeTruthy()
+  if (!brandBlock || !pillBox || !clockBox) return
+  expect(pillBox.x - (brandBlock.x + brandBlock.width)).toBeGreaterThan(80)
+  expect(clockBox.x).toBeGreaterThan(pillBox.x + pillBox.width - 1)
+  expect(clockBox.x - (pillBox.x + pillBox.width)).toBeLessThan(40)
 })
 
 function registerMemberLogin(api: ApiRouter): void {
