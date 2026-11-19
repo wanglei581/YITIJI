@@ -19,12 +19,15 @@ const SUBMITTED = '已提交。开好后，电子发票发到你填的邮箱。'
 const BLOCKED = '这一单开不了发票。请回到一体机查看订单。'
 const REFUNDED = '已退款的单，开不了发票。'
 
-const resolved = {
-  status: 200,
-  json: {
-    success: true,
-    data: { sessionId: SESSION, submitToken: TOKEN, orderKind: 'print', expiresAt: '2099-01-01T00:00:00.000Z', status: '等手机填写' },
-  },
+// 夹具日期相对现在算（返工包 P2c1b 第 17 条），不写死年份。页面不读这个字段，只保持接口形状。
+function resolved() {
+  return {
+    status: 200,
+    json: {
+      success: true,
+      data: { sessionId: SESSION, submitToken: TOKEN, orderKind: 'print', expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(), status: '等手机填写' },
+    },
+  }
 }
 
 function runtimeErrors(page: Page): string[] {
@@ -59,7 +62,7 @@ test('冷开票链接在 375 宽说明不能填写，没有税号框 @w5-mobile'
 test('开票短链兑换后个人不显示税号框，提交不带税号 @w5-mobile', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   await page.setViewportSize({ width: 375, height: 812 })
-  api.respond('POST', RESOLVE, resolved)
+  api.respond('POST', RESOLVE, resolved())
   api.respond('POST', SUBMIT, {
     status: 200,
     json: { success: true, data: { status: '已提交', message: SUBMITTED, requestId: 'inv-w5' } },
