@@ -16,6 +16,9 @@ const logger = new Logger('RefundChannelQuery')
 /** 查询过程自己抛错。error 要带到待人工诊断，不能只留一个 fault 字。 */
 export type ChannelQueryFault = { verdict: 'fault'; error: unknown }
 
+/** 渠道说退成。金额是渠道回报的这一笔退款额，没回报时为 null，不能拿本地金额顶替。 */
+export type ChannelQuerySuccess = { verdict: 'success'; refundAmountCents: number | null; channelRefundNo: string | null }
+
 /**
  * 三步处置用的渠道结论。退款收敛不走这里，仍看 RefundQueryResult.status。
  * 只有官方文档写明这笔钱没退成的，才当失败：
@@ -88,7 +91,7 @@ export async function queryRefundChannel(
   registry: PaymentProviderRegistry,
   db: PrismaService,
   input: { channel: string; refundNo: string; orderId: string },
-): Promise<Exclude<RefundChannelVerdict, 'fault'> | ChannelQueryFault> {
+): Promise<Exclude<RefundChannelVerdict, 'fault' | 'success'> | ChannelQueryFault | ChannelQuerySuccess> {
   const provider = registry.get(input.channel)
   if (!provider?.queryRefund) return 'unsupported'
   const attempt = await db.paymentAttempt.findFirst({
@@ -101,7 +104,13 @@ export async function queryRefundChannel(
       refundNo: input.refundNo,
       outTradeNo: attempt?.id ?? null,
     })
-    return classifyChannelRefundStatus(queried)
+    const verdict = classifyChannelRefundStatus(queried)
+    if (verdict !== 'success') return verdict
+    return {
+      verdict: 'success',
+      refundAmountCents: typeof queried.refundAmountCents === 'number' ? queried.refundAmountCents : null,
+      channelRefundNo: queried.channelRefundNo,
+    }
   } catch (error) {
     logger.error(
       `查询退款渠道失败 orderId=${input.orderId} refundNo=${input.refundNo}：${channelFaultText(error)}`,

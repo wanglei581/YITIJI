@@ -4,7 +4,6 @@
  */
 import assert from 'node:assert/strict'
 import { BadRequestException } from '@nestjs/common'
-import type { RefundChannelVerdict } from '../../src/payment/resolve-print-return-hold'
 import { resolvePrintReturnHold, type PrintReturnResolution } from '../../src/payment/resolve-print-return-hold'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 
@@ -146,13 +145,27 @@ export async function runP2b8ChannelStepsCases(
       const id = `ord_${tag}_p2b8_ok_${action.slice(0, 3)}`
       await seed(db, { id, terminalId, orderIds: input.orderIds, taskIds: input.taskIds })
       created.push(id)
-      const done = await resolvePrintReturnHold(db, id, action, 'admin-test', async () => 'success' as RefundChannelVerdict)
-      assert.equal(done.payStatus, 'refunded', `${action} 遇到渠道成功必须记退成`)
-      assert.equal(done.refundStatus, 'success')
-      assert.notEqual(done.taskStatus, 'pending', `${action} 遇到渠道成功不能改为出纸`)
-      assert.notEqual((await db.order.findUniqueOrThrow({ where: { id } })).payStatus, 'closed')
-      const audit = await db.auditLog.findFirst({ where: { targetId: id, action: 'refund.hold_resolved' } })
-      assert.match(audit?.payloadJson ?? '', /确认退款已经退成/)
+      // P2b9 第 3 条：渠道答复成功按渠道回报的金额记账；改为出纸、关单照实拒绝，不再改写成「确认退成」后返回成功。
+      const outcome = await resolvePrintReturnHold(db, id, action, 'admin-test', async () => ({
+        verdict: 'success' as const,
+        refundAmountCents: 200,
+        channelRefundNo: null,
+      })).then((done) => ({ code: 'ok', done }), (error: unknown) => ({ code: errorCode(error), done: null }))
+      assert.equal(outcome.code, action === 'confirm_refunded' ? 'ok' : 'REFUND_CHANNEL_REFUNDED', `${action} 遇到渠道成功：确认退成给结果，其余照实拒绝`)
+      const order = await db.order.findUniqueOrThrow({ where: { id } })
+      assert.equal(order.payStatus, 'refunded', `${action} 遇到渠道成功必须记退成`)
+      assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: id } })).status, 'success')
+      assert.notEqual((await db.printTask.findFirstOrThrow({ where: { orderId: id } })).status, 'pending', `${action} 遇到渠道成功不能改为出纸`)
+      assert.notEqual(order.payStatus, 'closed')
+      if (action === 'confirm_refunded') {
+        assert.equal(outcome.done?.refundStatus, 'success')
+        const audit = await db.auditLog.findFirst({ where: { targetId: id, action: 'refund.hold_resolved' } })
+        assert.match(audit?.payloadJson ?? '', /确认退款已经退成/)
+      } else {
+        const audit = await db.auditLog.findFirst({ where: { targetId: id, action: 'refund.hold_rejected' } })
+        assert.match(audit?.payloadJson ?? '', /REFUND_CHANNEL_REFUNDED/)
+        assert.equal(await db.auditLog.count({ where: { targetId: id, action: 'refund.hold_resolved' } }), 0, `${action} 不能记成已处置`)
+      }
     }
 
     const failedRelease = `ord_${tag}_p2b8_fl_rel`

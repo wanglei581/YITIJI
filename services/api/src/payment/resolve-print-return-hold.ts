@@ -1,6 +1,7 @@
 /**
  * 待人工的三种解开办法。改状态在一个事务里做完，改完只剩一种状态。
- * 渠道还没明确失败时，三步都先查渠道。渠道说成功就记退成，不改出纸、不关单。
+ * 渠道受理过、还没落定的退款，三步都先查渠道（每一笔都查）。渠道说成功就按渠道金额记账：
+ * 确认退成给出记账后的结果，改为出纸、关单照实拒绝。
  * 渠道说失败后，改为出纸和关单仍不把钱记成已退。已经出纸不能关单。
  * 确认退成把「还没放行出纸」写进同一条订单更新：任务状态，以及 printOutcome=printed。
  * 和领取、核验出纸抢同一行。抢输了整笔回滚，拒绝审计写在事务外，才留得下。
@@ -9,7 +10,8 @@ import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { resolveChannelBeforeHold } from './refund-channel-hold-gate'
-import type { ChannelQueryFault } from './refund-channel-query'
+import { channelRefundedOutcome } from './refund-channel-answer'
+import type { ChannelQueryFault, ChannelQuerySuccess } from './refund-channel-query'
 import { closeOrderIfPaperUnreleased } from './close-order-if-unreleased'
 import { markOrderIfPaperUnreleased, paperAlreadyReleased } from './refund-paper-exclusion'
 import { settlementAfterSuccess } from './refund-remainder'
@@ -20,7 +22,7 @@ export type PendingRefundChannelQuery = (input: {
   channel: string
   refundNo: string
   orderId: string
-}) => Promise<RefundChannelVerdict | ChannelQueryFault>
+}) => Promise<RefundChannelVerdict | ChannelQueryFault | ChannelQuerySuccess>
 
 const HOLD_STATUSES = ['failed', 'manual_review', 'pending'] as const
 const NOT_REFUNDED_NOTE = '这笔钱不会记成已退回'
@@ -112,6 +114,7 @@ export async function resolvePrintReturnHold(
 }> {
   await rejectReleasedPaper(db, orderId, action, operatorId)
   const step = await resolveChannelBeforeHold(db, orderId, action, operatorId, channelQuery)
+  if (step === 'channel_refunded') return channelRefundedOutcome(db, orderId, action, operatorId)
   try {
     return await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } })

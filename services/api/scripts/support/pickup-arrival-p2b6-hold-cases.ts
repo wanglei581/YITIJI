@@ -13,7 +13,13 @@ import type { PrismaService } from '../../src/prisma/prisma.service'
 
 const PAGES = JSON.stringify({ copies: 1, colorMode: 'black_white' })
 
-type ChannelVerdict = 'success' | 'processing' | 'failed' | 'unknown' | 'unsupported'
+type ChannelVerdict =
+  | 'success'
+  | 'processing'
+  | 'failed'
+  | 'unknown'
+  | 'unsupported'
+  | { verdict: 'success'; refundAmountCents: number | null; channelRefundNo: string | null }
 
 function errorCode(error: unknown): string {
   if (!(error instanceof BadRequestException)) return error instanceof Error ? error.message : 'error'
@@ -168,8 +174,9 @@ export async function runP2b6HoldChannelCases(
       printOutcome: 'not_printed',
       orderTaskStatus: 'failed',
     })
-    const successCode = await releaseCode(channelSuccess, 'success')
-    assert.equal(successCode, 'ok', '渠道说成功就记退成，不改为出纸')
+    // P2b9 第 3 条：渠道答复成功时按渠道回报的金额记账，改为出纸照实拒绝，不再改写成「确认退成」后返回成功。
+    const successCode = await releaseCode(channelSuccess, { verdict: 'success', refundAmountCents: 200, channelRefundNo: null })
+    assert.equal(successCode, 'REFUND_CHANNEL_REFUNDED', '渠道说成功就按渠道金额记账，改为出纸照实拒绝')
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: channelSuccess } })).payStatus, 'refunded')
     assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: channelSuccess } })).status, 'success')
     assert.equal((await db.printTask.findFirstOrThrow({ where: { orderId: channelSuccess } })).status, 'failed')
