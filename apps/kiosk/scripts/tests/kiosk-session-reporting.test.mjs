@@ -293,6 +293,10 @@ test('R10 白名单与服务端源码一致；路径归类抽样', () => {
     '/print/pickup-claim': 'print',
     '/upload/phone': 'print',
     '/scan': 'scan',
+    // 按次付款屏归到它付的那种服务：付完接着办同一件事，使用统计不多出一类。
+    '/pay/scan': 'scan',
+    '/pay/resume': 'resume',
+    '/pay/interview': 'interview',
     '/resume/source': 'resume',
     '/resume/career-plan': 'career',
     '/resume/self-assessment/intro': 'career',

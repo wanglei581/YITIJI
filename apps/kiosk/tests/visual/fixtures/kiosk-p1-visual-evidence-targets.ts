@@ -321,6 +321,10 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   productionOnly('/interview-service'),
   productionOnly('/policy-service'),
   productionOnly('/print/pickup-claim'),
+  // 按次付款屏：2026-07 原型集里没有，稿在触屏版 pay-1113.js；这里只登记生产侧证据与原型缺口。
+  productionOnly('/pay/resume'),
+  productionOnly('/pay/interview'),
+  productionOnly('/pay/scan'),
   productionOnly('/ai/plan'),
   productionOnly('/session-resume'),
   redirect('/jobs/online-platforms', '/official-channels'),

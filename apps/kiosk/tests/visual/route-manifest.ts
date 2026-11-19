@@ -34,6 +34,8 @@ export const productionRoutePatterns = [
   '/interview-service',
   // 打印取件认领
   '/print/pickup-claim',
+  // 按次付款（简历优化、模拟面试、扫描各一条）
+  '/pay/resume', '/pay/interview', '/pay/scan',
   // PR #496 (AI OS 三新路由)
   '/ai/plan',
   '/session-resume',

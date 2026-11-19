@@ -193,6 +193,8 @@ const WAVE_ROUTES = new Map([
     '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
     '/print/cashier', '/print/progress', '/print/done', '/print/pickup-claim', '/scan', '/scan/start', '/scan/settings',
     '/scan/progress', '/scan/result',
+    // 按次付款屏样子照打印收银台，三种服务各一条，归在收银台这一波。
+    '/pay/resume', '/pay/interview', '/pay/scan',
   ]],
   ['W3', [
     '/resume', '/resume/upload', '/resume/source', '/resume/generate',
