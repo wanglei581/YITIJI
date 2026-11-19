@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common'
+import { trtcConfigGap } from './trtc-config-gap'
 import { describeBackgroundError, runBackground, scheduleBackground } from '../common/process/background-task'
 import { randomUUID } from 'node:crypto'
 import { TrtcSessionRegistry, readTrtcMaxSessionSeconds } from './trtc-session-registry.service'
@@ -23,17 +24,17 @@ export const TRTC_DEFAULT_SYSTEM_PROMPT = withAiSafety(
   '回答简洁口语化，每次回复控制在 100 字以内。',
 )
 
-function envNumber(name: string, fallback: number): number {
-  const raw = process.env[name]
+function envNumber(name: string, fallback: number, env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env[name]
   if (!raw) return fallback
 
   const value = Number(raw)
   return Number.isFinite(value) ? value : fallback
 }
 
-/** 小青音色 ID。buildTtsConfig 与思考模式在线探针共用，避免默认值 1008 写两处。 */
-export function readXiaoqingVoiceType(): number {
-  return envNumber('TRTC_TTS_VOICE', 1008)
+/** 小青音色 ID。语音合成拼装与思考模式在线探针共用，避免默认值 1008 写两处。 */
+export function readXiaoqingVoiceType(env: NodeJS.ProcessEnv = process.env): number {
+  return envNumber('TRTC_TTS_VOICE', 1008, env)
 }
 
 function envForbiddenWords(primaryName: string, fallbackName: string): string[] {
@@ -77,6 +78,52 @@ export function buildTrtcLlmConfigJson(input: TrtcLlmConfigInput, overrideJson?:
     Streaming:    true,
     ...(Object.keys(thinkingOff).length > 0 ? { ExtraBody: thinkingOff } : {}),
   })
+}
+
+function buildTrtcTtsConfig(secretId: string, cloudKey: string, env: NodeJS.ProcessEnv = process.env): string {
+  const explicitConfig = env['TRTC_TTS_CONFIG_JSON']?.trim()
+  if (explicitConfig) return explicitConfig
+  const gap = trtcConfigGap(env)
+  if (gap) throw new ServiceUnavailableException({ error: gap.http })
+
+  const ttsType = (env['TRTC_TTS_TYPE'] ?? 'tencent').toLowerCase()
+
+  if (ttsType === 'tencent') {
+    const appId = Number(env['TRTC_TTS_APP_ID'] ?? env['TENCENT_APP_ID'])
+
+    return JSON.stringify({
+      TTSType:         'tencent',
+      AppId:           appId,
+      SecretId:        secretId,
+      SecretKey:       cloudKey,
+      VoiceType:       readXiaoqingVoiceType(env),
+      Volume:          envNumber('TRTC_TTS_VOLUME', 5, env),
+      Speed:           envNumber('TRTC_TTS_SPEED', 0, env),
+      PrimaryLanguage: envNumber('TRTC_TTS_PRIMARY_LANGUAGE', 1, env),
+    })
+  }
+
+  const unsupported = trtcConfigGap(env)
+  throw new ServiceUnavailableException({ error: unsupported?.http ?? { code: 'AI_NOT_CONFIGURED', message: `不支持的 TRTC_TTS_TYPE: ${ttsType}，请使用 tencent 或 TRTC_TTS_CONFIG_JSON` } })
+}
+
+/**
+ * 建会话交给腾讯云代调的两段配置。可用判断必须用这一份，再交给同一个
+ * assertTrtcDelegatedEndpoints，避免「能力表放行、真打电话被地址拒绝」。
+ */
+export function buildTrtcSessionDelegatedConfigs(env: NodeJS.ProcessEnv = process.env): { llmConfig: string; ttsConfig: string } {
+  const secretId = env['TENCENT_SECRET_ID'] ?? ''
+  const cloudKey = env['TENCENT_SECRET_KEY'] ?? ''
+  const llmApiKey = env['TRTC_LLM_API_KEY'] ?? ''
+  const llmModel = env['TRTC_LLM_MODEL'] ?? 'deepseek-v4-flash'
+  const llmType = env['TRTC_LLM_TYPE'] ?? 'openai'
+  const llmApiUrl = env['TRTC_LLM_API_URL'] ?? 'https://api.deepseek.com/v1/chat/completions'
+  const systemPrompt = env['TRTC_SYSTEM_PROMPT'] || TRTC_DEFAULT_SYSTEM_PROMPT
+  const llmConfig = buildTrtcLlmConfigJson(
+    { llmType, model: llmModel, apiKey: llmApiKey, apiUrl: llmApiUrl, systemPrompt },
+    env['TRTC_LLM_CONFIG_JSON'],
+  )
+  return { llmConfig, ttsConfig: buildTrtcTtsConfig(secretId, cloudKey, env) }
 }
 
 export interface StartSessionResult {
@@ -174,46 +221,18 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
     return { sdkAppId, userId, userSig: genUserSig(sdkAppId, secretKey, userId, trtcUserSigTtlSeconds()) }
   }
 
-  private buildTtsConfig(secretId: string, cloudKey: string): string {
-    const explicitConfig = process.env['TRTC_TTS_CONFIG_JSON']?.trim()
-    if (explicitConfig) return explicitConfig
-
-    const ttsType = (process.env['TRTC_TTS_TYPE'] ?? 'tencent').toLowerCase()
-
-    if (ttsType === 'tencent') {
-      const appId = Number(process.env['TRTC_TTS_APP_ID'] ?? process.env['TENCENT_APP_ID'])
-      if (!Number.isFinite(appId) || appId <= 0) {
-        throw new InternalServerErrorException('腾讯 TTS AppId 未配置（TRTC_TTS_APP_ID 或 TENCENT_APP_ID）')
-      }
-
-      return JSON.stringify({
-        TTSType:         'tencent',
-        AppId:           appId,
-        SecretId:        secretId,
-        SecretKey:       cloudKey,
-        VoiceType:       readXiaoqingVoiceType(),
-        Volume:          envNumber('TRTC_TTS_VOLUME', 5),
-        Speed:           envNumber('TRTC_TTS_SPEED', 0),
-        PrimaryLanguage: envNumber('TRTC_TTS_PRIMARY_LANGUAGE', 1),
-      })
-    }
-
-    throw new InternalServerErrorException(`不支持的 TRTC_TTS_TYPE: ${ttsType}，请使用 tencent 或 TRTC_TTS_CONFIG_JSON`)
-  }
-
   /**
    * 启动一次对话式 AI 会话：
    *  1. 为用户和 AI 机器人各生成 UserSig
    *  2. 调用腾讯云 StartAIConversation 把 AI 拉进房间
    */
   async startSession(userId: string): Promise<StartSessionResult> {
+    const gap = trtcConfigGap()
+    if (gap) throw new ServiceUnavailableException({ error: gap.http })
     const { sdkAppId, secretKey, secretId, cloudKey, region } = this.cfg()
-
-    if (!sdkAppId || !secretKey) {
-      throw new InternalServerErrorException('TRTC 应用凭证未配置')
-    }
-    if (!secretId || !cloudKey) {
-      throw new InternalServerErrorException('腾讯云 API 凭证（SecretId/SecretKey）未配置')
+    if (!sdkAppId || !secretKey || !secretId || !cloudKey) {
+      const again = trtcConfigGap()
+      throw new ServiceUnavailableException({ error: again?.http ?? { code: 'AI_NOT_CONFIGURED', message: 'TRTC 应用凭证未配置' } })
     }
 
     // 房间号：用时间戳派生，保证每次唯一（字符串房间）
@@ -224,14 +243,9 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
     const userSig      = genUserSig(sdkAppId, secretKey, userId, trtcUserSigTtlSeconds())
     const botUserSig   = genUserSig(sdkAppId, secretKey, botUserId, trtcUserSigTtlSeconds())
 
-    // ── LLM 配置 ─────────────────────────────────────────────
-    const llmApiKey = process.env['TRTC_LLM_API_KEY']
-    const llmModel  = process.env['TRTC_LLM_MODEL']   ?? 'deepseek-v4-flash'
-    const llmType   = process.env['TRTC_LLM_TYPE']    ?? 'openai'
-    const llmApiUrl = process.env['TRTC_LLM_API_URL'] ?? 'https://api.deepseek.com/v1/chat/completions'
-
-    if (!llmApiKey) {
-      throw new InternalServerErrorException('LLM API Key 未配置（TRTC_LLM_API_KEY）')
+    if (!process.env['TRTC_LLM_API_KEY']) {
+      const missingKey = trtcConfigGap()
+      throw new ServiceUnavailableException({ error: missingKey?.http ?? { code: 'AI_NOT_CONFIGURED', message: 'LLM API Key 未配置（TRTC_LLM_API_KEY）' } })
     }
 
     const promptConfig = {
@@ -240,14 +254,8 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
       forbiddenWords: envForbiddenWords('TRTC_FORBIDDEN_WORDS', 'AI_ASSISTANT_FORBIDDEN_WORDS'),
     }
 
-    // LLMConfig（OpenAI 兼容协议，DeepSeek；DeepSeek 系默认关闭思考，见 buildTrtcLlmConfigJson）
-    const llmConfig = buildTrtcLlmConfigJson(
-      { llmType, model: llmModel, apiKey: llmApiKey, apiUrl: llmApiUrl, systemPrompt: promptConfig.systemPrompt },
-      process.env['TRTC_LLM_CONFIG_JSON'],
-    )
-
-    // ── TTS 配置 ─────────────────────────────────────────────
-    const ttsConfig = this.buildTtsConfig(secretId, cloudKey)
+    // 与可用判断同一份拼装。地址校验仍在下面的 try 里、腾讯请求之前。
+    const { llmConfig, ttsConfig } = buildTrtcSessionDelegatedConfigs()
 
     const payload = {
       SessionId:  sessionId,

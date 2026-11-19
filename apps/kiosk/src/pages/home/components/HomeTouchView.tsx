@@ -13,17 +13,18 @@ import { QxTouchTask } from '../../../components/qingxu/touch/QxTouchTask'
 import { QxTouchTile } from '../../../components/qingxu/touch/QxTouchTile'
 import { hasKioskSensitiveSession } from '../../../auth/kioskSensitiveSession'
 import { homeStandbyNote, publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
+import { useKioskHomePriceSnapshot } from '../../../hooks/useKioskHomeFreeBadge'
 import type { RecruitmentHostingState } from '../../../hooks/useRecruitmentHosting'
 import type { TerminalDeviceStatusView } from '../../../hooks/useTerminalDeviceStatus'
 import { rememberAssistantDraft } from '../../../services/assistantDraft'
 import { useTerminalKiosk } from '../../../services/api/screensaver'
-import { unitCentsFor, usePrintPriceConfig } from '../../../services/print/priceConfigApi'
 import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeV6ActionId } from '../homeV6Domains'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
 import { campusCopy, greetingWord, jobCopy } from '../homeTouchCopy'
 import '../styles/home-touch.css'
+import { HomeFreeBadge } from './HomeFreeBadge'
 import { HomeIdentityActions } from './HomeIdentityActions'
 
 const RETRY_CUE = '点这里重新读取'
@@ -76,13 +77,10 @@ export function HomeTouchView({
   const contact = useSupportContactSnapshot()
   const winding = mode === 'winding-down'
   const kiosk = useTerminalKiosk()
-  const price = usePrintPriceConfig()
-  const bwUnit = unitCentsFor(price.config, 'black_white')
-  const colorUnit = unitCentsFor(price.config, 'color')
-  const priceKnown = price.status === 'ready' && bwUnit !== null && colorUnit !== null
-  const paidPrint = priceKnown && (bwUnit > 0 || colorUnit > 0)
-  const freePrint = priceKnown && bwUnit === 0 && colorUnit === 0
-  const priceNotice = paidPrint && !freePrint ? '收费以现场公示为准' : null
+  // 角标和收费句读同一轮五个生效价。重读或换终端时一起更新，不另读只在挂载时取一次的价。
+  const priceSnapshot = useKioskHomePriceSnapshot()
+  const showFreeBadge = priceSnapshot.badge
+  const priceNotice = priceSnapshot.charged ? '收费以现场公示为准' : null
   const [now, setNow] = useState(() => new Date())
   const [introDone, setIntroDone] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -177,6 +175,7 @@ export function HomeTouchView({
             title="我是小青"
             sub="今天想办哪件事？下面选一项，或者直接问我"
             status={{ text: deviceStatus.label, tone: deviceStatus.tone }}
+            greetMark={showFreeBadge ? <HomeFreeBadge /> : null}
           />
           <LicenseLock>
           <QxTouchAskBar

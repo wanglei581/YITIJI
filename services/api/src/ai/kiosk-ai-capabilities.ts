@@ -1,5 +1,7 @@
 import { AI_MODEL_FEATURES, type LlmConfigService, type LlmConfigView } from './llm/llm-config.service'
 import { evaluateAiPlatform, type AiPlatformState } from '../config/ai-platform-config'
+import type { AiAccessService } from '../ai-access/ai-access.service'
+import { digitalHumanVerdict } from '../trtc/digital-human-availability'
 
 /** 契约源：packages/shared/src/types/ai.ts（KioskAiCapabilitiesResponse）。 */
 export type KioskAiCapabilityStatus = 'available' | 'degraded' | 'off'
@@ -70,9 +72,22 @@ function toItem(view: LlmConfigView, metaStatus: 'active' | 'planned', platform:
   return { ...base, status: 'available', providerName: view.vendor }
 }
 
-/** 只读 llm-config 视图。不解密 apiKey，不发任何出站请求。 */
-export function listKioskAiCapabilities(config: LlmConfigService): KioskAiCapabilitiesResponse {
+/**
+ * 只读 llm-config 视图。不解密密钥，不发任何出站请求。
+ * digital_human 改用与 POST /trtc/session 相同的判断，不用本功能位自己的模型密钥。
+ */
+export async function listKioskAiCapabilities(
+  config: LlmConfigService,
+  access?: Pick<AiAccessService, 'paidAiRefusal'>,
+): Promise<KioskAiCapabilitiesResponse> {
   const platform = evaluateAiPlatform()
   const items = AI_MODEL_FEATURES.map((meta) => toItem(config.getView(meta.key), meta.status, platform))
+  const index = items.findIndex((item) => item.key === 'digital_human')
+  if (index >= 0) {
+    const verdict = await digitalHumanVerdict(access, config)
+    items[index] = verdict.refusal
+      ? { key: 'digital_human', status: 'off', reason: verdict.capabilityReason ?? '音视频通话还没配齐' }
+      : { key: 'digital_human', status: 'available' }
+  }
   return { items }
 }

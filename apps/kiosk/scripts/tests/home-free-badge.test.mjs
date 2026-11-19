@@ -2,6 +2,7 @@
 // 取配置、定时重读在不依赖 React 的函数里测。价在配置的 pricing 上，不再另读价目接口。
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
@@ -10,8 +11,8 @@ import ts from 'typescript'
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (path) => readFileSync(join(root, path), 'utf8')
 
-function load(path, resolve) {
-  const output = ts.transpileModule(read(path), {
+function load(path, resolve, transform = (source) => source) {
+  const output = ts.transpileModule(transform(read(path)), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
   const module = { exports: {} }
@@ -92,9 +93,20 @@ test('扫描价大于 0 时不显示', () => {
   assert.equal(kioskHomeFreeBadgeVisible({ config: configWith({ scan: 100, print_bw_page: 0, print_color_page: 0 }) }), false)
 })
 
+test('五个生效价里有一个大于 0 才算在收费，读不齐且没有已知正价不算', () => {
+  const { kioskEffectivePricesCharged } = reader
+  assert.equal(kioskEffectivePricesCharged(allFree), false)
+  assert.equal(kioskEffectivePricesCharged(configWith({ scan: 100 })), true)
+  assert.equal(kioskEffectivePricesCharged(configWith({ print_bw_page: 20 })), true)
+  assert.equal(kioskEffectivePricesCharged(configWith({ resume_optimize: 100 })), true)
+  assert.equal(kioskEffectivePricesCharged({ homeFreeBadge: true }), false)
+  assert.equal(kioskEffectivePricesCharged(null), false)
+})
+
 test('钩子接线只启动轮询，不自己读价目、不用 window 定时器', () => {
   const hook = read('src/hooks/useKioskHomeFreeBadge.ts')
-  assert.match(hook, /startKioskHomeFreeBadgePolling\(setVisible\)/)
+  assert.match(hook, /startKioskHomeFreeBadgePolling\(\(badge, charged = false\) => \{/)
+  assert.match(hook, /setSnapshot\(\{ badge, charged \}\)/)
   assert.match(hook, /export \{ kioskHomeFreeBadgeVisible, REFRESH_MS, startKioskHomeFreeBadgePolling \}/)
   assert.doesNotMatch(hook, /usePrintPriceConfig/)
   assert.doesNotMatch(hook, /window\.setInterval|window\.clearInterval/)
@@ -476,5 +488,255 @@ test('更早发出的缓存请求不能盖掉强制刷新', async () => {
   } finally {
     if (previousWindow === undefined) delete globalThis.window
     else globalThis.window = previousWindow
+  }
+})
+
+const requireFromKiosk = createRequire(join(root, 'package.json'))
+
+function createHookState() {
+  const states = []
+  const refs = []
+  const effectRan = []
+  const cleanups = []
+  const pending = []
+  let index = 0
+  return {
+    useState(init) {
+      const slot = index++
+      if (!Object.hasOwn(states, slot)) states[slot] = typeof init === 'function' ? init() : init
+      return [states[slot], (next) => {
+        states[slot] = typeof next === 'function' ? next(states[slot]) : next
+      }]
+    },
+    useRef(init) {
+      const slot = index++
+      if (!Object.hasOwn(refs, slot)) refs[slot] = { current: init }
+      return refs[slot]
+    },
+    useEffect(fn) {
+      const slot = index++
+      if (!effectRan[slot]) {
+        effectRan[slot] = true
+        pending.push(fn)
+      }
+    },
+    begin() { index = 0 },
+    flushEffects() {
+      for (const fn of pending.splice(0)) {
+        const cleanup = fn()
+        if (typeof cleanup === 'function') cleanups.push(cleanup)
+      }
+    },
+    stop() {
+      for (const fn of cleanups.splice(0)) fn()
+    },
+  }
+}
+
+// 用真实 reader、真实钩子和真实 HomeTouchView 渲染。外层组件桩掉，只留角标和页脚。
+function mountHome(nextConfig) {
+  const previousWindow = globalThis.window
+  const win = {
+    setInterval: (...args) => globalThis.setInterval(...args),
+    clearInterval: (...args) => globalThis.clearInterval(...args),
+    setTimeout: (...args) => globalThis.setTimeout(...args),
+    clearTimeout: (...args) => globalThis.clearTimeout(...args),
+    matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }),
+  }
+  globalThis.window = win
+  const calls = { config: 0 }
+  const hooks = createHookState()
+  try {
+    const jsxRuntime = requireFromKiosk('react/jsx-runtime')
+    const { renderToStaticMarkup } = requireFromKiosk('react-dom/server')
+    const readerMod = load('src/hooks/kioskHomeFreeBadgeReader.ts', (name) => {
+      if (name === '@ai-job-print/shared') {
+        return { TERMINAL_CHARGE_SERVICE_KEYS: ['resume_optimize', 'mock_interview', 'print_bw_page', 'print_color_page', 'scan'] }
+      }
+      if (name === '../services/api/terminalConfig') {
+        return {
+          getTerminalId: () => 'term-1',
+          peekCachedKioskTerminalConfig: () => null,
+          getCachedKioskTerminalConfig: async () => {
+            calls.config += 1
+            const value = nextConfig()
+            if (value instanceof Error) throw value
+            return value
+          },
+        }
+      }
+      if (name === '../services/api/screensaver') return { subscribeTerminalIdentity: () => () => {} }
+      throw new Error(`Unexpected dependency ${name}`)
+    })
+    const hookMod = load('src/hooks/useKioskHomeFreeBadge.ts', (name) => {
+      if (name === 'react') return hooks
+      if (name === './kioskHomeFreeBadgeReader') return readerMod
+      throw new Error(`Unexpected dependency ${name}`)
+    })
+    const badgeMod = load('src/pages/home/components/HomeFreeBadge.tsx', (name) => {
+      if (name === 'react/jsx-runtime') return jsxRuntime
+      throw new Error(`Unexpected dependency ${name}`)
+    })
+    const view = load('src/pages/home/components/HomeTouchView.tsx', (name) => {
+      if (name === 'react') return hooks
+      if (name === 'react/jsx-runtime') return jsxRuntime
+      if (name.endsWith('useKioskHomeFreeBadge')) return hookMod
+      if (name.endsWith('HomeFreeBadge')) return badgeMod
+      if (name.endsWith('.css')) return {}
+      if (name.endsWith('KioskLicenseContext')) return { useKioskLicense: () => ({ mode: 'normal' }) }
+      if (name.endsWith('QxTouchBand')) {
+        return { QxTouchBand: (props) => jsxRuntime.jsx('div', { className: 'qxt-greet', children: props.greetMark }) }
+      }
+      if (name.endsWith('QxTouchScreen')) {
+        return {
+          QxTouchScreen: (props) => jsxRuntime.jsxs('main', {
+            children: [
+              jsxRuntime.jsx('div', { children: props.band }, 'band'),
+              jsxRuntime.jsx('div', { children: props.children }, 'body'),
+            ],
+          }),
+        }
+      }
+      return new Proxy({}, { get: () => () => null })
+    }, (source) => source.replaceAll('import.meta.env.VITE_USE_TRTC_CALL', 'false'))
+    const props = {
+      isLoggedIn: false,
+      guestMode: false,
+      device: { loading: false, printerReady: true, printerLabel: '在线' },
+      jobs: { status: 'ready', retry() {} },
+      jobFair: { status: 'ready', retry() {} },
+      recruitment: { enabled: false, status: 'ready' },
+      officialChannelCount: 0,
+      place: '',
+      deviceStatus: { label: '正常', tone: 'ok' },
+      onAction() {},
+      onHome() {},
+      onOpenDevice() {},
+      onEndPrevious() {},
+    }
+    const paint = () => {
+      hooks.begin()
+      return renderToStaticMarkup(view.HomeTouchView(props))
+    }
+    paint()
+    hooks.flushEffects()
+    return {
+      calls,
+      async settle() {
+        await flush()
+        const markup = paint()
+        return {
+          badge: markup.includes('aria-label="免费使用"'),
+          notice: markup.includes('收费以现场公示为准'),
+        }
+      },
+      stop() {
+        const outer = globalThis.window
+        globalThis.window = win
+        try {
+          hooks.stop()
+        } finally {
+          if (outer !== win) globalThis.window = outer
+          else if (previousWindow === undefined) delete globalThis.window
+          else globalThis.window = previousWindow
+        }
+      },
+    }
+  } catch (error) {
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+    throw error
+  }
+}
+
+test('全 0 再下一轮某价变正：第二轮收费句出现、角标灭', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] })
+  let config = allFree
+  const home = mountHome(() => config)
+  try {
+    const first = await home.settle()
+    assert.equal(first.badge, true, '挂载五价全 0：角标亮')
+    assert.equal(first.notice, false, '挂载五价全 0：不写收费句')
+    config = configWith({ scan: 100 })
+    const calls = home.calls.config
+    t.mock.timers.tick(reader.REFRESH_MS)
+    const second = await home.settle()
+    assert.equal(home.calls.config, calls + 1, '下一轮只再读一次配置')
+    assert.equal(second.badge, false, '第二轮有正价：角标灭')
+    assert.equal(second.notice, true, '第二轮有正价：收费句出现')
+    assert.equal(second.badge && second.notice, false)
+  } finally {
+    home.stop()
+    t.mock.timers.reset()
+  }
+})
+
+test('有正价再下一轮全 0：第二轮收费句消失、角标亮', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] })
+  let config = configWith({ scan: 100 })
+  const home = mountHome(() => config)
+  try {
+    const first = await home.settle()
+    assert.equal(first.badge, false, '挂载有正价：角标不亮')
+    assert.equal(first.notice, true, '挂载有正价：写收费句')
+    config = allFree
+    const calls = home.calls.config
+    t.mock.timers.tick(reader.REFRESH_MS)
+    const second = await home.settle()
+    assert.equal(home.calls.config, calls + 1, '下一轮只再读一次配置')
+    assert.equal(second.badge, true, '第二轮全 0：角标亮')
+    assert.equal(second.notice, false, '第二轮全 0：收费句消失')
+    assert.equal(second.badge && second.notice, false)
+  } finally {
+    home.stop()
+    t.mock.timers.reset()
+  }
+})
+
+test('缺一项且已有正价：角标不亮，收费句出现；没有正价则两处都不出现', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] })
+  const partial = configWith({ scan: 100 })
+  delete partial.pricing.effective.resume_optimize
+  assert.equal(reader.kioskEffectivePricesCharged(partial), true)
+  assert.equal(reader.kioskHomeFreeBadgeVisible({ config: partial }), false)
+  const blank = configWith({})
+  delete blank.pricing.effective.resume_optimize
+  assert.equal(reader.kioskEffectivePricesCharged(blank), false)
+  assert.equal(reader.kioskHomeFreeBadgeVisible({ config: blank }), false)
+  const charged = mountHome(() => partial)
+  try {
+    const paid = await charged.settle()
+    assert.equal(paid.badge, false, '缺一项但 scan 为正：角标不亮')
+    assert.equal(paid.notice, true, '缺一项但 scan 为正：写收费句')
+  } finally {
+    charged.stop()
+  }
+  const unknown = mountHome(() => blank)
+  try {
+    const unsure = await unknown.settle()
+    assert.equal(unsure.badge, false, '缺一项且没有正价：角标不亮')
+    assert.equal(unsure.notice, false, '缺一项且没有正价：不写收费句')
+  } finally {
+    unknown.stop()
+    t.mock.timers.reset()
+  }
+})
+
+test('同一轮只读一次配置，角标和收费句不各拿一份', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] })
+  let reads = 0
+  const home = mountHome(() => {
+    reads += 1
+    return reads === 1 ? allFree : configWith({ scan: 100 })
+  })
+  try {
+    const screen = await home.settle()
+    assert.equal(home.calls.config, 1, '同一轮不能为角标和收费句各读一次')
+    assert.equal(screen.badge, true)
+    assert.equal(screen.notice, false)
+    assert.equal(screen.badge && screen.notice, false)
+  } finally {
+    home.stop()
+    t.mock.timers.reset()
   }
 })

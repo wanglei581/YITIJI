@@ -1,5 +1,5 @@
 import { API_MODE } from './client'
-import { adminMockAdapter } from './adminMockAdapter'
+import { adminDeviceMock } from './adminDeviceMock'
 import { adminHttpAdapter } from './adminHttpAdapter'
 import type {
   AdminPrintersResponse,
@@ -33,6 +33,13 @@ import type {
   ReleaseObservationPlansResponse,
   UpdateReleaseObservationPlanInput,
 } from './types'
+import type {
+  CreateTerminalBatchInput,
+  TerminalBatchBindCodeResult,
+  TerminalBatchCreated,
+  TerminalBatchRevokeResult,
+  TerminalBatchSelectionInput,
+} from './terminalBatch'
 
 export type {
   AdminPrintersResponse,
@@ -77,6 +84,10 @@ interface AdminDeviceServiceInterface {
   emergencyRevokeTerminal(terminalId: string, input: EmergencyRevokeTerminalInput): Promise<EmergencyRevokeTerminalResult>
   createTerminalBindCode(terminalId: string, ttlMinutes?: number): Promise<TerminalBindCodeCreated>
   createPlannedTerminal(input: CreatePlannedTerminalInput): Promise<PlannedTerminalCreated>
+  createTerminalBatch(input: CreateTerminalBatchInput): Promise<TerminalBatchCreated>
+  issueTerminalBatchBindCodes(input: TerminalBatchSelectionInput): Promise<TerminalBatchBindCodeResult>
+  revokeTerminalBatchBindCodes(input: TerminalBatchSelectionInput): Promise<TerminalBatchRevokeResult>
+  reissueTerminalBatchBindCodes(input: TerminalBatchSelectionInput): Promise<TerminalBatchBindCodeResult>
   getReleaseObservationPlans(): Promise<ReleaseObservationPlansResponse>
   createReleaseObservationPlan(input: CreateReleaseObservationPlanInput): Promise<ReleaseObservationPlanRecord>
   updateReleaseObservationPlan(planId: string, input: UpdateReleaseObservationPlanInput): Promise<{
@@ -88,7 +99,7 @@ interface AdminDeviceServiceInterface {
 }
 
 const adapter: AdminDeviceServiceInterface =
-  API_MODE === 'http' ? adminHttpAdapter : adminMockAdapter
+  API_MODE === 'http' ? adminHttpAdapter : adminDeviceMock
 
 /** 读取严格脱敏的终端集群 F0 总览。 */
 export const getDeviceFleetOverview = () => adapter.getDeviceFleetOverview()
@@ -125,6 +136,22 @@ export const createTerminalBindCode = (terminalId: string, ttlMinutes?: number) 
 /** Admin 预创建 planned 设备资产；不签发 Agent 凭证。 */
 export const createPlannedTerminal = (input: CreatePlannedTerminalInput) =>
   adapter.createPlannedTerminal(input)
+
+/** 一次预建多台，整批成功或整批不建。 */
+export const createTerminalBatch = (input: CreateTerminalBatchInput) =>
+  adapter.createTerminalBatch(input)
+
+/** 给选中或整批未激活终端生成一次性绑定码。明文只在这次返回值里。 */
+export const issueTerminalBatchBindCodes = (input: TerminalBatchSelectionInput) =>
+  adapter.issueTerminalBatchBindCodes(input)
+
+/** 作废选中终端尚未使用的绑定码。 */
+export const revokeTerminalBatchBindCodes = (input: TerminalBatchSelectionInput) =>
+  adapter.revokeTerminalBatchBindCodes(input)
+
+/** 作废旧绑定码后再生成新码。 */
+export const reissueTerminalBatchBindCodes = (input: TerminalBatchSelectionInput) =>
+  adapter.reissueTerminalBatchBindCodes(input)
 
 /** F0.5 发布观察：仅显示与回报版本事实，不下载、不安装、不控制 Windows 服务。 */
 export const getReleaseObservationPlans = () => adapter.getReleaseObservationPlans()

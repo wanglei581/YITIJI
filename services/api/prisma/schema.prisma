@@ -58,6 +58,8 @@ model Terminal {
   /// 保存收费设置要带回读取时的这个数。不用机构 id：改走再改回、或解绑后再绑再解绑时，
   /// 机构 id 会回到原值，旧价仍能写进已经复位过的绑定。
   orgBindingGeneration Int @default(0)
+  /// 批量预建的批次号。单台预建为空。列表按这个字段筛一批终端。
+  provisionBatchId String?
 
   heartbeats   TerminalHeartbeat[]
   servicePrices TerminalServicePrice[]
@@ -75,6 +77,7 @@ model Terminal {
   @@index([orgId])
   @@index([enabled])
   @@index([lifecycleStatus])
+  @@index([provisionBatchId])
 }
 
 /// 每台机器、每个服务一行价。没有行 = 0。金额是整数分。

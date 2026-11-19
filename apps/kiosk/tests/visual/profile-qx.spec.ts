@@ -355,7 +355,10 @@ test('privacy revoke posts revoke_consent and does not claim account deletion @w
   // 2026-09-30 A 批：旧名「岗位 AI 授权」与工程词「元数据」「step-up」不再上屏（稿 41）。
   await expect(page.getByText(/岗位 AI 授权|元数据|step-up/)).toHaveCount(0)
   await expect(page.getByText('一体机未开放')).toBeVisible()
-  await expect(page.getByText('暂未开放').first()).toBeVisible()
+  // 2026-11-17：10/3 口径把一体机注销从「暂未开放」改成按《隐私政策》的电话、邮箱申请，管理员 15 个工作日内处理。
+  await expect(page.getByText('注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。')).toBeVisible()
+  await expect(page.getByText('一体机上不能直接注销。')).toBeVisible()
+  await expect(page.getByText('暂未开放')).toHaveCount(0)
   await page.getByTestId('member-privacy-revoke-entry').click()
   await expect(page.getByRole('dialog')).toBeVisible()
 

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { AiModule } from '../ai/ai.module'
+import { AiAccessModule } from '../ai-access/ai-access.module'
 import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
 import { FilesModule } from '../files/files.module'
 import { AsrModule } from '../asr/asr.module'
@@ -13,6 +14,7 @@ import { InterviewPracticeSheetPdfService } from './interview-practice-sheet-pdf
 import { InterviewTranscriptPdfService } from './interview-transcript-pdf.service'
 import { InterviewTranscriptPrintService } from './interview-transcript-print.service'
 import { TtsService } from './asr/tts.service'
+import { MockInterviewAvailability } from './mock-interview-availability.service'
 
 /**
  * 2C 模拟面试模块。
@@ -24,6 +26,7 @@ import { TtsService } from './asr/tts.service'
 @Module({
   imports: [
     AiModule,
+    AiAccessModule,
     MemberPrivacyModule,
     AsrModule,
     FilesModule,
@@ -41,6 +44,7 @@ import { TtsService } from './asr/tts.service'
   providers: [
     MockInterviewService,
     MockInterviewLlmService,
+    MockInterviewAvailability,
     InterviewReportPdfService,
     // ai-down 支线的出纸能力：不依赖任何 LLM provider，必须与 AI 版式并列注册，
     // 否则 AI 挂掉时连这张纸也生成不出来。

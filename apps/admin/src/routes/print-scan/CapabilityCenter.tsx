@@ -66,6 +66,16 @@ interface CapabilitySaveReceipt {
   key: PrintScanCapabilityKey
   terminalCode: string
   at: string
+  status: PrintScanCapabilityStatus
+}
+
+function receiptLine(receipt: CapabilitySaveReceipt): string {
+  const base = `已登记到 ${receipt.terminalCode} · ${receipt.at}`
+  // 云端把屏上扫描标成可用，改不到终端本机 agent-config.json。
+  // 终端程序只在启动时 loadConfig() 读取 scanDeviceEnabled（apps/terminal-agent/src/index.ts），
+  // 心跳里的配置热更新不重读这个开关。保存配置文件本身不会马上生效。
+  if (receipt.key !== 'scan_device' || receipt.status !== 'available') return base
+  return `${base}。云端已标为可用。还要在这台终端的终端程序配置里打开扫描（把 agent-config.json 的 scanDeviceEnabled 写成 true），并重启终端程序（Terminal Agent）才生效。终端程序只在启动时读取这个开关，保存配置文件本身不会马上生效。`
 }
 
 // ─── 设备能力 ─────────────────────────────────────────────────────────────────
@@ -164,7 +174,12 @@ export function CapabilityCenter() {
       const res = await adminPrintScanService.updateCapability(requestedTerminalId, key, { status, note: note || undefined })
       if (!isCurrentSaveRequest()) return
       setCapabilities((prev) => prev?.map((c) => (c.capabilityKey === key ? res.capability : c)) ?? null)
-      setReceipt({ key, terminalCode: res.terminalCode, at: formatDateTime(res.capability.updatedAt) })
+      setReceipt({
+        key,
+        terminalCode: res.terminalCode,
+        at: formatDateTime(res.capability.updatedAt),
+        status: res.capability.status,
+      })
       pendingRef.current = null
       setPending(null)
     } catch (e) {
@@ -236,7 +251,7 @@ export function CapabilityCenter() {
   const promptText = pending && pending.terminalId === terminalId
     ? `将把『${pending.displayLabel}』的『${pending.capabilityLabel}』登记为『${pending.statusLabel}』`
     : null
-  const receiptText = receipt ? `已登记到 ${receipt.terminalCode} · ${receipt.at}` : null
+  const receiptText = receipt ? receiptLine(receipt) : null
 
   return (
     <div className="space-y-3">

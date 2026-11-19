@@ -2,7 +2,8 @@
 //
 // 断言口径：
 //   1. 页面/服务只暴露白名单动作（retry/cancel），不出现强制释放、改支付状态等越权写操作。
-//   2. 未上线任务类型必须如实展示"未上线"，不得出现伪造行数据的 mock 常量。
+//   2. 证件照、格式转换、签名写明停放；复印与材料包走只读列表。不得再留可点却永远空的「尚未上线」。
+//      演示模式不伪造这些类型的行。统一聚合对这五类仍返回 implemented=false，那条断言在 API 门禁，这里不删。
 //   3. 能力开关 fail-closed 语义文案在页（只有 available 对用户开放）。
 //   4. 商业化控制不伪造补贴标签/退款工作流配置项，复用 billing/benefit 入口。
 //   5. 路由与导航已注册。
@@ -116,16 +117,49 @@ if (
   fail('controlled unpaid-print close endpoint, eligibility and confirmation form must stay aligned')
 }
 
-// 2. 未上线类型诚实展示
-if (page.includes('未上线') && page.includes('implemented: false')) {
-  pass('page marks unimplemented task types honestly')
+// 2. 停放与只读履约（S15d，2026-11-18）
+// 期望值改动理由：这五类不再共用「尚未上线」空态。证件照、格式转换、签名没有任务表，页签改为停放说明。
+// 复印、材料包改读真实只读列表。旧断言要求页面同时含「未上线」「implemented: false」和那句永远空的说明，会把新页签判成倒退。
+const fulfillmentPath = join(root, 'src/routes/print-scan/FulfillmentJobList.tsx')
+const fulfillment = existsSync(fulfillmentPath) ? readFileSync(fulfillmentPath, 'utf8') : ''
+if (
+  page.includes('已停放') &&
+  page.includes('不在本期') &&
+  page.includes("mode: 'parked'") &&
+  page.includes("mode: 'fulfillment'") &&
+  page.includes("from './FulfillmentJobList'") &&
+  !page.includes('该任务类型尚未上线') &&
+  !page.includes('该能力尚未开放，目前没有可查看的真实任务。')
+) {
+  pass('parked tabs say 停放 and 不在本期; the old always-empty 尚未上线 state is gone')
 } else {
-  fail('page must mark photo/copy/material_pack/format_conversion/signature_stamp as 未上线')
+  fail('parked tabs must explain 停放 / 不在本期 and must not keep 该任务类型尚未上线')
 }
-if (page.includes('该任务类型尚未上线') && page.includes('该能力尚未开放，目前没有可查看的真实任务。')) {
-  pass('unimplemented types render an honest empty state, not fabricated rows')
+if (
+  fulfillment.includes('读取失败') &&
+  fulfillment.includes('还没有复印任务') &&
+  fulfillment.includes('还没有材料包订单') &&
+  fulfillment.includes('各行份数不同') &&
+  fulfillment.includes('listCopyJobs') &&
+  fulfillment.includes('listMaterialPackOrders') &&
+  service.includes("listCopyJobs: (query) => fulfillmentQuery('/admin/print-scan/copy-jobs', query)") &&
+  service.includes("listMaterialPackOrders: (query) => fulfillmentQuery('/admin/print-scan/material-pack-orders', query)") &&
+  service.includes('listCopyJobs: async () => EMPTY_FULFILLMENT_PAGE') &&
+  service.includes('listMaterialPackOrders: async () => EMPTY_FULFILLMENT_PAGE')
+) {
+  pass('copy and material-pack use read-only lists; mock returns an empty page')
 } else {
-  fail('unimplemented types must render an honest empty state')
+  fail('copy and material-pack must use the read-only endpoints, and mock must return an empty page')
+}
+if (
+  cap.includes("receipt.key !== 'scan_device' || receipt.status !== 'available'") &&
+  cap.includes('scanDeviceEnabled') &&
+  cap.includes('重启终端程序（Terminal Agent）') &&
+  cap.includes('终端程序只在启动时读取这个开关，保存配置文件本身不会马上生效。')
+) {
+  pass('saving scan_device as available tells the operator to enable scanDeviceEnabled and restart Terminal Agent')
+} else {
+  fail('scan_device available receipt must name scanDeviceEnabled and the Terminal Agent restart')
 }
 for (const key of ["type: 'photo'", "type: 'copy'", "type: 'material_pack'"]) {
   if (service.includes(`${key},`) && service.includes('MOCK') && new RegExp(`MOCK_[A-Z_]*\\s*[:=][^]*${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(service)) {
@@ -189,9 +223,11 @@ if (
 } else {
   fail('task action must guard old query closures and distinguish failed from stale refresh')
 }
+// S15d：依赖数组末尾增加 mode。复印、材料包和停放页签不请求统一聚合，但仍把 page、pageSize 留在 live 请求的竞态键里。
 if (!page.includes('const [pageSize, setPageSize] = useState(20)') ||
     !page.includes('pageSize={pageSize}') || !page.includes('onPageSizeChange={setPageSize}') ||
-    !page.includes('page, pageSize }') || !page.includes('[taskType, status, page, pageSize, unconfirmed, queryKey]')) fail('统一分页器每页条数必须接入请求和竞态保护')
+    !page.includes('page, pageSize }') || !page.includes('[taskType, status, page, pageSize, unconfirmed, queryKey, mode]') ||
+    !page.includes("if (mode !== 'live')")) fail('统一分页器每页条数必须接入请求和竞态保护')
 
 // 7. 保存请求必须同时绑定 sequence + terminal：A 的 success/catch/finally 都不得污染切到 B 后的 UI。
 if (

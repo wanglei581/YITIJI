@@ -5,6 +5,8 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 const root = resolve(import.meta.dirname, '../..')
 const realRequire = createRequire(import.meta.url)
@@ -372,4 +374,129 @@ test('deleted saved optimization shows a usable reason and releases the lock', a
   box.request.reject(Object.assign(Error('not found'), { code: 'AI_TASK_NOT_FOUND' })); await box.h.flush()
   assert.equal(box.locks.active, 0); assert.match(box.state.FailMsg, /已删除.*保存期限.*当前账号/)
   assert.equal(box.state.OptimizedResume, null); box.h.unmount()
+})
+
+// 定稿出处不读产品源码：空态那句取自稿 23-resume-optimize.html:961，再由 OptimizeEmptyState 渲染核对。
+// 模板读失败的现成句取自 ResumeFormatChooser.tsx:226；编辑页排版在这句下面，不能写「上面的」。
+const repoRoot = resolve(root, '../..')
+const quoted = (file, lineNo) => [...readFileSync(file, 'utf8').split('\n')[lineNo - 1].matchAll(/'([^']*)'/g)].map((match) => match[1])
+const markupText = (html) => html.replace(/<[^>]*>/g, '')
+const reactModule = realRequire('react')
+const layout = { accent: 'blue', columns: 1, fontScale: 'standard', lineSpacing: 'standard', margin: 'normal' }
+
+function renderModule(file, mocks, props) {
+  const loaded = load(file, { react: reactModule, ...mocks })
+  const name = Object.keys(loaded).find((key) => typeof loaded[key] === 'function')
+  return renderToStaticMarkup(createElement(loaded[name], props))
+}
+
+test('optimize outage copy matches the draft sentence on screen', async () => {
+  const draftPhrase = quoted(resolve(repoRoot, 'docs/design/kiosk-redesign-2026-08/23-resume-optimize.html'), 961)[3]
+  const emptyHtml = renderModule('src/pages/resume/components/resume-deliver/OptimizeEmptyState.tsx', {
+    '../resume-report/ResumeReportExits': load('src/pages/resume/components/resume-report/ResumeReportExits.tsx', {
+      react: reactModule,
+      '../../../../components/qingxu/touch/QxTouchIcon': { QxTouchIcon: () => null },
+      '../../resume-report-model': { MANUAL_CHECKS: [] },
+    }),
+  }, { onReport() {}, onManualEdit() {}, onMyResumes() {} })
+  const manual = emptyHtml.match(/data-testid="resume-optimize-empty-manual"[\s\S]*?<p>([^<]*)<\/p>/)
+  assert.equal(manual?.[1], draftPhrase)
+
+  const h = hooks()
+  const request = deferred()
+  const state = {}
+  const { useOptimizeLoad } = load('src/pages/resume/components/resume-deliver/useOptimizeLoad.ts', {
+    react: h.react,
+    '../../resumeUserCopy': load('src/pages/resume/resumeUserCopy.ts'),
+    '../../../../services/api': { getResumeOptimize: () => request.promise },
+    '../../../../services/api/jobMaterials': { getResumeTemplates: async () => [] },
+    '../../../../services/api/userErrorMessage': { errorCodeOf: (error) => error.code ?? 'FAILED', userMessageOf: (_error, text) => text, AI_QUOTA_EXHAUSTED_RESUME_COPY: 'quota' },
+    '../../../../ai/aiOutage': load('src/ai/aiOutage.ts', {
+      '../services/api/userErrorMessage': { userMessageOf: () => '' },
+      './aiDeclarationErrors': { aiDeclarationDeclineMessage: () => '' },
+    }),
+    './fixtures': {},
+    '../../../../contexts/KioskBusyContext': { useBusyLock: () => {} },
+  })
+  const opts = { taskId: 'A', access: {}, consentReady: true, consentChecking: false, consentNeedsPrompt: false, retryNonce: 0 }
+  for (const name of ['Loading', 'FailKind', 'FailMsg', 'Modules', 'OptimizedResume', 'TemplatesError', 'ResumeTemplates', 'SelectedTemplateId']) {
+    opts[`set${name}`] = (value) => { state[name] = typeof value === 'function' ? value(state[name]) : value }
+  }
+  h.render(() => useOptimizeLoad(opts))
+  await h.flush()
+  request.resolve({ status: 'failed', failCode: 'AI_PAUSED' })
+  await h.flush()
+  const { resolveOptimizeView } = load('src/pages/resume/components/resume-deliver/optimizeQuery.ts', {
+    '../../../../utils/buildMode': { ALLOW_FIXTURES: false },
+    './constants': load('src/pages/resume/components/resume-deliver/constants.ts', { '@ai-job-print/shared': { AI_LABEL_COPY: {} } }),
+  })
+  const { optimizeStateDescription } = load('src/pages/resume/components/resume-deliver/optimizeStateCopy.ts', {
+    '../../../../services/api/userErrorMessage': { errorCodeOf: () => '', userMessageOf: (_error, text) => text },
+    '../../../../copy/unattendedCopy': { helpNeededLine: () => '' },
+  })
+  const { unattendedResumeCopy } = load('src/pages/resume/touch/unattendedResumeCopy.ts')
+  const view = resolveOptimizeView(
+    { requested: null, capture: false, debug: false, fallback: false, taskId: 'A', format: 'pdf', exportHint: null },
+    { hasTask: true, loading: false, outage: state.FailKind === 'outage', readError: false, failed: false, empty: false, ready: false },
+  ).view
+  const description = unattendedResumeCopy(optimizeStateDescription(view, state.FailMsg))
+  const card = renderModule('src/pages/resume/touch/OptimizeStateCard.tsx', {
+    '../../../components/qingxu/touch/QxTouchIcon': { QxTouchIcon: () => null },
+    '../components/resume-deliver/constants': { SYNTHETIC_BANNER: '' },
+  }, { tone: 'error', title: '简历优化当前不可用', description })
+  assert.equal(view, 'unavailable')
+  assert.equal(markupText(card.match(/<p>[^<]*<\/p>/)[0]), `AI 暂时不可用。${draftPhrase}`)
+  h.unmount()
+})
+
+test('template list failure copy is the on-screen sentence, not the false claim', () => {
+  const chooserFile = resolve(root, 'src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx')
+  const chooserSentence = readFileSync(chooserFile, 'utf8').split('\n')[225].match(/>([^<]+)</)[1]
+  const chooserHtml = renderModule('src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx', {
+    react: { ...reactModule, useState: () => [true, () => {}] },
+    '../../../../copy/unattendedCopy': { helpNeededLine: () => '' },
+    '../ResumeLayoutControls': { ResumeLayoutControls: () => null },
+    '../../touch/ResumeHelpLine': { ResumeHelpLine: () => null },
+    './constants': { COMPRESS_ONE_PAGE: '压到一页' },
+    './ResumeExportResult': { ResumeExportResult: () => null },
+    './ResumePricingBar': { ResumePricingBar: () => null },
+  }, {
+    screen: 'export-chooser', format: 'pdf', onFormatChange() {}, layout, onLayoutChange() {},
+    templates: [], templatesError: true, selectedTemplateId: '', onTemplateChange() {},
+    exporting: false, exported: null, exportError: null, exportVersion: 0,
+    pricing: null, pricingLoading: false, blockedReason: null, guest: true, synthetic: false,
+    printNavigating: false, onPrint() {}, onOpenPreview() {}, onClearExport() {}, onHelp() {},
+    estimatedPagesLabel: '约 1 页',
+  })
+  const chooserShown = [...chooserHtml.matchAll(/<p class="qx-rg-note"[^>]*>([^<]*)<\/p>/g)].map((match) => match[1])
+  assert.ok(chooserShown.includes(chooserSentence), chooserShown.join(' | '))
+
+  const editProps = {
+    resume: {}, onResumeChange() {}, unconfirmed: [], layout, onLayoutChange() {},
+    previewClassName: '', previewStyle: {}, templates: [], selectedTemplateId: '', onTemplateChange() {},
+    loading: false, exporting: false, aiUnavailable: false, adjusting: null, lastResumeBeforeAiAdjust: null,
+    adjustWarnings: [], adjustError: null, onAiAdjust() {}, onUndoAi() {}, estimatedPagesLabel: '约 1 页',
+    saveText: '未保存', saveTone: 'plain', hasModules: false, onBackToOverview() {}, token: null, exportVersion: 0,
+  }
+  const editMocks = {
+    '@ai-job-print/shared': {},
+    '../../../ai/AiDeclarationNote': { AiDeclarationNote: () => null },
+    '../../../components/qingxu/touch/QxTouchChip': { QxTouchChip: () => null },
+    '../../../components/qingxu/touch/QxTouchIcon': { QxTouchIcon: () => null },
+    '../components/OptimizedResumeEditor': { OptimizedResumeEditor: () => null },
+    '../components/ResumeLayoutControls': { ResumeLayoutControls: () => null },
+    '../components/resume-deliver/constants': { AIGC_SCREEN_MARK: '标记', COMPRESS_ONE_PAGE: '压到一页', HTML_PREVIEW_NOTE: '预览' },
+    '../components/resume-deliver/facts': { UNCONFIRMED_WHY: '原因' },
+    '../components/resume-deliver/ResumeVersionsPanel': { ResumeVersionsPanel: () => null },
+    './edit.css': {},
+  }
+  const shared = '模板列表这次没读取到。导出仍可进行，'
+  assert.equal(chooserSentence.startsWith(shared), true)
+  const expected = `${shared}会使用默认版式；排版调整照常可用。`
+  const shown = renderModule('src/pages/resume/touch/OptimizeEditView.tsx', editMocks, { ...editProps, templatesError: true })
+  const hidden = renderModule('src/pages/resume/touch/OptimizeEditView.tsx', editMocks, { ...editProps, templatesError: false })
+  assert.equal((shown.match(/<p class="qxt-note">([^<]*)<\/p>/) ?? [])[1], expected)
+  assert.equal(hidden.includes(expected), false)
+  assert.equal(expected.includes('不是没有模板'), false)
+  assert.equal(expected.includes('上面的'), false)
 })

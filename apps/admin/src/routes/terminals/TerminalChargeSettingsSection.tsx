@@ -13,6 +13,7 @@ import {
   saveTerminalChargeSettings,
   type TerminalChargeSettingsView,
 } from '../../services/api/terminalCharge'
+import { KIOSK_PAY_SCREEN_NOTE } from '../../lib/kioskPayScreenNote'
 
 const REASON_TEXT: Record<EffectivePriceReason, string> = {
   public_site: '公共就业点位，永远免费',
@@ -48,12 +49,28 @@ function yuanFields(view: TerminalChargeSettingsView): Record<TerminalChargeServ
   return fields
 }
 
+const KIOSK_GAP_KEYS = ['resume_optimize', 'mock_interview', 'scan'] as const
+
+/** 输入框旁的编辑提示。只看正在填的数，不代表已经在收。 */
+function showsDraftKioskPayGap(yuan: Record<TerminalChargeServiceKey, string>): boolean {
+  return KIOSK_GAP_KEYS.some((key) => {
+    const cents = parseYuan(yuan[key])
+    return cents !== null && cents > 0
+  })
+}
+
+/** 实际收费行上的警告。只看这次读到的生效价，保存成功并重新读到之后才变。 */
+function showsSavedKioskPayGap(view: TerminalChargeSettingsView): boolean {
+  return KIOSK_GAP_KEYS.some((key) => view.prices[key].effectiveCents > 0)
+}
+
 function effectiveLine(view: TerminalChargeSettingsView): string {
   const parts = TERMINAL_CHARGE_SERVICE_KEYS.map((key) => {
     const row = view.prices[key]
     return `${TERMINAL_CHARGE_SERVICE_LABELS[key]} ¥${yuanText(row.effectiveCents)}（${REASON_TEXT[row.reason]}）`
   })
-  return `现在实际向用户收：${parts.join('；')}`
+  const base = `现在实际向用户收：${parts.join('；')}`
+  return showsSavedKioskPayGap(view) ? `${base} ${KIOSK_PAY_SCREEN_NOTE}` : base
 }
 
 export function TerminalChargeSettingsSection({
@@ -65,7 +82,7 @@ export function TerminalChargeSettingsSection({
 }: {
   terminalId: string
   orgId: string | null
-  /** 本次改绑接口返回已复位时，由抽屉外层留下这一句。重新打开抽屉时外层清掉。 */
+  /** 本次改绑接口返回已复位时，由抽屉外层留下这一句。保存成功后外层清掉；保存失败时保留。关掉抽屉时外层也清掉。 */
   resetNotice: string | null
   /** 改绑机构的请求还没回来。这段时间不能保存，否则会把旧价写进新机构。 */
   savingOrg: boolean
@@ -209,6 +226,7 @@ export function TerminalChargeSettingsSection({
                 />
               </label>
             ))}
+            {showsDraftKioskPayGap(yuan) ? <p className="text-xs leading-relaxed text-warning-fg">{KIOSK_PAY_SCREEN_NOTE}</p> : null}
           </div>
           <p className="text-xs leading-relaxed text-neutral-600">{effectiveLine(view)}</p>
           {locked ? null : (

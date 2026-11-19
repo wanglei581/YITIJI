@@ -173,12 +173,13 @@ async function flush() {
   for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setImmediate(resolve))
 }
 
-function chargeView(mode, cents, generation) {
+function chargeView(mode, cents, generation, priceCents) {
   const prices = {}
   for (const key of PRICE_KEYS) {
+    const configured = priceCents?.[key] ?? cents
     prices[key] = {
-      configuredCents: cents,
-      effectiveCents: mode === 'user_pays' ? cents : 0,
+      configuredCents: configured,
+      effectiveCents: mode === 'user_pays' ? configured : 0,
       reason: mode,
     }
   }
@@ -402,10 +403,12 @@ function mountTerminalPage(options) {
       return {
         loadTerminalChargeSettings: async (terminalId) => {
           loads.push(terminalId)
-          return chargeView(server.mode, server.cents, server.generation)
+          return chargeView(server.mode, server.cents, server.generation, options.priceCents)
         },
         saveTerminalChargeSettings: async (terminalId, body) => {
           saves.push({ terminalId, body: structuredClone(body) })
+          if (options.holdSave) await options.holdSave
+          if (options.failSave) throw new Error('收费设置保存失败')
           if (options.staleSave) {
             server.mode = 'org_pays'
             server.cents = 0
@@ -431,10 +434,18 @@ function mountTerminalPage(options) {
       './TerminalDetailDrawer': 'src/routes/terminals/TerminalDetailDrawer.tsx',
       './TerminalHomeFreeBadgeSection': 'src/routes/terminals/TerminalHomeFreeBadgeSection.tsx',
       './TerminalChargeSettingsSection': 'src/routes/terminals/TerminalChargeSettingsSection.tsx',
+      '../../lib/kioskPayScreenNote': 'src/lib/kioskPayScreenNote.ts',
       './terminalStatusViews': 'src/routes/terminals/terminalStatusViews.ts',
       './printCompletionEvidence': 'src/routes/terminals/printCompletionEvidence.ts',
     }
     if (files[name]) return loadCached(files[name])
+    if (name === './TerminalBatchDialogs') {
+      return {
+        TerminalBatchCreateDialog: nullComponent('TerminalBatchCreateDialog'),
+        TerminalBatchCodeDialog: nullComponent('TerminalBatchCodeDialog'),
+        requestBatchCodes: async () => { throw new Error('这个用例不批量生成绑定码') },
+      }
+    }
     const stubs = {
       './TerminalDailyFreeSidesSection': 'TerminalDailyFreeSidesSection',
       './TerminalLifecycleActions': 'TerminalLifecycleActions',
@@ -592,5 +603,66 @@ test('保存撞上过期绑定版本时提示并重读，不留下旧价', async
     print_color_page: 100,
     scan: 100,
   })
+  view.unmount()
+})
+
+const PAY_NOTE = '一体机付款屏还没上线。这几项设了价，用户在一体机上会用不了，现在请保持 0。'
+const SCAN_ONLY_CENTS = {
+  resume_optimize: 0,
+  mock_interview: 0,
+  print_bw_page: 0,
+  print_color_page: 0,
+  scan: 100,
+}
+
+function actualChargeText(tree) {
+  const line = nodesOf(tree).find((node) => node.type === 'p' && textOf(node).startsWith('现在实际向用户收：'))
+  assert.ok(line, '找不到现在实际向用户收')
+  return textOf(line)
+}
+
+function assertServerScanCharge(tree) {
+  const line = actualChargeText(tree)
+  assert.match(line, /扫描（每次） ¥1\.00（按上面的价收）/)
+  assert.equal(line.includes('扫描（每次） ¥0.00'), false, '实际收费行不能改成还没保存的 0 元')
+  assert.equal(line.includes(PAY_NOTE), true, '实际收费行上的付款屏警告必须仍按服务端生效价')
+}
+
+function setScanInput(tree, value) {
+  const inputs = nodesOf(tree).filter((node) => node.type === 'input' && node.props.inputMode === 'decimal')
+  assert.equal(inputs.length, 5, '五个价的输入框要都在')
+  inputs[4].props.onChange({ target: { value } })
+}
+
+test('只改扫描输入不保存，实际收费行和警告仍按服务端生效价', async () => {
+  const { view, jobs } = mountTerminalPage({ reset: false, priceCents: SCAN_ONLY_CENTS })
+  let tree = await openCharge(view, jobs)
+  assertServerScanCharge(tree)
+  setScanInput(tree, '0')
+  tree = view.render()
+  assert.equal(priceValues(tree)[4], '0')
+  assertServerScanCharge(tree)
+  view.unmount()
+})
+
+test('保存失败后，实际收费行和警告仍按服务端生效价', async () => {
+  let rejectSave = () => {}
+  const holdSave = new Promise((_, reject) => { rejectSave = reject })
+  const { view, jobs, saves } = mountTerminalPage({ reset: false, priceCents: SCAN_ONLY_CENTS, holdSave })
+  let tree = await openCharge(view, jobs)
+  setScanInput(tree, '0')
+  tree = view.render()
+  clickLabeled(tree, '保存收费设置')
+  await flush()
+  tree = view.render()
+  assert.equal(saves.length, 1)
+  assert.equal(saves[0].body.prices.scan, 0)
+  assert.equal(priceValues(tree)[4], '0', '请求还没回来时，输入仍是刚填的 0')
+  assertServerScanCharge(tree)
+  rejectSave(new Error('收费设置保存失败'))
+  await flush()
+  tree = view.render()
+  assert.equal(textOf(tree).includes('收费设置保存失败'), true)
+  assertServerScanCharge(tree)
   view.unmount()
 })

@@ -1,6 +1,6 @@
 import { wavDuration } from '../asr/wav-duration'
-import { BadRequestException, Body, Controller, Delete, Get, Optional, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
-import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
+import { BadRequestException, Body, Controller, Delete, Get, Optional, Param, Post, Query, Req, ServiceUnavailableException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { AiUse, AiUseExempt, MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
@@ -18,7 +18,9 @@ import { InterviewTranscriptPrintService } from './interview-transcript-print.se
 import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
 import { TtsService } from './asr/tts.service'
 import { AiLogService } from '../ai/ai-log.service'
-import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { PaidAiThrottle, TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
+import { MOCK_INTERVIEW_NOT_CONFIGURED } from './mock-interview-availability'
+import { MockInterviewAvailability } from './mock-interview-availability.service'
 import { chargeInterviewStart } from '../payment/service-order.intercept'
 import { ServiceOrderService } from '../payment/service-order.service'
 
@@ -119,7 +121,8 @@ function headerOf(req: ReqLike, name: string): string | null {
  *
  * 归属：登录会员 Bearer（结果按 endUserId 本人校验）；匿名凭创建时一次性下发的
  * x-interview-access-token。任何越权统一 NOT_FOUND。
- * 限流：创建/答题/结束触发 LLM 调用，公共一体机单 IP 收紧。
+ * 限流：开场、答题、结束会调模型，公共一体机单 IP 收紧。
+ * 建配置和通用题目单不调模型，只按次限流，不受 AI 可用性闸门拦。
  */
 @Controller('mock-interviews')
 export class MockInterviewController {
@@ -133,6 +136,7 @@ export class MockInterviewController {
     private readonly aiLog: AiLogService,
     private readonly transcriptPrint: InterviewTranscriptPrintService,
     @Optional() private readonly serviceOrders?: ServiceOrderService,
+    @Optional() private readonly opening?: MockInterviewAvailability,
   ) {}
 
   private async requesterOf(req: ReqLike): Promise<InterviewRequester> {
@@ -142,9 +146,15 @@ export class MockInterviewController {
     return { endUserId: null, accessToken: headerOf(req, 'x-interview-access-token') }
   }
 
+  /**
+   * 建一场练习配置。不调模型，开场才调。
+   * 此前标成 @AiUse('generate')，全站暂停、当天预算、生产未开通都会把「打印通用题目单」一起拦掉。
+   * 现在显式豁免这三道闸，只保留全机维护（与材料检查一致）。
+   */
   @Post()
   @PaidAiThrottle(6)
-  @AiUse('generate')
+  @AiUseExempt('建一场练习配置，不调模型；开场才调模型')
+  @MaintenanceBlocked()
 
   async create(@Body() dto: CreateInterviewDto, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
@@ -156,6 +166,10 @@ export class MockInterviewController {
   @AiUse('generate')
 
   async start(@Param('id') id: string, @Body() dto: StartInterviewDto, @Req() req: ReqLike) {
+    if (this.opening) {
+      const refusal = await this.opening.refusal()
+      if (refusal) throw new ServiceUnavailableException({ error: refusal })
+    }
     const requester = await this.requesterOf(req)
     const alreadyOpen = typeof this.service.hasInterviewerTurn === 'function'
       ? await this.service.hasInterviewerTurn(id, requester)
@@ -272,6 +286,18 @@ export class MockInterviewController {
     return ApiResponse.ok({ asrEnabled: this.asr.enabled, ttsEnabled: this.tts.enabled })
   }
 
+  /**
+   * 开场前的只读探针。与 POST :id/start 共用同一个判断。
+   * 只回答能不能用，不回密钥、厂商、模型或提示词。静态路径必须写在 :id 之前。
+   */
+  @Get('availability')
+  @TerminalScopedThrottle(30)
+  @AiUse('read')
+  async availability(): Promise<ApiResponse<{ available: boolean }>> {
+    const refusal = this.opening ? await this.opening.refusal() : MOCK_INTERVIEW_NOT_CONFIGURED
+    return ApiResponse.ok({ available: refusal === null })
+  }
+
   @Post(':id/end')
   @PaidAiThrottle(6)
   @AiUse('generate')
@@ -308,10 +334,12 @@ export class MockInterviewController {
    * 通用题目与答案单（ai-down 支线）。不调模型，因此 AI 全挂时照常可用 ——
    * 这是「模拟面试」在打印终端上唯一的出纸兜底。为什么不能复用 :id/report/print，
    * 见 MockInterviewService.printPracticeSheet 的注释。
+   * 不走 AI 暂停、预算、平台开通、登录档和声明；全机维护仍拦。
    */
   @Post(':id/practice-sheet')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
-  @AiUse('export')
+  @AiUseExempt('通用题目单按本场配置排版，不调模型')
+  @MaintenanceBlocked()
 
   async practiceSheet(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.printPracticeSheet(id, await this.requesterOf(req)))

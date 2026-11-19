@@ -56,11 +56,11 @@ export const AI_USE_ROUTES: readonly AiUseRoute[] = [
   { method: 'DELETE', path: '/me/job-ai-sessions/:id', kind: 'exempt' },
   { method: 'GET', path: '/me/mock-interviews', kind: 'read' },
   { method: 'DELETE', path: '/me/mock-interviews/:id', kind: 'exempt' },
-  { method: 'POST', path: '/mock-interviews', kind: 'generate' },
+  { method: 'POST', path: '/mock-interviews', kind: 'exempt' },
   { method: 'GET', path: '/mock-interviews/:id', kind: 'read' },
   { method: 'POST', path: '/mock-interviews/:id/answer', kind: 'generate' },
   { method: 'POST', path: '/mock-interviews/:id/end', kind: 'generate' },
-  { method: 'POST', path: '/mock-interviews/:id/practice-sheet', kind: 'export' },
+  { method: 'POST', path: '/mock-interviews/:id/practice-sheet', kind: 'exempt' },
   { method: 'GET', path: '/mock-interviews/:id/report', kind: 'read' },
   { method: 'POST', path: '/mock-interviews/:id/report/print', kind: 'export' },
   { method: 'POST', path: '/mock-interviews/:id/start', kind: 'generate' },
@@ -99,6 +99,8 @@ export const AI_USE_ROUTES: readonly AiUseRoute[] = [
   { method: 'POST', path: '/resume/voice/transcribe', kind: 'voice' },
   { method: 'POST', path: '/trtc/session', kind: 'voice' },
   { method: 'POST', path: '/trtc/session/stop', kind: 'exempt' },
+  { method: 'GET', path: '/assistant/availability', kind: 'read' },
+  { method: 'GET', path: '/mock-interviews/availability', kind: 'read' },
 ]
 
 function segments(path: string): string[] {

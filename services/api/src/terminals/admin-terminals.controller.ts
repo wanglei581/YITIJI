@@ -11,7 +11,7 @@
 // 消费方：Agent3 admin 设备页。响应字段/类型必须严格匹配契约 C1。
 // ============================================================
 
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Optional, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common'
 import type { TerminalCapabilityView } from './terminal-capabilities.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -49,6 +49,7 @@ import { UpdateTerminalLifecycleDto } from './dto/update-terminal-lifecycle.dto'
 import { EmergencyRevokeTerminalCredentialsDto } from './dto/emergency-revoke-terminal-credentials.dto'
 
 import { resolveClientIp } from '../common/client-ip'
+import { TerminalBatchService } from './terminal-batch.service'
 interface AuditReq {
   headers: Record<string, string | string[] | undefined>
   requestId?: string
@@ -64,12 +65,15 @@ export class AdminTerminalsController {
     private readonly terminalsService: TerminalsService,
     private readonly capabilities: TerminalCapabilitiesService,
     private readonly audit: AuditService,
+    @Optional() private readonly batches?: TerminalBatchService,
   ) {}
 
   // GET /api/v1/admin/terminals
   @Get()
   async list(): Promise<ApiResponse<{ terminals: AdminTerminalView[] }>> {
-    return ApiResponse.ok(await this.terminalsService.listTerminalsForAdmin())
+    const listed = await this.terminalsService.listTerminalsForAdmin()
+    if (!this.batches) return ApiResponse.ok(listed)
+    return ApiResponse.ok({ terminals: await this.batches.attachActivation(listed.terminals) })
   }
 
   // POST /api/v1/admin/terminals
@@ -165,6 +169,7 @@ export class AdminTerminalsController {
           terminalCode: assignment.terminalCode,
           oldOrgId: assignment.oldOrgId,
           newOrgId: assignment.newOrgId,
+          before: assignment.chargeSettingsBefore,
         },
         ipAddress: extractIp(req),
         userAgent: extractUa(req),

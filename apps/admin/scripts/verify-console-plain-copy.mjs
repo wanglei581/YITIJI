@@ -405,9 +405,11 @@ const common = { '@ai-job-print/ui': ui, '@ai-job-print/shared': shared, '../Pag
   '../components/FilterChip': { FilterChip: () => null }, 'lucide-react': {} }
 let billingStates = []
 const billingHooks = { ...hooks([]), useState: () => [billingStates.shift(), () => {}] }
+const kioskPayScreenNote = runFile('apps/admin/src/lib/kioskPayScreenNote.ts')
 const billing = runFile('apps/admin/src/routes/billing/index.tsx', {
   ...common, react: billingHooks,
   '../../services/api/adminBilling': {},
+  '../../lib/kioskPayScreenNote': kioskPayScreenNote,
 }, '\nexport { PriceConfigSection, ReconciliationSection }\n')
 billingStates = ['price']
 // 页头直接展开 Page，避免继续调用尚无数据的子区块。
@@ -421,7 +423,7 @@ const reconciliationText = cleanText('本地对账', billing.ReconciliationSecti
 if (!reconciliationText.includes('渠道账单仍需使用真实商户账单另行核对。')) fail('本地对账必须说明真实渠道账单另行核对')
 const print = runFile('apps/admin/src/routes/print-scan/index.tsx', {
   ...common, react: hooks([]), 'react-router-dom': { Link: (p) => p.children }, '../../lib/printErrorText': errors,
-  './CapabilityCenter': {}, './CloseUnpaidPrintTaskForm': {}, './FreePrintQuotaCard': { FreePrintQuotaCard: () => null }, './PrintQueueTimeoutCard': { PrintQueueTimeoutCard: () => null }, '../../services/api/printScan': {}, './PrintRetryButton': { PrintRetryButton: () => null },
+  './CapabilityCenter': {}, './FulfillmentJobList': { FulfillmentJobList: () => null }, './CloseUnpaidPrintTaskForm': {}, './FreePrintQuotaCard': { FreePrintQuotaCard: () => null }, './PrintQueueTimeoutCard': { PrintQueueTimeoutCard: () => null }, '../../services/api/printScan': {}, './PrintRetryButton': { PrintRetryButton: () => null },
 }, '\nexport { taskColumns, TaskDetailBody, CommercialControls }\n')
 for (const code of ['PRINTER_ERROR', 'PRINT_JOB_UNCONFIRMED', 'PAPER_EMPTY', 'printer_jam', 'PARTIAL_OUTPUT', 'UNKNOWN_PRINT_CODE']) {
   const item = { type: 'print', status: 'failed', ownerType: 'member', errorCode: code, taskId: 'ptask_test', fileName: '测试.pdf', statusLogs: [{ errorCode: code, fromStatus: 'printing', toStatus: 'failed' }], closeUnpaidEligible: false }

@@ -2,6 +2,7 @@ import { AiContentBlockedError } from '../ai/llm/llm-guard'
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { contentBlockedException } from '../ai/safety/content-blocked'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
+import { mockInterviewModelRefusal } from './mock-interview-availability'
 import {
   LLM_BUSY_MESSAGE,
   LLM_TIMEOUT_MS,
@@ -332,11 +333,10 @@ export class MockInterviewLlmService {
    * A-6：每次调用结束后通过 onLlmCall? 回调 provider + token usage。
    */
   private async callLlm(system: string, user: string, onLlmCall?: AiLlmCallSink): Promise<string> {
-    const apiKey = this.config.getApiKey('mock_interview')
+    const refusal = mockInterviewModelRefusal(this.config)
+    if (refusal) throw new ServiceUnavailableException({ error: refusal })
+    const apiKey = this.config.getApiKey('mock_interview')!
     const cfg = this.config.getConfig('mock_interview')
-    if (!apiKey || !cfg.enabled) {
-      throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 模拟面试暂未启用，请联系管理员配置' } })
-    }
     const providerLabel = `llm:${cfg.vendor}:${cfg.model}`
     const url = `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`
     let res: Awaited<ReturnType<typeof llmFetchJson>>

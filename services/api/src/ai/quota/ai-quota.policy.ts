@@ -17,14 +17,86 @@ export function quotaEnv(name: string, fallback: number): number {
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) ? parsed : fallback
 }
-export function dailyLimit(bucket: AiQuotaBucket): number {
-  const config = {
-    ai_resume: ['AI_QUOTA_RESUME_DAILY', 20],
-    ai_assistant: ['AI_QUOTA_ASSISTANT_DAILY', 80],
-    ai_interview: ['AI_QUOTA_INTERVIEW_DAILY', 5],
-  } as const
-  const [name, fallback] = config[bucket]
-  return quotaEnv(name, fallback)
+
+const DAILY_LIMIT_ENV = {
+  ai_resume: ['AI_QUOTA_RESUME_DAILY', 20],
+  ai_assistant: ['AI_QUOTA_ASSISTANT_DAILY', 80],
+  ai_interview: ['AI_QUOTA_INTERVIEW_DAILY', 5],
+} as const
+
+/** 管理员在后台填写的上限。环境变量不受这个上限约束。 */
+export const AI_QUOTA_LIMIT_MAX = 1000
+/** 各进程读 Redis 后的缓存时间。写成功的进程会立刻清掉自己的缓存。 */
+export const AI_QUOTA_LIMIT_CACHE_MS = 30_000
+export const AI_QUOTA_LIMIT_TTL_SECONDS = 60 * 60 * 24 * 365
+
+export type AiQuotaLimitSource = 'admin' | 'env' | 'default'
+export interface PublishedDailyLimit {
+  bucket: AiQuotaBucket
+  effective: number
+  source: AiQuotaLimitSource
+  fallback: number
+}
+
+/**
+ * 一个进程里的上限快照。
+ * 写成功只清写的那一份。另一个进程要另建一份，不能和这份共用。
+ * 不传缓存时，读和写都落在本进程这一份上。
+ */
+export class DailyLimitCache {
+  private published: { buckets: PublishedDailyLimit[]; expiresAt: number } | null = null
+
+  read(now = Date.now()): PublishedDailyLimit[] | null {
+    if (!this.published || this.published.expiresAt <= now) return null
+    return this.published.buckets
+  }
+
+  publish(buckets: PublishedDailyLimit[], now = Date.now()): void {
+    this.published = { buckets, expiresAt: now + AI_QUOTA_LIMIT_CACHE_MS }
+  }
+
+  clear(): void {
+    this.published = null
+  }
+}
+
+/** 产品默认用这一份。每个进程各自一份模块状态，测试里的「另一进程」不要用它。 */
+export const processDailyLimitCache = new DailyLimitCache()
+
+export function aiQuotaDailyLimitKey(bucket: AiQuotaBucket): string {
+  return `system:ai-quota-daily:${bucket}`
+}
+
+export function configuredDailyLimit(bucket: AiQuotaBucket): { value: number; source: 'env' | 'default'; fallback: number } {
+  const [name, fallback] = DAILY_LIMIT_ENV[bucket]
+  const raw = process.env[name]
+  if (raw && /^\d+$/.test(raw)) {
+    const parsed = Number(raw)
+    if (Number.isSafeInteger(parsed)) return { value: parsed, source: 'env', fallback }
+  }
+  return { value: fallback, source: 'default', fallback }
+}
+
+/**
+ * 没人发布快照时，dailyLimit 仍只读环境变量。
+ * 旧的 `new AiQuotaService(prisma)` 和「刚改环境变量就要生效」的门禁都靠这一点。
+ */
+export function readPublishedDailyLimits(now = Date.now(), cache: DailyLimitCache = processDailyLimitCache): PublishedDailyLimit[] | null {
+  return cache.read(now)
+}
+
+export function publishDailyLimits(buckets: PublishedDailyLimit[], now = Date.now(), cache: DailyLimitCache = processDailyLimitCache): void {
+  cache.publish(buckets, now)
+}
+
+export function clearDailyLimitCache(cache: DailyLimitCache = processDailyLimitCache): void {
+  cache.clear()
+}
+
+export function dailyLimit(bucket: AiQuotaBucket, cache: DailyLimitCache = processDailyLimitCache): number {
+  const cached = cache.read()?.find((item) => item.bucket === bucket)
+  if (cached) return cached.effective
+  return configuredDailyLimit(bucket).value
 }
 export function quotaDay(now: Date): string {
   if (!Number.isFinite(now.getTime())) throw new BadRequestException('AI_QUOTA_DATE_INVALID')

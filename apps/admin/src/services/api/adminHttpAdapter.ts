@@ -29,6 +29,13 @@ import type {
   UpdateReleaseObservationPlanInput,
 } from './types'
 import type { ReviewAction, PublishAction } from './review-types'
+import type {
+  CreateTerminalBatchInput,
+  TerminalBatchBindCodeResult,
+  TerminalBatchCreated,
+  TerminalBatchRevokeResult,
+  TerminalBatchSelectionInput,
+} from './terminalBatch'
 import { isPagedSourceQuery, toAdminSourceQueryString } from './sourcePaging'
 
 /**
@@ -168,6 +175,18 @@ export const adminHttpAdapter = {
 
   createPlannedTerminal: (input: CreatePlannedTerminalInput) =>
     postData<PlannedTerminalCreated>('/admin/terminals', input),
+
+  createTerminalBatch: (input: CreateTerminalBatchInput) =>
+    postData<TerminalBatchCreated>('/admin/terminals/batches', input),
+
+  issueTerminalBatchBindCodes: (input: TerminalBatchSelectionInput) =>
+    postData<TerminalBatchBindCodeResult>('/admin/terminals/batches/bind-codes', input),
+
+  revokeTerminalBatchBindCodes: (input: TerminalBatchSelectionInput) =>
+    postData<TerminalBatchRevokeResult>('/admin/terminals/batches/bind-codes/revoke', input),
+
+  reissueTerminalBatchBindCodes: (input: TerminalBatchSelectionInput) =>
+    postData<TerminalBatchBindCodeResult>('/admin/terminals/batches/bind-codes/reissue', input),
 
   getReleaseObservationPlans: () =>
     getData<ReleaseObservationPlansResponse>('/admin/release-observation-plans'),

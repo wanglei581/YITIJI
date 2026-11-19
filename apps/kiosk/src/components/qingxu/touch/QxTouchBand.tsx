@@ -65,6 +65,7 @@ export function QxTouchBand({
   titleRole,
   live = false,
   dense = false,
+  greetMark,
 }: {
   kind?: QxTouchBandKind
   eyebrow?: string
@@ -99,6 +100,8 @@ export function QxTouchBand({
   live?: boolean
   /** hero 挤版：第三行块数 ≥ 4 时压低意图带。 */
   dense?: boolean
+  /** 贴在 hero 问候块里、不占问候文字宽度。其它档不画。 */
+  greetMark?: ReactNode
 }) {
   const brand = useKioskProfile()
   const rawId = useId().replace(/:/g, '')
@@ -150,6 +153,7 @@ export function QxTouchBand({
           <TitleTag id={titleId} role={titleRole}>{title}</TitleTag>
           {sub ? <p>{sub}</p> : null}
         </div>
+        {hero ? greetMark : null}
         {hero ? null : sealEl}
       </div>
       {showRail && rail ? (

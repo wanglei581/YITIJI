@@ -1,7 +1,8 @@
 // 隐私与数据请求 — /me/privacy-requests
-// 与 main 后端对齐：仅开放撤回授权；导出需再次验证本人（一体机无提交）；账号注销暂未开放。
-// 撤回的是 job_ai 授权，用户可见名写「AI 使用授权」（稿 41、账号设置页同名）。托管 a 下它仍被
-// /resume/job-fit 手填岗位要求那条路使用，所以撤回项保留，只改说法（2026-09-30 A 批）。
+// 与 main 后端对齐：本页只提交撤回授权。导出不在一体机上提交。
+// 账号注销由本人按《隐私政策》里的电话、邮箱申请，管理员执行，15 个工作日内处理（10/3）。
+// 一体机上不提供注销按钮。撤回的是 job_ai 授权，用户可见名写「AI 使用授权」（稿 41、账号设置页同名）。
+// 托管 a 下它仍被 /resume/job-fit 手填岗位要求那条路使用，所以撤回项保留（2026-09-30 A 批）。
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -24,6 +25,18 @@ import './styles/privacy-qx.css'
 
 function fmt(iso: string): string {
   return formatDateTime(iso)
+}
+
+// 与账号设置页 ACCOUNT_CLOSURE_NOTE 同一句，对齐《隐私政策》2026-10-pilot-1 第五节。
+const ACCOUNT_CLOSURE_NOTE = '注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。'
+
+function kioskRequestTypeLabel(type: MemberDataRequestItem['requestType']): string {
+  if (type === 'delete') return '账号注销'
+  return MEMBER_DATA_REQUEST_TYPE_LABEL[type]
+}
+
+function kioskPrivacyScope(scope: string): string {
+  return scope.replace('账号注销暂未开放；', '账号注销不在这台机器上办理；')
 }
 
 type PrivacyUiState = 'login' | 'loading' | 'error' | 'empty' | 'history-ready' | 'revoke-confirm' | 'submitting'
@@ -163,7 +176,7 @@ export function MyPrivacyRequestsPage() {
           ) : null}
 
           {isLoggedIn && uiState !== 'loading' && uiState !== 'error' ? (
-            <div className="me-split" data-testid="member-privacy-capabilities" aria-label="可提交与暂未开放的请求">
+            <div className="me-split" data-testid="member-privacy-capabilities" aria-label="可提交的请求与注销说明">
               <MeHero art="resume" artWidth={150} title={MEMBER_DATA_REQUEST_TYPE_LABEL.revoke_consent} testId="member-privacy-revoke">
                 <MeP>{MEMBER_DATA_REQUEST_TYPE_HINT.revoke_consent}</MeP>
                 <MeP>撤回不会删除简历、文档、打印订单或收藏，也不等于注销。</MeP>
@@ -177,8 +190,8 @@ export function MyPrivacyRequestsPage() {
               <MeHero art="checklist" artWidth={150} title="导出、注销和申请记录">
                 <MeBtn v="sec" disabled data-capability="export">{MEMBER_DATA_REQUEST_TYPE_LABEL.export}</MeBtn>
                 <MeP>一体机未开放。按《隐私政策》里的联系方式申请。</MeP>
-                <MeBtn v="sec" disabled data-capability="delete">{MEMBER_DATA_REQUEST_TYPE_LABEL.delete}</MeBtn>
-                <MeP>暂未开放。一体机上不能直接注销。</MeP>
+                <MeBtn v="sec" disabled data-capability="delete">账号注销</MeBtn>
+                <MeP>{ACCOUNT_CLOSURE_NOTE}一体机上不能直接注销。</MeP>
                 {items.length === 0 ? (
                   <MeP>还没有申请记录。提交撤回授权后，进度会出现在这里。</MeP>
                 ) : (
@@ -186,7 +199,7 @@ export function MyPrivacyRequestsPage() {
                     {items.map((item) => (
                       <MeP key={item.id}>
                         <span data-request-type={item.requestType} data-request-status={item.status}>
-                          {MEMBER_DATA_REQUEST_TYPE_LABEL[item.requestType]} · {fmt(item.requestedAt)} · {MEMBER_DATA_REQUEST_STATUS_LABEL[item.status]}
+                          {kioskRequestTypeLabel(item.requestType)} · {fmt(item.requestedAt)} · {MEMBER_DATA_REQUEST_STATUS_LABEL[item.status]}
                         </span>
                       </MeP>
                     ))}
@@ -200,7 +213,7 @@ export function MyPrivacyRequestsPage() {
             </div>
           ) : null}
 
-          {isLoggedIn ? <MeFine>{MEMBER_DATA_REQUEST_SCOPE}离开 3 分钟没操作会自动退出。</MeFine> : null}
+          {isLoggedIn ? <MeFine>{kioskPrivacyScope(MEMBER_DATA_REQUEST_SCOPE)}离开 3 分钟没操作会自动退出。</MeFine> : null}
         </div>
       </MeTouchShell>
     </div>

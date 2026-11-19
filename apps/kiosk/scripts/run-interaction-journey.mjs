@@ -35,6 +35,7 @@ const redisPort = portFrom('INTERACTION_REDIS_PORT', 6495)
 const apiPort = portFrom('INTERACTION_API_PORT', 3112)
 const vitePort = portFrom('INTERACTION_VITE_PORT', 5375)
 const pepper = 'dev-secret-encryption-key-replace-in-prod-min-32-chars'
+const terminalAdminSecret = 'ci-only-terminal-admin-secret'
 
 const children = []
 let runDir = ''
@@ -68,6 +69,7 @@ function playwrightArgs() {
       config = value
       continue
     }
+    if (arg === '--') continue
     if (arg.startsWith('-')) throw new Error(`启动脚本不认识这个参数：${arg}`)
     spec = arg
   }
@@ -169,6 +171,7 @@ function watchSpawn(child, label) {
 }
 
 async function main() {
+  const args = playwrightArgs()
   for (const [name, port] of [['Redis', redisPort], ['API', apiPort], ['Vite', vitePort]]) {
     if (!(await portFree(port))) throw new Error(`${name} 端口 ${port} 已被占用，本脚本不连接别人的服务`)
   }
@@ -234,7 +237,7 @@ async function main() {
     SECRET_ENCRYPTION_KEY: pepper,
     PAYMENT_SESSION_SECRET: 'dev-payment-session-secret-replace-in-prod-min-32-chars',
     SANDBOX_PAYMENT_SECRET: 'dev-sandbox-payment-secret-replace-me',
-    TERMINAL_ADMIN_SECRET: 'ci-only-terminal-admin-secret',
+    TERMINAL_ADMIN_SECRET: terminalAdminSecret,
     TERMINAL_ACTION_TOKEN_SECRET: 'ci-only-terminal-action-secret',
     TERMINAL_LEGACY_REGISTER_ENABLED: 'true',
     RECRUITMENT_CONTENT_HOSTING_ENABLED: 'false',
@@ -347,7 +350,7 @@ export default async (env) => {
   const playwrightCli = join(dirname(kioskRequire.resolve('@playwright/test/package.json')), 'cli.js')
   // 必须异步起 Playwright：spawnSync 会堵住事件循环，API / Redis 的日志管道写满后请求会挂死。
   const testCode = await new Promise((resolveCode) => {
-    const test = track(spawn(process.execPath, [playwrightCli, 'test', ...playwrightArgs()], {
+    const test = track(spawn(process.execPath, [playwrightCli, 'test', ...args], {
       cwd: kioskRoot,
       env: childEnv({
         NODE_ENV: 'test',
@@ -356,6 +359,7 @@ export default async (env) => {
         INTERACTION_EVIDENCE_DIR: evidenceDir,
         INTERACTION_REDIS_URL: `redis://127.0.0.1:${redisPort}`,
         INTERACTION_SMS_PEPPER: pepper,
+        INTERACTION_TERMINAL_ADMIN_SECRET: terminalAdminSecret,
         SWEEP_API_LOG: apiLog,
         SWEEP_PDF: join(runDir, 'valid-2p.pdf'),
       }),

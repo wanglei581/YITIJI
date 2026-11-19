@@ -29,6 +29,7 @@ import { isPostgresBusyError } from '../common/prisma/postgres-busy'
 import { isSerializationConflict, waitBeforeSerializationRetry } from '../common/prisma/serialization-conflict'
 import { PASSWORD_PROOF_STATE, passwordProofState } from '../auth/password-proof-state'
 import { contactPhoneAssignment } from './contact-phone-change'
+import { ORG_TYPE_MATRIX } from './org-type-matrix'
 import { assertPartnerAccountIdentifiers } from './partner-account-identifiers'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
 import { isParkedOrgType, throwOrgTypeParked } from './parked-org-types'
@@ -44,7 +45,9 @@ import {
 } from './admin-org-account-security'
 
 import { resolveClientIp } from '../common/client-ip'
+import { resetTerminalChargesOnEnteringPublicSite } from '../payment/terminal-charge-public-reset'
 export type { AdminOrgAccount } from './admin-org-account-view'
+export { ORG_TYPE_MATRIX }
 
 type SessionInvalidationResult =
   | { sessionInvalidation: 'ok' }
@@ -89,65 +92,6 @@ const PROHIBITED_MODULES = new Set([
   'interview_invitation',
   'offer_management',
 ])
-
-interface OrgTypeMatrixRule {
-  sceneTemplate: string | null
-  allowedModules: Set<string>
-}
-
-const matrixModules = (modules: string[]) => new Set(modules)
-
-const PUBLIC_EMPLOYMENT_RULE: OrgTypeMatrixRule = {
-  sceneTemplate: 'public_employment',
-  allowedModules: matrixModules([
-    'resume_service', 'print_scan', 'policy_service', 'job_info', 'job_fair',
-    'ai_interview', 'device_status', 'service_statistics', 'external_apply_redirect',
-  ]),
-}
-
-/** 机构类型矩阵: type 决定唯一场景模板和模块权限上限。 */
-export const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
-  school_employment_center: {
-    sceneTemplate: 'school',
-    allowedModules: matrixModules([
-      'resume_service',
-      'print_scan',
-      'policy_service',
-      'job_info',
-      'job_fair',
-      'smart_campus',
-      'ai_interview',
-      'device_status',
-      'service_statistics',
-      'external_apply_redirect',
-    ]),
-  },
-  public_employment_service: PUBLIC_EMPLOYMENT_RULE,
-  // 零工之家、就业服务站属公共就业服务体系，场景与模块上限同人社版（2026-09-29 新增）。
-  gig_worker_home: PUBLIC_EMPLOYMENT_RULE,
-  employment_service_station: PUBLIC_EMPLOYMENT_RULE,
-  licensed_hr_agency: {
-    sceneTemplate: 'licensed_hr_service',
-    allowedModules: matrixModules([
-      'resume_service',
-      'print_scan',
-      'job_info',
-      'job_fair',
-      'ai_interview',
-      'device_status',
-      'service_statistics',
-      'external_apply_redirect',
-    ]),
-  },
-  fair_organizer: {
-    sceneTemplate: null,
-    allowedModules: matrixModules([]),
-  },
-  enterprise_source: {
-    sceneTemplate: null,
-    allowedModules: matrixModules([]),
-  },
-}
 
 export interface AdminOrgListItem {
   id: string
@@ -437,6 +381,14 @@ export class AdminOrgsService {
         targetType: 'organization',
         targetId: orgId,
         payload: { changedFields, ...(brandBefore ? { brand: orgBrandAudit(brandBefore, brandPatch) } : {}) },
+      })
+      await resetTerminalChargesOnEnteringPublicSite(tx, {
+        orgId,
+        previousType: current.type,
+        nextType,
+        actorId: admin.userId,
+        actorRole: admin.role,
+        writeAudit: (args) => this.audit.writeRequired(tx, args),
       })
     })
     return this.getOrgDetail(orgId)

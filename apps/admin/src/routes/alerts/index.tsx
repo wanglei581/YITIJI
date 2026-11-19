@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatCount, formatDateTime } from '@ai-job-print/shared'
 import { ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
@@ -15,6 +15,7 @@ import {
 import { ApiHttpError } from '../../services/api/client'
 import { AI_CONTENT_COMPLAINT_SLA_WORKDAYS } from '../member-feedback/feedbackSla'
 import { alertDetailText } from './alertDetailText'
+import { ALERT_AUTO_REFRESH_MS, useAutoRefresh, type AutoRefreshContext } from './useAutoRefresh'
 
 const TYPE_META: Record<
   AdminAlertItem['type'],
@@ -111,6 +112,11 @@ function fmt(iso: string): string {
   return formatDateTime(iso)
 }
 
+function formatClock(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 function handlingLabel(alert: AdminAlertItem): { badge: 'info' | 'warning' | 'default'; label: string } {
   if (alert.handlingState === 'acknowledged') return { badge: 'info', label: '已确认 · 问题仍在发生' }
   if (alert.handlingState === 'silenced') return { badge: 'warning', label: '已静默 · 问题仍在发生' }
@@ -136,13 +142,24 @@ export default function AlertsPage() {
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [confirmCloseKey, setConfirmCloseKey] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null)
+  const [autoRefreshFailed, setAutoRefreshFailed] = useState(false)
+  const hasSnapshotRef = useRef(false)
+  const requestSeq = useRef(0)
 
-  const load = useCallback(async (nextView: AlertListView = view) => {
-    setState('loading')
-    setActionError(null)
-    setConfirmCloseKey(null)
+  const load = useCallback(async (nextView: AlertListView, kind: 'user' | 'auto', ctx?: AutoRefreshContext) => {
+    if (ctx?.disposed()) return false
+    const seq = ++requestSeq.current
+    const keep = hasSnapshotRef.current
+    if (!keep) {
+      setState('loading')
+      setActionError(null)
+      setConfirmCloseKey(null)
+    }
     try {
       const res = await adminOpsService.listAlerts(nextView)
+      if (ctx?.disposed()) return false
+      if (seq !== requestSeq.current) return true
       setAlerts(res.data)
       setDerivedAt(res.derivedAt)
       setFiringCount(res.firingCount)
@@ -154,13 +171,38 @@ export default function AlertsPage() {
       setOpenCount(res.openCount)
       setAcknowledgedCount(res.acknowledgedCount)
       setSuppressedCount(res.suppressedCount)
+      setLastRefreshAt(new Date())
+      setAutoRefreshFailed(false)
+      setActionError(null)
+      hasSnapshotRef.current = true
       setState('ready')
-    } catch {
-      setState('error')
+      return true
+    } catch (err) {
+      if (ctx?.disposed()) return false
+      if (seq !== requestSeq.current) return true
+      if (!hasSnapshotRef.current) {
+        setAutoRefreshFailed(false)
+        setState('error')
+        return false
+      }
+      setState('ready')
+      if (kind === 'auto') setAutoRefreshFailed(true)
+      else setActionError(err instanceof ApiHttpError ? err.message : '刷新失败，请重试')
+      return false
     }
-  }, [view])
+  }, [])
 
-  useEffect(() => { void load(view) }, [load, view])
+  const refresh = useAutoRefresh({
+    intervalMs: ALERT_AUTO_REFRESH_MS,
+    resetKey: `${view}\u0000${typeFilter}`,
+    reload: (kind, ctx) => load(view, kind, ctx),
+  })
+
+  useEffect(() => {
+    // 换视图要重新取数，不能把上一栏的行留在新栏里冒充当前结果。
+    hasSnapshotRef.current = false
+    void refresh('user')
+  }, [refresh, view])
 
   const filtered = typeFilter ? alerts.filter((a) => a.type === typeFilter) : alerts
   const errorCount = alerts.filter((a) => a.severity === 'error').length
@@ -180,7 +222,7 @@ export default function AlertsPage() {
         action,
         duration,
       })
-      await load(view)
+      await refresh('user')
     } catch (err) {
       setActionError(err instanceof ApiHttpError ? err.message : '处理失败，请刷新后重试')
     } finally {
@@ -203,16 +245,6 @@ export default function AlertsPage() {
     <Page
       title="告警中心"
       subtitle={`实时派生 · 待处理 ${formatCount(openCount)} / 仍在发生 ${formatCount(firingCount)}${truncated ? (viewTotal !== null ? ` · 仅展示前 ${formatCount(listedCount)} 条，本视图共 ${formatCount(viewTotal)} 条` : ` · 仅展示前 ${formatCount(listedCount)} 条，全部在发 ${formatCount(total)} 条（派生层上限已触及，本视图精确条数未知）`) : ''}${derivedAt ? ` · 生成于 ${fmt(derivedAt)}` : ''}${errorCount ? ` · 本栏严重 ${formatCount(errorCount)}` : ''}`}
-      actions={
-        <button
-          type="button"
-          onClick={() => void load(view)}
-          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-4 text-[13px] font-bold text-neutral-700 transition-colors hover:bg-neutral-50"
-        >
-          <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />
-          刷新
-        </button>
-      }
     >
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
         告警由实时状态派生：终端离线（心跳超 5 分钟）、打印机异常、近 24 小时打印失败、已支付但打印文件不可用的待打印任务（需人工处置）、已开通屏上扫描且心跳在线时扫描仪找不到或出错、AI 账户不可用、AI 连续失败、当天全站 AI 费用用完。确认 / 静默 / 关闭只记录处理，问题仍在时不会显示成已恢复；关闭后可以「重新打开」退回待处理。已退款的订单按订单退款状态退出告警，本页不发起退款，不伪造出纸结果。
@@ -251,12 +283,30 @@ export default function AlertsPage() {
         ))}
       </div>
 
+      {state === 'ready' && lastRefreshAt && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className={`text-[13px] ${autoRefreshFailed ? 'text-error-fg' : 'text-neutral-500'}`}>
+            {autoRefreshFailed
+              ? `自动刷新失败，以下为上次成功获取的数据（${formatClock(lastRefreshAt)}），不代表现状。`
+              : `最后刷新 ${formatClock(lastRefreshAt)}`}
+          </p>
+          <button
+            type="button"
+            onClick={() => void refresh('user')}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-4 text-[13px] font-bold text-neutral-700 transition-colors hover:bg-neutral-50"
+          >
+            <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            重新获取
+          </button>
+        </div>
+      )}
+
       {actionError && (
         <p className="mb-3 text-[13px] text-error-fg">{actionError}</p>
       )}
 
       {state === 'loading' && <LoadingState className="py-24" />}
-      {state === 'error' && <ErrorState className="py-24" onRetry={() => void load(view)} />}
+      {state === 'error' && <ErrorState className="py-24" onRetry={() => void refresh('user')} />}
 
       {state === 'ready' && (
         filtered.length === 0 ? (
