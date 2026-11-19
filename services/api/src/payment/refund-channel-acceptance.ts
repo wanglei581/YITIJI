@@ -4,6 +4,7 @@
  * 状态 success / failed / withdrawn / closed 都是明确答复或本地已处置，不再算在途。
  * 本地新建的待人工（窗口关闭、没有渠道流水的过期付款、线下/人工确认/免费/券）永远不写这一列。
  */
+import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 
 const SETTLED_STATUSES = new Set(['success', 'failed', 'withdrawn', 'closed'])
 
@@ -16,4 +17,16 @@ export type ChannelAcceptanceRefund = {
 export function refundMayStillBeAtChannel(refund: ChannelAcceptanceRefund): boolean {
   if (!refund.channelSubmittedAt) return false
   return !SETTLED_STATUSES.has(refund.status)
+}
+
+/** 订单上有没有一笔渠道受理过、还没落定的退款。后台订单详情的 channelInFlight 就是它。 */
+export async function orderHasRefundAtChannel(
+  db: PrismaService | PrismaTransactionClient,
+  orderId: string,
+): Promise<boolean> {
+  const rows = await db.refund.findMany({
+    where: { orderId, channelSubmittedAt: { not: null } },
+    select: { status: true, channelSubmittedAt: true },
+  })
+  return rows.some((row) => refundMayStillBeAtChannel(row))
 }

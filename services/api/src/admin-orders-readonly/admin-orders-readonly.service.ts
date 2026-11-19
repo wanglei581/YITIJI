@@ -14,6 +14,7 @@ import {
 import { explainPrintRefund } from '../payment/print-return-disposition'
 import { staleSuccessUnprintedAttentionWhere } from '../payment/stale-success-unprinted-attention'
 import { remainderAmountCents } from '../payment/refund-remainder'
+import { orderHasRefundAtChannel } from '../payment/refund-channel-acceptance'
 import type {
   AdminOrderReadonlyDetail,
   AdminOrderReadonlyItem,
@@ -211,6 +212,7 @@ export class AdminOrdersReadonlyService {
       refundLedgerNo: printRefund.refundNo,
       refundLedgerCents: printRefund.amountCents,
       refundRemainderCents: await remainderAmountCents(this.prisma, row),
+      channelInFlight: await orderHasRefundAtChannel(this.prisma, row.id),
     }
   }
 

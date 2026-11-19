@@ -104,6 +104,12 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   refundLedgerCents: number | null
   /** 部分退款还没退完的金额（分）。不是部分退款时为 null。 */
   refundRemainderCents: number | null
+  /**
+   * 这单有渠道受理过、还没落定的退款（任何一笔都算）。和三步处置、核验出纸用同一个判断：
+   * Refund.channelSubmittedAt 非空且状态不是 success / failed / withdrawn / closed。
+   * 为 true 时后台三步的三颗按钮都禁用，只看这个字段，不再自己看 refundStatus。
+   */
+  channelInFlight: boolean
 }
 
 export interface AdminOrderReadonlyPage {

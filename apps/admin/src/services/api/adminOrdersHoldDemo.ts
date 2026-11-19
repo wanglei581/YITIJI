@@ -4,6 +4,9 @@ import type { AdminOrderReadonlyDetail, PrintReturnResolutionResult } from './ad
 /**
  * 只有浏览器用例写入这个键时才出现。默认列表不带这张单，也不带运营关注角标。
  * manual：渠道退款已经失败，三步都能做。pending：退款还在渠道处理中，三步都不能做。
+ * channel-manual：渠道受理过、记成待人工（例如金额对不上搁置），三步都不能做。
+ * window-local：取件窗口关闭后本地停放的待人工，渠道没受理过，三步都能做。
+ * 能不能做只看 channelInFlight，和服务端同一个判断。
  */
 const HOLD_DEMO_KEY = 'mock:order-hold'
 const HOLD_ID = 'ord_mock_hold'
@@ -11,7 +14,8 @@ const LEDGER_NO = 'RFD-HOLD-MANUAL'
 const LEDGER_CENTS = 200
 
 type HoldAction = 'confirm-refunded' | 'release-paper' | 'close'
-type HoldDemoMode = 'manual' | 'pending'
+type HoldDemoMode = 'manual' | 'pending' | 'channel-manual' | 'window-local'
+const HOLD_DEMO_MODES: readonly HoldDemoMode[] = ['manual', 'pending', 'channel-manual', 'window-local']
 
 let loaded = false
 let holdOrder: AdminOrderReadonlyDetail | null = null
@@ -19,8 +23,7 @@ let holdOrder: AdminOrderReadonlyDetail | null = null
 function holdDemoMode(): HoldDemoMode | null {
   try {
     const value = localStorage.getItem(HOLD_DEMO_KEY)
-    if (value === 'manual' || value === 'pending') return value
-    return null
+    return HOLD_DEMO_MODES.find((mode) => mode === value) ?? null
   } catch {
     return null
   }
@@ -77,13 +80,16 @@ function freshHoldOrder(mode: HoldDemoMode): AdminOrderReadonlyDetail {
     },
     statusLogs: [{ fromStatus: 'pending', toStatus: 'failed', errorCode: null, createdAt }],
     autoRefund: false,
-    refundStatus: mode === 'pending' ? 'pending' : 'failed',
-    refundFailureReason: mode === 'pending' ? null : '渠道退款失败',
+    refundStatus: mode === 'pending' ? 'pending' : mode === 'manual' ? 'failed' : 'manual_review',
+    refundFailureReason: mode === 'manual' ? '渠道退款失败' : null,
     printRefundDisposition: 'manual',
-    printRefundReason: '渠道未确认',
+    printRefundReason: mode === 'window-local'
+      ? '取件窗口已经关了，纸没出，待人工原路退回'
+      : mode === 'channel-manual' ? '渠道通知退款金额对不上，待人工核对' : '渠道未确认',
     refundLedgerNo: LEDGER_NO,
     refundLedgerCents: LEDGER_CENTS,
     refundRemainderCents: null,
+    channelInFlight: mode === 'pending' || mode === 'channel-manual',
   }
 }
 
@@ -107,7 +113,7 @@ export function resolveHoldDemo(id: string, action: HoldAction): PrintReturnReso
   if (!order.refundLedgerNo) {
     throw new ApiHttpError('REFUND_HOLD_NOT_FOUND', '没有待人工处理的退款，不能做这一步。', 400)
   }
-  if (order.refundStatus === 'pending') {
+  if (order.channelInFlight) {
     throw new ApiHttpError(
       'REFUND_CHANNEL_UNCONFIRMED',
       '退款还在渠道处理中，结果出来前不能处置。',
@@ -122,6 +128,7 @@ export function resolveHoldDemo(id: string, action: HoldAction): PrintReturnReso
   order.refundStatus = refundStatus
   order.taskStatus = taskStatus
   order.printRefundDisposition = null
+  order.channelInFlight = false
   order.opsAttention = false
   order.opsAttentionCode = null
   order.refundRequired = false

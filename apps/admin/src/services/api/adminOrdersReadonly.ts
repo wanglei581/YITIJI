@@ -94,6 +94,8 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   payableCents: number
   /** 部分退款还没退完的金额（分）。不是部分退款时为 null。 */
   refundRemainderCents?: number | null
+  /** 有渠道受理过、还没落定的退款（与服务端三步处置同一个判断）。为 true 时三步按钮都禁用。服务单不返回。 */
+  channelInFlight?: boolean
 }
 
 export interface AdminOrderReadonlyPage {
@@ -323,6 +325,8 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   printRefundReason: null,
   refundLedgerNo: null,
   refundLedgerCents: null,
+  refundRemainderCents: null,
+  channelInFlight: false,
 }
 
 /** 存量订单未记录计费页数，供列表和详情验证空值展示。 */

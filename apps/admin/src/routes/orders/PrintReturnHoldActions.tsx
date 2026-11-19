@@ -18,7 +18,8 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
     && Boolean(detail.refundLedgerNo)
     && !remainderOnly
   const paperOut = orderPaperReleased(detail)
-  const channelPending = detail.refundStatus === 'pending'
+  // 只看服务端给的判断：渠道受理过、还没落定的退款（不论记成处理中还是待人工）都不能处置。
+  const channelPending = detail.channelInFlight === true
   const verified = detail.payStatus === 'paid'
     && paperOut
     && detail.refundStatus !== 'pending'
