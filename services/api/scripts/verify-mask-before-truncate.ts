@@ -127,8 +127,8 @@ async function main(): Promise<void> {
       title: '春季招聘会',
       sourceName: '来源机构',
       sourceUrl: 'https://example.invalid/fair',
-      startAt: '2026-04-01T01:00:00.000Z',
-      endAt: '2026-04-01T09:00:00.000Z',
+      startAt: '2026-04-01T01:00:00.000Z', // time-bomb-ok: 招聘会时间只拼进提示词正文，LlmFairVisitPlanService 不拿它和当前时间比较（mode 由调用方传入）
+      endAt: '2026-04-01T09:00:00.000Z', // time-bomb-ok: 同上，只进提示词正文
       venue: '来源场馆',
       city: '上海',
     },
