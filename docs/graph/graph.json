@@ -2667,7 +2667,9 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "InvoiceRequest"
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
         ],
         "path": "/api/v1/admin/invoice-requests/:id/issue",
         "roles": [
@@ -2686,7 +2688,9 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "InvoiceRequest"
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
         ],
         "path": "/api/v1/admin/invoice-requests/:id/return",
         "roles": [
@@ -3669,7 +3673,9 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "InvoiceRequest"
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
         ],
         "path": "/api/v1/admin/orders/:id/invoice",
         "roles": [
@@ -8593,8 +8599,7 @@
         "models": [
           "InvoiceRequest",
           "Order",
-          "ServiceOrder",
-          "Terminal"
+          "ServiceOrder"
         ],
         "path": "/api/v1/kiosk/invoice-sessions",
         "roles": [],
@@ -8612,8 +8617,7 @@
         "models": [
           "InvoiceRequest",
           "Order",
-          "ServiceOrder",
-          "Terminal"
+          "ServiceOrder"
         ],
         "path": "/api/v1/kiosk/invoice-sessions/:sessionId",
         "roles": [],
@@ -8631,8 +8635,7 @@
         "models": [
           "InvoiceRequest",
           "Order",
-          "ServiceOrder",
-          "Terminal"
+          "ServiceOrder"
         ],
         "path": "/api/v1/kiosk/invoice-sessions/:sessionId/submit",
         "roles": [],
@@ -8650,8 +8653,7 @@
         "models": [
           "InvoiceRequest",
           "Order",
-          "ServiceOrder",
-          "Terminal"
+          "ServiceOrder"
         ],
         "path": "/api/v1/kiosk/invoice-sessions/scene/resolve",
         "roles": [],
@@ -9504,8 +9506,7 @@
         "models": [
           "InvoiceRequest",
           "Order",
-          "ServiceOrder",
-          "Terminal"
+          "ServiceOrder"
         ],
         "path": "/api/v1/me/invoice-orders",
         "roles": [],
@@ -9523,8 +9524,7 @@
         "models": [
           "InvoiceRequest",
           "Order",
-          "ServiceOrder",
-          "Terminal"
+          "ServiceOrder"
         ],
         "path": "/api/v1/me/invoice-requests",
         "roles": [],
@@ -9542,8 +9542,7 @@
         "models": [
           "InvoiceRequest",
           "Order",
-          "ServiceOrder",
-          "Terminal"
+          "ServiceOrder"
         ],
         "path": "/api/v1/me/invoice-requests/:id",
         "roles": [],
@@ -19942,7 +19941,8 @@
           "services/api/src/invoices/admin-invoice.service.ts",
           "services/api/src/invoices/invoice-email-retention.ts",
           "services/api/src/invoices/invoice-requests.service.ts",
-          "services/api/src/member-privacy/member-closure-retention.ts"
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
       {
@@ -20858,7 +20858,6 @@
           "services/api/src/first-order/first-order-incidents.service.ts",
           "services/api/src/first-order/first-order-projects.service.ts",
           "services/api/src/first-order/first-order-report-builder.ts",
-          "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
           "services/api/src/kiosk-session/kiosk-session.service.ts",
           "services/api/src/licenses/license-gate.ts",
@@ -27248,6 +27247,8 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-job-review.ts",
       "services/api/scripts/verify-jobfair-review.ts",
@@ -27315,6 +27316,9 @@
     ],
     "services/api/scripts/support/llm-pii-callsite-checks.ts": [
       "services/api/scripts/verify-llm-input-pii-mask.ts"
+    ],
+    "services/api/scripts/support/member-closure-invoices.ts": [
+      "services/api/scripts/verify-member-closure.ts"
     ],
     "services/api/scripts/support/member-closure-verification.ts": [
       "services/api/scripts/verify-member-closure.ts"
@@ -28853,6 +28857,8 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts",
       "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
@@ -29259,6 +29265,7 @@
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-http-exception-filter.ts",
       "services/api/scripts/verify-internal-accounts.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-auth.ts",
@@ -29301,6 +29308,7 @@
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-member-account-status.ts",
@@ -29512,6 +29520,7 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-license-runtime.ts",
       "services/api/scripts/verify-member-auth-races.ts",
@@ -29977,6 +29986,26 @@
     ],
     "services/api/src/first-order/first-order-report-metrics.ts": [
       "services/api/scripts/verify-first-order-http.ts"
+    ],
+    "services/api/src/invoices/admin-invoice.service.ts": [
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts"
+    ],
+    "services/api/src/invoices/invoice-member-list.ts": [
+      "services/api/scripts/verify-invoice-real-db.ts"
+    ],
+    "services/api/src/invoices/invoice-requests.service.ts": [
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts"
+    ],
+    "services/api/src/invoices/invoice-sessions.service.ts": [
+      "services/api/scripts/verify-invoice-http.ts"
+    ],
+    "services/api/src/invoices/kiosk-invoice-sessions.controller.ts": [
+      "services/api/scripts/verify-invoice-http.ts"
+    ],
+    "services/api/src/invoices/member-invoice.controller.ts": [
+      "services/api/scripts/verify-invoice-http.ts"
     ],
     "services/api/src/job-ai/governed-job-fit.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -31802,6 +31831,8 @@
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-job-application-track.ts",
@@ -32387,6 +32418,7 @@
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-official-channels.ts",
@@ -32412,6 +32444,7 @@
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -44547,6 +44580,59 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/invoices/admin-invoice.service.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/invoices/invoice-sessions.service.ts",
+          "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+          "services/api/src/invoices/member-invoice.controller.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-invoice-http.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:invoice-http"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/invoices/admin-invoice.service.ts",
+          "services/api/src/invoices/invoice-member-list.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-invoice-real-db.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:invoice-real-db"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/scripts/support/isolated-verification-database.ts"
         ],
         "missing": []
@@ -45909,6 +45995,7 @@
         "files": [
           "services/api/prisma/schema.prisma",
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/member-closure-invoices.ts",
           "services/api/scripts/support/member-closure-verification.ts",
           "services/api/src/admin-users/admin-users.controller.ts",
           "services/api/src/admin-users/admin-users.service.ts",
