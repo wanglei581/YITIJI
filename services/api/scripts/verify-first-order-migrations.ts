@@ -11,7 +11,50 @@ const migration = '20261022080000_first_order_delivery/migration.sql'
 const scanDeviceMigration = '20261102230000_add_scan_device_session_fields/migration.sql'
 const scanDeviceRoundMigration = '20261103030000_add_scan_device_round/migration.sql'
 const interviewDeadlineMigration = '20261104180000_mock_interview_deadline/migration.sql'
+const refundChannelSubmittedMigration = '20261119000000_add_refund_channel_submitted_at/migration.sql'
 const baseline = '07f9046c2'
+
+/**
+ * 存量回填：渠道是 sandbox / wechat / alipay 且状态 pending / manual_review 的行回填为创建时间，
+ * 其余（已成功、已失败、线下、券）保持 NULL。新列之后能用当前客户端读写。
+ */
+async function verifyRefundChannelSubmittedBackfill(
+  client: ReturnType<typeof createPrismaClient>['client'],
+  kind: 'sqlite' | 'postgres',
+  migrate: () => void,
+): Promise<void> {
+  const stamp = kind === 'sqlite' ? `'2026-11-01T08:00:00.000+00:00'` : `TIMESTAMP '2026-11-01 08:00:00'`
+  await client.$executeRawUnsafe(`INSERT INTO "Order" ("id", "orderNo", "updatedAt") VALUES ('legacy-refund-order', 'LEGACY-REFUND-ORDER', ${stamp})`)
+  const legacy: Array<[string, string, string, boolean]> = [
+    ['legacy-rfd-wx-pending', 'wechat', 'pending', true],
+    ['legacy-rfd-ali-manual', 'alipay', 'manual_review', true],
+    ['legacy-rfd-sbx-pending', 'sandbox', 'pending', true],
+    ['legacy-rfd-wx-success', 'wechat', 'success', false],
+    ['legacy-rfd-wx-failed', 'wechat', 'failed', false],
+    ['legacy-rfd-off-manual', 'offline', 'manual_review', false],
+    ['legacy-rfd-vch-pending', 'voucher', 'pending', false],
+  ]
+  for (const [id, channel, status] of legacy) {
+    await client.$executeRawUnsafe(`INSERT INTO "Refund" ("id", "orderId", "refundNo", "amountCents", "status", "channel", "createdAt", "updatedAt") VALUES ('${id}', 'legacy-refund-order', '${id}', 100, '${status}', '${channel}', ${stamp}, ${stamp})`)
+  }
+  migrate()
+  const rows = await client.$queryRawUnsafe<Array<{ id: string; filled: unknown; same: unknown }>>(
+    `SELECT "id", CASE WHEN "channelSubmittedAt" IS NULL THEN 0 ELSE 1 END AS "filled", CASE WHEN "channelSubmittedAt" = "createdAt" THEN 1 ELSE 0 END AS "same" FROM "Refund" WHERE "orderId" = 'legacy-refund-order'`,
+  )
+  for (const [id, , , expectFilled] of legacy) {
+    const row = rows.find((item) => item.id === id)
+    if (!row) throw new Error(`${kind}: legacy refund ${id} was lost`)
+    if ((Number(row.filled) === 1) !== expectFilled) throw new Error(`${kind}: ${id} channelSubmittedAt backfill must be ${expectFilled ? 'createdAt' : 'NULL'}`)
+    if (expectFilled && Number(row.same) !== 1) throw new Error(`${kind}: ${id} channelSubmittedAt must equal createdAt`)
+  }
+  const submittedAt = new Date('2026-11-19T01:02:03.000Z')
+  const fresh = await client.refund.create({ data: { orderId: 'legacy-refund-order', refundNo: 'migration-rfd-new', amountCents: 100, status: 'pending', channel: 'wechat', channelSubmittedAt: submittedAt } })
+  const back = await client.refund.findUnique({ where: { id: fresh.id }, select: { channelSubmittedAt: true } })
+  if (back?.channelSubmittedAt?.getTime() !== submittedAt.getTime()) throw new Error(`${kind}: refund channelSubmittedAt must round-trip`)
+  const local = await client.refund.create({ data: { orderId: 'legacy-refund-order', refundNo: 'migration-rfd-local', amountCents: 100, status: 'manual_review', channel: 'wechat' } })
+  if (local.channelSubmittedAt !== null) throw new Error(`${kind}: new refund without channelSubmittedAt must stay NULL`)
+  console.log(`PASS ${kind}: refund channelSubmittedAt — legacy channel pending/manual rows backfilled to createdAt, others NULL, new column round-trips`)
+}
 
 async function freePort(): Promise<number> {
   const server = createServer()
@@ -68,6 +111,8 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', interviewDeadlineMigration)])
     // 心跳的打印完成判据列（20261111120000）。必须在当前客户端写 TerminalHeartbeat 之前执行。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261111120000_add_terminal_heartbeat_print_completion/migration.sql')])
+    // 退款「已提交渠道时间」（20261119000000）：升级前已有的退款行只能用原生 SQL 写，且必须在这条迁移之前写。
+    await verifyRefundChannelSubmittedBackfill(client, kind, () => run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', refundChannelSubmittedMigration)]))
     await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
     if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' }, select: { id: true } })

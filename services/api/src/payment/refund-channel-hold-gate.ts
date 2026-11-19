@@ -60,27 +60,13 @@ export async function resolveChannelBeforeHold(
       refundNo: true,
       status: true,
       channel: true,
-      reason: true,
-      channelRefundNo: true,
       channelSubmittedAt: true,
     },
   })
   const refund = rows.find((row) => refundMayStillBeAtChannel(row))
   if (!refund) return action
-  // 订单已经关闭之后，渠道又通知退成，才会把已关闭的退款行搁成待人工并写下渠道退款号。
-  // 这是渠道的成功答复，不是还在处理。不再查一次，直接记退成。金额不符仍要拦住。
-  if (refund.status === 'manual_review' && refund.channelRefundNo) {
-    const parked = await db.order.findUnique({
-      where: { id: orderId },
-      select: { payStatus: true, refundReason: true },
-    })
-    if (
-      parked?.payStatus === 'closed'
-      && parked.refundReason !== REFUND_AMOUNT_MISMATCH_MANUAL_REASON
-    ) {
-      return 'confirm_refunded'
-    }
-  }
+  // 不再按「订单已关、待人工、有渠道退款号」猜渠道已经答复过：这一组字段谁都能写下。
+  // 渠道受理过、状态还没落定的，一律先问渠道。
   let verdict: RefundChannelVerdict = 'unsupported'
   let faultError: unknown = null
   if (channelQuery) {
