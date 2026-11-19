@@ -64,6 +64,31 @@ export function endKioskVisit(reason: KioskVisitEndReason): void {
   }
 }
 
+/** 这一次使用周期的编号（clientSessionId）。服务单建单带它；清场后换新的，整页重载也会换。 */
+export function currentKioskVisitId(): string {
+  return reporter.snapshot().clientSessionId
+}
+
+/**
+ * 建服务单之前调：服务端要求这一周期的 start 已经落库，否则回 400 SERVICE_SESSION_REQUIRED。
+ * 页面的副作用先于守卫的副作用执行，直接打开付款屏时 start 可能还没发出，所以这里按当前路径补一次
+ * （已经开始过的周期不会重复发），再等在飞的上报全部结束，最后返回周期编号。
+ * 上报关着（演示模式、浏览器测试构建）时不发请求，照样返回编号。不抛错。
+ */
+export async function kioskVisitReadyForCharge(pathname: string): Promise<string> {
+  try {
+    reporter.enterPath(pathname)
+  } catch {
+    // 上报失败不拦建单：建单会回 SERVICE_SESSION_REQUIRED，由调用方稍等再试一次。
+  }
+  try {
+    await reporter.settle()
+  } catch {
+    // 同上。
+  }
+  return reporter.snapshot().clientSessionId
+}
+
 const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = ['pointerdown', 'keydown']
 
 /** 挂在 KioskPrivacyGuard 里：把路由与触摸喂给上报器。 */
