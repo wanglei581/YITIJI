@@ -174,7 +174,10 @@ function bridgeAcross(folded: string, index: number, extended: boolean): number 
 
 function separatorLength(folded: string, index: number): number {
   const char = folded[index] ?? ''
-  if (char === '\\' && folded[index + 1] === 't') return 2
+  if (char === '\\') {
+    const next = folded[index + 1] ?? ''
+    if (next === 't' || next === 'n' || next === 'r' || next === '/') return 2
+  }
   return SEPARATOR_CHARS.has(char) ? 1 : 0
 }
 

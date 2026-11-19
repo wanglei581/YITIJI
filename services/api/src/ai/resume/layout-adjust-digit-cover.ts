@@ -93,10 +93,10 @@ function pickNonce(inputs: readonly string[]): string {
   return `a${randomBytes(3).toString('hex').slice(0, 5)}`
 }
 
-/** 年月用点、斜线或短横连起来的日期轴。各种点和短横先折成半角，空白和转义分隔拿掉再认。 */
+/** 年月用点、斜线或短横连起来的日期轴。转义分隔折成短横，空白拿掉再认。 */
 function isDateAxis(foldedSpan: string): boolean {
   const normalized = foldedSpan
-    .replace(/\\t|\\n|\\r|\\\//gu, '')
+    .replace(/\\t|\\n|\\r|\\\//gu, '-')
     .replace(/[·•・．]/gu, '.')
     .replace(/[‐‑–—﹣－/]/gu, '-')
     .replace(/[ \t\n\r\u00A0\u3000]/gu, '')
@@ -139,7 +139,8 @@ export function coverRealisticNumbers(text: string, book: LayoutDigitBook): stri
 /**
  * 取舍：顺着原文扫字符串值，不把整段 JSON 去掉标点再拼。
  * 去掉标点会把键名和不相邻的数字也接上，还原做不到逐字。
- * 键名跳过。带反斜杠转义的值、普通文字、日期轴都断开，不参与拼接。
+ * 键名跳过。普通文字、日期轴，以及不是分隔符的转义，都断开，不参与拼接。
+ * 只含反斜杠加 t、n、r 的值仍是号码段，可以和相邻字段接起来。
  * 数值字段按它写在 JSON 里的数字参加拼接，不重新序列化。
  * 每一段都是纯数字的年、年月或年月日时不接。
  * 命中的每个字段换成自己的占位符，里面存该字段原文。
@@ -155,7 +156,7 @@ export function coverAdjacentJsonValues(json: string, book: LayoutDigitBook): st
     }
     const pieces = run.map((literal) => foldDigits(json.slice(literal.innerStart, literal.innerEnd)))
     const total = pieces.reduce((sum, piece) => sum + countDigits(piece), 0)
-    const allDates = pieces.every((piece) => DATE_PIECE.test(piece))
+    const allDates = pieces.every((piece) => DATE_PIECE.test(piece.replace(/\\[tnr]/gu, '')))
     if (total >= 11 && !allDates) {
       for (const literal of run) spans.push([literal.innerStart, literal.innerEnd])
     }
@@ -168,7 +169,7 @@ export function coverAdjacentJsonValues(json: string, book: LayoutDigitBook): st
       continue
     }
     const inner = json.slice(literal.innerStart, literal.innerEnd)
-    if (literal.hasEscape || !isJoinableNumber(inner)) {
+    if ((literal.hasEscape && !escapesAreOnlySeparators(inner)) || !isJoinableNumber(inner)) {
       flush()
       continue
     }
@@ -274,6 +275,17 @@ function skipJsonNumber(json: string, index: number): number {
 
 function isJsonWhitespace(char: string): boolean {
   return char === ' ' || char === '\t' || char === '\n' || char === '\r'
+}
+
+/** 反斜杠后面只跟着 t、n、r 或斜线。这种转义不改变数字，可以参加拼接。 */
+function escapesAreOnlySeparators(raw: string): boolean {
+  for (let index = 0; index < raw.length; index += 1) {
+    if (raw[index] !== '\\') continue
+    const next = raw[index + 1] ?? ''
+    if (next !== 't' && next !== 'n' && next !== 'r' && next !== '/') return false
+    index += 1
+  }
+  return true
 }
 
 /** 整段都是数字，中间只隔允许的分隔符或括号。日期轴留在外面，当断开用。 */
