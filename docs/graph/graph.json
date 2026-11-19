@@ -27028,6 +27028,9 @@
     "services/api/scripts/verify-kiosk-job-board-switch.ts": [
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
+    "services/api/scripts/verify-layout-outbound-realistic-extra.ts": [
+      "services/api/scripts/verify-layout-outbound-realistic.ts"
+    ],
     "services/api/scripts/verify-legacy-pending-print-task-disposition.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
@@ -27890,10 +27893,12 @@
     ],
     "services/api/src/ai/resume/layout-adjust-digit-cover.ts": [
       "services/api/scripts/verify-layout-mask-truncate.ts",
+      "services/api/scripts/verify-layout-outbound-realistic-extra.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts"
     ],
     "services/api/src/ai/resume/layout-adjust-mask.ts": [
       "services/api/scripts/verify-layout-mask-truncate.ts",
+      "services/api/scripts/verify-layout-outbound-realistic-extra.ts",
       "services/api/scripts/verify-layout-outbound-realistic.ts"
     ],
     "services/api/src/ai/resume/llm-career-plan.service.ts": [
@@ -28882,7 +28887,8 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/common/pii/mask-placeholder.ts": [
-      "services/api/scripts/verify-layout-mask-truncate.ts"
+      "services/api/scripts/verify-layout-mask-truncate.ts",
+      "services/api/scripts/verify-layout-outbound-realistic-extra.ts"
     ],
     "services/api/src/common/pii/pii-masker.ts": [
       "services/api/scripts/verify-llm-input-pii-mask.ts"
@@ -44635,6 +44641,25 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/resume/layout-adjust-digit-cover.ts",
+          "services/api/src/ai/resume/layout-adjust-mask.ts",
+          "services/api/src/common/pii/mask-placeholder.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-layout-outbound-realistic-extra.ts",
+      "helper": true,
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/verify-layout-outbound-realistic-extra.ts",
           "services/api/src/ai/resume/layout-adjust-mask.ts"
         ],
         "missing": []
