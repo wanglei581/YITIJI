@@ -15,9 +15,9 @@
  * - 金额一律整数「分」；回调金额与服务端快照的双重比对在业务层完成。
  * - 退款（W-B）：`/v3/refund/domestic/refunds`，`out_refund_no=refundNo` 渠道级幂等；
  *   SUCCESS→success / PROCESSING→processing（经 queryRefund 收敛）/ 其它→failed，
- *   绝不把受理中假报为已退款。
+ *   绝不把受理中假报为已退款。退款报文归一化在 wechat-pay-refund.ts，验签串与加解密在 wechat-pay-crypto.ts。
  */
-import { createCipheriv, createDecipheriv, createSign, createVerify, randomBytes } from 'crypto'
+import { createSign, createVerify, randomBytes } from 'crypto'
 import type {
   CallbackAck,
   CallbackVerifyResult,
@@ -35,6 +35,10 @@ import type {
   RefundQueryResult,
 } from '../payment-provider.types'
 import { buildPaymentCallbackPath, channelChargeDescription } from '../payment-provider.types'
+import { buildWechatCallbackVerifyBase, decryptWechatResource } from './wechat-pay-crypto'
+import { parseWechatRefundCreate, parseWechatRefundNotify, parseWechatRefundQuery, wechatRefundQueryMiss } from './wechat-pay-refund'
+
+export { buildWechatCallbackVerifyBase, encryptWechatCallbackResource } from './wechat-pay-crypto'
 
 export const WECHAT_TIMESTAMP_HEADER = 'wechatpay-timestamp'
 export const WECHAT_NONCE_HEADER = 'wechatpay-nonce'
@@ -66,56 +70,6 @@ export interface WechatPayProviderConfig {
   apiBaseUrl: string
   /** 付款码支付线下门店商户编码；未配置时拒绝该方式，不影响屏上二维码支付。 */
   codePayStoreOutId?: string
-}
-
-/** 回调验签 base（与微信支付平台侧构造一致；verify 脚本模拟渠道侧时共用，避免口径漂移）。 */
-export function buildWechatCallbackVerifyBase(input: {
-  timestamp: string
-  nonce: string
-  rawBody: Buffer | string
-}): string {
-  const body = typeof input.rawBody === 'string' ? input.rawBody : input.rawBody.toString('utf8')
-  return `${input.timestamp}\n${input.nonce}\n${body}\n`
-}
-
-/**
- * AES-256-GCM 加密交易对象为回调 resource（**仅 verify 脚本模拟渠道侧使用**；
- * 生产回调只做解密）。与 decryptWechatResource 同一口径。
- */
-export function encryptWechatCallbackResource(
-  plaintext: string,
-  apiV3Key: string,
-  associatedData = 'transaction',
-): { ciphertext: string; nonce: string; associated_data: string } {
-  // nonce 用 ASCII 串（与真实回调一致），解密侧按 utf8 还原为同一 iv 字节序列。
-  const nonceStr = randomBytes(8).toString('hex') // 16 ASCII chars
-  const cipher = createCipheriv('aes-256-gcm', Buffer.from(apiV3Key, 'utf8'), Buffer.from(nonceStr, 'utf8'))
-  cipher.setAAD(Buffer.from(associatedData, 'utf8'))
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
-  const tag = cipher.getAuthTag()
-  return {
-    ciphertext: Buffer.concat([encrypted, tag]).toString('base64'),
-    nonce: nonceStr,
-    associated_data: associatedData,
-  }
-}
-
-function decryptWechatResource(
-  resource: { ciphertext: string; nonce: string; associated_data?: string },
-  apiV3Key: string,
-): string | null {
-  try {
-    const buf = Buffer.from(resource.ciphertext, 'base64')
-    if (buf.length < 16) return null
-    const data = buf.subarray(0, buf.length - 16)
-    const tag = buf.subarray(buf.length - 16)
-    const decipher = createDecipheriv('aes-256-gcm', Buffer.from(apiV3Key, 'utf8'), Buffer.from(resource.nonce, 'utf8'))
-    if (resource.associated_data) decipher.setAAD(Buffer.from(resource.associated_data, 'utf8'))
-    decipher.setAuthTag(tag)
-    return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8')
-  } catch {
-    return null // 解密失败（密钥不符/报文被改）→ 上层返回明确错误码，绝不半解析
-  }
 }
 
 function headerValue(headers: PaymentCallbackContext['headers'], name: string): string | null {
@@ -457,13 +411,6 @@ export class WechatPayProvider implements PaymentProvider {
     }
   }
 
-  /** wechat 退款状态 → 归一化（受理中绝不假报成功）。 */
-  private static mapRefundStatus(status: string | null): 'success' | 'failed' | 'processing' {
-    if (status === 'SUCCESS') return 'success'
-    if (status === 'PROCESSING') return 'processing'
-    return 'failed' // ABNORMAL / CLOSED / 未知：按失败处理（由业务层回滚可重试）
-  }
-
   /**
    * 真实退款（W-B）：POST /v3/refund/domestic/refunds。
    * `out_refund_no = refundNo`（渠道级幂等：同号重复请求不会重复出款）；
@@ -479,10 +426,7 @@ export class WechatPayProvider implements PaymentProvider {
       out_refund_no: input.refundNo,
       amount: { refund: input.amountCents, total: input.orderAmountCents, currency: 'CNY' },
     })
-    return {
-      channelRefundNo: asString(resp['refund_id']),
-      status: WechatPayProvider.mapRefundStatus(asString(resp['status'])),
-    }
+    return parseWechatRefundCreate(resp)
   }
 
   /** 退款查证（W-B）：GET /v3/refund/domestic/refunds/{out_refund_no}，processing 收敛依据。 */
@@ -491,72 +435,28 @@ export class WechatPayProvider implements PaymentProvider {
     try {
       resp = await this.request('GET', `/v3/refund/domestic/refunds/${encodeURIComponent(input.refundNo)}`)
     } catch (e) {
-      if ((e as Error).message?.includes('RESOURCE_NOT_EXISTS') || (e as Error).message?.includes('HTTP_404')) {
-        return {
-          status: 'unknown',
-          channelRefundNo: null,
-          refundState: (e as Error).message?.includes('RESOURCE_NOT_EXISTS') ? 'RESOURCE_NOT_EXISTS' : null,
-        }
-      }
+      const miss = wechatRefundQueryMiss(e)
+      if (miss) return miss
       throw e
     }
-    const status = WechatPayProvider.mapRefundStatus(asString(resp['status']))
-    // 查证接口的未知状态按 unknown 处理（不回滚不完成，等下次查证），仅明确 ABNORMAL/CLOSED 判失败。
-    const raw = asString(resp['status'])
-    const amount = resp['amount'] as { refund?: unknown } | undefined
-    const refundAmountCents =
-      typeof amount?.refund === 'number' && Number.isInteger(amount.refund) && amount.refund >= 0
-        ? amount.refund
-        : null
-    if (status === 'failed' && raw !== 'ABNORMAL' && raw !== 'CLOSED') {
-      return { status: 'unknown', channelRefundNo: asString(resp['refund_id']), refundAmountCents }
-    }
-    return { status, channelRefundNo: asString(resp['refund_id']), refundAmountCents, refundState: raw }
+    return parseWechatRefundQuery(resp)
   }
 
   /**
    * 退款结果异步通知（商户平台「退款结果回调通知 URL」）验签+解密+归一化。
    * 与支付回调共用 verifyAndDecryptNotify（同一验签/时间窗/serial/解密口径）；
    * 报文差异：解密后为退款对象（out_refund_no/refund_id/refund_status/amount.refund），
-   * **无 appid 字段**，归属只校验 mchid；SUCCESS→success，CLOSED/ABNORMAL→failed，
-   * 其它/未知 refund_status 一律拒绝（绝不猜测入账）。
+   * **无 appid 字段**，归属只校验 mchid。归一化见 wechat-pay-refund.ts。
    */
   async verifyRefundNotify(ctx: PaymentCallbackContext): Promise<RefundNotifyVerifyResult> {
     const base = this.verifyAndDecryptNotify(ctx)
     if (!base.ok) return base
-    const { payload: refund, nonce, timestampMs } = base
-
-    if (asString(refund['mchid']) !== this.cfg.mchid) return { ok: false, code: 'CALLBACK_MERCHANT_MISMATCH' }
-
-    const refundNo = asString(refund['out_refund_no'])
-    const outTradeNo = asString(refund['out_trade_no'])
-    if (!refundNo || !outTradeNo) return { ok: false, code: 'CALLBACK_PAYLOAD_INVALID' }
-
-    const rawStatus = asString(refund['refund_status'])
-    let status: 'success' | 'failed'
-    if (rawStatus === 'SUCCESS') status = 'success'
-    else if (rawStatus === 'CLOSED' || rawStatus === 'ABNORMAL') status = 'failed'
-    else return { ok: false, code: 'CALLBACK_PAYLOAD_INVALID' } // 未知状态：拒绝，绝不猜测
-
-    const amount = refund['amount'] as { refund?: unknown } | undefined
-    const refundAmountCents =
-      typeof amount?.refund === 'number' && Number.isInteger(amount.refund) && amount.refund >= 0 ? amount.refund : null
-    // SUCCESS 必须齐备退款金额（业务层比对依据），缺失拒绝。
-    if (status === 'success' && refundAmountCents === null) return { ok: false, code: 'CALLBACK_PAYLOAD_INVALID' }
-
-    return {
-      ok: true,
-      event: {
-        channel: this.channel,
-        refundNo,
-        outTradeNo,
-        channelRefundNo: asString(refund['refund_id']),
-        status,
-        refundAmountCents,
-        nonce,
-        timestampMs,
-      },
-    }
+    return parseWechatRefundNotify(base.payload, {
+      mchid: this.cfg.mchid,
+      channel: this.channel,
+      nonce: base.nonce,
+      timestampMs: base.timestampMs,
+    })
   }
 
   callbackAck(): CallbackAck {
