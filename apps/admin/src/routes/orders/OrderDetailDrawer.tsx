@@ -4,6 +4,7 @@ import { amountText, billablePagesText, channelText, pageRangeText, fmt, orderUs
 import { colorModeText, copiesText, duplexText, NET_PAID_UNRECORDED, recordedCentsText } from './orderHonestyCopy'
 import { printErrorText } from '../../lib/printErrorText'
 import { OrderAftercare } from './OrderAftercare'
+import { OrderInvoiceSection } from './OrderInvoiceSection'
 import { OrderPaymentActions } from './OrderPaymentActions'
 
 function Info({ label, value, title }: { label: string; value: string; title?: string }) {
@@ -71,6 +72,7 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               </div>
             )}
 
+      <OrderInvoiceSection orderId={detail.id} orderKind={detail.recordKind === 'service' ? 'service' : 'print'} />
       <OrderPaymentActions controls={controls} />
       </>)}
     </Drawer>

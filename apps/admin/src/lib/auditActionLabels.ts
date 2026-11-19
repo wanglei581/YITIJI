@@ -108,6 +108,8 @@ const ACTION_LABELS: Record<string, string> = {
   'file.direct_upload_completed': '完成文件直传校验',
   'file.retention_update': '更新文件保存期限',
   'file.storage_delete_reconciled': '核对存储文件删除结果',
+  'invoice.mark_issued': '标已开',
+  'invoice.return': '退回开票申请',
   'job.partner_unpublish': '机构下架岗位信息',
   'job.partner_update': '机构更新岗位信息',
   'job_material.generate': '生成求职材料',

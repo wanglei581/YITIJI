@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { RolesGuard } from '../common/guards/roles.guard'
 import { TerminalsModule } from '../terminals/terminals.module'
+import { AdminInvoiceController } from './admin-invoice.controller'
+import { AdminInvoiceService } from './admin-invoice.service'
 import { InvoiceRequestsService } from './invoice-requests.service'
 import { InvoiceSessionsService } from './invoice-sessions.service'
 import { KioskInvoiceSessionsController } from './kiosk-invoice-sessions.controller'
@@ -20,8 +24,8 @@ import { MemberInvoiceController } from './member-invoice.controller'
       },
     }),
   ],
-  controllers: [KioskInvoiceSessionsController, MemberInvoiceController],
-  providers: [InvoiceRequestsService, InvoiceSessionsService, EndUserAuthGuard],
+  controllers: [KioskInvoiceSessionsController, MemberInvoiceController, AdminInvoiceController],
+  providers: [InvoiceRequestsService, InvoiceSessionsService, EndUserAuthGuard, AdminInvoiceService, JwtAuthGuard, RolesGuard],
   exports: [InvoiceRequestsService, InvoiceSessionsService],
 })
 export class InvoicesModule {}
