@@ -20,6 +20,7 @@ import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import { AuditService } from '../src/audit/audit.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
+import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
 import {
@@ -41,6 +42,7 @@ import {
   MINIAPP_VIRTUAL_PAY_GOODS_AUDIT_ACTION,
 } from '../src/virtual-pay/virtual-pay-settings'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { assertOfficialVirtualPaySignatures, assertVirtualPayOrders } from './support/miniapp-virtual-pay-orders'
 
 const API_ROOT = resolve(__dirname, '..')
 const ADMIN = 'vpay-admin'
@@ -119,6 +121,7 @@ interface CallResult {
 }
 
 async function main(): Promise<void> {
+  assertOfficialVirtualPaySignatures()
   const missing = evaluateMiniappVirtualPayRuntime({ NODE_ENV: 'production' })
   assert.equal(missing.ready, false)
   assert.equal(missing.block, 'env_missing')
@@ -166,16 +169,21 @@ async function main(): Promise<void> {
   const jwt = new JwtService({ secret: 'verify-miniapp-vpay-jwt-secret' })
   const { VirtualPayAdminController } = await import('../src/virtual-pay/virtual-pay-admin.controller')
   const { VirtualPayAdminService } = await import('../src/virtual-pay/virtual-pay-admin.service')
+  const { VirtualPayOrderController } = await import('../src/virtual-pay/virtual-pay-order.controller')
+  const { VirtualPayOrderService } = await import('../src/virtual-pay/virtual-pay-order.service')
   const admin = new VirtualPayAdminService(prisma, audit)
+  const orderService = new VirtualPayOrderService(prisma, audit)
 
   @Module({
-    controllers: [VirtualPayAdminController],
+    controllers: [VirtualPayAdminController, VirtualPayOrderController],
     providers: [
       { provide: PrismaService, useValue: prisma },
       { provide: RedisService, useValue: redis },
       { provide: JwtService, useValue: jwt },
       { provide: AuditService, useValue: audit },
       { provide: VirtualPayAdminService, useValue: admin },
+      { provide: VirtualPayOrderService, useValue: orderService },
+      EndUserAuthGuard,
       JwtAuthGuard,
       RolesGuard,
     ],
@@ -353,6 +361,7 @@ async function main(): Promise<void> {
     assert.equal(closedCredit.consumedAt, null)
     assert.equal(closedCredit.refundedAt, null)
     console.log('PASS 注销断开账号和 openid，一单只能有一条权益')
+    await assertVirtualPayOrders({ prisma, call, jwt, redis })
   } finally {
     await app.close()
     await prisma.onModuleDestroy()

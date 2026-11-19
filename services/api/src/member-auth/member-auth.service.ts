@@ -18,6 +18,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { enforceMemberSmsHourlyLimit } from './sms/sms-egress-limits'
 import { SMS_SENDER, type SmsSender } from './sms/sms-sender'
+import { exchangeMiniappJsCode } from './wx-jscode'
 
 export type LegalConsentSource = 'sms_login' | 'qr_login' | 'wx_login'
 
@@ -533,36 +534,9 @@ export class MemberAuthService {
   }
 
   private async fetchWxOpenId(code: string): Promise<string> {
-    const appid = process.env['WECHAT_MINIAPP_APPID']
-    const secret = process.env['WECHAT_MINIAPP_APPSECRET']
-    if (!appid || !secret) {
-      throw new HttpException(
-        { error: { code: 'WX_CONFIG_MISSING', message: '微信小程序登录暂不可用，请使用短信验证码登录' } },
-        HttpStatus.SERVICE_UNAVAILABLE,
-      )
-    }
-    const url =
-      `https://api.weixin.qq.com/sns/jscode2session` +
-      `?appid=${encodeURIComponent(appid)}` +
-      `&secret=${encodeURIComponent(secret)}` +
-      `&js_code=${encodeURIComponent(code)}` +
-      `&grant_type=authorization_code`
-    const res = await fetch(url)
-    if (!res.ok) {
-      throw new HttpException(
-        { error: { code: 'WX_CODE2SESSION_FAILED', message: '微信登录服务异常，请稍后再试' } },
-        HttpStatus.BAD_GATEWAY,
-      )
-    }
-    const data = (await res.json()) as { openid?: string; errcode?: number; errmsg?: string }
-    // sessionKey 故意丢弃，不存储
-    if (!data.openid) {
-      throw new HttpException(
-        { error: { code: 'WX_CODE_INVALID', message: '微信登录凭证无效或已过期，请重试' } },
-        HttpStatus.UNAUTHORIZED,
-      )
-    }
-    return data.openid
+    // sessionKey 故意丢弃，不存储。虚拟支付另走 exchangeMiniappJsCode，用完即丢。
+    const { openid } = await exchangeMiniappJsCode(code)
+    return openid
   }
 
   private async fetchWxPhone(phoneCode: string): Promise<string> {
