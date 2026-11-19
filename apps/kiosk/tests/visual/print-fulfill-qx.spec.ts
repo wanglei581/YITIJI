@@ -127,7 +127,9 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   // 本用例的 takeaway-url 故意回 404 → canRetry 拿不到 →「重新提交打印」按钮根本不存在，
   // 正是"页面没给出重试出口"的那一态：此时更不能让用户以为补个纸就能等到结果。
   const outOfPaper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
-  await expect(outOfPaper).toContainText('加纸后也不会自动续打')
+  // 定稿第 2 条：这句在副题，不在滚动区。滚动区再写一遍会变成整屏说两次。
+  await expect(page.getByText('加纸后也不会自动续打')).toBeVisible()
+  await expect(outOfPaper).not.toContainText('加纸后也不会自动续打')
   await expect(outOfPaper).toContainText('手机带走链接这次没取到，不影响这笔订单。')
   await expect(outOfPaper).not.toContainText('打印有问题？')
   await expect(outOfPaper).not.toContainText('联系现场工作人员')
@@ -220,7 +222,8 @@ test('PAPER_EMPTY with server canRetry offers whole-file resubmit and server ord
   // canRetry 为真才出现重打出口，且说清是整份重打、不再收费，不是「续打剩下的」。
   await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
   await expect(outOfPaper.locator('.qxt-step').nth(1)).toContainText('整份重打')
-  await expect(outOfPaper).toContainText('加纸后也不会自动续打')
+  await expect(page.getByText('加纸后也不会自动续打')).toBeVisible()
+  await expect(outOfPaper).not.toContainText('加纸后也不会自动续打')
   await expect(outOfPaper).toContainText('不再收费')
   await expect(outOfPaper.getByRole('region', { name: '文件带走' })).toBeVisible()
   await expect(page.getByTestId('print-fulfill-resume-line')).toHaveCount(0)
