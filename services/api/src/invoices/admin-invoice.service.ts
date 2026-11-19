@@ -97,13 +97,14 @@ export class AdminInvoiceService {
       throw new ConflictException({ error: { code: 'INVOICE_NOT_SUBMITTED', message: RETURN_BLOCKED } })
     }
     const row = await this.load(id)
+    // 原因是管理员手写，可能写到姓名、邮箱。审计不改写、注销也不碰审计，所以这里只留长度和去处，原文只在申请行上。
     await this.audit.write({
       actorId: null,
       actorRole: 'admin',
       action: 'invoice.return',
       targetType: 'invoice_request',
       targetId: id,
-      payload: { operatorId: input.operatorId, orderKind: row.orderKind, orderId: row.orderId, reason },
+      payload: { operatorId: input.operatorId, orderKind: row.orderKind, orderId: row.orderId, reasonLength: reason.length, reasonNote: '原因见申请' },
     })
     return toView(row)
   }

@@ -36,6 +36,7 @@ import { createPrismaClient } from '../src/prisma/create-client'
 import { StorageService } from '../src/storage/storage.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { ClosureMemoryRedis, scanClosureDatabase, scanClosureRedis, type ClosureScanIdentity } from './support/member-closure-verification'
+import { assertClosureInvoices, closureInvoiceAuditTargets, seedClosureInvoices } from './support/member-closure-invoices'
 
 // 不允许把外部未标记的库偷偷替换成临时库来绕过保护。
 assertIsolatedVerificationDatabase()
@@ -326,10 +327,7 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
   await put('userDataRequest', { endUserId: id, requestType: 'export', status: 'ready', exportFileId: fileIds[5], exportExpiresAt: expiresAt, progressJson: JSON.stringify({ nickname: identity.nickname }) })
   await put('aiUsageRecord', { endUserId: id, featureKey: 'resume_parse', dayKey: RUNTIME_DAY_KEY, vendor: 'fallback', status: 'ok', terminalId, terminalVerified: true, costCny: 0.12, costMeasured: true })
   await put('aiServiceLog', { endUserId: id, operation: 'resume_parse', status: 'ok', terminalId, tokenUsageJson: JSON.stringify({ phone: identity.phone }), errorCode: identity.nickname })
-  await put('invoiceRequest', { orderKind: 'print', orderId: order.id, endUserId: id, titleType: 'personal', title: identity.nickname,
-    email: `${identity.phone}@example.com`, amountCents: 200, status: 'submitted', returnReason: `${identity.nickname} ${identity.phone}` })
-  await put('invoiceRequest', { orderKind: 'service', orderId: `svc-${order.id}`, endUserId: id, titleType: 'company', title: '崂山区某印刷服务部',
-    taxId: '91000000MA0000000N', email: `desk-${identity.phone}@example.com`, amountCents: 200, status: 'issued' })
+  await seedClosureInvoices({ put, prisma, audit, operatorId: admin.userId }, id, identity, order.id)
   await put('auditLog', { actorRole: 'end_user', action: 'member.phone.rebind', targetType: 'EndUser', targetId: id,
     payloadJson: JSON.stringify({ oldPhoneMasked: `${identity.phone.slice(0, 3)}****${identity.phone.slice(-4)}` }) })
   for (const prefix of ['code', 'attempt', 'cooldown', 'daily']) await key(`member:sms:${prefix}:${identity.phoneHash}`, '1')
@@ -591,20 +589,7 @@ async function main() {
     assert.equal(await prisma.aiUsageRecord.count({ where: { endUserId: null, featureKey: 'resume_parse' } }), 1)
     assert.equal(await prisma.aiServiceLog.count({ where: { endUserId: null, operation: 'resume_parse' } }), 1)
     assert.equal((await prisma.memberLegalConsent.findFirstOrThrow({ where: { endUserId: owned.id } })).ipAddress, null)
-    const personalInvoice = await prisma.invoiceRequest.findFirstOrThrow({ where: { endUserId: owned.id, titleType: 'personal' } })
-    const companyInvoice = await prisma.invoiceRequest.findFirstOrThrow({ where: { endUserId: owned.id, titleType: 'company' } })
-    assert.equal(await prisma.invoiceRequest.count({ where: { endUserId: owned.id } }), 2, '开票申请行被删了')
-    assert.equal(personalInvoice.title, '[已去标识]')
-    assert.equal(personalInvoice.email, null)
-    assert.ok(personalInvoice.emailClearedAt)
-    assert.equal(personalInvoice.amountCents, 200)
-    assert.equal(personalInvoice.status, 'submitted')
-    assert.equal(JSON.stringify(personalInvoice).includes(owned.identity.phone), false)
-    assert.equal(JSON.stringify(personalInvoice).includes(owned.identity.nickname), false)
-    assert.equal(companyInvoice.title, '崂山区某印刷服务部')
-    assert.equal(companyInvoice.taxId, '91000000MA0000000N')
-    assert.equal(companyInvoice.email, null)
-    assert.equal(companyInvoice.amountCents, 200)
+    await assertClosureInvoices(prisma, owned.id, owned.identity, ownedFixture.orderId)
   })
   await check('3 旧 token/session/step-up 失效，另一会员仍可使用', async () => {
     await expectError('MEMBER_SESSION_EXPIRED', () => guard.canActivate(context(session.token)))
@@ -786,7 +771,7 @@ async function verifyHttp(newId: string, oldInput: MemberClosureInput) {
 
 main().catch((error) => { console.error(error); process.exitCode = 1 }).finally(async () => {
   try {
-    await prisma.auditLog.deleteMany({ where: { OR: [{ actorId: admin.userId }, { targetId: { in: memberIds } },
+    await prisma.auditLog.deleteMany({ where: { OR: [{ actorId: admin.userId }, { targetId: { in: [...memberIds, ...closureInvoiceAuditTargets] } },
       { targetId: { in: (await prisma.userDataRequest.findMany({ where: { endUserId: { in: memberIds } }, select: { id: true } })).map((row) => row.id) } }] } })
     await prisma.userDataRequest.deleteMany({ where: { endUserId: { in: memberIds } } })
     for (const { model, id } of created.reverse()) await (prisma as any)[model].deleteMany({ where: { id } })

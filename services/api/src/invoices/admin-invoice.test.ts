@@ -130,6 +130,12 @@ test('退回必须写原因，退回之后不能再标已开', async () => {
   assert.equal(invoices[0]?.operatorId, OPERATOR)
   assert.equal(audits[0]?.['action'], 'invoice.return')
   assert.equal((audits[0]?.['payload'] as Record<string, unknown>)['operatorId'], OPERATOR)
+  // 退回原因可能写到姓名、邮箱，审计不变、注销也不改写审计，所以审计里只留长度和去处。
+  const returnPayload = audits[0]?.['payload'] as Record<string, unknown>
+  assert.equal(JSON.stringify(returnPayload).includes('抬头与付款人不符'), false)
+  assert.equal(returnPayload['reasonLength'], '抬头与付款人不符'.length)
+  assert.equal(returnPayload['reasonNote'], '原因见申请')
+  assert.equal('reason' in returnPayload, false)
   await assert.rejects(
     () => service.markIssued('inv-1', { operatorId: OPERATOR }),
     (error: unknown) => {

@@ -147,7 +147,7 @@ DeepSeek、百度智能云、腾讯云的处理范围见第 2.1 节。它们是�
 
 存储位置：`InvoiceRequest`（`services/api/prisma/schema.prisma` 的开票申请）。金额只存提交时的实付快照，单位为分。
 
-保留与清理：申请行是收款凭证，不按天删除整行。个人抬头在会员注销时改为去标识；邮箱在注销时清空。已开或已退回的申请，邮箱再按 `readAiServiceLogRetentionDays`（环境变量 `AI_SERVICE_LOG_RETENTION_DAYS`，默认 90 天，与 AI 服务日志同一口径）到期清空。已提交、尚未开出或退回的，不按这 90 天清邮箱，因为还要用来发送发票。单位名称和统一社会信用代码在注销时保留。代码在 `member-closure-retention.ts` 的注销去标识，以及 `invoice-email-retention.ts`、`invoice-email-cleanup.task.ts` 的每小时清邮箱。
+保留与清理：申请行是收款凭证，不按天删除整行。个人抬头在会员注销时改为去标识；邮箱在注销时清空；退回原因里本人填过的姓名抬头和邮箱在注销时擦掉；已提交、还没处理的申请在注销时转为已退回，原因只写「会员已注销」。退回的审计只记原因长度，不记原因原文。已开或已退回的申请，邮箱再按 `readAiServiceLogRetentionDays`（环境变量 `AI_SERVICE_LOG_RETENTION_DAYS`，默认 90 天，与 AI 服务日志同一口径）到期清空。已提交、尚未开出或退回的，不按这 90 天清邮箱，因为还要用来发送发票。单位名称和统一社会信用代码在注销时保留。代码在 `member-closure-retention.ts` 的注销去标识，以及 `invoice-email-retention.ts`、`invoice-email-cleanup.task.ts` 的每小时清邮箱。
 
 谁能访问：会员本人查询自己的申请；管理员在订单详情查看该单申请并标已开或退回。一体机轮询开票会话不返回税号和邮箱。
 

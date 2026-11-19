@@ -123,10 +123,12 @@ test('注销去掉个人抬头和邮箱，单位名称和税号还在，行不�
   assert.equal(personal.title, '[已去标识]')
   assert.equal(personal.email, null)
   assert.ok(personal.emailClearedAt instanceof Date)
-  assert.equal(personal.returnReason, '[已去标识]来过')
+  // 期望值改动（返工包 P2c1b 第 3 条）：已提交、还没处理的申请随注销转「已退回」，原因只写「会员已注销」，
+  // 原先断言的「仍是已提交、原因擦成 [已去标识]来过」正是这一条要改掉的行为。
+  assert.equal(personal.returnReason, '会员已注销')
   assert.equal(personal.taxId, null)
   assert.equal(personal.amountCents, 300)
-  assert.equal(personal.status, 'submitted')
+  assert.equal(personal.status, 'returned')
   assert.equal(personal.endUserId, 'member-1')
   assert.equal(company.title, COMPANY_NAME)
   assert.equal(company.taxId, TAX_ID)
@@ -137,6 +139,49 @@ test('注销去掉个人抬头和邮箱，单位名称和税号还在，行不�
   assert.equal(other.title, '会员乙')
   assert.equal(other.email, 'member-b@example.com')
   assert.equal(other.emailClearedAt, null)
+})
+
+test('注销擦掉本人申请里的个人抬头和邮箱：退回原因里的姓名、邮箱都查不到，已提交的转已退回', async () => {
+  const now = new Date(Date.now() - 60_000)
+  const NAME = '王小明'
+  const OWN_EMAIL = 'wangxm.invoice@example.com'
+  const DESK_EMAIL = 'finance.desk@example.com'
+  const STRAY_EMAIL = 'someone.else@example.org'
+  const base = { endUserId: 'member-1', taxId: null, emailClearedAt: null, amountCents: 300, updatedAt: now }
+  const { rows, tx } = createStore([
+    { ...base, id: 'returned-personal', orderKind: 'print', orderId: 'order-1', titleType: 'personal', title: NAME, email: OWN_EMAIL,
+      status: 'returned', returnReason: `${NAME}的邮箱 ${OWN_EMAIL} 收不到，请重新填写` },
+    { ...base, id: 'returned-company', orderKind: 'print', orderId: 'order-2', titleType: 'company', title: COMPANY_NAME, taxId: TAX_ID,
+      email: DESK_EMAIL, status: 'returned', returnReason: `抬头写成了${NAME}，${DESK_EMAIL} 是单位邮箱，另抄送 ${STRAY_EMAIL}` },
+    { ...base, id: 'issued-company', orderKind: 'service', orderId: 'order-3', titleType: 'company', title: COMPANY_NAME, taxId: TAX_ID,
+      email: DESK_EMAIL, status: 'issued', returnReason: null },
+    { ...base, id: 'submitted-personal', orderKind: 'print', orderId: 'order-4', titleType: 'personal', title: NAME, email: OWN_EMAIL,
+      status: 'submitted', returnReason: null },
+    { ...base, id: 'other-member', endUserId: 'member-2', orderKind: 'print', orderId: 'order-5', titleType: 'personal', title: NAME,
+      email: OWN_EMAIL, status: 'returned', returnReason: `${NAME} ${OWN_EMAIL}` },
+  ])
+  // 注销的身份擦除器只认手机号、昵称；「王小明」和发票邮箱都不是账号身份。
+  const scrub = (text: string) => text.split(PERSONAL_NAME).join('[已去标识]')
+  const count = await deidentifyClosedMemberInvoices(tx as never, 'member-1', scrub)
+  assert.equal(count, 4)
+  for (const row of rows.filter((item) => item.endUserId === 'member-1')) {
+    const text = JSON.stringify(row)
+    for (const secret of [NAME, OWN_EMAIL, DESK_EMAIL, STRAY_EMAIL]) {
+      assert.equal(text.includes(secret), false, `${row.id} 还留着 ${secret}`)
+    }
+    assert.equal(row.email, null)
+  }
+  const submitted = rows.find((row) => row.id === 'submitted-personal')!
+  assert.equal(submitted.status, 'returned')
+  assert.equal(submitted.returnReason, '会员已注销')
+  assert.equal(rows.find((row) => row.id === 'issued-company')!.status, 'issued')
+  assert.equal(rows.find((row) => row.id === 'returned-company')!.title, COMPANY_NAME)
+  assert.equal(rows.find((row) => row.id === 'returned-company')!.taxId, TAX_ID)
+  assert.equal(rows.find((row) => row.id === 'returned-company')!.amountCents, 300)
+  const other = rows.find((row) => row.id === 'other-member')!
+  assert.equal(other.title, NAME)
+  assert.equal(other.email, OWN_EMAIL)
+  assert.equal(other.returnReason, `${NAME} ${OWN_EMAIL}`)
 })
 
 test('已开或已退回满期才清邮箱，已提交和未满期留下，天数与 AI 服务日志相同', async () => {
