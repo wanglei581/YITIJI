@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 681,
+    "endpointCount": 682,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -10057,6 +10057,22 @@
         ]
       },
       {
+        "controller": "services/api/src/virtual-pay/virtual-pay-credits.controller.ts",
+        "handler": "VirtualPayCreditsController.list",
+        "method": "GET",
+        "models": [
+          "MemberServiceCredit"
+        ],
+        "path": "/api/v1/member/service-credits",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-credits.service.ts"
+        ],
+        "services": [
+          "VirtualPayCreditsService"
+        ]
+      },
+      {
         "controller": "services/api/src/virtual-pay/virtual-pay-order.controller.ts",
         "handler": "VirtualPayOrderController.create",
         "method": "POST",
@@ -20051,6 +20067,7 @@
         ],
         "usedBy": [
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/virtual-pay/virtual-pay-credits.service.ts",
           "services/api/src/virtual-pay/virtual-pay-delivery.ts"
         ]
       },
@@ -27209,6 +27226,9 @@
     "services/api/scripts/support/member-closure-verification.ts": [
       "services/api/scripts/verify-member-closure.ts"
     ],
+    "services/api/scripts/support/miniapp-virtual-pay-credits.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
     "services/api/scripts/support/miniapp-virtual-pay-delivery.ts": [
       "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
       "services/api/scripts/verify-miniapp-virtual-pay.ts"
@@ -32560,6 +32580,12 @@
       "services/api/scripts/verify-miniapp-virtual-pay.ts"
     ],
     "services/api/src/virtual-pay/virtual-pay-admin.service.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay-credits.controller.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay-credits.service.ts": [
       "services/api/scripts/verify-miniapp-virtual-pay.ts"
     ],
     "services/api/src/virtual-pay/virtual-pay-order.controller.ts": [
@@ -46567,6 +46593,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-credits.ts",
           "services/api/scripts/support/miniapp-virtual-pay-delivery.ts",
           "services/api/scripts/support/miniapp-virtual-pay-orders.ts",
           "services/api/scripts/support/miniapp-virtual-pay-reconcile.ts",
@@ -46583,6 +46610,8 @@
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/virtual-pay/virtual-pay-admin.controller.ts",
           "services/api/src/virtual-pay/virtual-pay-admin.service.ts",
+          "services/api/src/virtual-pay/virtual-pay-credits.controller.ts",
+          "services/api/src/virtual-pay/virtual-pay-credits.service.ts",
           "services/api/src/virtual-pay/virtual-pay-order.controller.ts",
           "services/api/src/virtual-pay/virtual-pay-order.service.ts",
           "services/api/src/virtual-pay/virtual-pay-settings.ts",

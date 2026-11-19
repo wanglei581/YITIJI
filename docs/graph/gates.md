@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2277 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2280 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2382,7 +2382,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 163 个文件</summary>
+<summary><code>services/api/scripts/</code> — 164 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2447,6 +2447,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/license-harness.ts` | `verify-license-runtime.ts`<br/>`verify-license-writes.ts`<br/>`verify-license.ts` |
 | `services/api/scripts/support/llm-pii-callsite-checks.ts` | `verify-llm-input-pii-mask.ts` |
 | `services/api/scripts/support/member-closure-verification.ts` | `verify-member-closure.ts` |
+| `services/api/scripts/support/miniapp-virtual-pay-credits.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/scripts/support/miniapp-virtual-pay-delivery.ts` | `verify-miniapp-virtual-pay-postgres.ts`<br/>`verify-miniapp-virtual-pay.ts` |
 | `services/api/scripts/support/miniapp-virtual-pay-orders.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/scripts/support/miniapp-virtual-pay-reconcile.ts` | `verify-miniapp-virtual-pay.ts` |
@@ -2553,7 +2554,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 740 个文件</summary>
+<summary><code>services/api/src/</code> — 742 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -3291,6 +3292,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/upload-sessions/upload-sessions.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-upload-scene.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/src/virtual-pay/virtual-pay-admin.controller.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/src/virtual-pay/virtual-pay-admin.service.ts` | `verify-miniapp-virtual-pay.ts` |
+| `services/api/src/virtual-pay/virtual-pay-credits.controller.ts` | `verify-miniapp-virtual-pay.ts` |
+| `services/api/src/virtual-pay/virtual-pay-credits.service.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/src/virtual-pay/virtual-pay-order.controller.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/src/virtual-pay/virtual-pay-order.service.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/src/virtual-pay/virtual-pay-settings.ts` | `verify-miniapp-virtual-pay.ts` |
