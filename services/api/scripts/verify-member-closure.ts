@@ -326,6 +326,10 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
   await put('userDataRequest', { endUserId: id, requestType: 'export', status: 'ready', exportFileId: fileIds[5], exportExpiresAt: expiresAt, progressJson: JSON.stringify({ nickname: identity.nickname }) })
   await put('aiUsageRecord', { endUserId: id, featureKey: 'resume_parse', dayKey: RUNTIME_DAY_KEY, vendor: 'fallback', status: 'ok', terminalId, terminalVerified: true, costCny: 0.12, costMeasured: true })
   await put('aiServiceLog', { endUserId: id, operation: 'resume_parse', status: 'ok', terminalId, tokenUsageJson: JSON.stringify({ phone: identity.phone }), errorCode: identity.nickname })
+  await put('invoiceRequest', { orderKind: 'print', orderId: order.id, endUserId: id, titleType: 'personal', title: identity.nickname,
+    email: `${identity.phone}@example.com`, amountCents: 200, status: 'submitted', returnReason: `${identity.nickname} ${identity.phone}` })
+  await put('invoiceRequest', { orderKind: 'service', orderId: `svc-${order.id}`, endUserId: id, titleType: 'company', title: '崂山区某印刷服务部',
+    taxId: '91000000MA0000000N', email: `desk-${identity.phone}@example.com`, amountCents: 200, status: 'issued' })
   await put('auditLog', { actorRole: 'end_user', action: 'member.phone.rebind', targetType: 'EndUser', targetId: id,
     payloadJson: JSON.stringify({ oldPhoneMasked: `${identity.phone.slice(0, 3)}****${identity.phone.slice(-4)}` }) })
   for (const prefix of ['code', 'attempt', 'cooldown', 'daily']) await key(`member:sms:${prefix}:${identity.phoneHash}`, '1')
@@ -453,7 +457,7 @@ async function main() {
   for (const model of CLOSURE_DELETE_MODELS) beforeOther.set(model, await (prisma[model] as any).count({ where: { endUserId: other.id } }))
   beforeOther.set('fileObject', await prisma.fileObject.count({ where: { endUserId: other.id } }))
   const otherRetained = new Map<string, string>()
-  for (const model of ['order', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'aiServiceLog', 'aiUsageRecord', 'userDataRequest']) {
+  for (const model of ['order', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'aiServiceLog', 'aiUsageRecord', 'userDataRequest', 'invoiceRequest']) {
     otherRetained.set(model, JSON.stringify(await (prisma as any)[model].findMany({ where: { endUserId: other.id } })))
   }
   const session = await auth.issueLoginForUser({ id: owned.id, phoneMasked: '***', nickname: owned.identity.nickname })
@@ -587,6 +591,20 @@ async function main() {
     assert.equal(await prisma.aiUsageRecord.count({ where: { endUserId: null, featureKey: 'resume_parse' } }), 1)
     assert.equal(await prisma.aiServiceLog.count({ where: { endUserId: null, operation: 'resume_parse' } }), 1)
     assert.equal((await prisma.memberLegalConsent.findFirstOrThrow({ where: { endUserId: owned.id } })).ipAddress, null)
+    const personalInvoice = await prisma.invoiceRequest.findFirstOrThrow({ where: { endUserId: owned.id, titleType: 'personal' } })
+    const companyInvoice = await prisma.invoiceRequest.findFirstOrThrow({ where: { endUserId: owned.id, titleType: 'company' } })
+    assert.equal(await prisma.invoiceRequest.count({ where: { endUserId: owned.id } }), 2, '开票申请行被删了')
+    assert.equal(personalInvoice.title, '[已去标识]')
+    assert.equal(personalInvoice.email, null)
+    assert.ok(personalInvoice.emailClearedAt)
+    assert.equal(personalInvoice.amountCents, 200)
+    assert.equal(personalInvoice.status, 'submitted')
+    assert.equal(JSON.stringify(personalInvoice).includes(owned.identity.phone), false)
+    assert.equal(JSON.stringify(personalInvoice).includes(owned.identity.nickname), false)
+    assert.equal(companyInvoice.title, '崂山区某印刷服务部')
+    assert.equal(companyInvoice.taxId, '91000000MA0000000N')
+    assert.equal(companyInvoice.email, null)
+    assert.equal(companyInvoice.amountCents, 200)
   })
   await check('3 旧 token/session/step-up 失效，另一会员仍可使用', async () => {
     await expectError('MEMBER_SESSION_EXPIRED', () => guard.canActivate(context(session.token)))
@@ -626,7 +644,7 @@ async function main() {
     const scan = await scanClosureDatabase(scanClient, owned.identity)
     const metadata = (scanClient as any)._runtimeDataModel.models
     const actualModels = Object.entries(metadata).filter(([, model]: any) => model.fields.some((field: any) => field.name === 'endUserId')).map(([name]) => name).sort()
-    const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'copyJob', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation', 'serviceOrder'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
+    const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'copyJob', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation', 'serviceOrder', 'invoiceRequest'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
     const copy = await prisma.copyJob.findFirstOrThrow({ where: { endUserId: owned.id } })
     assert.equal(copy.billableSides, 2, '注销保留复印履约数据')
     assert.notEqual(copy.requestKey, owned.identity.phoneHash, '注销清除复印幂等键中的身份')

@@ -6,6 +6,7 @@ import { RolesGuard } from '../common/guards/roles.guard'
 import { TerminalsModule } from '../terminals/terminals.module'
 import { AdminInvoiceController } from './admin-invoice.controller'
 import { AdminInvoiceService } from './admin-invoice.service'
+import { InvoiceEmailCleanupTask } from './invoice-email-cleanup.task'
 import { InvoiceRequestsService } from './invoice-requests.service'
 import { InvoiceSessionsService } from './invoice-sessions.service'
 import { KioskInvoiceSessionsController } from './kiosk-invoice-sessions.controller'
@@ -25,7 +26,7 @@ import { MemberInvoiceController } from './member-invoice.controller'
     }),
   ],
   controllers: [KioskInvoiceSessionsController, MemberInvoiceController, AdminInvoiceController],
-  providers: [InvoiceRequestsService, InvoiceSessionsService, EndUserAuthGuard, AdminInvoiceService, JwtAuthGuard, RolesGuard],
+  providers: [InvoiceRequestsService, InvoiceSessionsService, EndUserAuthGuard, AdminInvoiceService, JwtAuthGuard, RolesGuard, InvoiceEmailCleanupTask],
   exports: [InvoiceRequestsService, InvoiceSessionsService],
 })
 export class InvoicesModule {}

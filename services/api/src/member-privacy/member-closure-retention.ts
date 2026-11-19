@@ -42,6 +42,30 @@ export function closureTextScrubber(identity: ClosureIdentity): (text: string) =
   }
 }
 
+/**
+ * 开票申请是收款凭证，行留下。个人抬头整段换成去标识（姓名不一定等于账号昵称）。
+ * 单位名称只擦掉已知身份，统一社会信用代码不动。邮箱一律清空。
+ */
+export async function deidentifyClosedMemberInvoices(
+  tx: PrismaTransactionClient,
+  endUserId: string,
+  scrub: (text: string) => string,
+): Promise<number> {
+  const rows = await tx.invoiceRequest.findMany({ where: { endUserId } })
+  for (const row of rows) {
+    await tx.invoiceRequest.update({
+      where: { id: row.id },
+      data: {
+        title: row.titleType === 'personal' ? '[已去标识]' : scrub(row.title),
+        email: null,
+        ...(row.email != null ? { emailClearedAt: new Date() } : {}),
+        returnReason: row.returnReason ? scrub(row.returnReason) : null,
+      },
+    })
+  }
+  return rows.length
+}
+
 /** 逐行处理自由文本，避免清掉财务状态、金额与条款版本。 */
 export async function retainClosureRecords(tx: PrismaTransactionClient, endUserId: string, scrub: (text: string) => string) {
   const counts: Record<string, number> = {}
@@ -152,5 +176,6 @@ export async function retainClosureRecords(tx: PrismaTransactionClient, endUserI
   counts.KioskSession = (await tx.kioskSession.updateMany({ where: { memberId: endUserId }, data: {
     memberId: null, clientSessionId: null, categoriesJson: '[]',
   } })).count
+  counts.InvoiceRequest = await deidentifyClosedMemberInvoices(tx, endUserId, scrub)
   return counts
 }

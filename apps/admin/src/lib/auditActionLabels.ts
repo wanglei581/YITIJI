@@ -110,6 +110,7 @@ const ACTION_LABELS: Record<string, string> = {
   'file.storage_delete_reconciled': '核对存储文件删除结果',
   'invoice.mark_issued': '标已开',
   'invoice.return': '退回开票申请',
+  'invoice.email_cleared': '清掉开票邮箱',
   'job.partner_unpublish': '机构下架岗位信息',
   'job.partner_update': '机构更新岗位信息',
   'job_material.generate': '生成求职材料',

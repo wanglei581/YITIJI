@@ -857,6 +857,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:invoice-sessions
           pnpm --filter @ai-job-print/api verify:invoice-member
           pnpm --filter @ai-job-print/api verify:invoice-admin
+          pnpm --filter @ai-job-print/api verify:invoice-privacy
           # 贴牌第一步：品牌与备案默认值 = 现状、机构覆盖只影响该机构终端、Logo 只收 PNG / WebP（按文件头判、禁 SVG、
           # 清洗元数据）、一体机 kiosk-profile 只认已验签终端（防枚举）。写隔离库，结束恢复平台设置。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding

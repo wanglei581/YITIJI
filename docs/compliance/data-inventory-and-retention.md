@@ -58,6 +58,7 @@
 | 37 | 审计日志 | 同意、删除、管理员访问文件等动作 | 可能含会员关联和 IP；个人信息属性由字段决定 | 待律师确认（项目标签） | 关键动作写审计 | 两份期限文件未写天数。`services/api/src` 内未找到 `auditLog.delete` | 未发现定时删除 | `AuditLog`（`schema.prisma:2298`） | 审计人员。角色清单未在本表重列；不以此表替代网络日志判断 |
 | 38 | 本机未领取扫描件 | 扫描后尚未被本次办理取走的文件 | 扫描件通常是个人信息，可能是敏感个人信息 | 待律师确认 | 一体机扫描 | 最多 24 小时（`UNCLAIMED_MAX_AGE_MS`，`apps/terminal-agent/src/agent/scan-watcher.ts:122`） | 终端本机清扫。不是云上 cron | 终端本机目录，不在对象存储前缀表内 | 能接触那台机器的人。云上账号权限管不到这批文件 |
 | 39 | 本人自填的求职进度 | 公司名、岗位名、自述状态、备注 | 个人信息。状态由本人填写，不是企业回传。是否敏感：工作判断为否 | 一般。待律师确认 | 会员自己记一笔站外进展 | 未发现到期天数。账号存在期间，本人可删 | 未发现定时删除。本人删除走 `jobApplication.deleteMany`（`job-applications.service.ts:259`）。创建在同文件 `:173` | `JobApplication`（`schema.prisma:2138`–`:2176`）。`channel` 默认 `external_self_reported`，`statusSource` 默认 `self_reported`。代码注释写 `resumeFileId`、`consentId` 默认为空，实际数据仍需按接口核对 | 本人。导出映射会读出摘要（`member-data-export.mapper.ts:175`）。字段设计不等于已完成接口隔离，本次未逐个查询接口 |
+| 40 | 发票信息（抬头、税号、邮箱） | 个人写姓名，单位写单位名称和统一社会信用代码，加上接收邮箱；另有实付金额快照和状态 | 姓名抬头和邮箱能对应到本人，属个人信息。统一社会信用代码指向单位。个人不收集身份证号。是否敏感：工作判断为否 | 一般 | 本人在手机网页或会员接口提交开票申请，用来开电子发票（普通发票）并把发票发到所填邮箱 | 申请行随订单留存，未发现按天删除整行。邮箱：已开或已退回默认 90 天（`readAiServiceLogRetentionDays`，与第 25 行同一函数，`AI_SERVICE_LOG_RETENTION_DAYS`）。已提交、尚未开出或退回的邮箱不按这 90 天清除 | 注销时个人抬头改为去标识、邮箱清空（`deidentifyClosedMemberInvoices`，`member-closure-retention.ts`）。已开或已退回满期由 `InvoiceEmailCleanupTask` 每小时清空邮箱（`invoice-email-cleanup.task.ts`）。单位名称和税号不在这两步删除 | `InvoiceRequest`（`schema.prisma` 开票申请，约 `:1104`） | 本人查自己的申请。管理员在订单详情看这一单。一体机轮询不返回税号和邮箱 |
 
 已批准、矩阵写明未实施的两类，不放入上表，也不写成正在收集：简历智能上下文会话建议、`ResumeProfileSnapshot`。矩阵要求实现前不得描述为已上线。本次未再搜索同名模型。
 
@@ -68,7 +69,7 @@
 | 代码默认值 | 可覆盖环境变量 | 适用数据 |
 | --- | --- | --- |
 | 24 小时 | `AI_RESUME_RESULT_TTL_HOURS` | AI 简历结果、自我探索结果、岗位 AI 会话 |
-| 90 天 | `AI_SERVICE_LOG_RETENTION_DAYS` | AI 服务日志、AI 用量明细 |
+| 90 天 | `AI_SERVICE_LOG_RETENTION_DAYS` | AI 服务日志、AI 用量明细、已开或已退回的开票邮箱 |
 | 24 小时 | `ADVISOR_SESSION_TTL_HOURS` | 顾问会话 |
 | 24 小时 | `ADVISOR_ARTIFACT_TTL_HOURS` | 顾问产物 |
 | 30 天 | `ACTIVITY_LOG_TTL_DAYS` | 浏览、外部跳转记录 |
@@ -109,6 +110,7 @@
 15. 网络安全日志「不少于 6 个月」对应现行《网络安全法》第二十三条第三项，不是第二十一条。它写在试点制度第 1 条，不是这两份期限文件的一行，也没有对应到 `AuditLog` 的清理任务。Nginx、API、Windows/主机系统日志的实际保留均未核实，不能用其中一类推定其他类。
 16. 改保存期限时，不需要同意的策略会把同意字段写成空（`retention-policy.ts:170`–`:171`）。是否另写审计，未核实。同意没有历史表。
 17. 本人自填的求职进度已补为第 39 行。两份期限文件原先没有这一行。导出文案还提到权益（`packages/shared/src/types/memberPrivacy.ts:26`）。`BenefitGrant` 在 `schema.prisma:2201`。它的字段和保存期本次未摘完，所以没有单独成行。
+18. 发票信息已补为第 40 行。邮箱的 90 天与第 25 行同一函数，不是另设天数。申请整行没有按天删除，和打印订单一样属于未发现定时删除的财务留痕；多出来的只是邮箱字段到期清空。
 
 ## 待律师确认的事项
 
