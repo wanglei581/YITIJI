@@ -570,6 +570,102 @@ test('rapid repeated confirm sends exactly one create request @kiosk', async ({ 
   expect(jobs[0]?.['quotedAmountCents']).toBe(40)
 })
 
+function readyMachinePrice() {
+  return {
+    status: 200,
+    json: withMachinePricing(terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'price-truth'), 20, UNIT_CENTS.color),
+  }
+}
+
+// 开页第一次读公示价失败（没有 409）：报价接口已经带回金额，也不能拿它顶上。
+// 确认（去付款）不可点；出路是页面原有的「重新报价」，读回来之后金额和确认才出现。
+for (const failure of ['http-500', 'timedout'] as const) {
+  test(`first price read ${failure} hides the server quote until a reread succeeds @kiosk`, async ({ page, api }) => {
+    registerShell(api, [])
+    let reads = 0
+    api.respondWith('GET', KIOSK_CONFIG_PATH, () => {
+      reads += 1
+      if (reads === 1) {
+        return failure === 'timedout'
+          ? { abort: 'timedout' as const }
+          : { status: 500, json: { success: false, error: { code: 'INTERNAL', message: '当前应付 0.40 元' } } }
+      }
+      return readyMachinePrice()
+    })
+    await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+    const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
+
+    await openConfirm(page)
+    await expect(page.getByText('本机没能取到现行价目', { exact: true }).first()).toBeVisible()
+    await expect(page.getByTestId('print-confirm-state-quoted')).toBeVisible()
+    const failedText = await page.locator('[data-w2-page="print-confirm"]').innerText()
+    expect(failedText, failedText).not.toMatch(/[¥￥]\s*\d|\d+\.\d{2}\s*元|免费试运营|\/页/)
+    await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+    await expect(page.locator('[data-benefit-state="repriced"]')).toHaveCount(0)
+    await expect(page.locator('[data-free-pricing="true"]')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^(去付款|确认并打印)$/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /按新金额/ })).toHaveCount(0)
+    const retry = page.getByRole('button', { name: '重新报价' })
+    await expect(retry).toBeEnabled()
+    await retry.click()
+    await expectConfirmAmount(page, 20 * W2_FILE.pages)
+    await expect(originalConfirm(page)).toBeEnabled()
+    expect(jobs).toHaveLength(0)
+    expect(reads).toBeGreaterThanOrEqual(2)
+  })
+}
+
+// 报价接口本身第一次 500 / 超时：失败屏不显示金额，确认不可点，就地「重新报价」成功后才出现金额。
+for (const failure of ['http-500', 'timedout'] as const) {
+  test(`first quote ${failure} shows no amount and retries in place @kiosk`, async ({ page, api }) => {
+    registerShell(api, [])
+    registerPriceConfig(api, [20])
+    let attempts = 0
+    await page.route('**/api/v1/orders/quote', async (route: Route) => {
+      if (route.request().method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      attempts += 1
+      if (attempts === 1) {
+        if (failure === 'timedout') {
+          await route.abort('timedout')
+          return
+        }
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: false, error: { code: 'INTERNAL', message: '当前应付 0.40 元' } }),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(quoteJson(20, W2_FILE.pages)),
+      })
+    })
+    const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
+
+    await openConfirm(page)
+    await expect(page.getByTestId('print-confirm-state-quote-failed')).toBeVisible()
+    await expect(page.getByText('这一次没有拿到报价')).toBeVisible()
+    await expect(page.getByText('确认前不显示金额')).toBeVisible()
+    const failedText = await page.locator('[data-w2-page="print-confirm"]').innerText()
+    expect(failedText, failedText).not.toMatch(/[¥￥]\s*\d|\d+\.\d{2}\s*元|免费试运营|\/页/)
+    await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+    await expect(page.locator('[data-free-pricing="true"]')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^(去付款|确认并打印)$/ })).toHaveCount(0)
+    const retry = page.getByRole('button', { name: '重新报价' })
+    await expect(retry).toBeEnabled()
+    await retry.click()
+    await expectConfirmAmount(page, 20 * W2_FILE.pages)
+    await expect(originalConfirm(page)).toBeEnabled()
+    expect(jobs).toHaveLength(0)
+    expect(attempts).toBe(2)
+  })
+}
+
 test('confirm cannot create an order while the quote is failed or still loading @kiosk', async ({ page, api }) => {
   registerShell(api, [])
   const quote = { unitCents: 20, pages: W2_FILE.pages }

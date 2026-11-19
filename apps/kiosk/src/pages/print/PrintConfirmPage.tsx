@@ -149,6 +149,8 @@ export function PrintConfirmPage() {
     : `每单最多打印 ${PRINT_MAX_SIDES_PER_ORDER} 面（页数 × 份数），当前 ${printSides} 面`
   const [priceNotice, setPriceNotice] = useState<{ key: string; text: string } | null>(null)
   const [priceReadNonce, setPriceReadNonce] = useState(0)
+  // 公示价失败后的重读会先回到 loading。失败态要留到读成功，避免金额和「去付款」在半路闪回来。
+  const priceBlockedRef = useRef(false)
   const activeNotice = priceNotice?.key === quoteKey ? priceNotice.text : null
   const inFlightRef = useRef(false)
   const hasFileContext = Boolean(handoff)
@@ -157,9 +159,9 @@ export function PrintConfirmPage() {
   const [benefits, setBenefits] = useState<BenefitsView>({ status: 'loading' })
   const [priceCfg, setPriceCfg] = useState<PriceCfgView>({ status: 'loading' })
   const freePricing = quote.status === 'ready' ? quote.amountCents === 0 : priceCfg.status === 'ready' && priceCfg.unitCents === 0
-  // 409 之后公示价没读回来：不能再把 0 元报价说成免费试运营，也不能留着上一屏的金额。
-  const priceRereadFailed = Boolean(activeNotice) && priceCfg.status === 'error'
-  const displayFree = freePricing && !priceRereadFailed
+  // 公示价没读到（开页第一次，或 409 之后重读）：不能拿报价金额顶上，也不能说成免费试运营。
+  const priceReadFailed = priceCfg.status === 'error' || priceBlockedRef.current
+  const displayFree = freePricing && !priceReadFailed
 
   useEffect(() => {
     if (API_MODE !== 'http') return
@@ -203,10 +205,14 @@ export function PrintConfirmPage() {
     // 确认页每次都现读。30 秒缓存里可能还是刚改价之前的单价，拿它和这次报价一比就会误报「本屏报价已不是现价」。
     void fetchPrintPriceConfig({ force: true })
       .then((config) => {
-        if (!cancelled) setPriceCfg({ status: 'ready', unitCents: unitCentsFor(config, params.colorMode) })
+        if (cancelled) return
+        priceBlockedRef.current = false
+        setPriceCfg({ status: 'ready', unitCents: unitCentsFor(config, params.colorMode) })
       })
       .catch(() => {
-        if (!cancelled) setPriceCfg({ status: 'error' })
+        if (cancelled) return
+        priceBlockedRef.current = true
+        setPriceCfg({ status: 'error' })
       })
     return () => {
       cancelled = true
@@ -516,7 +522,7 @@ export function PrintConfirmPage() {
         : screen === 'capability-invalid-params'
           ? { tone: 'warn' as const, label: '已改回目前能打的参数' }
           : pill
-  const status = priceRereadFailed
+  const status = priceReadFailed
     ? { tone: 'bad' as const, label: '本机没能取到现行价目' }
     : printerLoading && (screen === 'quoted' || screen === 'zero-amount')
       ? { tone: 'unknown' as const, label: '状态未知' }
@@ -524,7 +530,7 @@ export function PrintConfirmPage() {
 
   // 金额变了（服务端 409 或生成了合并版）：按钮写明新金额，用户再点的就是这一笔。
   // 重读公示价失败时不给确认金额的按钮，屏上只留「没取到现行价目」。
-  const reconfirmLabel = activeNotice && quote.status === 'ready' && !priceRereadFailed
+  const reconfirmLabel = activeNotice && quote.status === 'ready' && !priceReadFailed
     ? quote.amountCents === 0 ? `核对后确认打印${appendEligible ? '（合并版）' : ''}` : `按新金额 ${formatCents(quote.amountCents)} 确认${appendEligible ? '（合并版）' : ''}`
     : null
 
@@ -538,7 +544,7 @@ export function PrintConfirmPage() {
           ? '设备检测中…'
           : !printerReady
             ? (printerNotice ? printerLabel : '打印机不可用')
-            : priceRereadFailed
+            : priceReadFailed
               ? '重新报价'
               : reconfirmLabel
               ? reconfirmLabel
@@ -718,8 +724,10 @@ export function PrintConfirmPage() {
         onClick: () => {
           if (guestQuotaExceeded) navigate(loginPathForPrintStep('confirm'))
           else if (piiCheckRequired) returnToMaterialCheck()
-          else if (priceRereadFailed) setPriceReadNonce((n) => n + 1)
-          else if (!sidesOverLimit && screen === 'quote-failed') setQuoteNonce((n) => n + 1)
+          else if (!sidesOverLimit && screen === 'quote-failed') {
+            setQuoteNonce((n) => n + 1)
+            if (priceReadFailed) setPriceReadNonce((n) => n + 1)
+          } else if (priceReadFailed) setPriceReadNonce((n) => n + 1)
           else void handleConfirm()
         },
       } : undefined}
@@ -729,7 +737,7 @@ export function PrintConfirmPage() {
       <PrintConfirmView
         step={4}
         freePricing={displayFree}
-        hideQuotedAmount={priceRereadFailed}
+        hideQuotedAmount={priceReadFailed}
         screen={screen}
         invalidReason={
           (handoffInvalid ? problem : null)
@@ -760,7 +768,7 @@ export function PrintConfirmPage() {
         settingsLabel={settingsLabel}
         copiesLabel={`${params.copies} 份`}
         docked
-        submitError={submitError ?? (priceRereadFailed ? null : activeNotice) ?? (sidesOverLimit ? sidesNotice : null)}
+        submitError={submitError ?? (priceReadFailed ? null : activeNotice) ?? (sidesOverLimit ? sidesNotice : null)}
         // 回跳地址只放路由路径：不带文件编号、打印链接、交接编号，也不带当前查询串。
         onLogin={() => navigate(loginPathForPrintStep('confirm'))}
       />
