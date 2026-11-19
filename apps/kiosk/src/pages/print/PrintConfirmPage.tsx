@@ -305,7 +305,8 @@ export function PrintConfirmPage() {
     terminalSession !== 'ready' ||
     !hasFileContext ||
     (API_MODE === 'http' && !confirmScreenAllowsOrder(screen)) ||
-    (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
+    (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo') ||
+    priceReadFailed
 
   const returnWithCarry = (): boolean => {
     const routeState = location.state
@@ -335,6 +336,8 @@ export function PrintConfirmPage() {
   }
 
   const handleConfirm = async () => {
+    // 公示价没读到、金额没画出来：不能建单。置灰之外再挡一次，避免绕过 disabled。
+    if (priceReadFailed) return
     if (terminalSession === 'checking') return
     if (terminalSession === 'failed') {
       setSubmitError(preferUnattended(
@@ -678,7 +681,7 @@ export function PrintConfirmPage() {
   const usesDockPrimary = guestQuotaExceeded || piiCheckRequired || (screen !== 'missing-context'
     && screen !== 'invalid-context'
     && screen !== 'ordered'
-    && screen !== 'benefit-unverified')
+    && (screen !== 'benefit-unverified' || priceReadFailed))
   const dockLabel = guestQuotaExceeded ? '去登录' : piiCheckRequired ? '回到材料检查' : sidesOverLimit
     ? '确认打印'
     : screen === 'quoting'
@@ -686,7 +689,8 @@ export function PrintConfirmPage() {
       : screen === 'quote-failed'
         ? (freePricing ? '重新核定页数' : '重新报价')
         : primaryLabel
-  const dockDisabled = !guestQuotaExceeded && !piiCheckRequired && (sidesOverLimit || screen === 'quoting' || (screen !== 'quote-failed' && confirmBlocked))
+  // 重新报价不是建单。价没读到时底栏仍可点，其它挡住建单的原因照旧置灰。
+  const dockDisabled = !guestQuotaExceeded && !piiCheckRequired && (sidesOverLimit || screen === 'quoting' || (screen !== 'quote-failed' && confirmBlocked && !(priceReadFailed && primaryLabel === '重新报价')))
   const previewKind = hasFileContext ? previewKindForFile(file) : 'unavailable'
   const previewNode = hasFileContext && (previewKind === 'pdf' || previewKind === 'image') ? <FilePageThumb file={file} /> : null
   const sheetPages = quote.status === 'ready' ? quote.billablePages : rangedPages

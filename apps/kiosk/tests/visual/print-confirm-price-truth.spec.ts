@@ -615,6 +615,55 @@ for (const failure of ['http-500', 'timedout'] as const) {
   })
 }
 
+// 已登录、权益接口失败、公示价也失败、报价已就绪且不是 0：金额藏起来之后，
+// 不能再点「按实际原价继续」建单。出路是就地「重新报价」，读回来才恢复原按钮。
+test('signed-in benefit failure hides the amount and blocks ordering until the price reread @kiosk', async ({ page, api }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  registerShell(api, [])
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 500,
+    json: { success: false, error: { code: 'INTERNAL', message: '当前应付 0.40 元' } },
+  })
+  let releasePrice = false
+  api.respondWith('GET', KIOSK_CONFIG_PATH, () => (
+    releasePrice
+      ? readyMachinePrice()
+      : { status: 500, json: { success: false, error: { code: 'INTERNAL', message: '当前应付 0.40 元' } } }
+  ))
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  const jobs = await routeJobs(page, [{ status: 201, unitCents: 20 }])
+
+  await page.goto('/print/confirm')
+  await writePrintHandoff(page, { printParams: W2_PRINT_PARAMS, materialCheck: null })
+  await loginThroughVisibleUi(page, '/print/confirm')
+
+  await expect(page.getByTestId('print-confirm-state-benefit-unverified')).toBeVisible()
+  await expect(page.getByText('本机没能取到现行价目', { exact: true }).first()).toBeVisible()
+  const failedText = await page.locator('[data-w2-page="print-confirm"]').innerText()
+  expect(failedText, failedText).not.toMatch(/[¥￥]\s*\d|\d+\.\d{2}\s*元|免费试运营|\/页/)
+  await expect(page.getByTestId('print-confirm-amount')).toHaveCount(0)
+  const orderButton = page.getByRole('button', { name: /按实际原价继续|去付款|确认并打印|按新金额|确认打印|打印合并版|按以上设置打印/ })
+  const orderCount = await orderButton.count()
+  for (let index = 0; index < orderCount; index += 1) {
+    await expect(orderButton.nth(index)).toBeDisabled()
+    await orderButton.nth(index).evaluate((button) => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+  }
+  expect(jobs).toHaveLength(0)
+  const retry = page.getByRole('button', { name: '重新报价', exact: true })
+  await expect(retry).toBeEnabled()
+  releasePrice = true
+  await retry.click()
+  await expectConfirmAmount(page, 20 * W2_FILE.pages)
+  await expect(page.getByRole('button', { name: '按实际原价继续', exact: true })).toBeEnabled()
+  expect(jobs).toHaveLength(0)
+  await expect(page).toHaveURL(/\/print\/confirm/)
+  expect(pageErrors).toEqual([])
+})
+
 // 报价接口本身第一次 500 / 超时：失败屏不显示金额，确认不可点，就地「重新报价」成功后才出现金额。
 for (const failure of ['http-500', 'timedout'] as const) {
   test(`first quote ${failure} shows no amount and retries in place @kiosk`, async ({ page, api }) => {
