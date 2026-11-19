@@ -854,6 +854,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:support-contact
           # 开票资格：一体机与会员接口共用。纯函数，不碰库。
           pnpm --filter @ai-job-print/api verify:invoice-eligibility
+          pnpm --filter @ai-job-print/api verify:invoice-sessions
           # 贴牌第一步：品牌与备案默认值 = 现状、机构覆盖只影响该机构终端、Logo 只收 PNG / WebP（按文件头判、禁 SVG、
           # 清洗元数据）、一体机 kiosk-profile 只认已验签终端（防枚举）。写隔离库，结束恢复平台设置。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding

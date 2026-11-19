@@ -187,6 +187,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.serviceOrder
   }
 
+  get invoiceRequest() {
+    return this.client.invoiceRequest
+  }
+
   // ── C5-4 退款域 ─────────────────────────────────────────────────────────────
 
   get refund() {

@@ -3,12 +3,13 @@ import { test } from 'node:test'
 import {
   INVOICE_BLOCK_MESSAGES,
   assessInvoiceEligibility,
-  type InvoiceFacts,
+  type PrintInvoiceFacts,
+  type ServiceInvoiceFacts,
 } from './invoice-eligibility'
 
 const MEMBER = 'member-1'
 
-function printFacts(overrides: Partial<InvoiceFacts> = {}): InvoiceFacts {
+function printFacts(overrides: Partial<Omit<PrintInvoiceFacts, 'kind'>> = {}): PrintInvoiceFacts {
   return {
     kind: 'print',
     id: 'order-1',
@@ -24,7 +25,7 @@ function printFacts(overrides: Partial<InvoiceFacts> = {}): InvoiceFacts {
   }
 }
 
-function serviceFacts(overrides: Partial<InvoiceFacts> = {}): InvoiceFacts {
+function serviceFacts(overrides: Partial<Omit<ServiceInvoiceFacts, 'kind'>> = {}): ServiceInvoiceFacts {
   return {
     kind: 'service',
     id: 'svc-1',
@@ -38,7 +39,7 @@ function serviceFacts(overrides: Partial<InvoiceFacts> = {}): InvoiceFacts {
   }
 }
 
-function expectBlock(facts: InvoiceFacts, code: keyof typeof INVOICE_BLOCK_MESSAGES): void {
+function expectBlock(facts: PrintInvoiceFacts | ServiceInvoiceFacts, code: keyof typeof INVOICE_BLOCK_MESSAGES): void {
   const decision = assessInvoiceEligibility(facts, MEMBER)
   assert.equal(decision.ok, false)
   assert.equal(decision.code, code)
