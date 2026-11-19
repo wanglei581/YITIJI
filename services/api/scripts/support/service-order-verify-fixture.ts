@@ -28,7 +28,8 @@ import { TripCoverService } from '../../src/payment/trip-cover.service'
 import { OnlinePaymentService } from '../../src/payment/online-payment.service'
 import { OrderStatusService } from '../../src/payment/order-status.service'
 import { PaymentController } from '../../src/payment/payment.controller'
-import { resolvePaymentProviders, type PaymentProviderRegistry } from '../../src/payment/payment-provider.factory'
+import { PAYMENT_PROVIDER_TOKEN, resolvePaymentProviders, type PaymentProviderRegistry } from '../../src/payment/payment-provider.factory'
+import { ServiceOrderSandboxController } from '../../src/payment/service-order-sandbox.controller'
 import { buildPaymentCallbackPath, type RefundExecuteInput } from '../../src/payment/payment-provider.types'
 import { SandboxPaymentProvider } from '../../src/payment/providers/sandbox-payment.provider'
 import { PricingService } from '../../src/payment/pricing.service'
@@ -374,6 +375,7 @@ export async function withServiceOrderFixture(run: (fx: ServiceOrderFixture) => 
     controllers: [
       ServiceOrderController,
       ServiceOrderAdminController,
+      ServiceOrderSandboxController,
       PaymentController,
       KioskSessionController,
       AiController,
@@ -394,6 +396,7 @@ export async function withServiceOrderFixture(run: (fx: ServiceOrderFixture) => 
       { provide: TripCoverService, useValue: new TripCoverService(serviceOrders) },
       { provide: KioskSessionService, useValue: kioskSessions },
       { provide: OnlinePaymentService, useValue: online },
+      { provide: PAYMENT_PROVIDER_TOKEN, useValue: registry },
       { provide: PricingService, useValue: {} },
       { provide: RefundService, useValue: {} },
       { provide: AiService, useValue: ai },

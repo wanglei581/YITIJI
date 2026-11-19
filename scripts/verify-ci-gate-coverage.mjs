@@ -90,6 +90,8 @@ const REQUIRED_COMMANDS = [
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:internal-login-real-redis',
   'pnpm --filter @ai-job-print/api verify:error-observability',
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters',
+  // 服务单沙箱模拟付成：生产必须 404、只认沙箱通道。它一旦从 CI 摘掉，生产判断被删也不会有人发现。
+  'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-sandbox-simulate',
 ]
 
 const workflowText = readFileSync(workflowPath, 'utf8')
