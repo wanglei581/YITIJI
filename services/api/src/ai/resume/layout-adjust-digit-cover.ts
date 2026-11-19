@@ -10,9 +10,10 @@
  * JSON 字符串里写成反斜杠加 n、r、t、斜线的，也按分隔符认。
  * 简历 JSON 再按字段对齐：相邻字符串值或数值拼起来够 11 位的，各换成自己的占位符。
  * 占位符是本次请求的标记，用户原文里写不出同样的一串。
- * 年月日期轴、中文日期和时间段不是号码，原样留下，排版还要看见时间。
+ * 整段像日期、时间或年份串的不是号码，原样留下，排版还要看见时间。
  */
 import { randomBytes } from 'node:crypto'
+import { isLayoutDateOrTime } from './layout-adjust-digit-dates'
 import {
   extendCheckDigit,
   isDigit,
@@ -27,7 +28,6 @@ export interface LayoutDigitBook {
   issue(original: string): string
 }
 
-const DATE_AXIS = /^(?:19|20)\d{2}[.-](?:0[1-9]|1[0-2])(?:[.-](?:0[1-9]|[12]\d|3[01]))?(?:-(?:19|20)\d{2}[.-](?:0[1-9]|1[0-2])(?:[.-](?:0[1-9]|[12]\d|3[01]))?)*$/u
 /** 纯数字的年、年月、年月日。两段这样的值接起来不是人写的号码。 */
 const DATE_PIECE = /^(?:19|20)\d{2}(?:(?:0[1-9]|1[0-2])(?:(?:0[1-9]|[12]\d|3[01]))?)?$/u
 
@@ -93,16 +93,6 @@ function pickNonce(inputs: readonly string[]): string {
   return `a${randomBytes(3).toString('hex').slice(0, 5)}`
 }
 
-/** 年月用点、斜线或短横连起来的日期轴。转义分隔折成短横，空白拿掉再认。 */
-function isDateAxis(foldedSpan: string): boolean {
-  const normalized = foldedSpan
-    .replace(/\\t|\\n|\\r|\\\//gu, '-')
-    .replace(/[·•・．]/gu, '.')
-    .replace(/[‐‑–—﹣－/]/gu, '-')
-    .replace(/[ \t\n\r\u00A0\u3000]/gu, '')
-  return DATE_AXIS.test(normalized)
-}
-
 /**
  * 把仍然露在外面的长数字换成可还原占位符。
  * 先折半角，长度不变，所以命中区间可以直接切回原文。
@@ -123,7 +113,7 @@ export function coverRealisticNumbers(text: string, book: LayoutDigitBook): stri
     const rawEnd = chosen === null ? joined.end : chosen.end
     const digitCount = chosen === null ? joined.digits : chosen.digits
     const end = extendCheckDigit(folded, rawEnd)
-    if (digitCount >= 11 && !isDateAxis(folded.slice(runStart, end))) {
+    if (digitCount >= 11 && !isLayoutDateOrTime(folded.slice(runStart, end))) {
       spans.push([numberSpanStart(text, folded, runStart, end), end])
     }
     index = end
@@ -287,7 +277,7 @@ function escapesAreOnlySeparators(raw: string): boolean {
 function isJoinableNumber(raw: string): boolean {
   if (raw.length === 0) return false
   const folded = foldDigits(raw)
-  if (isDateAxis(folded)) return false
+  if (isLayoutDateOrTime(folded)) return false
   let index = 0
   const digitsOnly = folded.replace(/\D/gu, '')
   if ((folded[0] === '+' || folded[0] === '＋') && digitsOnly.startsWith('86')) index = 1

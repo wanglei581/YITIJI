@@ -12,7 +12,7 @@
  * 运行：pnpm --filter @ai-job-print/api verify:layout-outbound-realistic
  */
 import { maskLayoutAdjustOutbound } from '../src/ai/resume/layout-adjust-mask'
-import { runExtendedSegmentCases } from './verify-layout-outbound-realistic-extra'
+import { runDateExemptionCases, runExtendedSegmentCases } from './verify-layout-outbound-realistic-extra'
 
 let passCount = 0
 
@@ -238,6 +238,7 @@ function main(): void {
   assertJsonKept('中间夹了文字就断开', '{"mobilePrefix":"138","note":"备注","mobileBody":"00138000"}', '138')
 
   runExtendedSegmentCases(assertCovered)
+  runDateExemptionCases(assertKept, assertCovered)
   assertPlaceholderCollision()
   assertPrivateUseKept()
   assertTruncationHoleDoesNotCrossWire()

@@ -16,10 +16,12 @@ import { randomBytes } from 'node:crypto'
 import { ServiceUnavailableException } from '@nestjs/common'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextsForLlmReversible } from '../../common/pii/llm-input-mask'
 import { llmMaskPlaceholderPattern } from '../../common/pii/mask-placeholder'
+import { isLayoutDateOrTime } from './layout-adjust-digit-dates'
 import {
   coverAdjacentJsonValues,
   coverRealisticNumbers,
   createLayoutTokenBook,
+  foldDigits,
   layoutTokenPattern,
   type LayoutDigitBook,
 } from './layout-adjust-digit-cover'
@@ -117,6 +119,8 @@ function rewriteEngineTokens(
     const queued = queue && queue.length > 0 ? queue.shift() : undefined
     const secret = queued ?? engineRestore(token)
     if (secret === token) return token
+    // 通用银行卡规则会把 20230501-20230505 收进去。整段是日期或时间就留原文。
+    if (isLayoutDateOrTime(foldDigits(secret))) return secret
     return book.issue(secret)
   })
 }

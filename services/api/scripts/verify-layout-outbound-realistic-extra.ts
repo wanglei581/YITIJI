@@ -6,6 +6,7 @@ const PHONE = '13800138000'
 const ID_CARD = '110101199003072315'
 
 type Covered = (label: string, raw: string, secretDigits: string, json?: string) => void
+type Kept = (label: string, raw: string) => void
 
 /** 扩展分隔把 1–8 位的数字段接成号码。三段都放进原文、字段值和简历 JSON。 */
 export function runExtendedSegmentCases(assertCovered: Covered): void {
@@ -23,4 +24,24 @@ export function runExtendedSegmentCases(assertCovered: Covered): void {
     PHONE,
     '{"prefix":"138/0013","suffix":"8000"}',
   )
+}
+
+/**
+ * 整段像日期、时间或年份串的不遮。三段都要原样看见。
+ * 月日不合法、或者根本不是日期的长数字仍然遮。
+ */
+export function runDateExemptionCases(assertKept: Kept, assertCovered: Covered): void {
+  assertKept('不补零的点分年月日区间', '2018.9.1-2022.6.30')
+  assertKept('不补零的斜线年月日区间', '2018/9/1-2022/6/30')
+  assertKept('不补零的年月区间', '2018.10-2022.6')
+  assertKept('紧凑日期区间', '20230501-20230505')
+  assertKept('年份串', '2018-2020-2022')
+  assertKept('全角分隔的年月日区间', '2018\uFF0F9\uFF0F1\uFF0D2022\uFF0E6\uFF0E30')
+  assertKept('斜线年月区间仍不遮', '2020/09 - 2024/06')
+  assertKept('点与破折号年月区间仍不遮', '2019.09\u20142023.06')
+  assertKept('中文年月区间仍不遮', '2021年3月-2024年5月')
+  assertKept('斜线年月日仍不遮', '2020/09/01')
+  assertKept('钟点时间段仍不遮', '9:00-18:00')
+  assertCovered('不像日期的斜线手机号仍遮', '138/0013/8000', PHONE)
+  assertCovered('月日不合法的紧凑区间仍遮', '20231345-20230505', '2023134520230505')
 }
