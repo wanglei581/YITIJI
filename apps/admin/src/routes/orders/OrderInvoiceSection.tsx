@@ -78,7 +78,8 @@ export function OrderInvoiceSection({
               className="mt-3 space-y-2"
               onSubmit={(event) => {
                 event.preventDefault()
-                void markIssued(invoiceNo).then(() => setMode('idle'))
+                // 只在成功后收起；没成（含 409）时钩子已重读申请，表单和刚填的发票号码留着。
+                void markIssued(invoiceNo).then((ok) => { if (ok) setMode('idle') })
               }}
             >
               <label className="block text-xs font-bold text-neutral-700">
@@ -103,7 +104,7 @@ export function OrderInvoiceSection({
               onSubmit={(event) => {
                 event.preventDefault()
                 if (!reason.trim()) return
-                void returnRequest(reason).then(() => setMode('idle'))
+                void returnRequest(reason).then((ok) => { if (ok) setMode('idle') })
               }}
             >
               <label className="block text-xs font-bold text-neutral-700">

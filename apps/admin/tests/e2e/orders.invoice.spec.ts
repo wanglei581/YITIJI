@@ -67,8 +67,18 @@ function orderDetail() {
   }
 }
 
-async function installOrders(page: Page) {
+interface Conflict {
+  code: string
+  message: string
+  /** 冲突发生时库里已经变成的状态（另一位管理员先动了，或者状态没变）。 */
+  nextStatus: 'submitted' | 'issued' | 'returned'
+  nextInvoiceNo?: string | null
+  nextReturnReason?: string | null
+}
+
+async function installOrders(page: Page, conflicts: { issue?: Conflict; return?: Conflict } = {}) {
   const posts: Array<{ path: string; body: unknown }> = []
+  const invoiceReads: string[] = []
   let status = 'submitted'
   let invoiceNo: string | null = null
   let returnReason: string | null = null
@@ -84,6 +94,7 @@ async function installOrders(page: Page) {
       return json({ data: { userId: MOCK_ADMIN_AUTH.user.id, role: 'admin', orgId: null } })
     }
     if (request.method() === 'GET' && url.pathname.endsWith(`/admin/orders/${ORDER_ID}/invoice`)) {
+      invoiceReads.push(status)
       return json({
         id: 'inv-probe',
         orderKind: 'print',
@@ -109,6 +120,12 @@ async function installOrders(page: Page) {
     if (request.method() === 'POST' && url.pathname.endsWith('/admin/invoice-requests/inv-probe/issue')) {
       const body = request.postDataJSON() as { invoiceNo?: string }
       posts.push({ path: url.pathname, body })
+      if (conflicts.issue) {
+        status = conflicts.issue.nextStatus
+        invoiceNo = conflicts.issue.nextInvoiceNo ?? null
+        returnReason = conflicts.issue.nextReturnReason ?? null
+        return json({ success: false, error: { code: conflicts.issue.code, message: conflicts.issue.message } }, 409)
+      }
       status = 'issued'
       invoiceNo = body.invoiceNo ?? null
       return json({
@@ -129,6 +146,12 @@ async function installOrders(page: Page) {
     if (request.method() === 'POST' && url.pathname.endsWith('/admin/invoice-requests/inv-probe/return')) {
       const body = request.postDataJSON() as { reason?: string }
       posts.push({ path: url.pathname, body })
+      if (conflicts.return) {
+        status = conflicts.return.nextStatus
+        invoiceNo = conflicts.return.nextInvoiceNo ?? null
+        returnReason = conflicts.return.nextReturnReason ?? null
+        return json({ success: false, error: { code: conflicts.return.code, message: conflicts.return.message } }, 409)
+      }
       status = 'returned'
       returnReason = body.reason ?? null
       return json({
@@ -148,7 +171,7 @@ async function installOrders(page: Page) {
     }
     return json({ items: [], total: 0, data: [] })
   })
-  return { posts }
+  return { posts, invoiceReads }
 }
 
 async function openOrder(page: Page) {
@@ -185,4 +208,55 @@ test('退回必须填写原因，提交后状态变成已退回', async ({ page 
   await expect(page.getByRole('button', { name: '退回', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '标已开', exact: true })).toHaveCount(0)
   expect(orders.posts).toEqual([{ path: '/api/v1/admin/invoice-requests/inv-probe/return', body: { reason: '抬头与付款人不符' } }])
+})
+
+test('标已开撞上别人先开了（409）：重新读申请，按最新状态画，按钮不再出现', async ({ page }) => {
+  const orders = await installOrders(page, {
+    issue: { code: 'INVOICE_NOT_SUBMITTED', message: '只有已提交的申请可以标已开。', nextStatus: 'issued', nextInvoiceNo: 'INV-OTHER' },
+  })
+  await openOrder(page)
+  await page.getByRole('button', { name: '标已开', exact: true }).click()
+  await page.getByLabel('发票号码（选填）').fill('INV-MINE')
+  await page.getByRole('button', { name: '确认标已开', exact: true }).click()
+  await expect(page.getByText('只有已提交的申请可以标已开。')).toBeVisible()
+  await expect(page.getByText('已开', { exact: true })).toBeVisible()
+  await expect(page.getByText('INV-OTHER', { exact: true })).toBeVisible()
+  await expect(page.getByText('已提交', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '标已开', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '退回', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '确认标已开', exact: true })).toHaveCount(0)
+  expect(orders.invoiceReads).toEqual(['submitted', 'issued'])
+})
+
+test('标已开时订单已退款（409）：仍是已提交，表单不收起，刚填的发票号码还在，可以改去退回', async ({ page }) => {
+  const orders = await installOrders(page, {
+    issue: { code: 'INVOICE_ORDER_NOT_ISSUABLE', message: '已退款的单，开不了发票。请点「退回」，写明原因。', nextStatus: 'submitted' },
+  })
+  await openOrder(page)
+  await page.getByRole('button', { name: '标已开', exact: true }).click()
+  await page.getByLabel('发票号码（选填）').fill('INV-KEEP')
+  await page.getByRole('button', { name: '确认标已开', exact: true }).click()
+  await expect(page.getByText('已退款的单，开不了发票。请点「退回」，写明原因。')).toBeVisible()
+  await expect(page.getByLabel('发票号码（选填）')).toHaveValue('INV-KEEP')
+  await expect(page.getByRole('button', { name: '确认标已开', exact: true })).toBeEnabled()
+  await expect(page.getByText('已提交', { exact: true })).toBeVisible()
+  expect(orders.invoiceReads).toEqual(['submitted', 'submitted'])
+  await page.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(page.getByRole('button', { name: '退回', exact: true })).toBeVisible()
+})
+
+test('退回撞上别人先退了（409）：重新读申请，显示最新原因，按钮不再出现', async ({ page }) => {
+  const orders = await installOrders(page, {
+    return: { code: 'INVOICE_NOT_SUBMITTED', message: '只有已提交的申请可以退回。', nextStatus: 'returned', nextReturnReason: '抬头与付款人不符（另一位管理员）' },
+  })
+  await openOrder(page)
+  await page.getByRole('button', { name: '退回', exact: true }).click()
+  await page.getByLabel('退回原因').fill('邮箱写错了')
+  await page.getByRole('button', { name: '确认退回', exact: true }).click()
+  await expect(page.getByText('只有已提交的申请可以退回。')).toBeVisible()
+  await expect(page.getByText('已退回', { exact: true })).toBeVisible()
+  await expect(page.getByText('抬头与付款人不符（另一位管理员）')).toBeVisible()
+  await expect(page.getByRole('button', { name: '退回', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '确认退回', exact: true })).toHaveCount(0)
+  expect(orders.invoiceReads).toEqual(['submitted', 'returned'])
 })

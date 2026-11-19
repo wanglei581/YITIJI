@@ -35,31 +35,48 @@ export function useOrderInvoice(orderId: string, orderKind: 'print' | 'service')
     }
   }, [orderId, orderKind])
 
-  const markIssued = useCallback(async (invoiceNo: string) => {
-    if (!view) return
+  /** 动作没成（含 409：别人先动了、订单退了款）后重读一次，按库里最新的状态画；读不出来就留着原样，错误句已经写上。 */
+  const reload = useCallback(async () => {
+    try {
+      setView(await adminInvoiceService.getByOrder(orderId, orderKind))
+      setPhase('ready')
+    } catch {
+      /* 留着原样 */
+    }
+  }, [orderId, orderKind])
+
+  /** 成功返回 true，表单才收起；失败返回 false，表单与刚填的内容留着。 */
+  const markIssued = useCallback(async (invoiceNo: string): Promise<boolean> => {
+    if (!view) return false
     setBusy(true)
     setError(null)
     try {
       setView(await adminInvoiceService.markIssued(view.id, invoiceNo))
+      return true
     } catch (err) {
       setError(err instanceof ApiHttpError ? err.message : '标已开没有成功。请稍后重试。')
+      await reload()
+      return false
     } finally {
       setBusy(false)
     }
-  }, [view])
+  }, [view, reload])
 
-  const returnRequest = useCallback(async (reason: string) => {
-    if (!view) return
+  const returnRequest = useCallback(async (reason: string): Promise<boolean> => {
+    if (!view) return false
     setBusy(true)
     setError(null)
     try {
       setView(await adminInvoiceService.returnRequest(view.id, reason.trim()))
+      return true
     } catch (err) {
       setError(err instanceof ApiHttpError ? err.message : '退回没有成功。请稍后重试。')
+      await reload()
+      return false
     } finally {
       setBusy(false)
     }
-  }, [view])
+  }, [view, reload])
 
   return { view, phase, error, busy, markIssued, returnRequest }
 }
