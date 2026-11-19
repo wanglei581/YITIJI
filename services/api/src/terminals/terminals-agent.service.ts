@@ -536,7 +536,7 @@ export class TerminalAgentService implements OnModuleInit {
 
           const order = await tx.order.findFirst({ where: { printTaskId: task.id }, select: { id: true } })
           if (!order) return null
-          if (await rejectClaimForRefund(tx, order.id, task.id)) return null
+          if (await rejectClaimForRefund(tx, this.prisma.dbKind, order.id, task.id)) return null
           const claimedOrder = await tx.order.updateMany({
             where: { id: order.id, taskStatus: 'pending', payStatus: 'paid' },
             data: { taskStatus: 'claimed', terminalId },

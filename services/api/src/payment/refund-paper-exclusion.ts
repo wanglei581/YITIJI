@@ -90,6 +90,22 @@ function deny(code: string, message: string): BadRequestException {
   return new BadRequestException({ error: { code, message } })
 }
 
+/** 单行都没盖住应付时，非过期成功退款的合计仍可能盖住。过期付款不计入。 */
+function summedSuccessBlock(
+  rows: Array<{ id: string; status: string; reason: string | null; amountCents: number }>,
+  payableCents: number,
+): { id: string } | null {
+  let sum = 0
+  let firstId: string | null = null
+  for (const row of rows) {
+    if (row.status !== 'success' || row.reason === STALE_ATTEMPT_REFUND_REASON) continue
+    sum += row.amountCents
+    if (!firstId) firstId = row.id
+  }
+  if (firstId && payableCents > 0 && sum >= payableCents) return { id: firstId }
+  return null
+}
+
 async function blockingRefund(
   db: HoldDb,
   orderId: string,
@@ -109,13 +125,14 @@ async function blockingRefund(
     },
     select: { status: true, reason: true, amountCents: true },
   })
-  return rows.some((row) => refundBlocksPaper({
+  if (rows.some((row) => refundBlocksPaper({
     status: row.status,
     reason: row.reason,
     amountCents: row.amountCents,
     payStatus: order.payStatus,
     payableCents,
-  }, opts))
+  }, opts))) return true
+  return summedSuccessBlock(rows, payableCents) !== null
 }
 
 /** 放行出纸前：在办、失败、待人工，或已经按实付退成的，都不许出纸。过期付款的退款，不论还在处理、失败还是已经退成，都不挡住后来的新付款。 */
@@ -137,7 +154,8 @@ export async function findBlockingRefund(db: HoldDb, orderId: string): Promise<{
     payStatus: order.payStatus,
     payableCents,
   }))
-  return hit ? { id: hit.id } : null
+  if (hit) return { id: hit.id }
+  return summedSuccessBlock(rows, payableCents)
 }
 
 export async function assertCanOpenRefund(
@@ -210,8 +228,14 @@ export async function recordBlockedClaimReason(db: PrismaService, terminalId: st
   await writeClaimBlock(db, task.order.id, task.id)
 }
 
-/** 事务内再看一次。返回 true 表示这单不能领，调用方不要改任务状态。 */
-export async function rejectClaimForRefund(db: HoldDb, orderId: string, taskId: string): Promise<boolean> {
+/** 事务内再看一次。先锁订单，再读退款合计。返回 true 表示这单不能领。 */
+export async function rejectClaimForRefund(
+  db: HoldDb,
+  dbKind: DbKind,
+  orderId: string,
+  taskId: string,
+): Promise<boolean> {
+  await lockOrderRow(db, dbKind, orderId)
   if (!await findBlockingRefund(db, orderId)) return false
   await writeClaimBlock(db, orderId, taskId)
   return true

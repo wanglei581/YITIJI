@@ -35,6 +35,8 @@ async function main(): Promise<void> {
     await runP2b8VerifyRaceCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
     const { runP2b8CloseRaceCases } = await import('./support/pickup-arrival-p2b8-close-race-cases')
     await runP2b8CloseRaceCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
+    const { runP2b8SumClaimCases } = await import('./support/pickup-arrival-p2b8-sum-claim-cases')
+    await runP2b8SumClaimCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
   } finally {
     await prisma.onModuleDestroy()
   }
