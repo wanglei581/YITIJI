@@ -88,6 +88,14 @@ export interface ProductionRuntimeEnv {
   RECRUITMENT_OPERATOR_NAME?: string
   RECRUITMENT_OPERATOR_LICENSE_NO?: string
   RECRUITMENT_OPERATOR_CREDENTIAL_TYPE?: string
+  WECHAT_MINIAPP_APPID?: string
+  WECHAT_MINIAPP_APPSECRET?: string
+  WECHAT_MINIAPP_VPAY_OFFER_ID?: string
+  WECHAT_MINIAPP_VPAY_APP_KEY?: string
+  WECHAT_MINIAPP_VPAY_SANDBOX_APP_KEY?: string
+  WECHAT_MINIAPP_VPAY_ENV?: string
+  WECHAT_MINIAPP_MESSAGE_TOKEN?: string
+  WECHAT_MINIAPP_MESSAGE_ENCODING_AES_KEY?: string
 }
 
 const MIN_JWT_SECRET_LENGTH = 16
@@ -311,5 +319,73 @@ export function assertProductionRuntimeGates(
   }
 
   // 走到这里说明非 AI 的底线全部满足。AI 类配置只评估、不拒启动（F-11）。
+  // 小程序虚拟支付也不在这里拒启动：开关开着但变量缺失、或生产配了沙箱 env，
+  // 只在下单时把功能失败关闭。缺配置不能把打印和后台一起打停。
   return { aiPlatform: evaluateAiPlatform(env) }
+}
+
+export type MiniappVirtualPayBlock = 'env_missing' | 'env_invalid' | 'sandbox_in_production'
+
+export interface MiniappVirtualPayRuntime {
+  ready: boolean
+  block: MiniappVirtualPayBlock | null
+  /** 0 现网 / 1 沙箱。没配成这两值时为 null。 */
+  env: 0 | 1 | null
+  offerId: string | null
+  /** 按 env 选出的 AppKey。没就绪时不把密钥带出去。 */
+  appKey: string | null
+  appId: string | null
+  messageToken: string | null
+  encodingAesKey: string | null
+}
+
+function trimmedEnv(value: string | undefined): string {
+  return value?.trim() ?? ''
+}
+
+/** EncodingAESKey 是 43 位，补一个 '=' 后 base64 解码必须是 32 字节。 */
+function encodingAesKeyOk(value: string): boolean {
+  if (value.length !== 43) return false
+  const key = Buffer.from(`${value}=`, 'base64')
+  return key.length === 32
+}
+
+/**
+ * 虚拟支付能不能调微信。不抛异常，也不看数据库开关。
+ * 生产用沙箱（env=1）或任一变量缺失，都是功能失败关闭。
+ */
+export function evaluateMiniappVirtualPayRuntime(
+  env: ProductionRuntimeEnv = process.env,
+): MiniappVirtualPayRuntime {
+  const offerId = trimmedEnv(env.WECHAT_MINIAPP_VPAY_OFFER_ID)
+  const productionAppKey = trimmedEnv(env.WECHAT_MINIAPP_VPAY_APP_KEY)
+  const sandboxAppKey = trimmedEnv(env.WECHAT_MINIAPP_VPAY_SANDBOX_APP_KEY)
+  const envRaw = trimmedEnv(env.WECHAT_MINIAPP_VPAY_ENV)
+  const appId = trimmedEnv(env.WECHAT_MINIAPP_APPID)
+  const appSecret = trimmedEnv(env.WECHAT_MINIAPP_APPSECRET)
+  const messageToken = trimmedEnv(env.WECHAT_MINIAPP_MESSAGE_TOKEN)
+  const encodingAesKey = trimmedEnv(env.WECHAT_MINIAPP_MESSAGE_ENCODING_AES_KEY)
+  const payEnv = envRaw === '0' ? 0 : envRaw === '1' ? 1 : null
+  const secretsPresent = Boolean(
+    offerId && productionAppKey && sandboxAppKey && appId && appSecret && messageToken && encodingAesKeyOk(encodingAesKey),
+  )
+  let block: MiniappVirtualPayBlock | null = null
+  if (!secretsPresent || envRaw === '') {
+    block = 'env_missing'
+  } else if (payEnv === null) {
+    block = 'env_invalid'
+  } else if (env.NODE_ENV === 'production' && payEnv === 1) {
+    block = 'sandbox_in_production'
+  }
+  const ready = block === null
+  return {
+    ready,
+    block,
+    env: payEnv,
+    offerId: offerId || null,
+    appKey: ready ? (payEnv === 1 ? sandboxAppKey : productionAppKey) : null,
+    appId: appId || null,
+    messageToken: ready ? messageToken : null,
+    encodingAesKey: ready ? encodingAesKey : null,
+  }
 }
