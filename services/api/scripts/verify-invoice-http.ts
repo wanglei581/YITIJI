@@ -268,6 +268,47 @@ async function main(): Promise<void> {
       assert.equal(disabled.json.error?.code, 'ACCOUNT_UNAVAILABLE')
     })
 
+    await check('5 一体机接口的守卫组合：建会话要终端会话加会员令牌，轮询要终端会话；挡单与会员口同为 409', async () => {
+      const owner = await member()
+      const orderId = await printOrder(owner.id, kioskTerminalId)
+      const memberOnly = { Authorization: `Bearer ${owner.token}` }
+      const sessionKeysBefore = (await client.keys('invoice_session:*')).length
+      const noTerminal = await call('POST', '/kiosk/invoice-sessions', { headers: memberOnly, body: { orderKind: 'print', orderId } })
+      assert.equal(noTerminal.status, 401, `只带会员令牌、不带终端会话也建了开票码：${noTerminal.text}`)
+      assert.equal(noTerminal.json.error?.code, 'TERMINAL_SESSION_INVALID')
+      const forged = await call('POST', '/kiosk/invoice-sessions', {
+        headers: { ...memberOnly, 'x-terminal-id': kioskTerminalId, 'x-terminal-session-token': randomBytes(32).toString('base64url') },
+        body: { orderKind: 'print', orderId },
+      })
+      assert.equal(forged.status, 401)
+      assert.equal(forged.json.error?.code, 'TERMINAL_SESSION_INVALID')
+      const noMember = await call('POST', '/kiosk/invoice-sessions', { headers: kiosk, body: { orderKind: 'print', orderId } })
+      assert.equal(noMember.status, 401, `只带终端会话、不带会员令牌也建了开票码：${noMember.text}`)
+      assert.equal(noMember.json.error?.code, 'MEMBER_MISSING_TOKEN')
+      assert.equal((await client.keys('invoice_session:*')).length, sessionKeysBefore, '被拒的请求不该写会话')
+      const created = await call('POST', '/kiosk/invoice-sessions', { headers: { ...kiosk, ...memberOnly }, body: { orderKind: 'print', orderId } })
+      assert.equal(created.status, 201, created.text)
+      made.keys.push(`invoice_session:${created.json.data.sessionId}`)
+      const control = { 'x-invoice-control': created.json.data.controlToken as string }
+      const pollNoTerminal = await call('GET', `/kiosk/invoice-sessions/${created.json.data.sessionId}`, { headers: control })
+      assert.equal(pollNoTerminal.status, 401, `不带终端会话也能轮询：${pollNoTerminal.text}`)
+      assert.equal(pollNoTerminal.json.error?.code, 'TERMINAL_SESSION_INVALID')
+      const poll = await call('GET', `/kiosk/invoice-sessions/${created.json.data.sessionId}`, { headers: { ...kiosk, ...control } })
+      assert.equal(poll.status, 200, poll.text)
+      assert.deepEqual(poll.json.data, { status: '等手机填写' })
+      const refundedId = await printOrder(owner.id, kioskTerminalId, { payStatus: 'refunded', refundedAmountCents: 300 })
+      const blockedKiosk = await call('POST', '/kiosk/invoice-sessions', { headers: { ...kiosk, ...memberOnly }, body: { orderKind: 'print', orderId: refundedId } })
+      const blockedMember = await call('POST', '/me/invoice-requests', {
+        headers: memberOnly,
+        body: { orderKind: 'print', orderId: refundedId, titleType: 'personal', title: '刘晓楠', email: 'liuxiaonan@example.com' },
+      })
+      for (const reply of [blockedKiosk, blockedMember]) {
+        assert.equal(reply.status, 409, reply.text)
+        assert.equal(reply.json.error?.code, 'INVOICE_NOT_ALLOWED')
+        assert.equal(reply.json.error?.message, '已退款的单，开不了发票。')
+      }
+    })
+
     console.log(`PASS verify:invoice-http（${passed.length} 组）`)
   } finally {
     await new Promise<void>((done) => app.getHttpServer().close(() => done()))

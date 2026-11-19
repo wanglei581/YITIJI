@@ -166,6 +166,53 @@ async function main(): Promise<void> {
     assert.equal(issued.status, 'issued', '改绑后标已开的复核也不看现机构')
   })
 
+  await check('5 打印单退款事实：只看已退金额的部分退款、退款行 pending 都开不了；失败的退款行不挡；快照是减去抵扣后的实付', async () => {
+    const endUserId = await member()
+    const partial = await printOrder(endUserId, commercialTerminal, { refundedAmountCents: 100 })
+    await expectConflict(() => submitPersonal(endUserId, 'print', partial), 'INVOICE_NOT_ALLOWED', '部分退款的单，开不了发票。')
+    const pending = await printOrder(endUserId, commercialTerminal)
+    await refund(pending, 'pending', 300)
+    await expectConflict(() => submitPersonal(endUserId, 'print', pending), 'INVOICE_NOT_ALLOWED', '退款还没完成的单，开不了发票。')
+    const refunded = await printOrder(endUserId, commercialTerminal, { refundedAmountCents: 300 })
+    await expectConflict(() => submitPersonal(endUserId, 'print', refunded), 'INVOICE_NOT_ALLOWED', '已退款的单，开不了发票。')
+    const voucher = await printOrder(endUserId, commercialTerminal, { amountCents: 300, discountCents: 300 })
+    await expectConflict(() => submitPersonal(endUserId, 'print', voucher), 'INVOICE_NOT_ALLOWED', '这一单没有实付金额，开不了发票。')
+    const failedRefund = await printOrder(endUserId, commercialTerminal, { amountCents: 500, discountCents: 200 })
+    await refund(failedRefund, 'failed', 300)
+    const stored = await submitPersonal(endUserId, 'print', failedRefund)
+    assert.equal(stored.amountCents, 300)
+    assert.equal(await prisma.invoiceRequest.count({ where: { endUserId } }), 1, '挡住的单不该落行')
+    const listed = await requests.listForMember(endUserId)
+    assert.deepEqual(listed.map((row) => [row.orderId, row.invoiceStatus, row.amountCents]), [[failedRefund, 'submitted', 300]])
+  })
+
+  await check('6 服务单事实：已消费可开；退款中、退款失败、已退款、付款失败、待付都开不了', async () => {
+    const endUserId = await member()
+    const make = async (fields: Record<string, unknown>) => {
+      const row = await prisma.serviceOrder.create({
+        data: {
+          terminalId: commercialTerminal, serviceKey: 'resume_optimize', amountCents: 300, status: 'paid', kioskSessionId: `verify-invoice-ks-${next()}`,
+          endUserId, provider: 'sandbox', providerOrderNo: `VINVS-${next()}`, expiresAt: new Date(Date.now() + 600_000), ...fields,
+        },
+      })
+      made.services.push(row.id)
+      return row.id
+    }
+    const consumed = await make({ status: 'consumed', paidAt: new Date(Date.now() - 60_000), consumedAt: new Date() })
+    for (const [fields, message] of [
+      [{ status: 'refunding' }, '退款还没完成的单，开不了发票。'],
+      [{ status: 'refund_failed' }, '退款还没完成的单，开不了发票。'],
+      [{ status: 'refunded', refundedAt: new Date() }, '已退款的单，开不了发票。'],
+      [{ status: 'pending', paymentFailed: true }, '没付成的单，开不了发票。'],
+      [{ status: 'pending' }, '没付成的单，开不了发票。'],
+    ] as Array<[Record<string, unknown>, string]>) {
+      const id = await make(fields)
+      await expectConflict(() => submitPersonal(endUserId, 'service', id), 'INVOICE_NOT_ALLOWED', message)
+    }
+    const stored = await submitPersonal(endUserId, 'service', consumed)
+    assert.equal(stored.amountCents, 300)
+  })
+
   console.log(`PASS verify:invoice-real-db（${passed.length} 组）`)
 }
 
