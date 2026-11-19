@@ -1,7 +1,7 @@
 /**
  * 在途退款改为出纸之前，向渠道查这一笔的结果。
  * 没有查证能力时明确返回 unsupported，不把「没查」说成失败。
- * 渠道自己说未知，仍是 unknown。我们这边抛错是 fault，要记下来并改成待人工。
+ * 渠道自己说未知，仍是 unknown。我们这边抛错是 fault，要记下来，退款状态保持原样。
  */
 import { BadRequestException, Logger } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
@@ -20,19 +20,15 @@ function channelFaultText(error: unknown): string {
   return raw.replace(/\s+/g, ' ').slice(0, 120)
 }
 
-/** 查询本身失败。退款改成待人工，写诊断，不放行出纸。 */
+/** 查询本身失败。状态保持原样，写诊断，不放行这次处置。 */
 export async function parkChannelQueryFault(
   db: PrismaService,
   orderId: string,
   refundNo: string,
   error: unknown,
 ): Promise<never> {
-  const detail = `查询渠道时出错：${channelFaultText(error)}`
+  const detail = `查询渠道时出错：${channelFaultText(error)}。退款状态保持原样，这次不能处置。`
   logger.error(`${detail} orderId=${orderId} refundNo=${refundNo}`)
-  await db.refund.updateMany({
-    where: { orderId, status: 'pending' },
-    data: { status: 'manual_review' },
-  })
   await db.auditLog.create({
     data: {
       actorId: null,
@@ -47,7 +43,7 @@ export async function parkChannelQueryFault(
   throw new BadRequestException({
     error: {
       code: 'REFUND_CHANNEL_QUERY_FAILED',
-      message: '查询渠道时出错了，这笔先留在待人工。',
+      message: '查询渠道时出错了，退款状态保持原样，这次不能处置。',
     },
   })
 }

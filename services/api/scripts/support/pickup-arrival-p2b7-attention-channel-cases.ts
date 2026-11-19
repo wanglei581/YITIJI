@@ -1,6 +1,6 @@
 /**
  * 过期成功退款之外还有当前这笔失败退款时，需关注不能把这单滤掉。
- * 渠道查询自己抛错，不能记成渠道未知。要留下诊断，并把退款改成待人工。
+ * 渠道查询自己抛错，不能记成渠道未知。要留下诊断，退款状态保持原样。
  * 渠道明确返回未知时，仍是查不到，退款行保持处理中。
  */
 import assert from 'node:assert/strict'
@@ -190,7 +190,7 @@ export async function runP2b7AttentionChannelCases(
       (query) => queryRefundChannel(registry, db, query),
     ).then(() => 'ok', (error: unknown) => errorCode(error))
     assert.equal(faultCode, 'REFUND_CHANNEL_QUERY_FAILED')
-    assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: faultId } })).status, 'manual_review')
+    assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: faultId } })).status, 'pending')
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: faultId } })).payStatus, 'paid')
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: faultId } })).taskStatus, 'failed')
     const faultAudit = await db.auditLog.findFirst({

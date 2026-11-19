@@ -8,6 +8,7 @@
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
+import { refundMayStillBeAtChannel } from './refund-channel-acceptance'
 import { parkChannelQueryFault, type ChannelQueryFault } from './refund-channel-query'
 import { markOrderIfPaperUnreleased, paperAlreadyReleased } from './refund-paper-exclusion'
 import { settlementAfterSuccess } from './refund-remainder'
@@ -94,18 +95,19 @@ async function rejectReleasedPaper(
   }
 }
 
-/** 在途退款改为出纸：只有渠道明确失败才放行。没查到、还在处理、已经退成，都拒绝并写审计。 */
+/** 渠道受理过的退款改为出纸：只有渠道明确失败才放行。处理中和待人工都查。没查到、还在处理、已经退成，都拒绝并写审计。 */
 async function rejectPendingReleaseUntilChannelFailed(
   db: PrismaService,
   orderId: string,
   operatorId: string,
   channelQuery: PendingRefundChannelQuery | undefined,
 ): Promise<void> {
-  const refund = await db.refund.findFirst({
-    where: { orderId, status: 'pending' },
+  const rows = await db.refund.findMany({
+    where: { orderId, status: { in: ['pending', 'manual_review'] } },
     orderBy: { createdAt: 'desc' },
-    select: { channel: true, refundNo: true },
+    select: { channel: true, refundNo: true, status: true, reason: true, channelRefundNo: true },
   })
+  const refund = rows.find((row) => refundMayStillBeAtChannel(row))
   if (!refund) return
   let verdict: RefundChannelVerdict = 'unsupported'
   let faultError: unknown = null
