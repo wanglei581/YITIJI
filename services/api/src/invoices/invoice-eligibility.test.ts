@@ -19,7 +19,6 @@ function printFacts(overrides: Partial<Omit<PrintInvoiceFacts, 'kind'>> = {}): P
     discountCents: 100,
     refundedAmountCents: 0,
     refundStatuses: [],
-    orgType: 'licensed_hr_agency',
     openInvoiceStatus: null,
     ...overrides,
   }
@@ -33,7 +32,6 @@ function serviceFacts(overrides: Partial<Omit<ServiceInvoiceFacts, 'kind'>> = {}
     status: 'paid',
     amountCents: 200,
     paymentFailed: false,
-    orgType: 'licensed_hr_agency',
     openInvoiceStatus: null,
     ...overrides,
   }
@@ -72,12 +70,21 @@ test('服务单：不是本人的订单开不了', () => {
   expectBlock(serviceFacts({ endUserId: null }), 'not_owner')
 })
 
-test('打印单：公共就业点位没有需要开发票的订单', () => {
-  expectBlock(printFacts({ orgType: 'public_employment_service', payStatus: 'unpaid', amountCents: 0 }), 'public_site')
+// 期望值改动（返工包 P2c1b 第 10 条）：原先按终端「现在」所属机构判「这台机器免费」（public_site），
+// 终端改绑到公共就业点位后，在商业点位已经付了钱的单也被挡住。能不能开只看订单自己的事实：
+// 公共就业点位永不收费，那里的单实付是 0，由「没有实付」挡住；终端现在绑到哪儿不进判断。
+test('打印单：终端现在绑到公共就业点位，不影响已付的单；公共点位的单实付是 0，开不了', () => {
+  const decision = assessInvoiceEligibility({ ...printFacts(), orgType: 'public_employment_service' } as never, MEMBER)
+  assert.equal(decision.ok, true)
+  assert.equal(decision.amountCents, 200)
+  expectBlock(printFacts({ payStatus: 'paid', amountCents: 0, discountCents: 0 }), 'zero_amount')
 })
 
-test('服务单：公共就业点位没有需要开发票的订单', () => {
-  expectBlock(serviceFacts({ orgType: 'employment_service_station' }), 'public_site')
+test('服务单：终端现在绑到公共就业点位，不影响已付的单；公共点位的单实付是 0，开不了', () => {
+  const decision = assessInvoiceEligibility({ ...serviceFacts(), orgType: 'employment_service_station' } as never, MEMBER)
+  assert.equal(decision.ok, true)
+  assert.equal(decision.amountCents, 200)
+  expectBlock(serviceFacts({ amountCents: 0 }), 'zero_amount')
 })
 
 test('打印单：没付成的单开不了', () => {

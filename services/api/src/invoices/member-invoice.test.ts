@@ -211,10 +211,13 @@ test('会员只看到自己能开的订单，列表不带税号和邮箱', async
     blockCode: row.blockCode,
     amountCents: row.amountCents,
   })), [
+    { orderKind: 'print', orderId: 'order-public', canRequest: true, invoiceStatus: 'none', blockCode: null, amountCents: 300 },
     { orderKind: 'print', orderId: 'order-ok', canRequest: true, invoiceStatus: 'none', blockCode: null, amountCents: 200 },
     { orderKind: 'service', orderId: 'svc-ok', canRequest: true, invoiceStatus: 'none', blockCode: null, amountCents: 500 },
   ])
-  assert.equal(list.some((row) => row.orderId === 'order-other' || row.orderId === 'order-refunded' || row.orderId === 'order-unpaid' || row.orderId === 'order-public'), false)
+  // 期望值改动（返工包 P2c1b 第 10 条）：order-public 是在终端现在绑到公共就业点位前就已付 300 分的单。
+  // 能不能开只看订单自己的事实，它现在能开，排在最前（创建最晚）；原先按现机构把它挡在列表外是误判。
+  assert.equal(list.some((row) => row.orderId === 'order-other' || row.orderId === 'order-refunded' || row.orderId === 'order-unpaid'), false)
   assert.equal(list.every((row) => !('taxId' in row) && !('email' in row)), true)
 })
 

@@ -62,6 +62,7 @@ function uniqueConflict(error: unknown): boolean {
 export class InvoiceRequestsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** 订单自己的事实。不读终端现在绑的机构（改绑后不误判公共点位）。 */
   async loadFacts(orderKind: 'print' | 'service', orderId: string): Promise<InvoiceFacts | null> {
     const open = await this.prisma.invoiceRequest.findFirst({
       where: { orderKind, orderId, status: { not: 'returned' } },
@@ -74,7 +75,6 @@ export class InvoiceRequestsService {
         select: {
           id: true,
           endUserId: true,
-          terminalId: true,
           payStatus: true,
           amountCents: true,
           discountCents: true,
@@ -92,7 +92,6 @@ export class InvoiceRequestsService {
         discountCents: order.discountCents,
         refundedAmountCents: order.refundedAmountCents,
         refundStatuses: order.refunds.map((row) => row.status),
-        orgType: await this.orgType(order.terminalId),
         openInvoiceStatus,
       }
     }
@@ -101,7 +100,6 @@ export class InvoiceRequestsService {
       select: {
         id: true,
         endUserId: true,
-        terminalId: true,
         status: true,
         amountCents: true,
         paymentFailed: true,
@@ -115,7 +113,6 @@ export class InvoiceRequestsService {
       status: order.status,
       amountCents: order.amountCents,
       paymentFailed: order.paymentFailed,
-      orgType: await this.orgType(order.terminalId),
       openInvoiceStatus,
     }
   }
@@ -264,14 +261,5 @@ export class InvoiceRequestsService {
       returnReason: row.returnReason,
       createdAt: row.createdAt.toISOString(),
     }
-  }
-
-  private async orgType(terminalId: string | null): Promise<string | null> {
-    if (!terminalId) return null
-    const terminal = await this.prisma.terminal.findUnique({
-      where: { id: terminalId },
-      select: { org: { select: { type: true } } },
-    })
-    return terminal?.org?.type ?? null
   }
 }

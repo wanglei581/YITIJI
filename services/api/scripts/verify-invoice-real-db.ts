@@ -152,6 +152,20 @@ async function main(): Promise<void> {
     assert.equal(await markIssuedAudits(stored.id), 0)
   })
 
+  await check('4 能不能开只看订单自己的事实：商业点位付 3 元，终端改绑到就业服务站后仍能申请，金额照实付', async () => {
+    const endUserId = await member()
+    const terminalId = await terminal(commercialOrg)
+    const orderId = await printOrder(endUserId, terminalId)
+    const publicOrg = await organization('employment_service_station')
+    await prisma.terminal.update({ where: { id: terminalId }, data: { orgId: publicOrg, orgBoundAt: new Date() } })
+    const list = await requests.listForMember(endUserId)
+    assert.deepEqual(list.map((row) => [row.orderId, row.canRequest, row.blockCode]), [[orderId, true, null]])
+    const stored = await submitPersonal(endUserId, 'print', orderId)
+    assert.equal(stored.amountCents, 300)
+    const issued = await admin.markIssued(stored.id, { operatorId: OPERATOR })
+    assert.equal(issued.status, 'issued', '改绑后标已开的复核也不看现机构')
+  })
+
   console.log(`PASS verify:invoice-real-db（${passed.length} 组）`)
 }
 
