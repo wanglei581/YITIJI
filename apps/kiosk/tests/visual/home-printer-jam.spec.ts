@@ -109,3 +109,20 @@ test('home jam: public paper_jam with the local agent reachable reads 打印机�
   await page.waitForTimeout(1_500)
   await expect(capsule(page)).toHaveText('打印机卡纸')
 })
+
+test('home jam: our cloud default config shows no 社会招聘 or 校园招聘 tile @w2', async ({ page, api }) => {
+  homeApi(api, JAM)
+  await openHomeWithAgentDown(page)
+  const home = page.getByTestId('qx-home')
+  // 托管关的答复已经到了（不是「还没读到」时的默认关）：底部合规句说本终端未开放。
+  await expect(home.getByText('本终端未开放岗位与招聘会信息，也不代收简历。', { exact: false })).toBeVisible()
+  await expect(home).toHaveAttribute('data-recruitment', 'closed')
+  for (const action of ['jobs-hub', 'jobs-retry', 'fairs-retry', 'campus-zone']) {
+    await expect(home.locator(`[data-action="${action}"]`), `我方云上默认不摆 ${action}`).toHaveCount(0)
+  }
+  await expect(home.getByRole('button', { name: /社会招聘/ })).toHaveCount(0)
+  await expect(home.getByRole('button', { name: /校园招聘/ })).toHaveCount(0)
+  const tiles = await home.locator('.qxt-home-tiles > [data-action]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-action')))
+  expect(tiles).toEqual(['pickup-claim', 'help'])
+  await expect(capsule(page)).toHaveText('打印机卡纸')
+})
