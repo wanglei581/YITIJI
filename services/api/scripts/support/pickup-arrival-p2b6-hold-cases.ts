@@ -96,6 +96,7 @@ export async function runP2b6HoldChannelCases(
         status: opts.refundStatus,
         reason: opts.refundStatus === 'pending' ? '渠道还没确认退款结果' : '退款失败',
         channel: 'sandbox',
+        ...(opts.refundStatus === 'pending' ? { channelSubmittedAt: new Date() } : {}),
       },
     })
     return id

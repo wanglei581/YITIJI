@@ -180,6 +180,7 @@ export async function runP2b7AttentionChannelCases(
         status: 'pending',
         reason: '渠道还没确认退款结果',
         channel: 'wechat',
+        channelSubmittedAt: new Date(),
       },
     })
     const faultCode = await resolvePrintReturnHold(
@@ -243,6 +244,7 @@ export async function runP2b7AttentionChannelCases(
         status: 'pending',
         reason: null,
         channel: 'wechat',
+        channelSubmittedAt: new Date(),
       },
     })
     const unknownCode = await resolvePrintReturnHold(

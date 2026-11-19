@@ -136,6 +136,11 @@ export async function refundExpiredAttemptCollection(
     return
   }
   try {
+    // 先落「已提交渠道」再调渠道：过期付款已发到渠道的退款，之后要按显式记录挡住核验与三步。
+    await db.refund.update({
+      where: { id: refund.id },
+      data: { channelSubmittedAt: new Date() },
+    })
     const executed = await provider.refund({
       orderId: input.orderId,
       orderNo: input.orderNo,

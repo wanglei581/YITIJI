@@ -796,6 +796,10 @@ model Refund {
   channel         String // sandbox | offline | manual_confirmed | free | voucher
   channelRefundNo String? // 渠道退款流水号（sandbox 假标识；线下/免费单为 null）
   operatorId      String? // 操作员标识（Admin/服务端；写入审计 payload，非 User 外键）
+  /// 已经向渠道（sandbox / wechat / alipay）发起过退款的时间。本地新建的待人工（窗口关闭、
+  /// 没有渠道流水的过期付款、线下/人工确认/免费/券）永远为 null。渠道受理过且状态仍不是
+  /// success / failed / withdrawn / closed 时，表示这笔退款还在渠道处理中。
+  channelSubmittedAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

@@ -74,6 +74,7 @@ async function seedPending(
       reason: null,
       channel: 'wechat',
       channelRefundNo: `ch-${refundNo}`.slice(0, 64),
+      channelSubmittedAt: new Date(),
     },
   })
 }

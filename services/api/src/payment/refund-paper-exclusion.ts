@@ -247,6 +247,7 @@ type VerifyRefundRow = {
   channel: string
   refundNo: string
   channelRefundNo: string | null
+  channelSubmittedAt: Date | null
 }
 
 /** 过期付款的退款不挡。处理中、已退成，以及渠道还没明确失败的，挡住核验。 */
@@ -278,7 +279,7 @@ export async function orderRefundBlocksOutcome(
   }
   const rows = await db.refund.findMany({
     where: { orderId },
-    select: { status: true, reason: true, channel: true, refundNo: true, channelRefundNo: true },
+    select: { status: true, reason: true, channel: true, refundNo: true, channelRefundNo: true, channelSubmittedAt: true },
   })
   return rows.some((row) => refundBlocksVerifiedOutcome(row))
 }
@@ -435,7 +436,7 @@ export async function writePrintOutcomeIfRefundClear(
   if (!locked) return false
   const rows = await tx.refund.findMany({
     where: { orderId: input.orderId },
-    select: { id: true, refundNo: true, status: true, reason: true, channel: true, channelRefundNo: true },
+    select: { id: true, refundNo: true, status: true, reason: true, channel: true, channelRefundNo: true, channelSubmittedAt: true },
   })
   if (rows.some((row) => refundBlocksVerifiedOutcome(row))) return false
   if (input.outcome === 'printed') {

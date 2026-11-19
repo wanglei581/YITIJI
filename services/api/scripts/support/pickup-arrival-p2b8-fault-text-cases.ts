@@ -85,6 +85,7 @@ export async function runP2b8FaultTextCases(
         reason: null,
         channel: 'wechat',
         channelRefundNo: 'ch-fault-text',
+        channelSubmittedAt: new Date(),
       },
     })
     const registry = new PaymentProviderRegistry([{

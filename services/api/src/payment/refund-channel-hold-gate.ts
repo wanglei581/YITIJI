@@ -1,13 +1,13 @@
 /**
- * 渠道受理过、还没有明确失败答复时，三步都先问渠道。
+ * 渠道受理过、还没有明确答复时，三步都先问渠道。
  * 成功就改为记退成。失败先记下，再按点的那一步做。其余结果保持原状态并拒绝。
+ * 「渠道受理过」只看 Refund.channelSubmittedAt（显式记录），不再按原因、单号前缀或历史审计猜。
  */
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
-import { refundMayStillBeAtChannel, type ChannelAcceptanceRefund } from './refund-channel-acceptance'
+import { refundMayStillBeAtChannel } from './refund-channel-acceptance'
 import { parkChannelQueryFault } from './refund-channel-query'
 import { REFUND_AMOUNT_MISMATCH_MANUAL_REASON } from './refund-amount-hold'
-import { PRINT_NO_PAPER_AUTO_FAILED_AUDIT } from './print-return-disposition'
 import type { PendingRefundChannelQuery, PrintReturnResolution, RefundChannelVerdict } from './resolve-print-return-hold'
 
 const OPEN_STATUSES = ['pending', 'manual_review'] as const
@@ -45,37 +45,6 @@ async function rejectUnconfirmed(
   throw deny('REFUND_CHANNEL_UNCONFIRMED', message)
 }
 
-/**
- * 通道没配上，退款行已经写成处理中，但请求没有离开本机。
- * 这种不是渠道受理过。超时、处理中才算可能已经交给渠道。
- */
-async function providerRefundNeverLeft(
-  db: PrismaService,
-  orderId: string,
-  refund: ChannelAcceptanceRefund,
-): Promise<boolean> {
-  if (refund.status !== 'pending' || refund.channelRefundNo) return false
-  const audits = await db.auditLog.findMany({
-    where: {
-      targetId: orderId,
-      action: { in: [PRINT_NO_PAPER_AUTO_FAILED_AUDIT, 'refund.channel_ambiguous', 'refund.processing'] },
-    },
-    select: { action: true, payloadJson: true },
-  })
-  if (audits.some((row) => row.action === 'refund.channel_ambiguous' || row.action === 'refund.processing')) {
-    return false
-  }
-  return audits.some((row) => {
-    if (row.action !== PRINT_NO_PAPER_AUTO_FAILED_AUDIT) return false
-    try {
-      const payload = JSON.parse(row.payloadJson) as { code?: string }
-      return payload.code === 'ONLINE_PAYMENT_DISABLED'
-    } catch {
-      return false
-    }
-  })
-}
-
 /** 返回这一步真正要做的动作。渠道说成功时，不论点的是哪一步，都改成记退成。 */
 export async function resolveChannelBeforeHold(
   db: PrismaService,
@@ -93,11 +62,11 @@ export async function resolveChannelBeforeHold(
       channel: true,
       reason: true,
       channelRefundNo: true,
+      channelSubmittedAt: true,
     },
   })
   const refund = rows.find((row) => refundMayStillBeAtChannel(row))
   if (!refund) return action
-  if (await providerRefundNeverLeft(db, orderId, refund)) return action
   // 订单已经关闭之后，渠道又通知退成，才会把已关闭的退款行搁成待人工并写下渠道退款号。
   // 这是渠道的成功答复，不是还在处理。不再查一次，直接记退成。金额不符仍要拦住。
   if (refund.status === 'manual_review' && refund.channelRefundNo) {

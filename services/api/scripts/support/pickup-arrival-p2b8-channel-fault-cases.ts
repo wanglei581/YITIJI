@@ -37,6 +37,7 @@ async function seedOrder(
       channel: string
       reason: string | null
       channelRefundNo?: string | null
+      channelSubmittedAt?: Date | null
     }
     refundReason?: string | null
   },
@@ -86,6 +87,7 @@ async function seedOrder(
       reason: input.refund.reason,
       channel: input.refund.channel,
       channelRefundNo: input.refund.channelRefundNo ?? null,
+      channelSubmittedAt: input.refund.channelSubmittedAt ?? null,
     },
   })
 }
@@ -135,6 +137,7 @@ export async function runP2b8ChannelFaultCases(
         status: 'pending',
         channel: 'wechat',
         reason: '渠道还没确认退款结果',
+        channelSubmittedAt: new Date(),
       },
     })
     created.push(pendingId)
@@ -172,6 +175,7 @@ export async function runP2b8ChannelFaultCases(
         channel: 'wechat',
         reason: '渠道还没确认退款结果',
         channelRefundNo: `WX-${tag}`.slice(0, 32),
+        channelSubmittedAt: new Date(),
       },
     })
     created.push(parkedId)
@@ -199,6 +203,7 @@ export async function runP2b8ChannelFaultCases(
         status: 'manual_review',
         channel: 'wechat',
         reason: '渠道还没确认退款结果',
+        channelSubmittedAt: new Date(),
       },
     })
     created.push(historyId)
@@ -223,6 +228,7 @@ export async function runP2b8ChannelFaultCases(
         channel: 'wechat',
         reason: '渠道金额对不上',
         channelRefundNo: `WX-MIS-${tag}`.slice(0, 32),
+        channelSubmittedAt: new Date(),
       },
     })
     created.push(mismatchId)

@@ -84,6 +84,7 @@ export async function runP2b5PendingHoldCases(
           status: 'pending',
           reason: '渠道还没确认退款结果',
           channel: 'sandbox',
+          channelSubmittedAt: new Date(),
         },
       })
     }

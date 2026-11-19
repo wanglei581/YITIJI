@@ -71,6 +71,7 @@ async function seed(
       reason: '渠道还没确认退款结果',
       channel: 'wechat',
       channelRefundNo: `WX-${input.id}`.slice(0, 32),
+      channelSubmittedAt: new Date(),
     },
   })
 }

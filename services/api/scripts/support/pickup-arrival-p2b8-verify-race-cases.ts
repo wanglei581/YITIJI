@@ -164,6 +164,7 @@ export async function runP2b8VerifyRaceCases(
               reason: null,
               channel: 'wechat',
               channelRefundNo: `WX-P8VR-${tag}-${round}`.slice(0, 32),
+              channelSubmittedAt: new Date(),
             },
           })
         }, () => ask(taskId, 'printed'))
@@ -194,6 +195,7 @@ export async function runP2b8VerifyRaceCases(
         reason: null,
         channel: 'wechat',
         channelRefundNo: `WX-PF-${tag}`.slice(0, 32),
+        channelSubmittedAt: new Date(),
       },
     })
     const pendingCode = await ask(pendingTask, 'printed')
@@ -303,6 +305,7 @@ export async function runP2b8VerifyRaceCases(
         reason: '渠道还没确认退款结果',
         channel: 'wechat',
         channelRefundNo: `WX-CH-${tag}`.slice(0, 32),
+        channelSubmittedAt: new Date(),
       },
     })
     const channelCode = await ask(channelTask, 'printed')

@@ -409,6 +409,11 @@ export class RefundService {
     }
 
     let res: RefundExecuteResult
+    // 先落「已提交渠道」再调渠道：宁可多记，调用中途失败也算提交过，之后靠查渠道收口。
+    await this.prisma.refund.updateMany({
+      where: { id: refund.id },
+      data: { channelSubmittedAt: new Date() },
+    })
     try {
       res = await provider.refund(providerInput)
     } catch (e) {
