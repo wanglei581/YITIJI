@@ -32,11 +32,13 @@ async function main(): Promise<void> {
   const { PrismaService } = await import('../src/prisma/prisma.service')
   const { runPickupArrivalPriceCases } = await import('./support/pickup-arrival-price-cases')
   const { runP2b8ChannelFaultCases } = await import('./support/pickup-arrival-p2b8-channel-fault-cases')
+  const { runP2b8ChannelStepsCases } = await import('./support/pickup-arrival-p2b8-channel-steps-cases')
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   try {
     await runPickupArrivalPriceCases(prisma, randomBytes(4).toString('hex'))
     await runP2b8ChannelFaultCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
+    await runP2b8ChannelStepsCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
   } finally {
     await prisma.onModuleDestroy()
     rmSync(dir, { recursive: true, force: true })

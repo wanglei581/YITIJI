@@ -146,7 +146,7 @@ export async function runP2b6HoldChannelCases(
     assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: noQuery } })).status, 'pending')
     assert.equal(await db.auditLog.count({ where: { targetId: noQuery, action: 'refund.hold_rejected' } }), 1)
 
-    for (const verdict of ['success', 'processing', 'unknown', 'unsupported'] as const) {
+    for (const verdict of ['processing', 'unknown', 'unsupported'] as const) {
       const id = await seed({
         suffix: verdict.slice(0, 2),
         refundStatus: 'pending',
@@ -159,6 +159,19 @@ export async function runP2b6HoldChannelCases(
       assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: id } })).status, 'pending')
       assert.equal(await db.auditLog.count({ where: { targetId: id, action: 'refund.hold_rejected' } }), 1)
     }
+
+    const channelSuccess = await seed({
+      suffix: 'su',
+      refundStatus: 'pending',
+      taskStatus: 'failed',
+      printOutcome: 'not_printed',
+      orderTaskStatus: 'failed',
+    })
+    const successCode = await releaseCode(channelSuccess, 'success')
+    assert.equal(successCode, 'ok', '渠道说成功就记退成，不改为出纸')
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: channelSuccess } })).payStatus, 'refunded')
+    assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: channelSuccess } })).status, 'success')
+    assert.equal((await db.printTask.findFirstOrThrow({ where: { orderId: channelSuccess } })).status, 'failed')
 
     const failedChannel = await seed({
       suffix: 'fl',
@@ -196,9 +209,13 @@ export async function runP2b6HoldChannelCases(
       printOutcome: 'not_printed',
       orderTaskStatus: 'failed',
     })
-    const closed = await resolvePrintReturnHold(db, stillClose, 'close_order', 'admin-test')
-    assert.equal(closed.payStatus, 'closed')
-    assert.equal(closed.refundStatus, 'closed')
+    const heldCloseCode = await resolvePrintReturnHold(db, stillClose, 'close_order', 'admin-test').then(
+      () => 'ok',
+      (error: unknown) => errorCode(error),
+    )
+    assert.equal(heldCloseCode, 'REFUND_CHANNEL_UNCONFIRMED')
+    assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: stillClose } })).status, 'pending')
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: stillClose } })).payStatus, 'paid')
     const stillConfirm = await seed({
       suffix: 'cf',
       refundStatus: 'pending',
@@ -206,9 +223,14 @@ export async function runP2b6HoldChannelCases(
       printOutcome: null,
       orderTaskStatus: 'pending',
     })
-    const confirmed = await resolvePrintReturnHold(db, stillConfirm, 'confirm_refunded', 'admin-test')
-    assert.equal(confirmed.payStatus, 'refunded')
-    assert.equal(confirmed.refundStatus, 'success')
+    const confirmCode = await resolvePrintReturnHold(db, stillConfirm, 'confirm_refunded', 'admin-test').then(
+      () => 'ok',
+      (error: unknown) => errorCode(error),
+    )
+    assert.equal(confirmCode, 'REFUND_CHANNEL_UNCONFIRMED')
+    assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: stillConfirm } })).status, 'pending')
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: stillConfirm } })).payStatus, 'paid')
+    assert.equal((await db.printTask.findFirstOrThrow({ where: { orderId: stillConfirm } })).status, 'pending')
   } finally {
     await db.refund.deleteMany({ where: { orderId: { in: created } } })
     await db.auditLog.deleteMany({ where: { targetId: { in: created } } })

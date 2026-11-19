@@ -3,7 +3,7 @@ import type { AdminOrderReadonlyDetail, PrintReturnResolutionResult } from './ad
 
 /**
  * 只有浏览器用例写入这个键时才出现。默认列表不带这张单，也不带运营关注角标。
- * manual：渠道退款已经失败，三步都能做。pending：退款还在处理，改为出纸必须禁用。
+ * manual：渠道退款已经失败，三步都能做。pending：退款还在渠道处理中，三步都不能做。
  */
 const HOLD_DEMO_KEY = 'mock:order-hold'
 const HOLD_ID = 'ord_mock_hold'
@@ -107,10 +107,10 @@ export function resolveHoldDemo(id: string, action: HoldAction): PrintReturnReso
   if (!order.refundLedgerNo) {
     throw new ApiHttpError('REFUND_HOLD_NOT_FOUND', '没有待人工处理的退款，不能做这一步。', 400)
   }
-  if (action === 'release-paper' && order.refundStatus === 'pending') {
+  if (order.refundStatus === 'pending') {
     throw new ApiHttpError(
       'REFUND_CHANNEL_UNCONFIRMED',
-      '渠道还没确认这笔退款失败。请先向渠道查证，确认失败后再改为出纸。',
+      '退款还在渠道处理中，结果出来前不能处置。',
       400,
     )
   }

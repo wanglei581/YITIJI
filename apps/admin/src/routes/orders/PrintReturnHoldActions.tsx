@@ -82,13 +82,13 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
               <p className="text-xs text-neutral-600">纸已经出去，不能关单。确认退成也不能用，请走核对后仍退款。</p>
             ) : (
               <>
-                <button type="button" disabled={pending !== null} onClick={() => void run('confirm-refunded')} className="inline-flex h-9 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white disabled:opacity-40">
+                <button type="button" disabled={pending !== null || channelPending} onClick={() => void run('confirm-refunded')} className="inline-flex h-9 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white disabled:opacity-40">
                   {pending === 'confirm-refunded' ? '处理中…' : `确认退成 ${amountText(detail.refundLedgerCents ?? 0, detail.currency)}`}
                 </button>
                 <button type="button" disabled={pending !== null || channelPending} onClick={() => void run('release-paper')} className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-800 disabled:opacity-40">
                   {pending === 'release-paper' ? '处理中…' : '确认改为出纸'}
                 </button>
-                <button type="button" disabled={pending !== null} onClick={() => void run('close')} className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-800 disabled:opacity-40">
+                <button type="button" disabled={pending !== null || channelPending} onClick={() => void run('close')} className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-800 disabled:opacity-40">
                   {pending === 'close' ? '处理中…' : '确认关单'}
                 </button>
               </>
@@ -97,7 +97,7 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
           {paperOut ? null : (
             <>
               <p className="text-xs text-neutral-500">改为出纸和关单都不会把这笔钱记成已退回。关单后纸也不会再出。</p>
-              {channelPending ? <p className="text-xs font-semibold text-neutral-700">退款还在处理，先查渠道结果。</p> : null}
+              {channelPending ? <p className="text-xs font-semibold text-neutral-700">退款还在渠道处理中，结果出来前不能处置。</p> : null}
             </>
           )}
         </>

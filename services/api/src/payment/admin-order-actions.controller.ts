@@ -77,19 +77,22 @@ export class AdminOrderActionsController {
 
   @Post('admin/orders/:id/print-return/confirm-refunded')
   confirmRefunded(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
-    return resolvePrintReturnHold(this.prisma, id, 'confirm_refunded', user.userId)
+    return resolvePrintReturnHold(this.prisma, id, 'confirm_refunded', user.userId, (input) => this.askRefundChannel(input))
   }
 
   @Post('admin/orders/:id/print-return/release-paper')
   releasePaper(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
-    const providers = this.providers ?? new PaymentProviderRegistry([])
-    return resolvePrintReturnHold(this.prisma, id, 'release_paper', user.userId, (input) =>
-      queryRefundChannel(providers, this.prisma, input))
+    return resolvePrintReturnHold(this.prisma, id, 'release_paper', user.userId, (input) => this.askRefundChannel(input))
   }
 
   @Post('admin/orders/:id/print-return/close')
   closeHeldOrder(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
-    return resolvePrintReturnHold(this.prisma, id, 'close_order', user.userId)
+    return resolvePrintReturnHold(this.prisma, id, 'close_order', user.userId, (input) => this.askRefundChannel(input))
+  }
+
+  private askRefundChannel(input: { channel: string; refundNo: string; orderId: string }) {
+    const providers = this.providers ?? new PaymentProviderRegistry([])
+    return queryRefundChannel(providers, this.prisma, input)
   }
 
   /** 纸已经放行之后的单独路径。退款服务记下人工核对，再按实付开退款。 */

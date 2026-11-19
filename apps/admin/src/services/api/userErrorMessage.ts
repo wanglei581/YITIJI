@@ -26,7 +26,7 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   ORDER_NOT_FOUND: '订单不存在',
   PAPER_ALREADY_RELEASED: '这单已经放行出纸或已经出纸，这一页不能退款。真要退，请走核对后仍退款。',
   PAPER_ALREADY_OUT_CANNOT_CLOSE: '纸已经出去，不能关单。钱还在的话请走核对后仍退款。',
-  REFUND_CHANNEL_UNCONFIRMED: '渠道还没确认这笔退款失败。请先向渠道查证，确认失败后再改为出纸。',
+  REFUND_CHANNEL_UNCONFIRMED: '退款还在渠道处理中，结果出来前不能处置。',
   REFUND_CHANNEL_QUERY_FAILED: '查询渠道时出错了，退款状态保持原样，这次不能处置。',
   REFUND_ALREADY_OPEN: '这单已经有退款在处理或已经退成，不能再开一笔。',
   PAPER_NOT_RELEASED: '这单还没放行出纸，请用这一页的普通退款。',

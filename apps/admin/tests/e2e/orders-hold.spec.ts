@@ -71,7 +71,7 @@ test.describe('待人工退款三步处置', () => {
     })
   }
 
-  test('退款还在处理时，改为出纸是禁用的，并写明要先查渠道', async ({ page }) => {
+  test('退款还在渠道处理中时，三步都不能点，并写明原因', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('mock:order-hold', 'pending'))
     const guards = await openAuthed(page, '/orders')
     await settleAdminPage(page, guards)
@@ -85,11 +85,13 @@ test.describe('待人工退款三步处置', () => {
     await expect(detail).toBeVisible()
     await expect(detail.getByText('处理中', { exact: true })).toBeVisible()
     const release = detail.getByRole('button', { name: '确认改为出纸', exact: true })
+    const confirm = detail.getByRole('button', { name: `确认退成 ${AMOUNT}`, exact: true })
+    const close = detail.getByRole('button', { name: '确认关单', exact: true })
     await expect(release).toBeVisible()
     await expect(release).toBeDisabled()
-    await expect(detail.getByText('退款还在处理，先查渠道结果。', { exact: true })).toBeVisible()
-    await expect(detail.getByRole('button', { name: `确认退成 ${AMOUNT}`, exact: true })).toBeEnabled()
-    await expect(detail.getByRole('button', { name: '确认关单', exact: true })).toBeEnabled()
+    await expect(confirm).toBeDisabled()
+    await expect(close).toBeDisabled()
+    await expect(detail.getByText('退款还在渠道处理中，结果出来前不能处置。', { exact: true })).toBeVisible()
     await settleAdminPage(page, guards)
   })
 })

@@ -1,6 +1,6 @@
 /**
- * 待人工的 pending 退款。确认退成和关单能处理。
- * 改为出纸要先查渠道。sandbox 没有查证，这一步必须拒绝。
+ * 渠道还没答复的 pending 退款，三步都不放行。sandbox 没有查证。
+ * 并发夹具是渠道已经明确失败，确认退成和关单仍只成功一笔。
  */
 import assert from 'node:assert/strict'
 import { BadRequestException } from '@nestjs/common'
@@ -88,10 +88,13 @@ export async function runP2b5PendingHoldCases(
       })
     }
 
-    const confirmed = await resolvePrintReturnHold(db, ids.confirm, 'confirm_refunded', 'admin-test')
-    assert.equal(confirmed.refundStatus, 'success')
-    assert.equal(confirmed.payStatus, 'refunded')
-    assert.equal(confirmed.amountCents, 200)
+    const confirmed = await resolvePrintReturnHold(db, ids.confirm, 'confirm_refunded', 'admin-test').then(
+      () => 'ok',
+      (error: unknown) => errorCode(error),
+    )
+    assert.equal(confirmed, 'REFUND_CHANNEL_UNCONFIRMED')
+    assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: ids.confirm } })).status, 'pending')
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: ids.confirm } })).payStatus, 'paid')
     const releaseCode = await resolvePrintReturnHold(db, ids.release, 'release_paper', 'admin-test').then(
       () => 'ok',
       (error: unknown) => errorCode(error),
@@ -101,10 +104,13 @@ export async function runP2b5PendingHoldCases(
     assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: ids.release } })).status, 'pending')
     assert.equal((await db.printTask.findFirstOrThrow({ where: { orderId: ids.release } })).status, 'failed')
     assert.equal(await db.auditLog.count({ where: { targetId: ids.release, action: 'refund.hold_rejected' } }), 1)
-    const closed = await resolvePrintReturnHold(db, ids.close, 'close_order', 'admin-test')
-    assert.equal(closed.refundStatus, 'closed')
-    assert.equal(closed.payStatus, 'closed')
-    assert.notEqual((await db.order.findUniqueOrThrow({ where: { id: ids.close } })).payStatus, 'refunded')
+    const closed = await resolvePrintReturnHold(db, ids.close, 'close_order', 'admin-test').then(
+      () => 'ok',
+      (error: unknown) => errorCode(error),
+    )
+    assert.equal(closed, 'REFUND_CHANNEL_UNCONFIRMED')
+    assert.equal((await db.refund.findFirstOrThrow({ where: { orderId: ids.close } })).status, 'pending')
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: ids.close } })).payStatus, 'paid')
   } finally {
     await db.refund.deleteMany({ where: { orderId: { in: created } } })
     await db.auditLog.deleteMany({ where: { targetId: { in: created } } })
@@ -164,8 +170,8 @@ async function seedPending(
       orderId: input.id,
       refundNo: `RFD-RACE-${input.id}`.slice(0, 40),
       amountCents: 200,
-      status: 'pending',
-      reason: '渠道还没确认退款结果',
+      status: 'failed',
+      reason: '渠道明确失败',
       channel: 'sandbox',
     },
   })
