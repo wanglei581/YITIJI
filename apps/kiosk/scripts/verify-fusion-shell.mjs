@@ -136,6 +136,8 @@ function assertTopLevelHelperRoutes(routes) {
     // 2026-10-29 一体机手机码短链的网页中转，与上面两页同样不进一体机运行时根。
     ['/k/u/:scene', 'UploadSceneEntry'],
     ['/k/l/:ticketId', 'LoginTicketEntry'],
+    ['/k/i/:scene', 'InvoiceSceneEntry'],
+    ['/invoice/phone', 'PhoneInvoicePage'],
   ]) {
     const routeIndex = objects.findIndex((route) =>
       directStringProperty(route, 'path') === path &&

@@ -6,6 +6,7 @@ import { LoginPage } from '../pages/auth/LoginPage'
 import { MobileQrLoginPage } from '../pages/auth/MobileQrLoginPage'
 import { PhoneUploadPage } from '../pages/upload/PhoneUploadPage'
 import { LoginTicketEntry, UploadSceneEntry } from '../pages/upload/KioskCodeEntryPage'
+import { InvoiceSceneEntry, PhoneInvoicePage } from '../pages/invoice/PhoneInvoicePages'
 import { LegalDocPage } from '../pages/legal/LegalDocPage'
 import { InterviewWorkbenchPage } from '../pages/interview/InterviewWorkbenchPage'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
@@ -71,6 +72,9 @@ export const kioskRouter = createBrowserRouter([
   // 一体机手机码短链的网页中转（微信规则没生效或用别的软件扫时打开）：兑换或校验后 replace 到上面两页。
   { path: '/k/u/:scene', element: <UploadSceneEntry />, errorElement: <KioskRouteErrorPage /> },
   { path: '/k/l/:ticketId', element: <LoginTicketEntry />, errorElement: <KioskRouteErrorPage /> },
+  // 开票码前缀 /k/i/ 不在小程序扫普通链接规则里。兑换后 replace 到手机填写页。
+  { path: '/k/i/:scene', element: <InvoiceSceneEntry />, errorElement: <KioskRouteErrorPage /> },
+  { path: '/invoice/phone', element: <PhoneInvoicePage />, errorElement: <KioskRouteErrorPage /> },
   {
     element: <KioskRuntimeRoot />,
     errorElement: <KioskRouteErrorPage />,

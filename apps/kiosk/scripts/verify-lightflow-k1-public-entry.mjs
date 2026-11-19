@@ -431,6 +431,8 @@ for (const [path, component] of [
   // 2026-10-29 一体机手机码短链的网页中转。
   ['/k/u/:scene', 'UploadSceneEntry'],
   ['/k/l/:ticketId', 'LoginTicketEntry'],
+  ['/k/i/:scene', 'InvoiceSceneEntry'],
+  ['/invoice/phone', 'PhoneInvoicePage'],
   ['/legal/:doc', 'LegalDocPage'],
   ['/screensaver', 'ScreensaverPage'],
 ]) {

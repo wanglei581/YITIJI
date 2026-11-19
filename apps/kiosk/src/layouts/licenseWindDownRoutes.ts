@@ -13,7 +13,7 @@ const groups: Array<[string, WindDownRouteKind, string[]]> = [
   ['campus', 'work', ['/campus/freshman-insights']],
   ['fair', 'work', ['/job-fairs/checkin', '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan']],
   ['toolbox', 'work', ['/dev/touch-gallery']],
-  ['print', 'work', ['/print/upload', '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm', '/print/cashier', '/print/progress', '/print/pickup-claim', '/upload/phone', '/k/u/:scene']],
+  ['print', 'work', ['/print/upload', '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm', '/print/cashier', '/print/progress', '/print/pickup-claim', '/upload/phone', '/k/u/:scene', '/invoice/phone', '/k/i/:scene']],
   ['print', 'result', ['/print/done']],
   ['convert', 'work', ['/print-scan/convert', '/print/scan-convert']],
   ['scan', 'work', ['/scan', '/scan/start', '/scan/settings', '/scan/progress', '/scan/result']],
