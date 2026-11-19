@@ -179,7 +179,9 @@ export class InvoiceSessionsService {
       })
       record.status = 'submitted'
       record.invoiceRequestId = row.id
-      await this.redis.setEx(invoiceSessionKey(sessionId), INVOICE_SESSION_TTL_SECONDS, JSON.stringify(record))
+      // 只续到原来的到期时刻：场景码索引按原时刻过期，会话若重置成 10 分钟，过了原时刻再扫码会说「已过期」而一体机还显示「已提交」。
+      const remaining = Math.max(1, Math.ceil((Date.parse(record.expiresAt) - Date.now()) / 1000))
+      await this.redis.setEx(invoiceSessionKey(sessionId), Math.min(remaining, INVOICE_SESSION_TTL_SECONDS), JSON.stringify(record))
       return { status: INVOICE_POLL_STATUS.submitted, message: SUBMITTED_MESSAGE, requestId: row.id }
     } finally {
       const current = await this.redis.get(invoiceSubmitLockKey(sessionId))

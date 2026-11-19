@@ -44,6 +44,11 @@ class MemoryRedis implements InvoiceRedis {
   keys(): string[] {
     return [...this.rows.keys()]
   }
+
+  ttlSeconds(key: string): number {
+    const row = this.rows.get(key)
+    return row ? Math.ceil((row.expiresAt - Date.now()) / 1000) : -2
+  }
 }
 
 function paidPrint() {
@@ -222,4 +227,31 @@ test('过期后轮询是已过期，个人带税号会被拒绝', async () => {
   record.expiresAt = new Date(Date.now() - 1000).toISOString()
   await redis.setEx(invoiceSessionKey(created.sessionId), 600, JSON.stringify(record))
   assert.deepEqual(await sessions.poll(created.sessionId, created.controlToken), { status: '已过期' })
+})
+
+test('提交后会话只续到原来的到期时刻，不重置成 10 分钟', async () => {
+  process.env['FILE_SIGNING_SECRET'] = 'invoice-test-signing-secret-0123456789'
+  const { sessions, redis } = createHarness()
+  const created = await sessions.create({
+    terminalId: TERMINAL,
+    endUserId: MEMBER,
+    orderKind: 'print',
+    orderId: 'order-1',
+    origin: 'https://kiosk.example',
+  })
+  const redeemed = await sessions.resolveScene(created.sceneToken)
+  // 模拟二维码已经亮了 8 分钟：会话只剩 2 分钟。
+  const raw = await redis.get(invoiceSessionKey(created.sessionId))
+  const record = JSON.parse(raw ?? '{}') as { expiresAt: string }
+  record.expiresAt = new Date(Date.now() + 120_000).toISOString()
+  await redis.setEx(invoiceSessionKey(created.sessionId), 120, JSON.stringify(record))
+  await sessions.submit(created.sessionId, {
+    submitToken: redeemed.submitToken,
+    titleType: 'personal',
+    title: '张三',
+    email: EMAIL,
+  })
+  const left = redis.ttlSeconds(invoiceSessionKey(created.sessionId))
+  assert.ok(left > 0 && left <= 120, `提交后会话剩 ${left} 秒，应不超过原来剩下的 120 秒`)
+  assert.deepEqual(await sessions.poll(created.sessionId, created.controlToken), { status: '已提交' })
 })
