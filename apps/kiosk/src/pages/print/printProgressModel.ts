@@ -19,7 +19,7 @@
 // ============================================================
 
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
-import { printProblemLine } from '../../copy/unattendedCopy'
+import { machineCannotPrintLine, preferUnattended, printProblemLine, type PublicSupportContact } from '../../copy/unattendedCopy'
 import type { BackendJobStatus } from '../../services/print/printJobsApi'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
@@ -135,10 +135,15 @@ export function outOfPaperMoneyOf(
   }
 }
 
+/** 顶栏胶囊前半截。免费写「免费试运营，本单 0 元」，付过写金额，不知道金额只说订单保留。缺纸、卡纸、离线共用。 */
+export function paidLabelOf(money: OutOfPaperMoney): string {
+  if (money.fact === 'free') return '免费试运营，本单 0 元'
+  if (money.fact === 'paid' && money.amountCents != null) return `已付 ${formatCents(money.amountCents)}`
+  return '订单保留'
+}
+
 export function outOfPaperPill(money: OutOfPaperMoney): string {
-  if (money.fact === 'paid' && money.amountCents != null) return `已付 ${formatCents(money.amountCents)} · 缺纸`
-  if (money.fact === 'free') return '免费试运营 · 缺纸'
-  return '订单保留 · 缺纸'
+  return `${paidLabelOf(money)} · 打印机缺纸`
 }
 
 /**
@@ -181,12 +186,19 @@ export function priorOutputTrayLine(flags: {
   return null
 }
 
-/** 卡纸说明的副标题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。 */
-export function jamOrderKeptLine(fact: PaymentFact): string {
-  // 不写「处理好后可以继续打印」：现场没人处理，说清是谁在管（我们已收到提醒）、订单还在就够了（走查 I-11）。
+/**
+ * 失败副题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。
+ * fault 写这一态的设备事实。不写「处理好后可以继续打印」：现场没人处理，说清是谁在管（我们已收到提醒）、订单还在就够了（走查 I-11）。
+ */
+export function orderKeptFaultLine(fact: PaymentFact, fault: string): string {
   return fact === 'paid'
-    ? '你的订单和已付金额都保留着。机器卡纸，我们已经收到提醒，会尽快处理'
-    : '你的订单还在。机器卡纸，我们已经收到提醒，会尽快处理'
+    ? `你的订单和已付金额都保留着。${fault}，我们已经收到提醒，会尽快处理`
+    : `你的订单还在。${fault}，我们已经收到提醒，会尽快处理`
+}
+
+/** 卡纸说明的副标题。公开状态确实是卡纸时才用。 */
+export function jamOrderKeptLine(fact: PaymentFact): string {
+  return orderKeptFaultLine(fact, '机器卡纸')
 }
 
 /** 小青区首句的前半截：先说钱的事实，再说任务阶段（稿「支付成功，正在出纸。」）。 */
@@ -233,9 +245,9 @@ export const FAIL_REASONS = [
 const ERROR_CODE_MESSAGES: Record<string, string> = {
   DOWNLOAD_HASH_MISMATCH: '文件校验未通过（上传可能中断或文件已变化），请返回重新上传后再打印',
   PRINTER_NOT_FOUND: `未找到打印机。${printProblemLine()}`,
-  PRINTER_OFFLINE: `打印机离线，请稍后重试。${printProblemLine()}`,
-  PAPER_EMPTY: `打印机缺纸，当前无法打印。${printProblemLine()}`,
-  PRINTER_ERROR: `打印机可能卡纸或发生设备故障，当前暂时无法继续使用。${printProblemLine()}`,
+  PRINTER_OFFLINE: '打印机离线，当前无法打印。',
+  PAPER_EMPTY: '打印机缺纸，当前无法打印。',
+  PRINTER_ERROR: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。',
   PRINT_JOB_UNCONFIRMED: `打印作业已提交到打印队列，但未确认完成。请先看纸张、卡纸和出纸口。${printProblemLine()}`,
   PRINT_TIMEOUT: '打印超时，请稍后重试',
   PRINT_QUEUE_TIMEOUT: '这单等了太久没有打印，没有出纸，可以重新提交打印。',
@@ -250,11 +262,12 @@ export function errorCodeToMessage(code?: string): string | undefined {
 
 /**
  * 进度页和失败页要显示对照表里的句子。
- * 排队超时、离线、缺纸、卡纸优先用对照表（具体原因加下一步），不用接口带回的 failureReasonForUser。
- * 接口那三句若仍写着找人，无人值守会整句换成下一步，屏幕上看不出是哪一种故障。
+ * 排队超时、离线、缺纸、卡纸优先用对照表，不用接口带回的 failureReasonForUser。
+ * 接口那三句若仍写着找人，整句换成笼统下一步就看不出是哪一种故障。
  * 其它错误码仍先用接口文案，对照表只在接口没给句子时补上。
  */
 const SCREEN_REASON_CODES = new Set(['PRINT_QUEUE_TIMEOUT', 'PRINTER_OFFLINE', 'PAPER_EMPTY', 'PRINTER_ERROR'])
+const FAULT_SCREEN_CODES = new Set(['PRINTER_OFFLINE', 'PAPER_EMPTY', 'PRINTER_ERROR'])
 
 export function screenFailureReason(input: {
   errorCode?: string | null
@@ -266,6 +279,27 @@ export function screenFailureReason(input: {
   const fromApi = input.failureReasonForUser?.trim()
   if (fromApi) return fromApi
   return input.errorCode ? ERROR_CODE_MESSAGES[input.errorCode] : undefined
+}
+
+/**
+ * 失败页实际念的那句。
+ * 缺纸、卡纸、离线：对照表的原因加上「这台机器暂时打不了」的下一步（换一台或稍后再来；小程序已发布才补手机上能看到）。
+ * 不把这三句整段换成「打印有问题」。
+ * 其它错误码仍走无人值守兜底：原话叫人去现场才换成「打印有问题」，否则留下原话。
+ */
+export function presentScreenFailure(
+  input: {
+    errorCode?: string | null
+    failureReasonForUser?: string | null
+  },
+  contact?: PublicSupportContact | null,
+): string {
+  const code = input.errorCode ?? ''
+  if (FAULT_SCREEN_CODES.has(code)) {
+    const base = ERROR_CODE_MESSAGES[code] ?? ''
+    return `${base}${machineCannotPrintLine(contact, { orderKept: true })}`
+  }
+  return preferUnattended((input.failureReasonForUser ?? '').trim(), printProblemLine(contact))
 }
 
 export const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)

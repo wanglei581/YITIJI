@@ -59,6 +59,7 @@ import {
   paymentPill,
   priorOutputTrayLine,
   PRINT_PROGRESS_QUIET_MS,
+  presentScreenFailure,
   progressFailurePresentation,
   progressStatusFingerprint,
   screenFailureReason,
@@ -228,10 +229,10 @@ export function PrintProgressPage() {
         }
         if (result.status === 'failed') {
           stopped = true
-          navigateFail(preferUnattended(
-            screenFailureReason(result) ?? FAIL_REASONS[0],
-            printProblemLine(),
-          ))
+          navigateFail(presentScreenFailure({
+            errorCode: result.errorCode,
+            failureReasonForUser: screenFailureReason(result) ?? FAIL_REASONS[0],
+          }))
           return
         }
         if (result.status === 'cancelled' || result.status === 'abandoned') {

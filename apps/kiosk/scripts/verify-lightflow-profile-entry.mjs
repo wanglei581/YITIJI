@@ -431,6 +431,10 @@ const allowedMeChanges = new Set([
   // verify-profile-print-orders-inkpaper.mjs 顶部注释。
   'apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts',
   'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
+  // S15c（2026-11-18）：我的打印订单复用取件时间线，列出手机上还没取的单。只加这一行。
+  'apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx',
+  // S15c2（2026-11-19）：有待取单、没有打印任务时的两张出路卡。只加这一行。
+  'apps/kiosk/src/pages/profile/me/printOrders/pendingPickupExits.ts',
   'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
   'apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx',
   'apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css',

@@ -487,18 +487,21 @@ export function PrintScanHomePage() {
     notice: machineCannotPrintLine(contact),
   }
 
-  // 稿 st-device-off：确定缺纸时是另一版面（眉题「打印 · 扫描 · 复印」、无步骤轴、无印章）；离线、异常、暂停接单仍是 print?printer=down 的版面。
-  const paperOff = hubState === 'device-off' && device.printer.errorCode === 'paperEmpty' && !device.printerNotice
-  // 稿：st-loading「问小青：怎么选打印方式？」、st-device-off「问小青：缺纸了文件还要传吗？」、默认「问小青：怎么选打印方式 →」。
+  // 稿 st-device-off / st-device-jam：确定缺纸或确定卡纸用缺纸这一版；离线、别的故障、暂停接单仍是 print?printer=down。
+  const paperOff = hubState === 'device-off' && !device.printerNotice && (device.printer.errorCode === 'paperEmpty' || device.printer.errorCode === 'paperJam')
+  const trayJam = paperOff && device.printer.errorCode === 'paperJam'
+  // 稿：st-loading「问小青：怎么选打印方式？」、缺纸「问小青：缺纸了文件还要传吗？」、卡纸「问小青：卡纸了文件还要传吗？」、默认「问小青：怎么选打印方式 →」。
   const askLabel = paperOff
-    ? '问小青：缺纸了文件还要传吗？'
+    ? (trayJam ? '问小青：卡纸了文件还要传吗？' : '问小青：缺纸了文件还要传吗？')
     : hubState === 'capability-loading'
       ? '问小青：怎么选打印方式？'
       : '问小青：怎么选打印方式 →'
   const hubSubtitle = hubState === 'capability-loading'
     ? '确认前，打印、扫描这几项先不进入；到机码、复印照常可用。'
     : paperOff
-      ? '缺纸了。打印和扫描先停，订单还在。'
+      ? (trayJam
+        ? '卡纸了，请不要自己开机盖、拽纸。打印和扫描先停，订单还在。'
+        : '缺纸了。打印和扫描先停，订单还在。')
       : undefined
 
   return (

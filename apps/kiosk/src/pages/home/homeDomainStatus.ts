@@ -53,3 +53,25 @@ export function printDomainStatus(input: {
     unavailableActions: new Set<HomeV6ActionId>(['scan-paper']),
   }
 }
+
+export type HomeBandTone = 'ok' | 'warn' | 'bad' | 'unknown'
+
+/** 首页顶栏胶囊。公开打印机状态已经是卡纸时，本机探针连不上也不把文案盖成「状态未知」。 */
+export function homeBandStatus(input: {
+  loading: boolean
+  requestFailed: boolean
+  localAgentUnreachable: boolean
+  printerReady: boolean
+  kind: 'ready' | 'offline' | 'error' | 'low_paper' | 'unknown'
+  printerLabel: string
+  errorCode: string | null
+}): { tone: HomeBandTone; label: string } {
+  if (input.loading) return { tone: 'unknown', label: '设备检查中' }
+  if (input.requestFailed) return { tone: 'warn', label: '服务暂时连不上' }
+  if (input.errorCode === 'paperJam') return { tone: 'bad', label: input.printerLabel }
+  if (input.localAgentUnreachable) return { tone: 'unknown', label: '状态未知' }
+  if (input.printerReady) return { tone: 'ok', label: input.printerLabel }
+  if (input.kind === 'error') return { tone: 'bad', label: input.printerLabel }
+  if (input.kind === 'offline') return { tone: 'warn', label: input.printerLabel }
+  return { tone: 'unknown', label: '状态未知' }
+}

@@ -14,7 +14,7 @@ import { LicenseLock } from '../../../layouts/LicenseLock'
 // - 「再打一份」不从订单侧直连，详单内引导「去我的文档再打印」（新任务新订单）。
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
 import { getMyPrintOrders } from '../../../services/api/memberPrintOrders'
@@ -28,6 +28,8 @@ import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock } from './qx/QxMeState
 import { MeActs, MeBtn, MeP, MeRow, MeRows, MeSeg } from '../touch/MeKit'
 import { MeEmptyPack, MeExitCard } from '../touch/MeStatePacks'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
+import { PendingPickupSection, usePendingPickupOrders } from './printOrders/PendingPickupSection'
+import { mobilePickupBanner, pendingPickupExitCards } from './printOrders/pendingPickupExits'
 import {
   formatAmountCents,
   isFreeMemberOrder,
@@ -236,27 +238,85 @@ export function MyPrintOrdersPage() {
     return items.filter((i) => f.match(i.status))
   }, [items, filterKey])
 
-  const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 ? 'empty' : 'ready'
+  const pendingPickup = usePendingPickupOrders(isLoggedIn ? getToken() : null)
+  const pendingBlocking = isLoggedIn && state === 'ready' && items.length === 0
+    && (pendingPickup.presence === 'loading' || pendingPickup.presence === 'off')
+  const uiState = !isLoggedIn
+    ? 'login'
+    : state === 'loading' || pendingBlocking
+      ? 'loading'
+      : state === 'error'
+        ? 'error'
+        : state === 'ready' && items.length === 0 && pendingPickup.presence === 'hidden'
+          ? 'empty'
+          : 'ready'
   const miniOn = whenMiniapp(useSupportContact(isLoggedIn), 'on') !== ''
   const allLoadedFree = items.length > 0 && items.every(isFreeMemberOrder)
+  const pickupBanner = mobilePickupBanner(miniOn, pendingPickup.presence)
+  const pickupBlock = (
+    <>
+      {pickupBanner ? (
+        <button type="button" className="me-line" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/print/pickup-claim')}>
+          <b>{pickupBanner.title}</b>
+          {pickupBanner.note ? <small>{pickupBanner.note}</small> : null}
+        </button>
+      ) : null}
+      <PendingPickupSection
+        presence={pendingPickup.presence}
+        rows={pendingPickup.rows}
+        hasTasks={items.length > 0}
+        reloading={pendingPickup.reloading}
+        onReload={pendingPickup.reload}
+      />
+    </>
+  )
 
   let body: ReactNode
   if (!isLoggedIn) {
     body = <QxMeLoginBlock title="登录后查看打印订单" />
-  } else if (state === 'loading') {
+  } else if (state === 'loading' || pendingBlocking) {
     body = <QxMeLoadingBlock title="正在加载打印订单" />
   } else if (state === 'error') {
     body = <QxMeErrorBlock onRetry={() => setReloadKey((k) => k + 1)} />
-  } else if (items.length === 0) {
+  } else if (items.length === 0 && pendingPickup.presence === 'hidden') {
     body = (
       <div className="me-state" data-testid="qx-me-fallback">
-        <MeEmptyPack sentence="还没有打印订单。没登录时在这台机器上打的单不会进这个账号。">
+        <MeEmptyPack exitsClassName="me-orders-exits" sentence="还没有打印订单。没登录时在这台机器上打的单不会进这个账号。">
           <LicenseLock><MeExitCard art="usb" artWidth={120} title="去打印" desc="U 盘、手机或扫描都可以" onClick={() => navigate('/print-scan')} /></LicenseLock>
           {miniOn
             ? <LicenseLock><MeExitCard art="phone" artWidth={96} title="输到机码取件" desc="手机上下的到店单，到机器上输入到机码" onClick={() => navigate('/print/pickup-claim')} /></LicenseLock>
             : <MeExitCard art="stack" artWidth={120} title="看看我的文档" desc="选一份已保存的文件再打" onClick={() => navigate('/me/documents')} />}
         </MeEmptyPack>
       </div>
+    )
+  } else if (items.length === 0) {
+    const exits = pendingPickupExitCards({
+      printTaskCount: items.length,
+      presence: pendingPickup.presence,
+      miniOn,
+    })
+    body = (
+      <>
+        {pickupBlock}
+        {exits.length > 0 ? (
+          <div className="me-stack me-orders-exits" data-testid="pending-pickup-exits">
+            {exits.map((card) => {
+              const node = (
+                <MeExitCard
+                  art={card.art}
+                  artWidth={card.artWidth}
+                  title={card.title}
+                  desc={card.desc}
+                  onClick={() => navigate(card.to)}
+                />
+              )
+              return card.locked
+                ? <LicenseLock key={card.to}>{node}</LicenseLock>
+                : <Fragment key={card.to}>{node}</Fragment>
+            })}
+          </div>
+        ) : null}
+      </>
     )
   } else {
     const syncNote = autoRefreshChecking
@@ -266,12 +326,7 @@ export function MyPrintOrdersPage() {
           : '进行中的订单会自动刷新。没登录时在这台机器上打的单不会进这个账号。'
     body = (
       <>
-        {miniOn ? (
-          <button type="button" className="me-line" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/print/pickup-claim')}>
-            <b>手机上下的到店单，到机器上输到机码取件</b>
-            <small>还没核销出打印任务的单，不在下面的列表里</small>
-          </button>
-        ) : null}
+        {pickupBlock}
         {/* 任务状态筛选（对已加载数据过滤） */}
         <MeSeg
           mode="pressed"
@@ -284,7 +339,7 @@ export function MyPrintOrdersPage() {
         {filtered.length === 0 ? (
           <div className="me-state">
             <MeP>{filterKey !== 'all' && nextCursor ? '已加载记录中暂无此类，点「加载更多」继续查找。' : '这个筛选下没有订单。'}</MeP>
-            <div className="me-stack">
+            <div className="me-stack me-orders-exits">
               <MeExitCard art="checklist" artWidth={120} title="查看全部" desc="全部订单都在「全部」里" onClick={() => setFilterKey('all')} />
               <LicenseLock><MeExitCard art="usb" artWidth={120} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} /></LicenseLock>
             </div>
@@ -348,7 +403,7 @@ export function MyPrintOrdersPage() {
         ) : null}
 
         {filtered.length > 0 && filtered.length < 7 && expandedId === null ? (
-          <div className="me-stack">
+          <div className="me-stack me-orders-exits">
             <LicenseLock><MeExitCard art="usb" artWidth={110} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} /></LicenseLock>
             <MeExitCard art="stack" artWidth={110} title="去我的文档" desc="从已保存的文件里再选一份" onClick={() => navigate('/me/documents')} />
           </div>
@@ -366,7 +421,11 @@ export function MyPrintOrdersPage() {
       screen="member-list"
       screenState={`orders-${uiState}`}
       eyebrow="我的 · 打印订单"
-      sub={items.length > 0 ? `共 ${total} 条已产生打印任务的单` : uiState === 'empty' ? '还没有归入账号的打印任务' : undefined}
+      sub={items.length > 0
+        ? `共 ${total} 条已产生打印任务的单`
+        : uiState === 'empty' || (items.length === 0 && (pendingPickup.presence === 'rows' || pendingPickup.presence === 'error'))
+          ? '还没有归入账号的打印任务'
+          : undefined}
       fine={allLoadedFree ? '只显示当前登录账号的打印订单；状态与到机码一律由系统返回。' : undefined}
       ctabar={ctabar}
       live={false}

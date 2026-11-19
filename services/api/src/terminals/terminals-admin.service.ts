@@ -40,6 +40,8 @@ import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './t
 import { withOrgTerminalQuota } from '../licenses/license-gate'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
 import {
+  KIOSK_PUBLIC_PRINTER_STATUS_SELECT,
+  publicPrinterStatusFromHeartbeat,
   publicScanDeviceHealth,
   publicScanInputHealth,
   type PublicScanDeviceHealth,
@@ -869,7 +871,7 @@ export class TerminalAdminService {
           orderBy: { createdAt: 'desc' },
           take: 1,
           select: {
-            printerStatus: true,
+            ...KIOSK_PUBLIC_PRINTER_STATUS_SELECT,
             scanInputHealth: true,
             scanDeviceHealth: true,
             scanDeviceObservedAt: true,
@@ -894,7 +896,7 @@ export class TerminalAdminService {
     const isOnline = latest ? Date.now() - latest.createdAt.getTime() < TERMINAL_ONLINE_WINDOW_MS : false
     return {
       found: true,
-      printerStatus: latest?.printerStatus ?? null,
+      printerStatus: publicPrinterStatusFromHeartbeat(latest),
       lastSeenAt,
       isOnline,
       scanInputHealth: publicScanInputHealth(latest?.scanInputHealth),

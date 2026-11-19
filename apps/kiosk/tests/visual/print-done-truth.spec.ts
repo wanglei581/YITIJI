@@ -140,7 +140,7 @@ test('paper-out, jam, and offline each show that reason plus the next step @kios
     {
       errorCode: 'PRINTER_OFFLINE',
       staff: '打印机离线，请联系工作人员检查设备',
-      reason: '打印机离线，请稍后重试。',
+      reason: '打印机离线，当前无法打印。',
     },
   ] as const
 
@@ -158,8 +158,18 @@ test('paper-out, jam, and offline each show that reason plus the next step @kios
     const summary = page.getByTestId('print-fulfill-list')
     await expect(summary.getByText('设备上报', { exact: true })).toBeVisible()
     await expect(summary).toContainText(item.reason)
-    await expect(summary).toContainText('打印有问题？')
+    await expect(summary).not.toContainText('这台机器暂时打不了')
+    await expect(summary).not.toContainText('请稍后再来')
+    await expect(summary).not.toContainText('打印有问题？')
+    await expect(summary).not.toContainText('服务电话')
     await expect(summary).not.toContainText('工作人员')
+    const step2 = page.locator('.qxt-step').nth(1)
+    const step3 = page.locator('.qxt-step').nth(2)
+    await expect(step2).toContainText('稍后再来')
+    await expect(step2).not.toContainText('请稍后再来')
+    await expect(step3).toContainText('需要帮助？拨打服务电话 18369161921，报这一单的订单号')
+    await expect(step3).toContainText('服务时间：工作日 9:00–18:00')
+    await expect(step3).not.toContainText('这台机器暂时打不了')
     await expect(page.getByText(item.staff, { exact: true })).toHaveCount(0)
   }
 })

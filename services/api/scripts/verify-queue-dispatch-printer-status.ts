@@ -96,7 +96,13 @@ function assertKioskFailClosed(): void {
     `${stripped}
 const cleanup = mapTerminalPrinterStatus({ heartbeatOnline: true, printerStatus: 'queue_cleanup_failed' })
 const pause = mapTerminalPrinterStatus({ heartbeatOnline: true, printerStatus: 'queue_pause_failed' })
+const jam = mapTerminalPrinterStatus({ heartbeatOnline: true, printerStatus: 'paper_jam' })
+const jamAlias = mapTerminalPrinterStatus({ heartbeatOnline: true, printerStatus: 'jam' })
+const stillError = mapTerminalPrinterStatus({ heartbeatOnline: true, printerStatus: 'error' })
 if (cleanup.printerReady !== false || pause.printerReady !== false) process.exit(1)
+if (jam.printerReady !== false || jam.printerLabel !== '打印机卡纸' || jam.printer.errorCode !== 'paperJam') process.exit(2)
+if (jamAlias.printerLabel !== '打印机卡纸' || jamAlias.printerReady !== false) process.exit(3)
+if (stillError.printerLabel !== '打印机异常' || stillError.printerReady !== false) process.exit(4)
 process.exit(0)
 `,
   )

@@ -427,6 +427,58 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
   }
 })
 
+test('S15c7：确定卡纸用缺纸版面，离线、异常和暂停接单仍用离线版', () => {
+  const home = readFileSync(join(kioskRoot, 'src/pages/print-scan/PrintScanHomePage.tsx'), 'utf8')
+  assert.match(
+    home,
+    /paperOff\s*=\s*hubState === 'device-off' && !device\.printerNotice && \(device\.printer\.errorCode === 'paperEmpty' \|\| device\.printer\.errorCode === 'paperJam'\)/,
+    '页面只在没有暂停接单时，把确定缺纸和确定卡纸送进缺纸版',
+  )
+  assert.match(home, /卡纸了，请不要自己开机盖、拽纸。打印和扫描先停，订单还在。/)
+  assert.match(home, /问小青：卡纸了文件还要传吗？/)
+  assert.match(home, /缺纸了。打印和扫描先停，订单还在。/)
+  assert.match(home, /问小青：缺纸了文件还要传吗？/)
+
+  const cap = (key) => ({
+    key, title: key, description: '说明', icon: () => null, actionable: false, available: false, deviceOff: true,
+  })
+  const render = (extra) => renderToStaticMarkup(createElement(QxPrintHubView, {
+    hubState: 'device-off', probe: 'ok', mfp: 'unavailable',
+    colorDuplexLabel: '本机暂未开通',
+    capabilities: [cap('doc-print'), cap('scan')],
+    arrivalCode: { key: 'arrival', icon: () => null, title: '到机码', description: '输入到机码' },
+    quickLinks: [], notices: [],
+    onRetry: () => {}, onHelp: () => {}, onArrivalCode: () => {}, onQuickLink: () => {}, onCapability: () => {},
+    ...extra,
+  }))
+  const jam = render({ printerUnavailable: { label: '打印机卡纸', notice: '这台机器暂时打不了' } })
+  assert.match(jam, /ph-paper/)
+  assert.match(jam, /卡纸时复印也出不了纸，恢复后再用/)
+  assert.match(jam, /打印机卡纸，这次出不了纸。文件可以先从下面传上来。/)
+  assert.match(jam, /扫描和打印是同一台机器，一起停。/)
+  assert.doesNotMatch(jam, /缺纸时复印也出不了纸/)
+  assert.doesNotMatch(jam, /打印机异常时复印/)
+
+  const empty = render({ printerUnavailable: { label: '打印机缺纸', notice: '这台机器暂时打不了' } })
+  assert.match(empty, /ph-paper/)
+  assert.match(empty, /缺纸时复印也出不了纸，补纸后再用/)
+  assert.match(empty, /打印机缺纸，这次出不了纸。文件可以先从下面传上来。/)
+
+  for (const label of ['打印机异常', '打印机离线']) {
+    const html = render({ printerUnavailable: { label, notice: '这台机器暂时打不了' } })
+    assert.equal(/ph-paper/.test(html), false, `${label} 不走缺纸版`)
+    assert.doesNotMatch(html, /卡纸时复印|缺纸时复印/)
+  }
+
+  const paused = render({
+    printerUnavailable: { label: '打印机卡纸', notice: '暂停' },
+    orderPaused: { label: '暂停接单', notice: '这台终端暂停接打印单' },
+  })
+  assert.equal(/ph-paper/.test(paused), false, '暂停接单不走缺纸版')
+  assert.match(paused, /暂停接单时，复印以打印机屏幕为准/)
+  assert.doesNotMatch(paused, /卡纸时复印也出不了纸/)
+})
+
 test('到机码入口：读不到或小程序未发布不点名，已发布才点名', async () => {
   const props = {
     hubState: 'default', probe: 'ok', mfp: 'ready', colorDuplexLabel: '本机暂未开通',
@@ -506,7 +558,10 @@ test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保
     assert.match(freeText, /免费试运营/)
     assert.doesNotMatch(freeText, /报价|价格|费用|付款|收费|收款|扣费|抵扣|权益|internal-task/)
     const paidText = copyText(failedModel.failureCopy({ ...base, money: { fact: 'paid', amountCents: 200 } }))
-    assert.match(paidText, /不会重复收费/)
+    // 定稿第 6 条：小字只说金额还在。能重打时第 2 步写「不再收费」，不再写「不会重复收费」。
+    assert.match(paidText, /订单和已付金额都保留着，不会因为这次失败消失/)
+    if (canRetry) assert.match(paidText, /不再收费/)
+    assert.doesNotMatch(paidText, /不会重复收费|退款/)
   }
 })
 
@@ -516,10 +571,15 @@ test('缺纸页不承诺补纸后自动续打，重打只在 canRetry 时出现�
   const withRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-20261003-PAPER', canRetry: true })
   assert.equal(noRetry.steps.length, 3)
   assert.match(noRetry.steps[0].detail, /本机不知道出了几页/)
-  assert.match(noRetry.steps[2].title, /订单号 ORD-20261003-PAPER/)
-  assert.match(withRetry.steps[2].detail, /整份重打/)
+  // 定稿第 4 条：没配服务电话时第 3 步改去隐私政策，具体订单号仍在摘要。
+  assert.equal(noRetry.steps[2].title, '需要帮助？查看《隐私政策》里的联系方式')
+  assert.equal(
+    failedModel.failureSummaryRows({ orderNo: 'ORD-20261003-PAPER', file: null, params: null, money, reason: '' }).find((row) => row.key === 'order').value,
+    'ORD-20261003-PAPER',
+  )
+  assert.match(withRetry.steps[1].detail, /整份重打/)
   for (const copy of [noRetry, withRetry]) {
-    assert.match(copyText(copy), /不会在加纸后自动继续/)
+    assert.match(copyText(copy), /加纸后也不会自动续打/)
     assert.doesNotMatch(copyText(copy), /加纸后可以继续|加纸后可继续打印|剩下没打的部分会在加纸后继续|不需要重新下单|已出 1|等待加纸|退款|自动续打后/)
   }
 })
@@ -529,9 +589,23 @@ test('卡纸三步不提收款', () => {
     const copy = failedModel.failureCopy({ variant: 'paper-jam', money: { fact, amountCents: fact === 'paid' ? 200 : fact === 'free' ? 0 : null }, orderNo: 'ORD-20261003-JAM', canRetry: false })
     const text = stepsText(copy)
     assert.equal(copy.stepsLabel, '处理之前先做这三件')
-    assert.match(text, /别硬拉纸/)
-    assert.match(text, /订单号 ORD-20261003-JAM/)
-    assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)
+    assert.match(text, /不要拽纸/)
+    assert.match(text, /撕在里面更难取/)
+    assert.equal(copy.steps[2].title, '需要帮助？查看《隐私政策》里的联系方式')
+    assert.equal(
+      failedModel.failureSummaryRows({
+        orderNo: 'ORD-20261003-JAM',
+        file: null,
+        params: null,
+        money: { fact, amountCents: fact === 'paid' ? 200 : fact === 'free' ? 0 : null },
+        reason: '',
+      }).find((row) => row.key === 'order').value,
+      'ORD-20261003-JAM',
+    )
+    const stepsOnly = copy.steps.flatMap((step) => [step.title, step.detail]).join('\n')
+    assert.doesNotMatch(stepsOnly, /已付金额|已支付|支付|报价|价格|收费/)
+    if (fact === 'paid') assert.equal(copy.fine, '订单和已付金额都保留着，不会因为这次失败消失。')
+    else assert.equal(copy.fine, '订单记录保留着，不会因为这次失败消失。')
   }
 })
 
@@ -555,6 +629,46 @@ test('普通失败三步：免费与金额未知不提已付，收费单保留�
 // ── 走查 I-11（2026-10-29）：缺纸 / 卡纸 / 结果未确认三屏，现场没人加纸、没人处理 ──
 const contactEntry = await import(transpile(join(kioskRoot, 'src/pages/print/components/printContactEntry.ts')))
 
+test('离线失败屏用离线标题和稍后再来，不叫人找工作人员', () => {
+  const copy = failedModel.failureCopy({ variant: 'offline', money: { fact: 'free', amountCents: 0 }, orderNo: 'ORD-20261118-OFF', canRetry: false })
+  assert.equal(copy.title, '打印机离线')
+  assert.match(copy.subtitle, /你的订单还在。打印机没连上，我们已经收到提醒，会尽快处理/)
+  assert.match(copy.steps[1].detail, /你可以稍后再来/)
+  assert.match(copy.steps[2].title, /需要帮助？查看《隐私政策》里的联系方式/)
+  assert.doesNotMatch(copyText(copy), /请稍后再来|这台机器暂时打不了/)
+  assert.doesNotMatch(copyText(copy), /工作人员/)
+  assert.doesNotMatch(copyText(copy), /打印有问题/)
+})
+
+test('缺纸、卡纸、离线的失败句保留各自原因，并带下一步，不整句换成打印有问题', () => {
+  for (const [code, base] of [
+    ['PAPER_EMPTY', '打印机缺纸，当前无法打印。'],
+    ['PRINTER_ERROR', '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。'],
+    ['PRINTER_OFFLINE', '打印机离线，当前无法打印。'],
+  ]) {
+    const shown = progress.presentScreenFailure({
+      errorCode: code,
+      failureReasonForUser: `${base}请联系工作人员`,
+    })
+    assert.match(shown, new RegExp(base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    assert.match(shown, /请稍后再来/)
+    assert.match(shown, /这台机器暂时打不了/)
+    assert.doesNotMatch(shown, /工作人员/)
+    assert.doesNotMatch(shown, /打印有问题/)
+  }
+  const other = progress.presentScreenFailure({
+    errorCode: 'PRINT_COMMAND_FAILED',
+    failureReasonForUser: '请联系工作人员处理',
+  })
+  assert.match(other, /打印有问题/)
+  assert.doesNotMatch(other, /工作人员/)
+  const kept = progress.presentScreenFailure({
+    errorCode: 'PRINT_COMMAND_FAILED',
+    failureReasonForUser: '打印执行失败，请稍后重试。',
+  })
+  assert.equal(kept, '打印执行失败，请稍后重试。')
+})
+
 test('I-11 缺纸、卡纸的下一步不等人「加完纸」「处理好」，说清我们已收到提醒、请稍后再来', () => {
   const money = { fact: 'free', amountCents: 0 }
   const jam = failedModel.failureCopy({ variant: 'paper-jam', money, orderNo: 'ORD-20261029-JAM', canRetry: false })
@@ -563,14 +677,13 @@ test('I-11 缺纸、卡纸的下一步不等人「加完纸」「处理好」，
   for (const copy of [jam, noRetry, withRetry]) {
     assert.doesNotMatch(copyText(copy), /加完纸|处理好后|加纸之后|等人|工作人员/)
   }
-  // 卡纸、缺纸（没有重提出口）的第三步用「机器暂时打不了」的标准句：我们已收到提醒、请稍后再来、怎么找到我们。
-  for (const copy of [jam, noRetry]) {
-    assert.match(copy.steps[2].detail, /这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请/)
-    assert.match(copy.steps[2].title, /订单号 ORD-2026102/)
+  // 定稿第 4 条：第 3 步固定是求助，不写「这台机器暂时打不了」。稍后再来在第 2 步。
+  for (const copy of [jam, noRetry, withRetry]) {
+    assert.equal(copy.steps[2].title, '需要帮助？查看《隐私政策》里的联系方式')
+    assert.doesNotMatch(`${copy.steps[2].title}\n${copy.steps[2].detail}`, /我们已经收到提醒|这台机器暂时打不了|请稍后再来|重新提交打印/)
   }
-  // 有重提出口：第三步说清是机器恢复后才点，整份重打。
-  assert.equal(withRetry.steps[2].title, '机器恢复后可点下方「重新提交打印」')
-  assert.match(withRetry.steps[2].detail, /整份重打/)
+  assert.match(noRetry.steps[1].detail, /你可以稍后再来/)
+  assert.match(withRetry.steps[1].detail, /整份重打/)
 })
 
 test('到机码失败屏只在后端还允许续打时说出同码续打，不按价格', () => {
@@ -608,11 +721,16 @@ test('I-11 重新提交打印：打印机现在不能出纸就给出原因，能
   assert.match(failedModel.retryBlockedReason(dev({ loading: true })), /正在确认/)
   assert.match(failedModel.retryBlockedReason(dev({ kind: 'offline' })), /离线/)
   assert.match(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'paperEmpty' } })), /缺纸/)
+  assert.match(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'paperJam' } })), /卡着纸/)
+  assert.doesNotMatch(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'paperJam' } })), /工作人员/)
   assert.match(failedModel.retryBlockedReason(dev({ kind: 'error', printer: { errorCode: 'hardwareError' } })), /故障/)
   assert.match(failedModel.retryBlockedReason(dev({ kind: 'unknown' })), /读不到打印机状态/)
   assert.equal(failedModel.retryBlockedReason(dev({ kind: 'error', printerNotice: '这台机器暂时不能用，请稍后再来' })), '这台机器暂时不能用，请稍后再来')
   for (const kind of ['offline', 'error', 'unknown']) {
-    assert.match(failedModel.retryBlockedReason(dev({ kind })), /订单还在/)
+    const reason = failedModel.retryBlockedReason(dev({ kind }))
+    assert.match(reason, /机器恢复后，这个按钮会自己亮起。$/)
+    assert.doesNotMatch(reason, /订单还在/)
+    assert.doesNotMatch(reason, /请不要重新下单/)
   }
 })
 
@@ -681,10 +799,10 @@ test('失败摘要行：订单号、文件、参数、支付事实；原因已�
   const rowsOf = (money, reason) => failedModel.failureSummaryRows({ orderNo: 'ORD-20261003-ROW', file, params, money, reason })
   const paid = rowsOf({ fact: 'paid', amountCents: 200 }, '新任务已确认失败')
   assert.deepEqual(paid.map((row) => row.label), ['订单号', '文件', '参数', '支付状态', '设备上报'])
-  assert.equal(paid.find((row) => row.key === 'pay').value, '已付 ¥2.00')
+  assert.equal(paid.find((row) => row.key === 'pay').value, '已付 2.00 元')
   assert.equal(paid.find((row) => row.key === 'file').value, 'w2-sample.pdf')
   assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').label, '办理方式')
-  assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').value, '免费试运营')
+  assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').value, '免费试运营，本单 0 元')
   assert.equal(rowsOf({ fact: 'unknown', amountCents: null }, '').find((row) => row.key === 'pay').value, '以订单为准')
   const helpLine = '打印有问题？查看《隐私政策》里的联系方式，或问小青'
   assert.equal(rowsOf({ fact: 'paid', amountCents: 200 }, helpLine).some((row) => row.key === 'reason'), false)

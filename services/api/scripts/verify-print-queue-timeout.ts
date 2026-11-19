@@ -19,6 +19,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
 import { loadFreePrintUsage } from '../src/print-jobs/free-print-quota.usage'
 import { failureReasonForUser } from '../src/print-jobs/print-jobs.service'
+import { publicPrinterStatusForKiosk } from '../src/terminals/printer-status'
 import {
   PRINT_QUEUE_TIMEOUT,
   PRINT_QUEUE_TIMEOUT_AUDIT,
@@ -69,6 +70,35 @@ function assertWired(): void {
   for (const code of ['PRINTER_OFFLINE', 'PAPER_EMPTY', 'PRINTER_ERROR']) {
     assert.equal(failureReasonForUser(code).includes('工作人员'), false, code)
   }
+  const unattended = [
+    ['PRINTER_NOT_FOUND', '未找到打印机。'],
+    ['PRINT_JOB_UNCONFIRMED', '打印作业已提交到打印队列，但未确认完成。请先看纸张、卡纸和出纸口。'],
+    ['PRINT_COMMAND_FAILED', '打印执行失败，请稍后重试。'],
+    ['NOT_A_REAL_CODE', '打印任务失败，请稍后重试。'],
+  ] as const
+  for (const [code, expected] of unattended) {
+    const text = failureReasonForUser(code)
+    assert.equal(text, expected, code)
+    assert.equal(text.includes('工作人员'), false, code)
+  }
+  assert.equal(failureReasonForUser(null).includes('工作人员'), false)
+  assert.equal(failureReasonForUser(undefined).includes('工作人员'), false)
+  assert.equal(publicPrinterStatusForKiosk('error', '2,8,False,0,0'), 'paper_jam')
+  assert.equal(publicPrinterStatusForKiosk('error', '2,2,False,8,0'), 'paper_jam')
+  assert.equal(publicPrinterStatusForKiosk('error', '2,8,False'), 'paper_jam')
+  assert.equal(publicPrinterStatusForKiosk('error', '2,7,False,0,0'), 'error')
+  assert.equal(publicPrinterStatusForKiosk('error', '2,6,False,0,0'), 'error')
+  assert.equal(publicPrinterStatusForKiosk('error', '2,2,False,0,9'), 'error')
+  assert.equal(publicPrinterStatusForKiosk('paper_empty', '4,4,False,8,0'), 'paper_empty')
+  assert.equal(publicPrinterStatusForKiosk('offline', '7,9,True,128,7'), 'offline')
+  assert.equal(publicPrinterStatusForKiosk('error', 'not_found'), 'error')
+  assert.equal(publicPrinterStatusForKiosk('error', 'query_failed'), 'error')
+  assert.equal(publicPrinterStatusForKiosk('error', null), 'error')
+  assert.equal(publicPrinterStatusForKiosk('ready', '3,0,False,0,0'), 'ready')
+  const admin = read(join(API_ROOT, 'src/terminals/terminals-admin.service.ts'))
+  assert.match(admin, /publicPrinterStatusFromHeartbeat\(/)
+  assert.match(admin, /\.\.\.KIOSK_PUBLIC_PRINTER_STATUS_SELECT/)
+  assert.equal(admin.includes('printerQueueRawStatus'), false, '队列原始状态只留在辅助函数里')
   execFileSync(process.execPath, [join(REPO_ROOT, 'apps/kiosk/scripts/verify-print-queue-timeout-copy.cjs')], {
     stdio: 'inherit',
   })

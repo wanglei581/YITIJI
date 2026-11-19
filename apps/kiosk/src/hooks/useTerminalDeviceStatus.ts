@@ -153,6 +153,20 @@ export function mapTerminalPrinterStatus(input: {
         printerLabel: '打印机缺纸',
         deviceStatus: 'error',
       }
+    case 'paper_jam':
+    case 'jam':
+      return {
+        kind: 'error',
+        printerReady: false,
+        printer: {
+          isOnline: true,
+          hasPaper: true,
+          tonerLevels: { ...ZERO_TONER },
+          errorCode: 'paperJam',
+        },
+        printerLabel: '打印机卡纸',
+        deviceStatus: 'error',
+      }
     case 'error':
       return {
         kind: 'error',
