@@ -309,6 +309,27 @@ async function main(): Promise<void> {
       }
     })
 
+    await check('6 会员列表翻页参数：limit 1–50，翻页标记原样带回；写坏了是 400 VALIDATION_FAILED', async () => {
+      const owner = await member()
+      const headers = { Authorization: `Bearer ${owner.token}` }
+      for (let index = 0; index < 3; index += 1) await printOrder(owner.id, kioskTerminalId, { createdAt: new Date(Date.now() - 60_000 - index * 1000) })
+      const first = await call('GET', '/me/invoice-orders?limit=2', { headers })
+      assert.equal(first.status, 200, first.text)
+      assert.equal(first.json.data.items.length, 2)
+      assert.equal(typeof first.json.data.nextCursor, 'string')
+      const second = await call('GET', `/me/invoice-orders?limit=2&cursor=${encodeURIComponent(first.json.data.nextCursor)}`, { headers })
+      assert.equal(second.status, 200, second.text)
+      assert.equal(second.json.data.items.length, 1)
+      assert.equal(second.json.data.nextCursor, null)
+      const all = [...first.json.data.items, ...second.json.data.items].map((row: { orderId: string }) => row.orderId)
+      assert.equal(new Set(all).size, 3)
+      for (const query of ['limit=0', 'limit=51', 'limit=abc', 'cursor=%40%40%40', 'cursor=bm90LWEtY3Vyc29y']) {
+        const bad = await call('GET', `/me/invoice-orders?${query}`, { headers })
+        assert.equal(bad.status, 400, `${query}：${bad.text}`)
+        assert.equal(bad.json.error?.code, 'VALIDATION_FAILED', query)
+      }
+    })
+
     console.log(`PASS verify:invoice-http（${passed.length} 组）`)
   } finally {
     await new Promise<void>((done) => app.getHttpServer().close(() => done()))

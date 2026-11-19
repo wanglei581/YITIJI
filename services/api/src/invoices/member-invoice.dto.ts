@@ -1,4 +1,5 @@
-import { Allow, IsIn, IsString, MaxLength } from 'class-validator'
+import { Type } from 'class-transformer'
+import { Allow, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 
 export class SubmitMemberInvoiceDto {
   @IsIn(['print', 'service'])
@@ -22,4 +23,19 @@ export class SubmitMemberInvoiceDto {
 
   @Allow()
   email?: unknown
+}
+
+/** GET /me/invoice-orders 的翻页参数。limit 1–50，默认 20；cursor 原样带回上一页的 nextCursor。 */
+export class ListMemberInvoiceOrdersDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cursor?: string
 }

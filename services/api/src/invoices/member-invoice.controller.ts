@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { InvoiceRequestsService } from './invoice-requests.service'
-import { SubmitMemberInvoiceDto } from './member-invoice.dto'
+import { ListMemberInvoiceOrdersDto, SubmitMemberInvoiceDto } from './member-invoice.dto'
 
 /**
  * 小程序与一体机共用的会员开票接口。会员编号只来自登录态。
@@ -16,8 +16,8 @@ export class MemberInvoiceController {
   constructor(private readonly invoices: InvoiceRequestsService) {}
 
   @Get('invoice-orders')
-  async list(@CurrentEndUser() user: AuthedEndUser) {
-    return ApiResponse.ok(await this.invoices.listForMember(user.endUserId))
+  async list(@CurrentEndUser() user: AuthedEndUser, @Query() query: ListMemberInvoiceOrdersDto) {
+    return ApiResponse.ok(await this.invoices.listForMember(user.endUserId, { limit: query.limit, cursor: query.cursor }))
   }
 
   @Post('invoice-requests')

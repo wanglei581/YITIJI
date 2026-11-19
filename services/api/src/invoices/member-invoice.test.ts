@@ -53,6 +53,23 @@ interface InvoiceRow {
 
 function matches(row: Record<string, unknown>, where: Record<string, unknown>): boolean {
   for (const [key, expected] of Object.entries(where)) {
+    if (key === 'OR' && Array.isArray(expected)) {
+      if (!expected.some((branch) => matches(row, branch as Record<string, unknown>))) return false
+      continue
+    }
+    if (expected instanceof Date) {
+      if (!(row[key] instanceof Date) || (row[key] as Date).getTime() !== expected.getTime()) return false
+      continue
+    }
+    if (expected && typeof expected === 'object' && ('gt' in expected || 'lt' in expected || 'lte' in expected)) {
+      const bound = expected as { gt?: unknown; lt?: unknown; lte?: unknown }
+      const value = row[key] instanceof Date ? (row[key] as Date).getTime() : row[key]
+      const num = (input: unknown) => (input instanceof Date ? input.getTime() : input) as number | string
+      if (bound.gt !== undefined && !((value as number | string) > num(bound.gt))) return false
+      if (bound.lt !== undefined && !((value as number | string) < num(bound.lt))) return false
+      if (bound.lte !== undefined && !((value as number | string) <= num(bound.lte))) return false
+      continue
+    }
     if (expected && typeof expected === 'object' && 'in' in expected) {
       const values = (expected as { in: unknown[] }).in
       if (!values.includes(row[key])) return false
@@ -138,23 +155,37 @@ function createHarness(options?: { hideOpen?: boolean }) {
     },
   ]
   const invoices: InvoiceRow[] = []
+  const calls = { findUnique: 0, findFirst: 0, findMany: 0 }
   const orgType = (terminalId: string | null) => (
     terminalId === PUBLIC_TERMINAL ? 'public_employment_service' : 'licensed_hr_agency'
   )
   const prisma = {
     order: {
-      findUnique: async ({ where }: { where: { id: string } }) => prints.find((row) => row.id === where.id) ?? null,
-      findMany: async ({ where }: { where: Record<string, unknown> }) => prints.filter((row) => matches(row as never, where)),
+      findUnique: async ({ where }: { where: { id: string } }) => {
+        calls.findUnique += 1
+        return prints.find((row) => row.id === where.id) ?? null
+      },
+      findMany: async ({ where }: { where: Record<string, unknown> }) => {
+        calls.findMany += 1
+        return prints.filter((row) => matches(row as never, where))
+      },
     },
     serviceOrder: {
-      findUnique: async ({ where }: { where: { id: string } }) => services.find((row) => row.id === where.id) ?? null,
-      findMany: async ({ where }: { where: Record<string, unknown> }) => services.filter((row) => matches(row as never, where)),
+      findUnique: async ({ where }: { where: { id: string } }) => {
+        calls.findUnique += 1
+        return services.find((row) => row.id === where.id) ?? null
+      },
+      findMany: async ({ where }: { where: Record<string, unknown> }) => {
+        calls.findMany += 1
+        return services.filter((row) => matches(row as never, where))
+      },
     },
     terminal: {
       findUnique: async ({ where }: { where: { id: string } }) => ({ org: { type: orgType(where.id) } }),
     },
     invoiceRequest: {
       findFirst: async ({ where }: { where: Record<string, unknown> }) => {
+        calls.findFirst += 1
         if (options?.hideOpen && where['status'] && typeof where['status'] === 'object' && (where['status'] as { not?: string }).not === 'returned') {
           return null
         }
@@ -192,7 +223,7 @@ function createHarness(options?: { hideOpen?: boolean }) {
     },
   }
   const requests = new InvoiceRequestsService(prisma as never)
-  return { invoices, requests, controller: new MemberInvoiceController(requests) }
+  return { prints, invoices, calls, requests, controller: new MemberInvoiceController(requests) }
 }
 
 function errorBody(error: unknown): { code?: string; message?: string } {
@@ -202,7 +233,8 @@ function errorBody(error: unknown): { code?: string; message?: string } {
 
 test('会员只看到自己能开的订单，列表不带税号和邮箱', async () => {
   const { requests } = createHarness()
-  const list = await requests.listForMember(MEMBER)
+  // 用法改动（返工包 P2c1b 第 16 条）：列表改成分页，返回 { items, nextCursor }，这里取 .items，期望值不变。
+  const list = (await requests.listForMember(MEMBER)).items
   assert.deepEqual(list.map((row) => ({
     orderKind: row.orderKind,
     orderId: row.orderId,
@@ -262,7 +294,7 @@ test('已退款的单提交要失败，同一订单不能有两条未退回申�
   )
   assert.equal(invoices.length, 1)
 
-  const listed = await requests.listForMember(MEMBER)
+  const listed = (await requests.listForMember(MEMBER)).items
   const row = listed.find((item) => item.orderId === 'order-ok')
   assert.equal(row?.invoiceStatus, 'submitted')
   assert.equal(row?.canRequest, false)
@@ -363,4 +395,31 @@ test('会员单条接口：退回原因里抄到的邮箱和税号也打码，�
   const text = JSON.stringify(view)
   assert.equal(text.includes(EMAIL), false)
   assert.equal(text.includes(TAX_ID), false)
+})
+
+test('会员列表批量读三次库，不对每张单逐个查；一页默认最多 20 张，后面还有就给翻页标记', async () => {
+  const { prints, calls, requests } = createHarness()
+  const now = Date.now()
+  for (let index = 0; index < 30; index += 1) {
+    prints.push({
+      id: `order-bulk-${String(index).padStart(2, '0')}`,
+      endUserId: MEMBER,
+      terminalId: TERMINAL,
+      payStatus: 'paid',
+      amountCents: 200,
+      discountCents: 0,
+      refundedAmountCents: 0,
+      refunds: [],
+      createdAt: new Date(now - 60_000 - index * 1000),
+    })
+  }
+  const page = await requests.listForMember(MEMBER)
+  assert.equal(page.items.length, 20)
+  assert.ok(page.nextCursor, '还有没列出的单，要给翻页标记')
+  assert.equal(calls.findUnique, 0, '不该对每张单逐个查订单')
+  assert.equal(calls.findFirst, 0, '不该对每张单逐个查申请')
+  assert.equal(calls.findMany, 2, '打印单、服务单各一次批量读')
+  const small = await requests.listForMember(MEMBER, { limit: 5 })
+  assert.equal(small.items.length, 5)
+  assert.deepEqual(small.items.map((row) => row.orderId), page.items.slice(0, 5).map((row) => row.orderId))
 })
