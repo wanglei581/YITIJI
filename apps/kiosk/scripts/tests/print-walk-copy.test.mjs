@@ -427,6 +427,58 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
   }
 })
 
+test('S15c7：确定卡纸用缺纸版面，离线、异常和暂停接单仍用离线版', () => {
+  const home = readFileSync(join(kioskRoot, 'src/pages/print-scan/PrintScanHomePage.tsx'), 'utf8')
+  assert.match(
+    home,
+    /paperOff\s*=\s*hubState === 'device-off' && !device\.printerNotice && \(device\.printer\.errorCode === 'paperEmpty' \|\| device\.printer\.errorCode === 'paperJam'\)/,
+    '页面只在没有暂停接单时，把确定缺纸和确定卡纸送进缺纸版',
+  )
+  assert.match(home, /卡纸了，请不要自己开机盖、拽纸。打印和扫描先停，订单还在。/)
+  assert.match(home, /问小青：卡纸了文件还要传吗？/)
+  assert.match(home, /缺纸了。打印和扫描先停，订单还在。/)
+  assert.match(home, /问小青：缺纸了文件还要传吗？/)
+
+  const cap = (key) => ({
+    key, title: key, description: '说明', icon: () => null, actionable: false, available: false, deviceOff: true,
+  })
+  const render = (extra) => renderToStaticMarkup(createElement(QxPrintHubView, {
+    hubState: 'device-off', probe: 'ok', mfp: 'unavailable',
+    colorDuplexLabel: '本机暂未开通',
+    capabilities: [cap('doc-print'), cap('scan')],
+    arrivalCode: { key: 'arrival', icon: () => null, title: '到机码', description: '输入到机码' },
+    quickLinks: [], notices: [],
+    onRetry: () => {}, onHelp: () => {}, onArrivalCode: () => {}, onQuickLink: () => {}, onCapability: () => {},
+    ...extra,
+  }))
+  const jam = render({ printerUnavailable: { label: '打印机卡纸', notice: '这台机器暂时打不了' } })
+  assert.match(jam, /ph-paper/)
+  assert.match(jam, /卡纸时复印也出不了纸，恢复后再用/)
+  assert.match(jam, /打印机卡纸，这次出不了纸。文件可以先从下面传上来。/)
+  assert.match(jam, /扫描和打印是同一台机器，一起停。/)
+  assert.doesNotMatch(jam, /缺纸时复印也出不了纸/)
+  assert.doesNotMatch(jam, /打印机异常时复印/)
+
+  const empty = render({ printerUnavailable: { label: '打印机缺纸', notice: '这台机器暂时打不了' } })
+  assert.match(empty, /ph-paper/)
+  assert.match(empty, /缺纸时复印也出不了纸，补纸后再用/)
+  assert.match(empty, /打印机缺纸，这次出不了纸。文件可以先从下面传上来。/)
+
+  for (const label of ['打印机异常', '打印机离线']) {
+    const html = render({ printerUnavailable: { label, notice: '这台机器暂时打不了' } })
+    assert.equal(/ph-paper/.test(html), false, `${label} 不走缺纸版`)
+    assert.doesNotMatch(html, /卡纸时复印|缺纸时复印/)
+  }
+
+  const paused = render({
+    printerUnavailable: { label: '打印机卡纸', notice: '暂停' },
+    orderPaused: { label: '暂停接单', notice: '这台终端暂停接打印单' },
+  })
+  assert.equal(/ph-paper/.test(paused), false, '暂停接单不走缺纸版')
+  assert.match(paused, /暂停接单时，复印以打印机屏幕为准/)
+  assert.doesNotMatch(paused, /卡纸时复印也出不了纸/)
+})
+
 test('到机码入口：读不到或小程序未发布不点名，已发布才点名', async () => {
   const props = {
     hubState: 'default', probe: 'ok', mfp: 'ready', colorDuplexLabel: '本机暂未开通',

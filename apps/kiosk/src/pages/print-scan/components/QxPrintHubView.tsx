@@ -346,7 +346,7 @@ function HubCapButton({
   index,
   variant,
   deviceLabel,
-  paperOff = false,
+  tray = null,
   onCapability,
 }: {
   capability: QxPrintCapabilityView
@@ -355,10 +355,12 @@ function HubCapButton({
   variant: 'task' | 'tile' | 'row'
   /** 出不了纸时卡上写的打印机状态短标题。 */
   deviceLabel?: string
-  paperOff?: boolean
+  /** 确定缺纸或确定卡纸才用出纸类暂停那一版说明。 */
+  tray?: 'empty' | 'jam' | null
   onCapability: (key: string) => void
 }) {
   const closed = !capability.actionable
+  const paperOff = tray === 'empty' || tray === 'jam'
   // 稿：出不了纸时，打印卡角标写打印机状态，扫描卡写「一起停」（同一台机器），说明句各写一句。
   const deviceTask = closed && capability.deviceOff && variant === 'task'
   const badge = deviceTask
@@ -367,12 +369,15 @@ function HubCapButton({
   const reason = capability.note ? `${badge}：${capability.note}` : badge
   const icon = HUB_CAP_ICON[capability.key] ?? 'file'
   const title = displayTitle(capability)
+  const stoppedDesc = tray === 'jam'
+    ? '打印机卡纸，这次出不了纸。文件可以先从下面传上来。'
+    : '打印机缺纸，这次出不了纸。文件可以先从下面传上来。'
   const desc = variant === 'tile' && closed && capability.deviceOff && deviceLabel
     ? deviceLabel
     : deviceTask
       ? (capability.key === 'scan'
         ? (paperOff ? '扫描和打印是同一台机器，一起停。' : '扫描和打印是同一台机器，一起停')
-        : (paperOff ? '打印机缺纸，这次出不了纸。文件可以先从下面传上来。' : '这次出不了纸'))
+        : (paperOff ? stoppedDesc : '这次出不了纸'))
       : displayDesc(capability)
   const take = HUB_TAKE[capability.key]
   // 可点卡照统一版 QxTouchTask 的做法：读屏名只取标题（aria-labelledby），说明句进描述（aria-describedby），
@@ -459,17 +464,27 @@ export function QxPrintHubView({
   ].filter((item): item is QxPrintCapabilityView => Boolean(item))
   const transferCaps = [phone, usb].filter((item): item is QxPrintCapabilityView => Boolean(item))
   const showLater = transferCaps.some((item) => item.actionable) && (!doc?.actionable || mfp === 'unavailable' || hubState === 'device-off')
-  const paperOff = Boolean(printerUnavailable?.label.includes('缺纸'))
-  /** 稿 st-device-off：确定缺纸时是另一版面（大卡、先传稍后打印两块磁贴、无工具区）。 */
+  // 稿 st-device-off / st-device-jam：短标题写明缺纸或卡纸才用缺纸这一版。暂停接单即使短标题带这两个字，仍走离线版。
+  const tray = orderPaused
+    ? null
+    : printerUnavailable?.label.includes('卡纸')
+      ? 'jam'
+      : printerUnavailable?.label.includes('缺纸')
+        ? 'empty'
+        : null
+  const paperOff = tray != null
+  /** 确定缺纸或确定卡纸时是另一版面（大卡、先传稍后打印两块磁贴、无工具区）。 */
   const paperVariant = hubState === 'device-off' && paperOff && !orderPaused
   const deviceLabel = orderPaused?.label ?? printerUnavailable?.label
   const copyDesc = orderPaused
     ? '暂停接单时，复印以打印机屏幕为准'
     : hubState === 'device-off'
-      ? (paperOff
-        ? '缺纸时复印也出不了纸，补纸后再用'
-        // 离线才说离线：异常不冒充离线（W-117）。
-        : `${deviceLabel?.includes('离线') ? '打印机离线' : '打印机异常'}时复印可能也用不了，以打印机屏幕为准`)
+      ? (tray === 'jam'
+        ? '卡纸时复印也出不了纸，恢复后再用'
+        : tray === 'empty'
+          ? '缺纸时复印也出不了纸，补纸后再用'
+          // 离线才说离线：异常不冒充离线（W-117）。
+          : `${deviceLabel?.includes('离线') ? '打印机离线' : '打印机异常'}时复印可能也用不了，以打印机屏幕为准`)
       : '在打印机屏幕上点「复印」「身份证复印」或「票据复印」；不经过这台一体机下单，也不进打印订单'
   const arrivalBase = '凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）'
   const arrivalMiniapp = pickupEntryMiniappLine(supportContact)
@@ -490,8 +505,8 @@ export function QxPrintHubView({
       data-mfp={mfp}
     >
       <div className="qxt-grid2 ph-grid" aria-busy={checking || undefined}>
-        {doc ? <HubCapButton capability={doc} index={0} variant="task" deviceLabel={deviceLabel} paperOff={paperOff} onCapability={onCapability} /> : null}
-        {scan ? <HubCapButton capability={scan} index={1} variant="task" deviceLabel={deviceLabel} paperOff={paperOff} onCapability={onCapability} /> : null}
+        {doc ? <HubCapButton capability={doc} index={0} variant="task" deviceLabel={deviceLabel} tray={tray} onCapability={onCapability} /> : null}
+        {scan ? <HubCapButton capability={scan} index={1} variant="task" deviceLabel={deviceLabel} tray={tray} onCapability={onCapability} /> : null}
         <button
           type="button"
           className={`qxt-task qxt-rise${hubState === 'device-off' ? ' qxt-hold qxt-press' : ''}`}

@@ -119,9 +119,11 @@ expectMatches(
   /label:\s*device\.printerLabel,\s*notice:\s*machineCannotPrintLine\(contact\)/,
   'W-117 离线与异常的状态词取自真实设备状态，求助走服务电话（不找现场工作人员）',
 )
-expectMatches(hubPageSrc, /paperOff\s*=\s*hubState === 'device-off' && device\.printer\.errorCode === 'paperEmpty'/, 'W-117 缺纸只在确定缺纸时单独成版面，异常与离线不冒充缺纸')
+expectMatches(hubPageSrc, /paperOff\s*=\s*hubState === 'device-off' && !device\.printerNotice && \(device\.printer\.errorCode === 'paperEmpty' \|\| device\.printer\.errorCode === 'paperJam'\)/, 'W-117 缺纸和确定卡纸才单独成版面，暂停接单、异常与离线不冒充')
 const hubView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
 expectMatches(hubView, /打印机缺纸，这次出不了纸/, 'W-117 缺纸单独说明（稿 st-device-off）')
+expectMatches(hubView, /打印机卡纸，这次出不了纸/, 'W-117 确定卡纸的打印卡沿用缺纸版说明')
+expectMatches(hubView, /卡纸时复印也出不了纸，恢复后再用/, 'W-117 确定卡纸的复印卡写恢复后再用')
 expectMatches(hubView, /transferCaps\.some\(\(item\) => item\.actionable\)/, 'W-117 「先传、稍后打印」只在传文件类入口真可用时才出现')
 const uploadSrc = read('src/pages/print/PrintUploadPage.tsx')
 const homeDomainSrc = read('src/pages/home/homeDomainStatus.ts')
