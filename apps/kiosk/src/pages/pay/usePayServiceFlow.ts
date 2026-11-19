@@ -24,8 +24,6 @@ import { forgetServiceTrip, readServiceTrip, type ServiceTrip } from '../../serv
 import { keepServiceTripOrder, openServiceTripOrder, retireServiceTripOrder } from '../../services/serviceTripOrder'
 import {
   PAY_SERVICE_KEY,
-  payCreateErrorLine,
-  payLookupErrorLine,
   pricingSaysFree,
   screenForPhase,
   type PayScreen,
@@ -43,7 +41,8 @@ interface FlowState {
   screen: PayScreen
   order: ServiceOrderView | null
   phase: ServiceOrderPhase | null
-  line: string | null
+  /** 没出成码或查不到时的那次错误。句子在画屏时才拼：服务电话晚到时跟着更新。 */
+  error: unknown
   /** 向渠道核实过、还没确认到账。普通查单不清它，只有下一次核实或状态变了才清。 */
   checking: boolean
 }
@@ -59,7 +58,7 @@ export interface PayFlow extends FlowState {
   onStart: () => void
 }
 
-const INITIAL: FlowState = { screen: 'loading', order: null, phase: null, line: null, checking: false }
+const INITIAL: FlowState = { screen: 'loading', order: null, phase: null, error: null, checking: false }
 const WAITING: ReadonlySet<PayScreen> = new Set(['wait', 'check'])
 
 export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: string }): PayFlow {
@@ -91,7 +90,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       else if (phase === 'awaiting') checking = fromRefresh ? false : prev.checking
       const mapped = screenForPhase(phase)
       const screen: PayScreen = mapped === 'renew' ? 'timeout' : WAITING.has(mapped) ? (checking ? 'check' : 'wait') : mapped
-      return { screen, order: view, phase, line: null, checking }
+      return { screen, order: view, phase, error: null, checking }
     })
   }, [])
 
@@ -120,7 +119,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         navigate(targets.next, { replace: true })
         return
       }
-      setState({ ...INITIAL, screen: 'error', line: payCreateErrorLine(error) })
+      setState({ ...INITIAL, screen: 'error', error })
     }
   }, [applyView, current, endUserId, navigate, pathname, serviceKey, targets.next])
 
@@ -156,7 +155,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') forgetServiceTrip(serviceKey, stored.orderId)
         else {
           tripRef.current = stored
-          setState({ ...INITIAL, screen: 'lookup', line: payLookupErrorLine(error) })
+          setState({ ...INITIAL, screen: 'lookup', error })
           return
         }
       }

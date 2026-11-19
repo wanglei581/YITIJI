@@ -19,7 +19,9 @@ import {
   formatYuan,
   payChannelHead,
   payChrome,
+  payCreateErrorLine,
   payFailLine,
+  payLookupErrorLine,
   payMissLine,
   payRefundLine,
   resolvePayTargets,
@@ -117,7 +119,11 @@ export function PayServicePage({ what }: { what: PayWhat }) {
       break
     case 'error':
     case 'lookup':
-      body = <p className="pys-chline" role="alert" data-testid="pay-service-line">{flow.line}</p>
+      body = (
+        <p className="pys-chline" role="alert" data-testid="pay-service-line">
+          {flow.view === 'error' ? payCreateErrorLine(flow.error) : payLookupErrorLine(flow.error)}
+        </p>
+      )
       break
     case 'loading':
       body = <p className="pys-chline" role="status"><b>正在出这一次的付款码</b>出好以后请扫码支付，付好了才会开始。</p>
