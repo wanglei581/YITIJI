@@ -46,7 +46,7 @@ import {
   derivePrintConfirmScreen,
   type QuoteView,
 } from './printConfirmModel'
-import { priceConfigForBenefit, quoteKeyOf, readyQuoteView } from './printConfirmPrice'
+import { confirmStayLine, priceConfigForBenefit, quoteKeyOf, readyQuoteView } from './printConfirmPrice'
 import { usePrintConfirmQueryGuard } from './printConfirmQuery'
 import './styles/print-confirm-qx.css'
 import { FilePageThumb } from './components/FileThumbCard'
@@ -162,6 +162,7 @@ export function PrintConfirmPage() {
   // 公示价没读到（开页第一次，或 409 之后重读）：不能拿报价金额顶上，也不能说成免费试运营。
   const priceReadFailed = priceCfg.status === 'error' || priceBlockedRef.current
   const displayFree = freePricing && !priceReadFailed
+  const stayLine = confirmStayLine(!priceReadFailed, freePricing)
 
   useEffect(() => {
     if (API_MODE !== 'http') return
@@ -671,7 +672,7 @@ export function PrintConfirmPage() {
             <li>隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</li>
           </>
         )}
-        <li>{freePricing ? '提交后请留在机器旁，任务确认后自动开始打印。' : '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。'}</li>
+        <li>{stayLine}</li>
         <li>打印完成请从出纸口取件。如有质量问题，{printProblemLine(support)}</li>
       </ol>
     </details>
@@ -741,6 +742,7 @@ export function PrintConfirmPage() {
       <PrintConfirmView
         step={4}
         freePricing={displayFree}
+        stayLine={stayLine}
         hideQuotedAmount={priceReadFailed}
         screen={screen}
         invalidReason={

@@ -41,3 +41,14 @@ export function priceConfigForBenefit(
   if (priceCfg.status === 'ready') return { status: 'ready', unitCents: priceCfg.unitCents }
   return { status: priceCfg.status, unitCents: null }
 }
+
+const STAY_WHEN_FREE = '提交后请留在机器旁，任务确认后自动开始打印。'
+const STAY_WHEN_PAID = '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。'
+/** 价目没读到。状态条上已有这句，提醒和须知不再另说免费或付费。 */
+const STAY_WHEN_PRICE_UNKNOWN = '本机没能取到现行价目'
+
+/** 提醒条和打印须知共用。价没读到时两处都不说免费，也不说付费。 */
+export function confirmStayLine(priceKnown: boolean, free: boolean): string {
+  if (!priceKnown) return STAY_WHEN_PRICE_UNKNOWN
+  return free ? STAY_WHEN_FREE : STAY_WHEN_PAID
+}

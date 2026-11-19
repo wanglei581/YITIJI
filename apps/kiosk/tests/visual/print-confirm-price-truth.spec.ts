@@ -664,7 +664,26 @@ test('signed-in benefit failure hides the amount and blocks ordering until the p
   expect(pageErrors).toEqual([])
 })
 
-// 报价接口本身第一次 500 / 超时：失败屏不显示金额，确认不可点，就地「重新报价」成功后才出现金额。
+// 报价已经是 0、公示价却没读到：提醒条和须知必须同一句，而且不说免费也不说付费。
+test('zero quote with a failed price read uses one neutral stay line @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  api.respondWith('GET', KIOSK_CONFIG_PATH, () => ({
+    status: 500,
+    json: { success: false, error: { code: 'INTERNAL', message: '免费试运营，付费任务完成支付后开始' } },
+  }))
+  await routeQuote(page, () => ({ unitCents: 0, pages: W2_FILE.pages }))
+  await openConfirm(page)
+  await expect(page.getByRole('button', { name: '重新报价', exact: true })).toBeVisible()
+  await page.locator('.pcf-notes > summary').click()
+  const remind = page.locator('.qxt-remind span')
+  const note = page.locator('.pcf-notes li').filter({ hasText: /留在机器旁|没能取到现行价目/ })
+  await expect(remind).toHaveText('本机没能取到现行价目')
+  await expect(note).toHaveText('本机没能取到现行价目')
+  await expect(remind).not.toContainText('免费')
+  await expect(remind).not.toContainText('付费')
+  await expect(note).not.toContainText('免费')
+  await expect(note).not.toContainText('付费')
+})
 for (const failure of ['http-500', 'timedout'] as const) {
   test(`first quote ${failure} shows no amount and retries in place @kiosk`, async ({ page, api }) => {
     registerShell(api, [])
