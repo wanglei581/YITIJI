@@ -1,6 +1,8 @@
 /**
  * 渠道对在途退款给了明确答复之后，先把答复记下来。答复是事实，记在处置事务之外。
- * - 失败：这一笔记失败，之后按点的那一步往下做。
+ * - 失败：这一笔记失败，订单离开「退款中」（和退款明确失败的回滚同一口径：有更早成功退款回部分退款，
+ *   迟到回调待退回关闭，其余回已付），之后按点的那一步往下做。只记退款行、订单留在退款中会让关单
+ *   绕过「只退了一部分不能关单」，处置被拒后订单也会卡在退款中。
  * - 成功：按渠道回报的退款金额把这一笔记成成功。订单按非过期成功退款的合计记账：
  *   合计等于应付记已退，小于应付记部分退；大于应付不记，整笔回滚并拒绝。
  *   纸已经放行就不记账（同一条订单更新里判定），整笔回滚。
@@ -9,10 +11,10 @@
  */
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
-import { payableCents } from './pending-refund-signal'
+import { isOnlineCollectedRefundLock, ONLINE_PAID_PENDING_REFUND_REASON, payableCents } from './pending-refund-signal'
 import { STALE_ATTEMPT_REFUND_REASON } from './print-no-paper-refund.constants'
 import { markOrderIfPaperUnreleased } from './refund-paper-exclusion'
-import { nonStaleSuccessCents } from './refund-remainder'
+import { nonStaleSuccessCents, payStatusAfterRefundFailure } from './refund-remainder'
 import type { PrintReturnResolution } from './resolve-print-return-hold'
 
 export type DefinitiveChannelAnswer =
@@ -78,7 +80,21 @@ export async function recordChannelAnswers(
         refundReason = row.reason
       }
     }
-    if (!paidBack) return false
+    if (!paidBack) {
+      // 这单没有还在办的退款了，订单不能停在退款中。
+      const stillOpen = await tx.refund.count({ where: { orderId, status: 'pending' } })
+      if (stillOpen === 0 && answers.some((answer) => answer.verdict === 'failed')) {
+        const current = await tx.order.findUniqueOrThrow({
+          where: { id: orderId },
+          select: { refundReason: true, paymentSource: true, paidAt: true },
+        })
+        const restored = isOnlineCollectedRefundLock(current)
+          ? { payStatus: 'closed', refundReason: ONLINE_PAID_PENDING_REFUND_REASON }
+          : await payStatusAfterRefundFailure(tx, orderId)
+        await tx.order.updateMany({ where: { id: orderId, payStatus: 'refunding' }, data: restored })
+      }
+      return false
+    }
     const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       select: { payStatus: true, amountCents: true, discountCents: true, printTaskId: true },
