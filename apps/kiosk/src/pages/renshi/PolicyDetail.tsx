@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { getPublishedPolicy, type PublishedPolicyLookup, type PolicyPostView } from '../../services/api/policies'
 import { createPolicyChecklist, type PolicyChecklistFile } from '../../services/api/policyChecklist'
@@ -14,9 +14,12 @@ import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
 import { QxTouchIcon, type QxTouchIconName } from '../../components/qingxu/touch/QxTouchIcon'
 import { useInterviewAiCapabilities } from '../interview/useInterviewAiCapabilities'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
-import { PolicyChecklistSample, PolicyReadState, PolicyTouchLayout } from './PolicyTouchLayout'
+import { PolicyExcerpt } from './PolicyExcerpt'
+import { PolicyReadState, PolicyTouchLayout } from './PolicyTouchLayout'
+import { PolicyUnavailable } from './PolicyUnavailable'
 import { policyFileSize, policyLines, policyPhoneExpiry, policyPrintButton, policySourceLink } from './policyModel'
-import { policyPublishedOn } from './policyFacts'
+import { policyPublishedLabel } from './policyFacts'
+import { policyDeadlineLabel, policyDeadlinePassed, policyGoneCopy } from './policySearchModel'
 
 const POLICY_REFRESH_MS = 30_000
 const POLICY_CHECK_TIMEOUT_MS = 8_000
@@ -52,6 +55,9 @@ export function PolicyDetail({ id }: { id: string }) {
   const [busy, setBusy] = useState(false)
   const [printFailed, setPrintFailed] = useState(false)
   const [phoneFile, setPhoneFile] = useState<PolicyChecklistFile | null>(null)
+  const [expiredView, setExpiredView] = useState(false)
+  const [expiredMeta, setExpiredMeta] = useState<{ sourceName: string; validThrough: string } | null>(null)
+  const [overlay, setOverlay] = useState<ReactNode>(null)
   const alive = useRef(false)
   const actionLock = useRef(false)
   const revision = useRef(0)
@@ -61,6 +67,12 @@ export function PolicyDetail({ id }: { id: string }) {
   printerReady.current = device.printerReady
   const returnPath = `/renshi?policy=${encodeURIComponent(id)}`
   const withdraw = useCallback(() => {
+    const known = currentPolicy.current
+    const passed = policyDeadlinePassed(known?.validThrough)
+    setExpiredView(passed)
+    setExpiredMeta(passed && known?.validThrough
+      ? { sourceName: known.sourceName || '发布机构未提供', validThrough: known.validThrough }
+      : null)
     revision.current++
     currentPolicy.current = null
     setPolicy(null)
@@ -79,6 +91,9 @@ export function PolicyDetail({ id }: { id: string }) {
     setPolicy(null)
     setPhoneFile(null)
     setPrintFailed(false)
+    setExpiredView(false)
+    setExpiredMeta(null)
+    setOverlay(null)
     setPhase('loading')
     const refresh = async (initial: boolean) => {
       if (checking) return
@@ -138,24 +153,36 @@ export function PolicyDetail({ id }: { id: string }) {
   const ready = phase === 'ready' && policy
   // 公告没有三栏，也不出办事清单；旧收藏里存的公告编号回公告列表，不套政策详情版式。
   if (ready && policy.kind === 'notice') return <Navigate to="/renshi?tab=notice" replace />
-  const title = ready ? policy.title : phase === 'missing' ? '这条政策已经撤下或不在可查看范围'
-    : phase === 'withdrawn' ? '这条政策已经撤下' : phase === 'failed' ? '这次没读到' : '正在读取这条政策'
+  const gone = phase === 'missing' || phase === 'withdrawn'
+    ? policyGoneCopy(phase === 'withdrawn' && expiredView ? 'expired' : 'missing', expiredMeta)
+    : null
+  const deadline = ready ? policyDeadlineLabel(policy.validThrough) : undefined
+  const title = ready ? policy.title : gone ? gone.title : phase === 'failed' ? '这次没读到' : '正在读取这条政策'
   const printButton = policyPrintButton({ busy, printerReady: device.printerReady, printerLoading: device.loading, blocked: winding })
-  return <PolicyTouchLayout compact ask={false} state={phase} title={title}
-    eyebrow={ready ? `${policy.sourceName || '发布机构未提供'}发布 · ${policyPublishedOn(policy) ?? '日期未提供'}` : '查政策'}
+  return <PolicyTouchLayout compact ask={false} state={phase} title={title} overlay={overlay}
+    bodyClass={ready && policy.content?.trim() ? 'policy-detail-excerpt' : undefined}
+    eyebrow={ready
+      ? `${policy.sourceName || '发布机构未提供'}发布 · ${policyPublishedLabel(policy) ?? '日期未提供'}${deadline ? ` · ${deadline}` : ''}`
+      : gone?.eyebrow ?? '查政策'}
     primary={ready ? { ...printButton, onClick: () => { void printChecklist() }, testId: 'policy-checklist-print' } : undefined}
     alert={winding ? <p role="status">{LICENSE_NO_NEW_TASK_REASON}</p> : undefined}>
     {ready ? <>
       <HandlingSection title="谁可以申请" value={policy.whoCanApply} icon="user" />
       <HandlingSection title="要准备的材料" value={policy.requiredMaterials} icon="clipboard" check />
       <section className="policy-min-section policy-min-source">
-        <div><h2><QxTouchIcon name="landmark" size={30} />去哪办、看原文</h2><ul>{policyLines(policy.whereToApply).map((line, index) => <li key={index}>{line}</li>)}</ul></div>
+        <div>
+          <h2><QxTouchIcon name="landmark" size={30} />去哪办、看原文</h2>
+          <ul>{policyLines(policy.whereToApply).map((line, index) => <li key={index}>{line}</li>)}</ul>
+          {source?.kind === 'verified' && <p className="policy-source-note">链接发布时已核对属于发布机构登记的官方网站</p>}
+        </div>
         <div className="policy-min-qr">
           {source?.kind === 'verified' ? <><SourceUrlQr value={source.url} size={200} />
-            <p>扫码打开原文 · 链接发布时已核对属于发布机构登记的官方网站</p><span>{source.host}</span></>
+            <span className="policy-info-chip">{source.host}</span></>
             : <p>{source && 'message' in source ? source.message : ''}</p>}
         </div>
       </section>
+      <PolicyExcerpt content={policy.content} title={policy.title} source={policy.sourceName || '发布机构未提供'}
+        published={policyPublishedLabel(policy) ?? '日期未提供'} onOverlay={setOverlay} />
       <div className="policy-min-grid policy-min-actions">
         <QxTouchTile icon="sparkle" title={ai.state('assistant_chat') === 'available' ? '问小青这条' : '小青暂时不可用'}
           desc={ai.state('assistant_chat') === 'available' ? '按这条原文解释，不判断能不能领' : '条件、材料、打印、扫码照常'}
@@ -180,12 +207,7 @@ export function PolicyDetail({ id }: { id: string }) {
           <p>请在手机上保存，链接到期后可以重新生成。</p></div></>
           : <p>这次没拿到手机下载链接，可以扫原文二维码</p>}
       </section>}
-    </> : phase === 'loading' || phase === 'failed' ? <PolicyReadState failed={phase === 'failed'} retry={() => setAttempt((value) => value + 1)} /> : <>
-      <section className="policy-min-section" role="status"><h2>{phase === 'withdrawn' ? '这条政策已下架' : '这条现在不能查看'}</h2>
-        <p>不再显示旧正文、原文二维码和清单。可以返回政策首页查看当前发布内容。</p>
-        <button type="button" className="policy-min-button" onClick={() => navigate('/policy-service')}>返回政策首页</button>
-        <button type="button" className="policy-min-button" onClick={() => setAttempt((value) => value + 1)}>重新读取</button>
-      </section><PolicyChecklistSample />
-    </>}
+    </> : phase === 'loading' || phase === 'failed' ? <PolicyReadState failed={phase === 'failed'} retry={() => setAttempt((value) => value + 1)} />
+      : <PolicyUnavailable copy={gone ?? policyGoneCopy('missing')} onHome={() => navigate('/policy-service')} onKiosk={() => navigate('/')} />}
   </PolicyTouchLayout>
 }

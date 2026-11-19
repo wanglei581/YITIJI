@@ -39,8 +39,22 @@ export interface PolicyPostView {
   externalUrlVerified?: boolean
   /** 内容版本。办事清单按版本生成，版本变了旧清单作废。 */
   contentVersion?: number
+  /**
+   * 截止日期（YYYY-MM-DD）。当天仍可看。
+   * 没有这个字段，或服务端已不再返回过期的一条时，页面不写截止日期，也不画「已过期」。
+   */
+  validThrough?: string
   sourceName: string
   syncTime: string
+}
+
+/** 服务端认为关键词超过 30 字。页面按「超过 30 字」显示，不当成没连上。 */
+export class PolicyKeywordTooLongError extends Error {
+  readonly code = 'POLICY_KEYWORD_TOO_LONG'
+  constructor() {
+    super('POLICY_KEYWORD_TOO_LONG')
+    this.name = 'PolicyKeywordTooLongError'
+  }
 }
 
 /**
@@ -71,6 +85,8 @@ export interface PolicyQueryParams {
   page?: number
   /** 每页条数（服务端上限 200）。不传 = 服务端默认 200。 */
   pageSize?: number
+  /** 按标题和摘要包含匹配。空的不传；超过 30 字由调用方先拦住。 */
+  keyword?: string
 }
 
 async function fetchPolicies(params?: PolicyQueryParams): Promise<PublishedPoliciesResult> {
@@ -80,11 +96,18 @@ async function fetchPolicies(params?: PolicyQueryParams): Promise<PublishedPolic
   if (params?.category) query.set('category', params.category)
   if (params?.page) query.set('page', String(params.page))
   if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+  if (params?.keyword) query.set('keyword', params.keyword)
   const qs = query.toString()
   const res = await terminalAttributedFetch(`${API_BASE_URL}/policies${qs ? `?${qs}` : ''}`, {
     headers: { Accept: 'application/json' },
   })
-  if (!res.ok) throw new Error(`请求失败（${res.status}）`)
+  if (!res.ok) {
+    if (res.status === 400) {
+      const failed = await res.json().catch(() => null) as { error?: { code?: string } } | null
+      if (failed?.error?.code === 'POLICY_KEYWORD_TOO_LONG') throw new PolicyKeywordTooLongError()
+    }
+    throw new Error(`请求失败（${res.status}）`)
+  }
   const body = (await res.json()) as {
     data: PolicyPostView[]
     scope?: string
@@ -121,16 +144,20 @@ const MOCK_POLICIES: PolicyPostView[] = [
 ]
 
 function filterMock(params?: PolicyQueryParams): PolicyPostView[] {
+  const word = params?.keyword?.trim() ?? ''
   return MOCK_POLICIES.filter((item) => {
     if (params?.kind && item.kind !== params.kind) return false
     if (params?.audience && item.audience !== params.audience) return false
     if (params?.category && item.category !== params.category) return false
+    if (word && !item.title.includes(word) && !(item.summary ?? '').includes(word)) return false
     return true
   })
 }
 
 export async function getPublishedPolicies(params?: PolicyQueryParams): Promise<PublishedPoliciesResult> {
   if (API_MODE !== 'http') {
+    const word = params?.keyword?.trim() ?? ''
+    if (word.length > 30) throw new PolicyKeywordTooLongError()
     const all = filterMock(params)
     const pageSize = params?.pageSize ?? Math.max(1, all.length)
     const page = params?.page ?? 1

@@ -12,13 +12,17 @@ import { POLICY_ASK_HOME } from './policyModel'
 import '../service-hubs/policy-touch.css'
 
 export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home = false, compact = false,
-  ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, nav = true, primary, alert }: {
+  ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, nav = true, primary, alert, overlay, bodyClass }: {
   title: string; eyebrow: string; sub?: string; state: string; children: ReactNode
   home?: boolean; compact?: boolean; ask?: boolean; askPrompt?: { label: string; draft: string }
   path?: readonly string[]; pathLabel?: string
   /** 底部导航：政策各屏照稿都有（policy-min.js 详情写 nav: null，ui.js 的 nav(null) 画的是没有选中项的导航，不是不画）。 */
   nav?: boolean
   primary?: QxTouchPrimary; alert?: ReactNode
+  /** 盖住这一屏的阅读层。有它时，下面的政策页不再接收点击。 */
+  overlay?: ReactNode
+  /** 有原文摘录时收紧详情，两张出路卡才能回到首屏。 */
+  bodyClass?: string
 }) {
   const navigate = useNavigate()
   const capabilities = useInterviewAiCapabilities()
@@ -26,16 +30,17 @@ export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home =
   return (
     <QxTouchScreen page="policy-min" testId={home ? 'policy-touch-hub' : 'renshi-page'} stateId={state}
       className={compact ? 'policy-min-compact' : ''} bodyClassName="qxt-body-scroll"
-      band={<QxTouchBand kind={compact ? 'compact' : 'std'} seal={null} title={title} eyebrow={eyebrow}
+      band={<QxTouchBand kind={compact ? 'compact' : 'std'} seal={home ? 'idle' : null} title={title} eyebrow={eyebrow}
         sub={sub} onBack={() => navigate(home ? '/' : '/policy-service')}
         path={path ?? (home ? ['选类别', '看条件和材料', '打印清单或扫码看原文'] : undefined)} pathLabel={pathLabel ?? '查一条政策'} />}
-      dock={<QxTouchDock onBack={() => navigate(home ? '/' : '/policy-service')} backLabel={home ? '返回首页' : '返回政策首页'}
+      dock={<QxTouchDock onBack={() => navigate(home ? '/' : '/policy-service')} backLabel="返回"
         ask={!ask ? false : winding || capabilities.state('assistant_chat') !== 'available'
           ? { label: '小青暂时不可用 · 查看政策照常', disabled: true }
           : { label: askPrompt.label, draft: askPrompt.draft, voice: import.meta.env.VITE_USE_TRTC_CALL === 'true' }}
         primary={primary} alert={alert} />}
-      nav={nav ? <QxTouchNav onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} /> : undefined}>
-      <div className="policy-min-body">
+      nav={nav ? <QxTouchNav onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} /> : undefined}
+      overlay={overlay}>
+      <div className={bodyClass ? `policy-min-body ${bodyClass}` : 'policy-min-body'}>
         {IS_MOCK_MODE && <p className="policy-min-fine" role="note">演示数据 · 当前为演示模式</p>}
         {children}
       </div>

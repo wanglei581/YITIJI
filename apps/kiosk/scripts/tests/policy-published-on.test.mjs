@@ -13,7 +13,7 @@ const output = ts.transpileModule(source, {
 }).outputText
 const module = { exports: {} }
 new Function('exports', 'module', output)(module.exports, module)
-const { policyPublishedOn } = module.exports
+const { policyPublishedOn, policyPublishedLabel } = module.exports
 
 test('发布日期优先 publishedDate，空了才用确认发布时间', () => {
   assert.equal(policyPublishedOn({ publishedDate: '2026-08-01', publishConfirmedAt: '2026-09-29T01:17:00.000Z' }), '2026-08-01')
@@ -38,4 +38,17 @@ test('政策库和公告都走同一个发布日期', () => {
   assert.doesNotMatch(shared, /publishedDate: p\.publishedDate/)
   assert.match(notice, /publishedOn=\{policyPublishedOn\(notice\)\}/)
   assert.doesNotMatch(notice, /publishedOn=\{notice\.publishedDate\}/)
+})
+
+test('屏上写成几月几日，日历日按字面，带时刻按北京时间', () => {
+  assert.equal(policyPublishedLabel({ publishedDate: '2026-11-05' }), '11 月 5 日')
+  assert.equal(policyPublishedLabel({ publishedDate: '2026-08-01', publishConfirmedAt: '2026-09-29T01:17:00.000Z' }), '8 月 1 日')
+  assert.equal(policyPublishedLabel({ publishConfirmedAt: '2026-11-04T16:30:00.000Z' }), '11 月 5 日')
+  assert.equal(policyPublishedLabel({ publishConfirmedAt: '2026-09-29T01:17:00.000Z' }), '9 月 29 日')
+  assert.equal(policyPublishedLabel({ publishConfirmedAt: '2026-07-15T08:00:00+08:00' }), '7 月 15 日')
+  assert.equal(policyPublishedLabel({}), undefined)
+  assert.equal(policyPublishedOn({ publishConfirmedAt: '2026-11-04T16:30:00.000Z' }), '2026-11-04')
+  assert.match(read('src/pages/renshi/PolicyGuideRow.tsx'), /policyPublishedLabel\(policy\)/)
+  assert.match(read('src/pages/renshi/PolicyDetail.tsx'), /policyPublishedLabel\(policy\)/)
+  assert.match(read('src/pages/service-hubs/PolicyTouchHub.tsx'), /policyPublishedLabel\(latest\)/)
 })
