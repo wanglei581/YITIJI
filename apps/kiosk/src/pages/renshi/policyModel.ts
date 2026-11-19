@@ -1,12 +1,12 @@
 import type { PolicyPostView, PublishedPoliciesResult } from '../../services/api/policies'
 
 export const POLICY_CATEGORIES = [
-  { key: 'graduate', label: '应届高校毕业生', icon: 'user' },
-  { key: 'startup', label: '创业扶持', icon: 'landmark' },
-  { key: 'flexible', label: '灵活就业人员', icon: 'folder' },
+  { key: 'graduate', label: '应届高校毕业生', icon: 'book' },
+  { key: 'startup', label: '创业扶持', icon: 'sparkle' },
+  { key: 'flexible', label: '灵活就业人员', icon: 'clock' },
   { key: 'hardship', label: '困难群体就业援助', icon: 'shield' },
-  { key: 'migrant', label: '返乡务工人员', icon: 'home' },
-  { key: 'general', label: '通用', icon: 'book' },
+  { key: 'migrant', label: '返乡务工人员', icon: 'map' },
+  { key: 'general', label: '通用', icon: 'clipboard' },
 ] as const
 export type PolicyAudience = typeof POLICY_CATEGORIES[number]['key']
 export const POLICY_PAGE_SIZE = 4

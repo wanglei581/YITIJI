@@ -1,5 +1,5 @@
 import { Navigate, useSearchParams } from 'react-router-dom'
-import { PolicyCategoryList } from './PolicyCategoryList'
+import { PolicyCategoryList, PolicySearchPage } from './PolicyCategoryList'
 import { PolicyDetail } from './PolicyDetail'
 import { PolicyNotices } from './PolicyNotices'
 import { policyAudience, policyPage } from './policyModel'
@@ -12,6 +12,7 @@ export function RenshiPage() {
   const tab = params.get('tab')
   if (tab === 'notice') return <PolicyNotices />
   if (tab) return <Navigate to="/policy-service" replace />
+  if (params.get('search') === '1') return <PolicySearchPage />
   const audience = policyAudience(params.get('audience'))
   if (audience) return <PolicyCategoryList key={`${audience}:${params.get('page')}`} audience={audience} page={policyPage(params.get('page'))} />
   return <Navigate to="/policy-service" replace />

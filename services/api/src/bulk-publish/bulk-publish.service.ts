@@ -104,12 +104,11 @@ export interface BulkPublishPreviewResult {
      * 判据按内容类型各自的日期字段实时算(岗位 validThrough / 招聘会 endAt),
      * 见 ./bulk-publish-expiry.ts。
      *
-     * 旧实现统计的是 publishStatus === 'expired' —— 那个值全仓从不落库,
-     * 于是这个数字对三种内容**恒为 0**,运营永远看不到「有 N 条已经过期了」,
-     * 同时候选池也没把它们排除掉。这是本字段存在的全部理由,别再改回去。
+     * 旧实现统计的是 publishStatus === 'expired'。岗位和招聘会仍不把这个状态落库。
+     * 政策到期任务会把已发布行写成 expired，但这里不靠那个状态计数。
      *
-     * 政策公告没有有效期字段(PolicyPost 只有 publishedDate 发布日期),
-     * 该类内容此项恒为 0 —— 这个 0 是「没有有效期概念」,不是「没算」。
+     * 政策有截止日期，公开读取会滤掉已过期的。批量发布不按截止日期排除政策
+     * （机构发布走单条确认），所以这一项对政策仍是 0，不是漏算。
      */
     expired: number
     /**

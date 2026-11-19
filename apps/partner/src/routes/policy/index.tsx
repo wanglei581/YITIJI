@@ -6,6 +6,7 @@ import { FileTextIcon, PlusIcon } from 'lucide-react'
 import { PolicyFormFields } from './PolicyFormFields'
 import { EMPTY_FORM, policyFormBlockReason, policyFormPayload, type PolicyFormChecks, type PolicyFormState } from './policyFormModel'
 import { PolicyReleaseDialog } from './PolicyReleaseDialog'
+import { PolicyRejectDialog } from './PolicyRejectDialog'
 import { PolicyTable } from './PolicyTable'
 import { CANNOT_CREATE_HINT, RECRUITMENT_POLICY_BLOCKED_REASON } from './policyLabels'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
@@ -60,6 +61,8 @@ export default function PolicyPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerPolicyRecord | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<PartnerPolicyRecord | null>(null)
+  const [rejecting, setRejecting] = useState<PartnerPolicyRecord | null>(null)
+  const [rejectError, setRejectError] = useState<string | null>(null)
   /** 发布责任确认弹窗（3.13：政策由本机构自己发布） */
   const [releasing, setReleasing] = useState<PartnerPolicyRecord | null>(null)
   const [page, setPage] = useState(1)
@@ -118,6 +121,7 @@ export default function PolicyPage() {
       category: (r.category as PolicyFormState['category']) ?? 'notice',
       externalUrl: r.externalUrl ?? '',
       publishedDate: r.publishedDate ?? '',
+      validThrough: r.validThrough ?? '',
       externalId: r.externalId ?? '',
       whoCanApply: r.whoCanApply ?? '',
       requiredMaterials: r.requiredMaterials ?? '',
@@ -191,6 +195,25 @@ export default function PolicyPage() {
       responsibilityAcknowledged: acknowledged,
       ...(id ? { id } : {}),
     })
+  }
+
+  const handleReject = async (row: PartnerPolicyRecord, reason: string) => {
+    setBusyId(row.id)
+    setRejectError(null)
+    try {
+      await partnerPoliciesService.rejectPolicy(row.id, reason)
+      setNoticeTone('success')
+      setNotice(`「${row.title}」已拒绝。`)
+      setRejecting(null)
+      void refresh()
+    } catch (e) {
+      const message = errMsg(e)
+      setRejectError(message)
+      setNoticeTone('error')
+      setNotice(message)
+    } finally {
+      setBusyId(null)
+    }
   }
 
   const handleApprove = async (row: PartnerPolicyRecord) => {
@@ -313,7 +336,7 @@ export default function PolicyPage() {
 
       <PolicyTable rows={rows} page={page} total={total} onPageChange={setPage} reviewFilter={reviewFilter} canCreate={canCreate} cannotCreateHint={CANNOT_CREATE_HINT}
         recruitmentWriteBlocked={!recruitmentOpen}
-        busyId={busyId} openEdit={openEdit} handleApprove={handleApprove} setReleasing={setReleasing} setConfirmUnpublish={setConfirmUnpublish} setConfirmDelete={setConfirmDelete} />
+        busyId={busyId} openEdit={openEdit} handleApprove={handleApprove} setRejecting={(row) => { setRejectError(null); setRejecting(row) }} setReleasing={setReleasing} setConfirmUnpublish={setConfirmUnpublish} setConfirmDelete={setConfirmDelete} />
 
       <p className="mt-3 text-xs text-neutral-400">
         政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会展示（对应一体机首页「查政策」）。也可以点「保存并发布」，勾选确认后由本机构一次完成。平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
@@ -391,6 +414,15 @@ export default function PolicyPage() {
         }}
       />
 
+      {rejecting && (
+        <PolicyRejectDialog
+          row={rejecting}
+          busy={busyId === rejecting.id}
+          error={rejectError}
+          onClose={() => { if (busyId === rejecting.id) return; setRejecting(null); setRejectError(null) }}
+          onConfirm={(reason) => void handleReject(rejecting, reason)}
+        />
+      )}
       <ConfirmActionDialog
         open={confirmUnpublish !== null}
         title="确认下架政策"

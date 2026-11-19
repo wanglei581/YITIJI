@@ -7,6 +7,7 @@ import { RejectReason } from '../../components/RejectReason'
 import { PolicyEmergencyNote } from './PolicyEmergencyNote'
 
 import { KIND_LABELS, AUDIENCE_LABELS, CATEGORY_LABELS, RECRUITMENT_POLICY_BLOCKED_REASON } from './policyLabels'
+import { isPolicyDeadlinePast } from './policyFormModel'
 
 const REVIEW_MAP: Record<
   string,
@@ -37,6 +38,7 @@ interface Props {
   busyId: string | null
   openEdit: (row: PartnerPolicyRecord) => void
   handleApprove: (row: PartnerPolicyRecord) => Promise<void>
+  setRejecting: (row: PartnerPolicyRecord) => void
   setReleasing: (row: PartnerPolicyRecord) => void
   setConfirmUnpublish: (row: PartnerPolicyRecord) => void
   setConfirmDelete: (row: PartnerPolicyRecord) => void
@@ -54,6 +56,7 @@ export function PolicyTable({
   busyId,
   openEdit,
   handleApprove,
+  setRejecting,
   setReleasing,
   setConfirmUnpublish,
   setConfirmDelete,
@@ -89,7 +92,9 @@ export function PolicyTable({
         )}
         renderRow={(r) => {
           const review = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
-          const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
+          const publish = isPolicyDeadlinePast(r.validThrough)
+            ? { badge: 'default' as const, label: '已到期' }
+            : (PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft)
           const held = isPolicyEmergencyHeld(r)
           const recruitmentBlocked = recruitmentWriteBlocked && r.category === 'recruitment' && !held
           return (
@@ -174,6 +179,17 @@ export function PolicyTable({
                         className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-success-fg hover:bg-success-bg disabled:opacity-50"
                       >
                         审核通过
+                      </button>
+                    )}
+                    {!held && (r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
+                      <button
+                        type="button"
+                        disabled={busyId === r.id || recruitmentBlocked}
+                        title={recruitmentBlocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined}
+                        onClick={() => setRejecting(r)}
+                        className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
+                      >
+                        拒绝
                       </button>
                     )}
                     {!held && r.reviewStatus === 'approved' && r.publishStatus !== 'published' && (

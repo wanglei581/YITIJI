@@ -73,8 +73,8 @@ for (const [label, ctor] of [['MemberFavoritesController', MemberFavoritesContro
   assert.ok(!deps.includes(PolicyScopeService), `${label} 不应按终端机构过滤本人记录（D4：本人记录照常显示）`)
 }
 assert.notEqual(
-  communityFeedCacheKey('closed', { mode: 'org', orgId: 'org-a', state: 'bound' }, undefined, 20),
-  communityFeedCacheKey('closed', { mode: 'org', orgId: 'org-b', state: 'bound' }, undefined, 20),
+  communityFeedCacheKey('closed', { mode: 'org', orgId: 'org-a', state: 'bound' }, undefined, 20, '2026-11-17'),
+  communityFeedCacheKey('closed', { mode: 'org', orgId: 'org-b', state: 'bound' }, undefined, 20, '2026-11-17'),
 )
 delete process.env['POLICY_SCOPE']
 assert.equal(policyScopeMode(), 'all', 'POLICY_SCOPE 缺省必须是 all（今天的行为）')

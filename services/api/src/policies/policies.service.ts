@@ -45,6 +45,9 @@ import {
   RECRUITMENT_POLICY_CATEGORY,
   type PolicyPublicScope,
 } from './policy-public-visibility'
+import { parsePolicyValidThrough } from './policy-validity'
+import { policyKeywordPlan } from './policy-keyword'
+import { pagePoliciesMatchingLiteral } from './policy-keyword-page'
 
 // ============================================================
 // PoliciesService — 阶段1D:政策服务(政策扶持条目 + 政策公告)
@@ -70,6 +73,8 @@ export interface PolicyPostDto {
   /** 来源方原始编号(CLAUDE.md §10 外部ID);来源未提供为 null,不得伪造 */
   externalId: string | null
   publishedDate?: string
+  /** 截止日期 YYYY-MM-DD。没填不带这个键，页面不得显示「已到期」。 */
+  validThrough?: string
   /** 办事三栏(2026-11-05):谁可以申请 / 要准备的材料 / 去哪办。纯文本、每行一项;未提供时不带该键。 */
   whoCanApply?: string
   requiredMaterials?: string
@@ -138,6 +143,7 @@ interface PrismaPolicyRow {
   externalUrl: string | null
   externalId: string | null
   publishedDate: Date | null
+  validThrough: Date | null
   whoCanApply: string | null
   requiredMaterials: string | null
   whereToApply: string | null
@@ -167,6 +173,7 @@ function mapPolicy(p: PrismaPolicyRow): PolicyPostDto {
     externalUrl: p.externalUrl ?? undefined,
     externalId: p.externalId ?? null,
     publishedDate: p.publishedDate ? p.publishedDate.toISOString().slice(0, 10) : undefined,
+    validThrough: p.validThrough ? p.validThrough.toISOString().slice(0, 10) : undefined,
     whoCanApply: p.whoCanApply ?? undefined,
     requiredMaterials: p.requiredMaterials ?? undefined,
     whereToApply: p.whereToApply ?? undefined,
@@ -201,29 +208,24 @@ export class PoliciesService {
   // ── Kiosk 公开读(approved+published；托管关闭时不含招聘分类；不含下架留痕)──
 
   async getPublishedPolicies(params?: {
-    kind?: string; audience?: string; category?: string; page?: number | string; pageSize?: number | string; scope?: PolicyPublicScope
+    kind?: string; audience?: string; category?: string; keyword?: string; page?: number | string; pageSize?: number | string; scope?: PolicyPublicScope
   }): Promise<{ data: PolicyPostDto[]; scope?: 'bound' | 'unbound' | 'missing'; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
     const parsedPage = Number.parseInt(String(params?.page ?? 1), 10)
     const page = Math.min(10_000, Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1)
     const parsedPageSize = Number.parseInt(String(params?.pageSize ?? 200), 10)
     const pageSize = Math.min(200, Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : 200)
+    const keywordPlan = policyKeywordPlan(params?.keyword, this.prisma.dbKind)
     const where = await publicPolicyLookupWhere(this.prisma, {
       reviewStatus: 'approved',
       publishStatus: 'published',
       ...(params?.kind ? { kind: params.kind } : {}),
       ...(params?.audience ? { audience: params.audience } : {}),
       ...(params?.category ? { category: params.category } : {}),
+      ...keywordPlan.where,
     }, params?.scope)
-    const [rows, total] = await Promise.all([
-      this.prisma.policyPost.findMany({
-        where,
-        include: { org: { select: { verifiedOfficialDomainsJson: true } } },
-        orderBy: [{ publishedDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-      this.prisma.policyPost.count({ where }),
-    ])
+    const { rows, total } = keywordPlan.literal
+      ? await pagePoliciesMatchingLiteral(this.prisma, where, keywordPlan.literal, page, pageSize)
+      : await this.readPublicPolicyPage(where, page, pageSize)
     return {
       data: rows.map(mapPolicy),
       ...(params?.scope?.mode === 'org' ? { scope: params.scope.state } : {}),
@@ -244,6 +246,24 @@ export class PoliciesService {
       throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
     }
     return { data: mapPolicy(row), success: true, ...(scope.mode === 'org' ? { scope: scope.state } : {}) }
+  }
+
+  private async readPublicPolicyPage(
+    where: Prisma.PolicyPostWhereInput,
+    page: number,
+    pageSize: number,
+  ) {
+    const [rows, total] = await Promise.all([
+      this.prisma.policyPost.findMany({
+        where,
+        include: { org: { select: { verifiedOfficialDomainsJson: true } } },
+        orderBy: [{ publishedDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.policyPost.count({ where }),
+    ])
+    return { rows, total }
   }
 
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────
@@ -345,6 +365,7 @@ export class PoliciesService {
         requiredMaterials: dto.requiredMaterials?.trim() || null,
         whereToApply: dto.whereToApply?.trim() || null,
         publishedDate: dto.publishedDate ? new Date(dto.publishedDate) : null,
+        validThrough: parsePolicyValidThrough(dto.validThrough),
       },
     })
     await this.audit.write({
@@ -386,6 +407,7 @@ export class PoliciesService {
         ...(dto.externalUrl !== undefined ? { externalUrl: normalizeOptionalHttpUrl(dto.externalUrl ?? undefined, 'externalUrl') ?? null } : {}),
         ...(dto.externalId !== undefined ? { externalId: dto.externalId?.trim() || null } : {}),
         ...(dto.publishedDate !== undefined ? { publishedDate: dto.publishedDate?.trim() ? new Date(dto.publishedDate) : null } : {}),
+        ...(dto.validThrough !== undefined ? { validThrough: parsePolicyValidThrough(dto.validThrough) } : {}),
         ...(dto.whoCanApply !== undefined ? { whoCanApply: dto.whoCanApply?.trim() || null } : {}),
         ...(dto.requiredMaterials !== undefined ? { requiredMaterials: dto.requiredMaterials?.trim() || null } : {}),
         ...(dto.whereToApply !== undefined ? { whereToApply: dto.whereToApply?.trim() || null } : {}),

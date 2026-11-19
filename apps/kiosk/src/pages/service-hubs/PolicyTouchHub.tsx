@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
+import { PolicyExitCard, PolicyLinkRow, PolicyStatusCard } from '../renshi/policyStatus'
 import { getPublishedPolicies, type PublishedPoliciesResult } from '../../services/api/policies'
 import { useAuth } from '../../auth/useAuth'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
@@ -9,9 +10,11 @@ import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { useInterviewAiCapabilities } from '../interview/useInterviewAiCapabilities'
-import { PolicyChecklistSample, PolicyReadState, PolicyTouchLayout } from '../renshi/PolicyTouchLayout'
+import { PolicySearchField } from '../renshi/PolicySearchField'
+import { setPolicyKeyword } from '../renshi/policyKeywordSession'
+import { PolicyReadState, PolicyTouchLayout } from '../renshi/PolicyTouchLayout'
 import { POLICY_CATEGORIES, POLICY_GENERAL_QUESTION, policyCategorySummaries, policyRead } from '../renshi/policyModel'
-import { policyPublishedOn } from '../renshi/policyFacts'
+import { policyPublishedLabel } from '../renshi/policyFacts'
 import { SERVICE_HUB_SPECS } from './serviceHubSpecs'
 import './policy-touch.css'
 
@@ -44,11 +47,13 @@ export function PolicyTouchHub() {
     return () => { active = false }
   }, [attempt])
   const empty = data?.latest.total === 0 && data.notices.total === 0
+  const unboundEmpty = empty && data !== null && [...data.categories, data.latest, data.notices].some((list) => list.scope === 'unbound' || list.scope === 'missing')
+  const emptyTitle = unboundEmpty ? '本机还没有运营机构发布的政策' : '这里还没有发布的政策'
   const latest = data?.latest.items[0]
   const spec = SERVICE_HUB_SPECS.policy
   const channelsRow = channelCount > 0 ? <button type="button" className="policy-min-row" data-testid="policy-official-channels" disabled={winding}
     onClick={() => navigate('/official-channels')}>本机构官方渠道 · {channelCount} 个 · 扫码到官网或官方账号</button> : null
-  return <PolicyTouchLayout home title={empty ? '这里还没有发布的政策' : spec.title}
+  return <PolicyTouchLayout home title={empty ? emptyTitle : spec.title}
     eyebrow={empty ? '查政策' : spec.eyebrow}
     path={empty ? ['机构在后台发布', '这里按类别列出', '打印清单或扫码看原文'] : undefined}
     pathLabel={empty ? '有政策以后' : undefined} sub={empty
@@ -59,36 +64,35 @@ export function PolicyTouchHub() {
       <PolicyReadState failed={failed} retry={() => setAttempt((value) => value + 1)} />
       {failed && channelsRow}
     </> : empty ? <>
-      <section className="policy-min-section">
-        <h2>政策由谁发布</h2>
+      <PolicyStatusCard icon="landmark" title="政策由谁发布" chip="有政策后可打印这样一页" artWidth={300}>
         <ul><li>政策由发布机构在机构后台自己审核、发布，并对内容负责</li>
           <li>本机不自己编写政策，也不拿别处的内容顶替</li>
           <li>有了政策，可以在这里打印一页办事清单带走，或扫码看原文</li></ul>
-      </section>
-      <PolicyChecklistSample empty />
-      <div className="policy-min-grid">
-        <QxTouchTile icon="sparkle" title={ai.state('assistant_chat') === 'available' ? '问小青' : '小青暂时不可用'}
+      </PolicyStatusCard>
+      <div className="policy-exit-grid">
+        <PolicyExitCard icon="sparkle" title={ai.state('assistant_chat') === 'available' ? '问小青' : '小青暂时不可用'}
           desc="问通用问题；不解释具体政策，不判断能不能领" off={winding || ai.state('assistant_chat') !== 'available'}
           onClick={() => { rememberAssistantDraft(POLICY_GENERAL_QUESTION); navigate('/assistant') }} />
-        <QxTouchTile icon="home" title="回首页办别的事" desc="打印、扫描、改简历、练面试照常" onClick={() => navigate('/')} />
+        <PolicyExitCard icon="home" title="回首页办别的事" desc="打印、扫描、改简历、练面试照常" onClick={() => navigate('/')} />
       </div>
       {channelsRow}
+      <p className="policy-min-fine policy-min-foot">政策由发布机构自行审核发布，以官方原文为准</p>
     </> : <>
+      <PolicySearchField disabled={winding} onSearch={(word) => { setPolicyKeyword(word); navigate('/renshi?search=1') }} />
       <div className="policy-min-grid policy-min-categories" data-testid="policy-categories">
         {policyCategorySummaries(data.categories).map((category, index) => <QxTouchTile key={category.key} icon={category.icon}
           title={category.label} desc={category.disabled ? '还没有机构发布' : `${category.total} 条 · 最近：${category.latest?.title ?? '标题未提供'}`}
-          layout="stack" off={winding || category.disabled} index={index} testId={`policy-category-${category.key}`}
+          tone="slate" layout="stack" off={winding || category.disabled} index={index} testId={`policy-category-${category.key}`}
           onClick={() => navigate(`/renshi?audience=${category.key}`)} />)}
       </div>
-      {latest && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate(`/renshi?policy=${encodeURIComponent(latest.id)}`)}>
-        最近更新 · {latest.title} · {policyPublishedOn(latest) ?? '日期未提供'}
-      </button>}
-      {data.notices.total > 0 && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate('/renshi?tab=notice')}>
-        机构公告 · {data.notices.total} 条
-      </button>}
+      {latest && <PolicyLinkRow icon="bell" title="最近更新" disabled={winding}
+        detail={`${latest.title} · ${policyPublishedLabel(latest) ?? '日期未提供'}`}
+        onClick={() => navigate(`/renshi?policy=${encodeURIComponent(latest.id)}`)} />}
+      {data.notices.total > 0 && <PolicyLinkRow icon="message" title="机构公告" detail={`${data.notices.total} 条`}
+        disabled={winding} onClick={() => navigate('/renshi?tab=notice')} />}
       {channelsRow}
       {isLoggedIn && <button type="button" className="policy-min-row" disabled={winding} onClick={() => navigate('/me/favorites?tab=policy')}>政策收藏</button>}
-      <p className="policy-min-fine">条数从发布数据读；政策由发布机构自行审核发布，以官方原文为准</p>
+      <p className="policy-min-fine policy-min-foot">政策由发布机构自行审核发布，以官方原文为准</p>
     </>}
   </PolicyTouchLayout>
 }
