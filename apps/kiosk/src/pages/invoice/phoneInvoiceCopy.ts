@@ -3,6 +3,7 @@
  * 稿：docs/design/kiosk-touch-2026-10/pay-1113.js 开票屏（用手机扫码填写开票信息）。
  * 合规句：docs/compliance/pilot-compliance-procedures.md「发票申请流程」。
  * 过期、已提交、提交成功与服务端 invoice-sessions.service.ts 同一句。
+ * 稿里「这台屏幕不保存税号」属于一体机屏，手机上不用（税号存在服务端，手机上说这句会被读成「这一页不保存」）。
  */
 
 export const INVOICE_PAGE_TITLE = '用手机扫码填写开票信息'
@@ -10,7 +11,7 @@ export const INVOICE_STEPS = ['手机扫码', '填写开票信息', '发票发�
 export const INVOICE_LIST_TITLE = '手机上要填的三项'
 export const INVOICE_FIELD_TITLE = '抬头。个人写姓名，单位写单位名称。'
 export const INVOICE_FIELD_TAX = '税号。单位才要填。个人不用填税号。'
-export const INVOICE_FIELD_EMAIL = '接收邮箱。电子发票发到这个邮箱。这台屏幕不保存税号。'
+export const INVOICE_FIELD_EMAIL = '接收邮箱。电子发票发到这个邮箱。'
 export const INVOICE_FINE = '在手机上填写并提交。没付成或已退款的单，开不了发票。'
 export const INVOICE_KIND = '电子发票（普通发票）'
 export const INVOICE_NO_ID = '个人不需要提供身份证号。'

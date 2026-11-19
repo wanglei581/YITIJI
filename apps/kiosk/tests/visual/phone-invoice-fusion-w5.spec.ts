@@ -77,6 +77,9 @@ test('开票短链兑换后个人不显示税号框，提交不带税号 @w5-mob
   await expect(root.getByText('税号。单位才要填。个人不用填税号。')).toBeVisible()
   await expect(root.locator('input[name="taxId"]')).toHaveCount(0)
   await expect(root.getByText('需要专用发票请拨打服务电话')).toBeVisible()
+  // 「这台屏幕不保存税号」属于一体机屏，不放到手机上。
+  await expect(root.getByText('接收邮箱。电子发票发到这个邮箱。', { exact: true })).toBeVisible()
+  await expect(page.getByText('这台屏幕不保存税号')).toHaveCount(0)
   await expect(page.getByText('工作人员')).toHaveCount(0)
   await root.getByRole('button', { name: '单位', exact: true }).click()
   await expect(root.locator('input[name="taxId"]')).toBeVisible()
