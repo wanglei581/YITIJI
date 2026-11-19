@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeftIcon, LoaderIcon, PrinterIcon } from 'lucide-react'
-import { PRINT_MAX_SIDES_PER_ORDER, type MemberBenefitItem, type PrintJobParams } from '@ai-job-print/shared'
+import { PRINT_MAX_SIDES_PER_ORDER, type MemberBenefitItem } from '@ai-job-print/shared'
 import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { useAuth } from '../../auth/useAuth'
 import { loginPathForPrintStep } from '../../auth/returnPath'
@@ -18,7 +18,6 @@ import {
   createPrintJob,
   PrintPriceChangedError,
   quotePrintOrder,
-  type PrintPriceChangedQuote,
 } from '../../services/print/printJobsApi'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
@@ -47,6 +46,7 @@ import {
   derivePrintConfirmScreen,
   type QuoteView,
 } from './printConfirmModel'
+import { priceConfigForBenefit, quoteKeyOf, readyQuoteView } from './printConfirmPrice'
 import { usePrintConfirmQueryGuard } from './printConfirmQuery'
 import './styles/print-confirm-qx.css'
 import { FilePageThumb } from './components/FileThumbCard'
@@ -71,23 +71,6 @@ type PriceCfgView =
   | { status: 'loading' }
   | { status: 'ready'; unitCents: number | null }
   | { status: 'error' }
-
-/** 报价接口与 409 PRICE_CHANGED 带回的现价共用同一换算，两处展示口径一致。 */
-function readyQuoteView(q: PrintPriceChangedQuote, copies: number): QuoteView {
-  const line = q.priceLines[0]
-  return {
-    status: 'ready',
-    amountCents: q.amountCents,
-    billablePages: q.billablePages,
-    unitCents: line?.unitCents ?? 0,
-    quantity: line?.quantity ?? q.billablePages * copies,
-  }
-}
-
-/** 报价键：最终出纸文件 + 全部打印参数。 */
-function quoteKeyOf(fileUrl: string | null | undefined, params: PrintJobParams): string {
-  return `${fileUrl ?? ''}|${JSON.stringify(params)}`
-}
 
 export function PrintConfirmPage() {
   const navigate = useNavigate()
@@ -265,13 +248,10 @@ export function PrintConfirmPage() {
           ? { status: 'ready', items: benefits.items }
           : { status: benefits.status, items: [] },
       quote: quoteInput,
-      priceConfig:
-        priceCfg.status === 'ready'
-          ? { status: 'ready', unitCents: priceCfg.unitCents }
-          : { status: priceCfg.status, unitCents: null },
+      priceConfig: priceConfigForBenefit(quote, priceCfg, Boolean(activeNotice)),
       now: benefits.status === 'ready' ? benefits.loadedAt : Date.now(),
     })
-  }, [benefitCardEnabled, isLoggedIn, benefits, quote, priceCfg])
+  }, [benefitCardEnabled, isLoggedIn, benefits, quote, priceCfg, activeNotice])
 
   // 稿 14 的 3×3 参数格。文件名、页数、大小在文件头里，不在格子里重复。
   // 本机暂未开通、已改过的项画灰并就地写「已按……报价」（稿 14，9/29 定稿）。

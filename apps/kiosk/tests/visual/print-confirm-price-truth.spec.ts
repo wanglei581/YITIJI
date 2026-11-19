@@ -401,6 +401,52 @@ for (const scenario of [
   })
 }
 
+// 价格连改两次：第一次 409 把屏上换成中间价，公示价也已经变成更新的单价。
+// 这两句不能同时在：409 让用户按新金额再确认，权益卡却说不要按本屏金额付款。
+test('two price changes do not show confirm-new-amount and do-not-pay together @kiosk', async ({ page, api }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  const pages = W2_FILE.pages
+  const first = 20 * pages
+  const mid = 30 * pages
+  const latest = 40 * pages
+  registerShell(api, [])
+  // 开页公示价 20；409 发出后公示价变成 40（第二次改价），与 409 带回的 30 不是同一个数。
+  const prices = registerPriceConfig(api, [20, 40])
+  await routeQuote(page, () => ({ unitCents: 20, pages }))
+  const jobs = await routeJobs(
+    page,
+    [{ status: 409, unitCents: 30 }, { status: 409, unitCents: 40 }],
+    prices.markChanged,
+  )
+
+  await openConfirm(page)
+  await expectConfirmAmount(page, first)
+  await expect(originalConfirm(page)).toBeEnabled()
+  await originalConfirm(page).click()
+
+  await expect(page.getByRole('alert')).toContainText(`你确认的是 ${yuan(first)}，现在应付 ${yuan(mid)}`)
+  await expect(page.getByRole('alert')).toContainText('请核对新金额后再点确认')
+  await expect(reconfirm(page, mid)).toBeEnabled()
+  await expect(page.getByText('按新金额')).toHaveCount(1)
+  await expect(page.getByText('不要按本屏金额付款')).toHaveCount(0)
+  await expect(page.getByText('本屏报价已不是现价')).toHaveCount(0)
+  await expect(page.getByText('请返回上一步重新核价')).toHaveCount(0)
+  expect(jobs).toHaveLength(1)
+  expect(jobs[0]?.['quotedAmountCents']).toBe(first)
+
+  await reconfirm(page, mid).click()
+  await expect(page.getByRole('alert')).toContainText(`你确认的是 ${yuan(mid)}，现在应付 ${yuan(latest)}`)
+  await expect(page.getByRole('alert')).toContainText('请核对新金额后再点确认')
+  await expect(reconfirm(page, latest)).toBeEnabled()
+  await expect(page.getByText('不要按本屏金额付款')).toHaveCount(0)
+  await expect(page.getByText('本屏报价已不是现价')).toHaveCount(0)
+  expect(jobs).toHaveLength(2)
+  expect(jobs[1]?.['quotedAmountCents']).toBe(mid)
+  await expect(page).toHaveURL(/\/print\/confirm/)
+  expect(pageErrors).toEqual([])
+})
+
 function registerHomeReads(api: ApiRouter): void {
   api.respond('GET', '/api/v1/jobs', {
     status: 200,
