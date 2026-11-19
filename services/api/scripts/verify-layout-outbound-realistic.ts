@@ -256,20 +256,22 @@ function main(): void {
 
 /** 用户原文里已经有形似占位符的字。还原后必须与原文逐字一致，出站拼不出那串长数字。 */
 function assertPlaceholderCollision(): void {
-  const literal = '[长数字_1]'
-  const secret = '9'.repeat(30)
-  const original = `${literal}说明${secret}结束`
-  const out = maskLayoutAdjustOutbound({
-    originalText: original,
-    resumeValues: literal,
-    resumeJson: JSON.stringify({ summary: literal }),
-    maxOriginalChars: original.length + 800,
-  })
-  if (recoverableDigits(out.maskedOriginal).includes(secret)) fail('形似占位符 原文还能拼出长数字')
-  if (!out.maskedOriginal.includes(literal)) fail('形似占位符 用户原文被换掉了')
-  if (out.restore(out.maskedOriginal) !== original) fail('形似占位符 还原后与原文不一致')
-  if (out.restore(out.maskedResumeValues) !== literal) fail('形似占位符 字段值还原后与原文不一致')
-  if (out.restore(literal) !== literal) fail('形似占位符 被当成了真占位符')
+  const literals = ['[长数字_1]', '⦃a1b2c3:42⦄']
+  for (const literal of literals) {
+    const secret = '9'.repeat(30)
+    const original = `${literal}说明${secret}结束`
+    const out = maskLayoutAdjustOutbound({
+      originalText: original,
+      resumeValues: literal,
+      resumeJson: JSON.stringify({ summary: literal }),
+      maxOriginalChars: original.length + 800,
+    })
+    if (recoverableDigits(out.maskedOriginal).includes(secret)) fail('形似占位符 原文还能拼出长数字')
+    if (!out.maskedOriginal.includes(literal)) fail('形似占位符 用户原文被换掉了')
+    if (out.restore(out.maskedOriginal) !== original) fail('形似占位符 还原后与原文不一致')
+    if (out.restore(out.maskedResumeValues) !== literal) fail('形似占位符 字段值还原后与原文不一致')
+    if (out.restore(literal) !== literal) fail('形似占位符 被当成了真占位符')
+  }
   pass('用户原文里的形似占位符原样保留')
 }
 

@@ -318,7 +318,7 @@ export class LlmResumeOptimizeService {
       resumeJson: JSON.stringify(input.currentResume),
       maxOriginalChars: MAX_INPUT_CHARS,
     })
-    const { maskedOriginal, maskedResumeValues, maskedResumeJson } = maskedTriple
+    const { maskedOriginal, maskedResumeValues, maskedResumeJson, tokens } = maskedTriple
     const factSource = `${maskedOriginal}\n${maskedResumeValues}`
     const layoutHint = buildLayoutHint(input.layout)
     const actionHint =
@@ -341,7 +341,7 @@ export class LlmResumeOptimizeService {
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
         `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, input.onLlmCall,
       ))
-      const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume)
+      const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume, tokens)
       if (result) {
         // 条目数量上限校验用的是原始 currentResume（未遮盖，长度不受遮盖影响）；
         // 这里只还原文本内容，basic 身份字段另以服务端权威值兜底。
@@ -635,6 +635,7 @@ export class LlmResumeOptimizeService {
     factSource: string,
     forbiddenWords: string[],
     currentResume: GeneratedResume,
+    tokens: ReadonlySet<string>,
   ): LayoutAdjustResult | null {
     const jsonStr = extractJson(raw)
     if (!jsonStr) return null
@@ -656,10 +657,14 @@ export class LlmResumeOptimizeService {
     if (arrayLength(r['skills']) > currentResume.skills.length) return null
     if (arrayLength(r['certificates']) > currentResume.certificates.length) return null
 
-    const normFact = normalizeResumeFactText(stripLayoutTokensForFacts(factSource))
-    const inFact = makeFactMatcher(factSource)
+    const strippedFactSource = stripLayoutTokensForFacts(factSource, tokens)
+    const normFact = normalizeResumeFactText(strippedFactSource)
+    const factMatcher = makeFactMatcher(strippedFactSource)
+    // 字段值是本次占位符时（电话、邮箱被遮），只在 strippedFactSource 里找不到，得按集合认它仍是事实。
+    const inFact = (value: string | undefined): boolean =>
+      factMatcher(value) || (typeof value === 'string' && value.length > 0 && tokens.has(value))
     const hasNoNewNumbers = (value: string): boolean => {
-      const visible = stripLayoutTokensForFacts(value)
+      const visible = stripLayoutTokensForFacts(value, tokens)
       for (const token of visible.match(/\d+(?:\.\d+)?%?/g) ?? []) {
         if (!normFact.includes(normalizeResumeFactText(token))) return false
       }

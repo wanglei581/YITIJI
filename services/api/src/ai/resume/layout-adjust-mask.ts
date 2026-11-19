@@ -161,9 +161,18 @@ function tooLong(): never {
   })
 }
 
-/** 事实核对前去掉本次标记。标记里的十六进制和序号不是简历上的数字。 */
-export function stripLayoutTokensForFacts(text: string): string {
-  return text.replace(layoutTokenPattern('gu'), '')
+/**
+ * 事实核对前去掉本次真正发出的标记。只删 token book 实际发出的那些（按集合精确匹配），
+ * 伪造的形似标记和用户原文里的同形字都留下。删的地方留一个空格而不是空串，
+ * 免得左右数字粘成新数字，把合法排版误判成「模型捏造数字」。
+ */
+export function stripLayoutTokensForFacts(text: string, tokens: ReadonlySet<string>): string {
+  if (!text || tokens.size === 0) return text
+  let out = text
+  for (const token of tokens) {
+    out = out.split(token).join(' ')
+  }
+  return out
 }
 
 /** 截到 limit。切点落在占位符里就退到占位符前面；末尾剩下的数字整段丢掉。 */
@@ -192,6 +201,7 @@ export function maskLayoutAdjustOutbound(input: {
   maskedResumeValues: string
   maskedResumeJson: string
   restore: (value: string) => string
+  tokens: ReadonlySet<string>
 } {
   const sources = [input.originalText, input.resumeValues, input.resumeJson]
   const { book, extra } = createLayoutTokenBook(sources)
@@ -226,5 +236,6 @@ export function maskLayoutAdjustOutbound(input: {
     maskedResumeValues,
     maskedResumeJson,
     restore: restoreTokens(extra),
+    tokens: new Set(extra.keys()),
   }
 }

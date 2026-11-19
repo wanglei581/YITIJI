@@ -35,6 +35,7 @@ import { validateSync } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
 import { Logger, ValidationPipe } from '@nestjs/common'
 import { layoutTokenPattern } from '../src/ai/resume/layout-adjust-digit-cover'
+import { stripLayoutTokensForFacts } from '../src/ai/resume/layout-adjust-mask'
 import { LAYOUT_ADJUST_SYSTEM_PROMPT, LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
 import { ResumeGenerateExportDto, ResumeLayoutAdjustDto } from '../src/ai/dto/resume-generate.dto'
 import { ResumePdfService } from '../src/ai/resume/resume-pdf.service'
@@ -292,6 +293,43 @@ async function main(): Promise<void> {
     }
     assertStubHealthy()
     pass('3c. 新增数字 → 拒绝')
+
+    // 事实核对只能去掉本次真正发出的标记。伪造的同形占位符里的数字仍是新数字。
+    const forgedToken: StubMutate = (resume) => {
+      resume.experience[0] = { ...resume.experience[0], description: '新增覆盖 ⦃abcdef:9⦄ 个模块。' }
+    }
+    setResponses([forgedToken, forgedToken])
+    try {
+      await svc.adjustLayoutDraft({ currentResume: baseResume, originalText: ORIGINAL_TEXT, action: 'condense' })
+      fail('3. 伪造占位符带新数字应被拒绝')
+    } catch (e) {
+      if (errCode(e) !== 'AI_LAYOUT_ADJUST_INVALID_OUTPUT') fail(`3. 期望 AI_LAYOUT_ADJUST_INVALID_OUTPUT，实际 ${errCode(e)}`)
+    }
+    assertStubHealthy()
+    pass('3d. 伪造占位符夹带新数字 → 拒绝')
+
+    // 用户原文里本来就写着的形似占位符，不是本次标记，比对时里面的数字仍是事实。
+    const userLiteralText = `${ORIGINAL_TEXT}\n备注 编号⦃a1b2c3:42⦄结束`
+    const useLiteralNumber: StubMutate = (resume) => {
+      resume.experience[0] = { ...resume.experience[0], description: '编号42，负责组件库维护。' }
+    }
+    setResponses([useLiteralNumber])
+    const literalKept = await svc.adjustLayoutDraft({ currentResume: baseResume, originalText: userLiteralText, action: 'reformat' })
+    assertStubHealthy()
+    if (literalKept.resume.experience[0].description !== '编号42，负责组件库维护。') {
+      fail('3e. 用户原文形似占位符里的数字应仍是事实，描述应保留')
+    }
+    pass('3e. 用户原文形似占位符里的数字仍是事实，比对不误拒')
+
+    // 去标记只删本次集合里的标记，删处留空格，不把左右数字粘成新数字。
+    {
+      const issued = new Set(['⦃a1b2c3:1⦄'])
+      if (stripLayoutTokensForFacts('123⦃a1b2c3:1⦄456', issued) !== '123 456') fail('3f. 去标记应留空格，避免数字粘连')
+      if (stripLayoutTokensForFacts('⦃abcdef:9⦄', issued) !== '⦃abcdef:9⦄') fail('3f. 伪造标记不应被删除')
+      if (stripLayoutTokensForFacts('⦃a1b2c3:42⦄', issued) !== '⦃a1b2c3:42⦄') fail('3f. 用户原文里的同形字不应被删除')
+      if (stripLayoutTokensForFacts('电话⦃a1b2c3:1⦄123', issued) !== '电话 123') fail('3f. 标记紧挨数字时留空格分隔')
+    }
+    pass('3f. 事实核对只去本次真正发出的标记，删处留空格')
 
     // 14. 只写了公司、没写职务的经历（11/08 包 2 并入 B8 ② 时补）：版式调整照样保留，职务留空，也不许补出职务。
     if (!LAYOUT_ADJUST_SYSTEM_PROMPT.includes('只有公司没有职务的经历,role 留空字符串,仍保留该条经历,不得编造职务')) {
