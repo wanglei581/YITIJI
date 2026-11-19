@@ -14,12 +14,15 @@ function invalid(code: string, message: string): BadRequestException {
   return new BadRequestException({ error: { code, message } })
 }
 
-/** 抬头、税号、邮箱。个人不收税号，单位只收统一社会信用代码。 */
+/**
+ * 抬头、税号、邮箱。个人不收税号，单位只收统一社会信用代码。
+ * 入参是请求体原样（DTO 只声明字段、不校验类型），所以每项都按 unknown 判；错误码和句子见 docs/api/member-invoice-requests.md。
+ */
 export function normalizeInvoiceTitle(input: {
-  titleType?: string
-  title?: string
-  taxId?: string | null
-  email?: string
+  titleType?: unknown
+  title?: unknown
+  taxId?: unknown
+  email?: unknown
 }): NormalizedInvoiceTitle {
   const titleType = input.titleType
   if (titleType !== 'personal' && titleType !== 'company') {

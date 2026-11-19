@@ -4,7 +4,7 @@
 
 本文只写路径、入参、返回、错误码和状态取值。不写价格。
 
-会员编号只来自登录态。请求体里如果带了会员编号，服务端不采用。
+会员编号只来自登录态。请求体里带了会员编号（或别的本文没写的字段），整单 400，`code` 为 `VALIDATION_FAILED`，不会采用。
 
 ## 登录
 
@@ -12,13 +12,14 @@
 Authorization: Bearer <会员 token>
 ```
 
-令牌 audience 为 `enduser`，并且 Redis 里仍有这次会话。缺登录、令牌无效、会话失效的错误码与现有会员接口相同：
+令牌 audience 为 `enduser`，并且 Redis 里仍有这次会话，账号也还可用。缺登录、令牌无效、会话失效、账号不可用的错误码与现有会员接口相同（会员守卫 `services/api/src/common/guards/end-user-auth.guard.ts`）：
 
 | HTTP | code | message |
 |---|---|---|
 | 401 | `MEMBER_MISSING_TOKEN` | 缺少登录凭证 |
 | 401 | `MEMBER_TOKEN_INVALID` | 登录已失效,请重新登录 |
 | 401 | `MEMBER_SESSION_EXPIRED` | 会话已失效,请重新登录 |
+| 401 | `ACCOUNT_UNAVAILABLE` | 账号停用、注销中或已注销。message 沿用会员守卫的现有原句，页面请按 code 显示本端自己的话 |
 | 503 | `MEMBER_SESSION_STORE_UNAVAILABLE` | 登录状态暂时无法核验，请稍后重试 |
 
 成功响应都是 `{ "success": true, "data": ... }`。失败响应是 `{ "success": false, "error": { "code", "message" } }`。
@@ -83,15 +84,19 @@ Authorization: Bearer <会员 token>
 | `status` | `submitted`（已提交） |
 | `amountCents` | 这一次写入的实付金额快照，整数，单位分 |
 
-抬头错误是 400：
+抬头、税号、邮箱填错是 400，下表每一行都能经 HTTP 拿到（门禁 `verify:invoice-http` 逐条打过）。一体机手机填写页的提交口（`POST /api/v1/kiosk/invoice-sessions/:sessionId/submit`）回同样的码和句子：
 
-| code | message |
-|---|---|
-| `INVOICE_TITLE_INVALID` | 抬头要选个人或单位。 / 抬头。个人写姓名，单位写单位名称。 / 抬头请控制在 80 个字以内。 |
-| `INVOICE_TAX_ID_FORBIDDEN` | 个人不用填税号。 |
-| `INVOICE_TAX_ID_REQUIRED` | 单位请填写名称和统一社会信用代码。 |
-| `INVOICE_TAX_ID_INVALID` | 统一社会信用代码需为 18 位（数字与大写字母，末位校验位正确） |
-| `INVOICE_EMAIL_INVALID` | 接收邮箱格式不对。电子发票发到这个邮箱。 |
+| 情形 | code | message |
+|---|---|---|
+| `titleType` 不是 `personal` 或 `company`，或没传 | `INVOICE_TITLE_INVALID` | 抬头要选个人或单位。 |
+| `title` 没传、不是字符串或只有空格 | `INVOICE_TITLE_INVALID` | 抬头。个人写姓名，单位写单位名称。 |
+| `title` 去掉首尾空格后超过 80 个字 | `INVOICE_TITLE_INVALID` | 抬头请控制在 80 个字以内。 |
+| 个人填了 `taxId` | `INVOICE_TAX_ID_FORBIDDEN` | 个人不用填税号。 |
+| 单位没填 `taxId` | `INVOICE_TAX_ID_REQUIRED` | 单位请填写名称和统一社会信用代码。 |
+| 单位的 `taxId` 不是 18 位或校验位不对 | `INVOICE_TAX_ID_INVALID` | 统一社会信用代码需为 18 位（数字与大写字母，末位校验位正确） |
+| `email` 没传、超过 120 个字符或格式不对 | `INVOICE_EMAIL_INVALID` | 接收邮箱格式不对。电子发票发到这个邮箱。 |
+
+`orderKind`、`orderId` 不合要求，或请求体带了本文没写的字段，是 400 `VALIDATION_FAILED`，`message` 是英文的字段说明，只供排错，页面不要直接显示。
 
 同一订单已有未退回申请时，顺序再提交是 409，`code` 为 `INVOICE_NOT_ALLOWED`，`message` 为「这一单已经提交过开票申请。」两笔同时通过资格判断时，后写入的被唯一约束挡住，409，`code` 为 `INVOICE_ALREADY_REQUESTED`，句子相同。两种都只留下一条。
 

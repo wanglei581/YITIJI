@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator'
+import { Allow, IsIn, IsString, MaxLength } from 'class-validator'
 
 export class CreateInvoiceSessionDto {
   @IsIn(['print', 'service'])
@@ -20,19 +20,16 @@ export class SubmitInvoiceSessionDto {
   @MaxLength(200)
   submitToken!: string
 
-  @IsIn(['personal', 'company'])
-  titleType!: 'personal' | 'company'
+  // 与会员提交口同理：抬头四项交给 normalizeInvoiceTitle，手机页才能拿到中文句子和专用错误码。
+  @Allow()
+  titleType?: unknown
 
-  @IsString()
-  @MaxLength(80)
-  title!: string
+  @Allow()
+  title?: unknown
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(32)
-  taxId?: string
+  @Allow()
+  taxId?: unknown
 
-  @IsString()
-  @MaxLength(120)
-  email!: string
+  @Allow()
+  email?: unknown
 }

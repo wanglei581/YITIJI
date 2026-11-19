@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator'
+import { Allow, IsIn, IsString, MaxLength } from 'class-validator'
 
 export class SubmitMemberInvoiceDto {
   @IsIn(['print', 'service'])
@@ -8,19 +8,18 @@ export class SubmitMemberInvoiceDto {
   @MaxLength(80)
   orderId!: string
 
-  @IsIn(['personal', 'company'])
-  titleType!: 'personal' | 'company'
+  // 抬头类型、抬头、税号、邮箱只在服务端 normalizeInvoiceTitle 里校验，好让文档写的专用错误码
+  // （INVOICE_TITLE_INVALID、INVOICE_EMAIL_INVALID 等）和中文句子原样回到小程序与手机页。
+  // 这里只声明字段（全局白名单要求），不在管道里先拦成英文的 VALIDATION_FAILED。
+  @Allow()
+  titleType?: unknown
 
-  @IsString()
-  @MaxLength(80)
-  title!: string
+  @Allow()
+  title?: unknown
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(32)
-  taxId?: string
+  @Allow()
+  taxId?: unknown
 
-  @IsString()
-  @MaxLength(120)
-  email!: string
+  @Allow()
+  email?: unknown
 }

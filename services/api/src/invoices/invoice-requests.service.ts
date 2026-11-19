@@ -12,10 +12,11 @@ import { normalizeInvoiceTitle } from './invoice-title'
 export interface SubmitInvoiceInput {
   orderKind: 'print' | 'service'
   orderId: string
-  titleType?: string
-  title?: string
-  taxId?: string | null
-  email?: string
+  /** 以下四项是请求体原样，由 normalizeInvoiceTitle 校验并给出专用错误码。 */
+  titleType?: unknown
+  title?: unknown
+  taxId?: unknown
+  email?: unknown
 }
 
 export interface StoredInvoiceRequest {

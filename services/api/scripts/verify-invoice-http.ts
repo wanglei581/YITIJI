@@ -199,6 +199,75 @@ async function main(): Promise<void> {
       assert.equal(list.text.includes(TAX_ID) || list.text.includes(EMAIL), false)
     })
 
+    await check('2 会员提交：抬头、税号、邮箱填错时，经 HTTP 回文档写的专用错误码和中文句子，每个码一条；不落行', async () => {
+      const owner = await member()
+      const orderId = await printOrder(owner.id, kioskTerminalId)
+      const headers = { Authorization: `Bearer ${owner.token}` }
+      const good = { orderKind: 'print', orderId, titleType: 'personal', title: '刘晓楠', email: 'liuxiaonan@example.com' }
+      const cases: Array<[string, Record<string, unknown>, string, string]> = [
+        ['抬头类型乱填', { ...good, titleType: 'boss' }, 'INVOICE_TITLE_INVALID', '抬头要选个人或单位。'],
+        ['抬头只有空格', { ...good, title: '   ' }, 'INVOICE_TITLE_INVALID', '抬头。个人写姓名，单位写单位名称。'],
+        ['抬头 81 个字', { ...good, title: '晓'.repeat(81) }, 'INVOICE_TITLE_INVALID', '抬头请控制在 80 个字以内。'],
+        ['个人填了税号', { ...good, taxId: TAX_ID }, 'INVOICE_TAX_ID_FORBIDDEN', '个人不用填税号。'],
+        ['单位没填税号', { ...good, titleType: 'company', title: '青岛某印务有限公司' }, 'INVOICE_TAX_ID_REQUIRED', '单位请填写名称和统一社会信用代码。'],
+        ['单位税号校验位错', { ...good, titleType: 'company', title: '青岛某印务有限公司', taxId: '91000000MA0000000X' }, 'INVOICE_TAX_ID_INVALID', '统一社会信用代码需为 18 位（数字与大写字母，末位校验位正确）'],
+        ['缺邮箱', { orderKind: 'print', orderId, titleType: 'personal', title: '刘晓楠' }, 'INVOICE_EMAIL_INVALID', '接收邮箱格式不对。电子发票发到这个邮箱。'],
+        ['邮箱格式错', { ...good, email: 'liuxiaonan@' }, 'INVOICE_EMAIL_INVALID', '接收邮箱格式不对。电子发票发到这个邮箱。'],
+      ]
+      for (const [label, body, code, message] of cases) {
+        const reply = await call('POST', '/me/invoice-requests', { headers, body })
+        assert.equal(reply.status, 400, `${label}：${reply.text}`)
+        assert.equal(reply.json.error?.code, code, `${label}：${reply.text}`)
+        assert.equal(reply.json.error?.message, message, label)
+      }
+      const injected = await call('POST', '/me/invoice-requests', { headers, body: { ...good, endUserId: made.members[0] } })
+      assert.equal(injected.status, 400, '请求体带会员编号整单拒绝，不采用')
+      assert.equal(injected.json.error?.code, 'VALIDATION_FAILED')
+      const badKind = await call('POST', '/me/invoice-requests', { headers, body: { ...good, orderKind: 'refund' } })
+      assert.equal(badKind.status, 400)
+      assert.equal(badKind.json.error?.code, 'VALIDATION_FAILED')
+      assert.equal(await prisma.invoiceRequest.count({ where: { endUserId: owner.id } }), 0)
+    })
+
+    await check('3 手机填写页提交：同样的专用错误码和中文句子经 HTTP 回到手机，会话仍可再交', async () => {
+      const owner = await member()
+      const orderId = await printOrder(owner.id, kioskTerminalId)
+      const created = await call('POST', '/kiosk/invoice-sessions', {
+        headers: { ...kiosk, Authorization: `Bearer ${owner.token}` },
+        body: { orderKind: 'print', orderId },
+      })
+      assert.equal(created.status, 201, created.text)
+      made.keys.push(`invoice_session:${created.json.data.sessionId}`)
+      const resolved = await call('POST', '/kiosk/invoice-sessions/scene/resolve', { body: { scene: created.json.data.sceneToken } })
+      assert.equal(resolved.status, 201, resolved.text)
+      const { sessionId, submitToken } = resolved.json.data as { sessionId: string; submitToken: string }
+      const good = { submitToken, titleType: 'personal', title: '刘晓楠', email: 'liuxiaonan@example.com' }
+      for (const [body, code, message] of [
+        [{ ...good, titleType: 'boss' }, 'INVOICE_TITLE_INVALID', '抬头要选个人或单位。'],
+        [{ ...good, title: '晓'.repeat(81) }, 'INVOICE_TITLE_INVALID', '抬头请控制在 80 个字以内。'],
+        [{ submitToken, titleType: 'personal', title: '刘晓楠' }, 'INVOICE_EMAIL_INVALID', '接收邮箱格式不对。电子发票发到这个邮箱。'],
+      ] as Array<[Record<string, unknown>, string, string]>) {
+        const reply = await call('POST', `/kiosk/invoice-sessions/${sessionId}/submit`, { body })
+        assert.equal(reply.status, 400, reply.text)
+        assert.equal(reply.json.error?.code, code, reply.text)
+        assert.equal(reply.json.error?.message, message)
+      }
+      const ok = await call('POST', `/kiosk/invoice-sessions/${sessionId}/submit`, { body: good })
+      assert.equal(ok.status, 201, ok.text)
+      assert.equal(await prisma.invoiceRequest.count({ where: { endUserId: owner.id } }), 1)
+    })
+
+    await check('4 登录错误表：缺令牌 401 MEMBER_MISSING_TOKEN；账号停用后 401 ACCOUNT_UNAVAILABLE', async () => {
+      const missing = await call('GET', '/me/invoice-orders')
+      assert.equal(missing.status, 401)
+      assert.equal(missing.json.error?.code, 'MEMBER_MISSING_TOKEN')
+      const owner = await member()
+      await prisma.endUser.update({ where: { id: owner.id }, data: { enabled: false } })
+      const disabled = await call('GET', '/me/invoice-orders', { headers: { Authorization: `Bearer ${owner.token}` } })
+      assert.equal(disabled.status, 401, disabled.text)
+      assert.equal(disabled.json.error?.code, 'ACCOUNT_UNAVAILABLE')
+    })
+
     console.log(`PASS verify:invoice-http（${passed.length} 组）`)
   } finally {
     await new Promise<void>((done) => app.getHttpServer().close(() => done()))
