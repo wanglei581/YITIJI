@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2265 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2266 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -455,7 +455,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 674 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 675 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -624,6 +624,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/interview/styles/interview-shell.css` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/touch/InterviewHubTouch.tsx` | `verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/useMockInterviewAvailability.ts` | `verify-kiosk-ai-availability.mjs` |
+| `apps/kiosk/src/pages/invoice/PhoneInvoicePages.tsx` | `verify-fusion-w6.mjs` |
 | `apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
 | `apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-page-size.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/pages/job-fairs/FairMapPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |

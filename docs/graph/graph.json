@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 675,
+    "endpointCount": 685,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -2662,6 +2662,44 @@
         ]
       },
       {
+        "controller": "services/api/src/invoices/admin-invoice.controller.ts",
+        "handler": "AdminInvoiceController.issue",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "InvoiceRequest"
+        ],
+        "path": "/api/v1/admin/invoice-requests/:id/issue",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/invoices/admin-invoice.service.ts"
+        ],
+        "services": [
+          "AdminInvoiceService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/admin-invoice.controller.ts",
+        "handler": "AdminInvoiceController.returnRequest",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "InvoiceRequest"
+        ],
+        "path": "/api/v1/admin/invoice-requests/:id/return",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/invoices/admin-invoice.service.ts"
+        ],
+        "services": [
+          "AdminInvoiceService"
+        ]
+      },
+      {
         "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.getJobSources",
         "method": "GET",
@@ -3623,6 +3661,25 @@
         ],
         "services": [
           "AdminOrdersReadonlyService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/admin-invoice.controller.ts",
+        "handler": "AdminInvoiceController.getByOrder",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "InvoiceRequest"
+        ],
+        "path": "/api/v1/admin/orders/:id/invoice",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/invoices/admin-invoice.service.ts"
+        ],
+        "services": [
+          "AdminInvoiceService"
         ]
       },
       {
@@ -6206,6 +6263,7 @@
           "FeedbackReply",
           "FeedbackTicket",
           "FileObject",
+          "InvoiceRequest",
           "JobAiRecommendation",
           "KioskSession",
           "MemberLegalConsent",
@@ -8529,6 +8587,82 @@
         "services": []
       },
       {
+        "controller": "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+        "handler": "KioskInvoiceSessionsController.create",
+        "method": "POST",
+        "models": [
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder",
+          "Terminal"
+        ],
+        "path": "/api/v1/kiosk/invoice-sessions",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-sessions.service.ts"
+        ],
+        "services": [
+          "InvoiceSessionsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+        "handler": "KioskInvoiceSessionsController.poll",
+        "method": "GET",
+        "models": [
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder",
+          "Terminal"
+        ],
+        "path": "/api/v1/kiosk/invoice-sessions/:sessionId",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-sessions.service.ts"
+        ],
+        "services": [
+          "InvoiceSessionsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+        "handler": "KioskInvoiceSessionsController.submit",
+        "method": "POST",
+        "models": [
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder",
+          "Terminal"
+        ],
+        "path": "/api/v1/kiosk/invoice-sessions/:sessionId/submit",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-sessions.service.ts"
+        ],
+        "services": [
+          "InvoiceSessionsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+        "handler": "KioskInvoiceSessionsController.resolve",
+        "method": "POST",
+        "models": [
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder",
+          "Terminal"
+        ],
+        "path": "/api/v1/kiosk/invoice-sessions/scene/resolve",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-sessions.service.ts"
+        ],
+        "services": [
+          "InvoiceSessionsService"
+        ]
+      },
+      {
         "controller": "services/api/src/legal/legal.controller.ts",
         "handler": "LegalController.getActive",
         "method": "GET",
@@ -9361,6 +9495,63 @@
         ],
         "services": [
           "MemberFeedbackService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/member-invoice.controller.ts",
+        "handler": "MemberInvoiceController.list",
+        "method": "GET",
+        "models": [
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder",
+          "Terminal"
+        ],
+        "path": "/api/v1/me/invoice-orders",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-requests.service.ts"
+        ],
+        "services": [
+          "InvoiceRequestsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/member-invoice.controller.ts",
+        "handler": "MemberInvoiceController.create",
+        "method": "POST",
+        "models": [
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder",
+          "Terminal"
+        ],
+        "path": "/api/v1/me/invoice-requests",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-requests.service.ts"
+        ],
+        "services": [
+          "InvoiceRequestsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/member-invoice.controller.ts",
+        "handler": "MemberInvoiceController.getOne",
+        "method": "GET",
+        "models": [
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder",
+          "Terminal"
+        ],
+        "path": "/api/v1/me/invoice-requests/:id",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-requests.service.ts"
+        ],
+        "services": [
+          "InvoiceRequestsService"
         ]
       },
       {
@@ -14569,7 +14760,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 300,
+      "reachableFileCount": 303,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -15356,11 +15547,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 330
+      "sourceFileCount": 333
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 838,
+      "reachableFileCount": 842,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15829,6 +16020,30 @@
           ],
           "path": "/interview/tips",
           "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "PhoneInvoicePage",
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/invoice/PhoneInvoicePages.tsx",
+          "layout": [],
+          "path": "/invoice/phone",
+          "styles": [
+            "apps/kiosk/src/pages/invoice/phone-invoice.css",
+            "apps/kiosk/src/pages/upload/kiosk-code-entry.css",
+            "apps/kiosk/src/pages/upload/phone-upload-service-desk.css"
+          ],
           "wrappers": []
         },
         {
@@ -16477,6 +16692,30 @@
           ],
           "path": "/jobs/online-platforms",
           "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "InvoiceSceneEntry",
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/invoice/PhoneInvoicePages.tsx",
+          "layout": [],
+          "path": "/k/i/:scene",
+          "styles": [
+            "apps/kiosk/src/pages/invoice/phone-invoice.css",
+            "apps/kiosk/src/pages/upload/kiosk-code-entry.css",
+            "apps/kiosk/src/pages/upload/phone-upload-service-desk.css"
+          ],
           "wrappers": []
         },
         {
@@ -18441,7 +18680,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1027
+      "sourceFileCount": 1031
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18973,7 +19212,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 124,
+    "modelCount": 125,
     "models": [
       {
         "fieldCount": 7,
@@ -19378,7 +19617,7 @@
         ]
       },
       {
-        "fieldCount": 34,
+        "fieldCount": 35,
         "name": "EndUser",
         "relations": [
           "AiResumeResult",
@@ -19394,6 +19633,7 @@
           "Favorite",
           "FeedbackTicket",
           "FileObject",
+          "InvoiceRequest",
           "JobAiSession",
           "JobApplication",
           "MemberLegalConsent",
@@ -19690,6 +19930,19 @@
         ],
         "usedBy": [
           "services/api/src/jobs/jobs-excel.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 18,
+        "name": "InvoiceRequest",
+        "relations": [
+          "EndUser"
+        ],
+        "usedBy": [
+          "services/api/src/invoices/admin-invoice.service.ts",
+          "services/api/src/invoices/invoice-email-retention.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts"
         ]
       },
       {
@@ -20044,6 +20297,7 @@
           "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/copy-jobs/copy-agent.service.ts",
           "services/api/src/copy-jobs/copy-jobs.service.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
@@ -20490,6 +20744,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-ops/derived-service-return-alerts.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/service-order.admin.ts",
           "services/api/src/payment/service-order.payment.ts",
@@ -20603,6 +20858,7 @@
           "services/api/src/first-order/first-order-incidents.service.ts",
           "services/api/src/first-order/first-order-projects.service.ts",
           "services/api/src/first-order/first-order-report-builder.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
           "services/api/src/kiosk-session/kiosk-session.service.ts",
           "services/api/src/licenses/license-gate.ts",
@@ -22638,6 +22894,9 @@
     ],
     "apps/kiosk/src/pages/interview/useMockInterviewAvailability.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-availability.mjs"
+    ],
+    "apps/kiosk/src/pages/invoice/PhoneInvoicePages.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w6.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
@@ -32409,7 +32668,8 @@
         "@ai-job-print/admin::test:e2e",
         "@ai-job-print/admin::test:e2e:screen",
         "@ai-job-print/admin::verify:admin-alerts-refresh-e2e",
-        "@ai-job-print/admin::verify:admin-files-actions-e2e"
+        "@ai-job-print/admin::verify:admin-files-actions-e2e",
+        "@ai-job-print/admin::verify:admin-invoice-e2e"
       ],
       "wired": true
     },
@@ -34509,6 +34769,7 @@
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/kiosk/src/pages/invoice/PhoneInvoicePages.tsx",
           "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",
           "apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
