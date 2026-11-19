@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BanIcon, CircleAlertIcon, CircleCheckIcon, HourglassIcon, type LucideIcon } from 'lucide-react'
 import { PLATFORM_BRAND_NAME } from '../../copy/miniappLinkCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import {
   buildPhoneInvoiceUrl,
@@ -35,11 +36,11 @@ import {
   INVOICE_PAGE_TITLE,
   INVOICE_RETRY,
   INVOICE_RETRY_LABEL,
-  INVOICE_SPECIAL,
   INVOICE_STEPS,
   INVOICE_SUBMIT_LABEL,
   INVOICE_SUBMITTED,
   INVOICE_TITLE_TOO_LONG,
+  invoiceSpecialLine,
 } from './phoneInvoiceCopy'
 
 type RelayState = 'resolving' | 'unusable' | 'retryable' | 'submitted'
@@ -131,6 +132,12 @@ export function InvoiceSceneEntry() {
       </StateCard>
     </Shell>
   )
+}
+
+/** 专用发票这一句带上公开的服务电话。只在表单屏读号码，其它状态屏不发这条请求。 */
+function SpecialInvoiceLine() {
+  const contact = useSupportContact()
+  return <p className="ph-inv-note" data-testid="invoice-special-line">{invoiceSpecialLine(contact)}</p>
 }
 
 type FillPhase = 'form' | 'submitted' | 'expired' | 'already' | 'blocked'
@@ -292,7 +299,7 @@ export function PhoneInvoicePage() {
         </label>
         <p className="ph-inv-note">{INVOICE_KIND}</p>
         <p className="ph-inv-note">{INVOICE_NO_ID}</p>
-        <p className="ph-inv-note">{INVOICE_SPECIAL}</p>
+        <SpecialInvoiceLine />
         <p className="ph-inv-note">{INVOICE_FINE}</p>
         {note ? <p className="ph-inv-alert" role="alert">{note}</p> : null}
         <button type="submit" className="ph-entry-retry" disabled={busy}>{INVOICE_SUBMIT_LABEL}</button>
