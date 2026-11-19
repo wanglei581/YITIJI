@@ -244,17 +244,17 @@ export async function rejectClaimForRefund(
 type VerifyRefundRow = {
   status: string
   reason: string | null
-  channel: string
-  refundNo: string
-  channelRefundNo: string | null
   channelSubmittedAt: Date | null
 }
 
-/** 过期付款的退款不挡。处理中、已退成，以及渠道还没明确失败的，挡住核验。 */
+/**
+ * 渠道受理过、还没落定的，不论原因（过期付款也一样）一律挡住核验。
+ * 其余的：处理中、已退成挡住；过期付款那一笔已经落定的不挡，它属于更早那次付款。
+ */
 function refundBlocksVerifiedOutcome(row: VerifyRefundRow): boolean {
+  if (refundMayStillBeAtChannel(row)) return true
   if (row.reason === STALE_ATTEMPT_REFUND_REASON) return false
-  if (row.status === 'pending' || row.status === 'success') return true
-  return refundMayStillBeAtChannel(row)
+  return row.status === 'pending' || row.status === 'success'
 }
 
 /** 渠道没受理过的待人工。核验已出纸时撤回，未出纸不动。 */
@@ -264,7 +264,7 @@ function withdrawOnVerifiedPaper(row: VerifyRefundRow): boolean {
   return true
 }
 
-/** 已在退或已退成（原因是空也算）。过期付款的退款不挡住后来这一笔。渠道受理过、还没失败的待人工也挡住。 */
+/** 已在退或已退成（原因是空也算）挡住。渠道受理过、还没落定的不论原因都挡住。过期付款落定的那一笔不挡后来这一笔。 */
 export async function orderRefundBlocksOutcome(
   db: HoldDb,
   orderId: string,
@@ -279,7 +279,7 @@ export async function orderRefundBlocksOutcome(
   }
   const rows = await db.refund.findMany({
     where: { orderId },
-    select: { status: true, reason: true, channel: true, refundNo: true, channelRefundNo: true, channelSubmittedAt: true },
+    select: { status: true, reason: true, channelSubmittedAt: true },
   })
   return rows.some((row) => refundBlocksVerifiedOutcome(row))
 }
@@ -436,7 +436,7 @@ export async function writePrintOutcomeIfRefundClear(
   if (!locked) return false
   const rows = await tx.refund.findMany({
     where: { orderId: input.orderId },
-    select: { id: true, refundNo: true, status: true, reason: true, channel: true, channelRefundNo: true, channelSubmittedAt: true },
+    select: { id: true, refundNo: true, status: true, reason: true, channelSubmittedAt: true },
   })
   if (rows.some((row) => refundBlocksVerifiedOutcome(row))) return false
   if (input.outcome === 'printed') {
