@@ -8,12 +8,18 @@
  * 带月的日期接成区间时，起不能晚于止，只比两头都写到的那一级；倒序的不当成日期。
  * 只由年份组成的串是年份列表，不看先后。
  * 紧凑 8 位年月日只能单独出现，或者两个接成区间；前后再接别的数字段，整段不当成日期。
+ * 钟点时间的时分秒可以用冒号，也可以用点号：9:00-18:00、9.00-18.00、09.00.00-18.00.00。
  */
 
 export function isLayoutDateOrTime(foldedSpan: string): boolean {
   const normalized = normalizeDateSpan(foldedSpan)
   if (normalized.length === 0) return false
-  return isTimeSpan(normalized) || isCalendarSpan(normalized)
+  return isTimeSpan(normalized) || isTimeSpan(normalizeDateSpan(dotsAsColons(foldedSpan))) || isCalendarSpan(normalized)
+}
+
+/** 点号分隔的钟点时间。点和全角点换成冒号，再按钟点时间认；间隔号不换。 */
+function dotsAsColons(foldedSpan: string): string {
+  return foldedSpan.replace(/[.．]/gu, ':')
 }
 
 function normalizeDateSpan(foldedSpan: string): string {

@@ -54,6 +54,8 @@ export function runDateExemptionCases(assertKept: Kept, assertCovered: Covered):
   assertKept('中文年月区间仍不遮', '2021年3月-2024年5月')
   assertKept('斜线年月日仍不遮', '2020/09/01')
   assertKept('钟点时间段仍不遮', '9:00-18:00')
+  assertKept('点号钟点时间段', '9.00-18.00')
+  assertKept('点号时分秒时间段', '09.00.00-18.00.00')
   assertCovered('不像日期的斜线手机号仍遮', '138/0013/8000', PHONE)
   assertCovered('月日不合法的紧凑区间仍遮', '20231345-20230505', '2023134520230505')
 }
