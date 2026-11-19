@@ -73,6 +73,39 @@ function faultNextStep(): string {
 }
 
 /**
+ * 定稿第 2 步。故障和离线先说这次不会自己接着打（缺纸已在副句说过）。
+ * 能重新提交时点名下面的按钮；不能时不提那个按钮。附近还有在线终端才写换一台。
+ * 全屏这一步只用「稍后再来」，不写「请稍后再来」。
+ */
+function reorderStep(variant: FailureVariant, money: OutOfPaperMoney, canRetry: boolean): FailureStep {
+  const paid = money.fact === 'paid'
+  const nearby = resolveSupportContact().otherOnlineTerminalNearby === true
+  const again = nearby
+    ? '也可以换一台机器继续，或稍后再来'
+    : canRetry
+      ? '也可以稍后再来'
+      : '你可以稍后再来'
+  const lead = variant === 'paper-jam' || variant === 'offline' ? '这次打印不会自己接着打。\n' : ''
+  const body = canRetry
+    ? `机器恢复后，用下面的「重新提交打印」整份重打${paid ? '，不再收费' : ''}；${again}。`
+    : `是否补打，以订单记录为准；${again}。`
+  return {
+    title: paid ? '请不要重新下单，那会变成两笔费用' : '请不要重新下单',
+    detail: `${lead}${body}`,
+  }
+}
+
+/** 故障态第 1 步：取纸和不要开机盖并成一步。确实卡纸只把「可能」升成「卡着的纸」。 */
+function jamStep(confirmed: boolean): FailureStep {
+  return {
+    title: '已出的纸取走收好，不要开机盖、不要拽纸',
+    detail: confirmed
+      ? '卡着的纸撕在里面更难取，也可能弄坏机器。'
+      : '可能卡了纸，撕在里面更难取，也可能弄坏机器。',
+  }
+}
+
+/**
  * 同一订单整份重打（takeaway-url 给出 canRetry 才有这个出口）。
  * 现场没人加纸、没人处理（走查 I-11），所以不写「加完纸」：按钮只在打印机恢复后才亮，没亮就是机器还没好。
  * 缺纸、卡纸、离线能重提时，把现成的求助句接在说明末尾，服务电话只在这一步出现一次。
@@ -124,8 +157,8 @@ export function failureCopy(input: {
       pill: fault,
       stepsLabel: STEPS_LABEL,
       steps: [
-        { title: '把出纸口里已经出来的纸取走收好', detail: '别留在机器上。' },
-        { title: '不要自己开机盖、不要拽纸', detail: '撕在里面更难取，也可能弄坏机器。' },
+        jamStep(confirmed),
+        reorderStep('paper-jam', money, canRetry),
         // 能重提时电话接在「重新提交打印」说明末尾。不能重提时，这一步只说暂时打不了、请稍后再来、怎么找到我们。
         canRetry
           ? retryStep(money, help)
@@ -144,9 +177,7 @@ export function failureCopy(input: {
       stepsLabel: STEPS_LABEL,
       steps: [
         LOOK_AT_TRAY,
-        paid
-          ? { title: '是否处理费用、处理多少，以订单记录为准', detail: '本机不会自动处理费用。' }
-          : { title: '是否补打，以订单记录为准', detail: '本机不会自动补打。' },
+        reorderStep('offline', money, canRetry),
         canRetry
           ? retryStep(money, help)
           : { title: `记下${orderRef}`, detail: faultNextStep() },
@@ -174,13 +205,7 @@ export function failureCopy(input: {
       stepsLabel: STEPS_LABEL,
       steps: [
         LOOK_AT_TRAY,
-        {
-          title: '纸匣空了，这次打印也不会自己接着打',
-          // 不能重提时这一页没有那个按钮，不能再说只有它能整份重打。
-          detail: canRetry
-            ? '机器恢复后，只有本页的「重新提交打印」能整份重打。'
-            : '本页没有「重新提交打印」。',
-        },
+        reorderStep('out-of-paper', money, canRetry),
         third,
       ],
       fine: `纸匣已空，这次打印不会在加纸后自动继续。${kept}；只有本页出现「重新提交打印」按钮时，才能自己重打一次${free ? '。' : '，且不会重复收费。'}${money2}`,

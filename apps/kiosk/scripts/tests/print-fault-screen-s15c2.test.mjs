@@ -335,17 +335,20 @@ test('已付离线页副句和三步里订单在只说一次，缺纸第 2 步�
     const head = [copy.subtitle, ...copy.steps.flatMap((step) => [step.title, step.detail])].join('\n')
     const hits = (head.match(/订单和支付记录都在|订单和已付金额都保留着/g) ?? []).length
     assert.equal(hits, 1, `canRetry=${canRetry} 副句加三步里这两句合计应恰好一次`)
-    assert.equal(copy.steps[1].title, '是否处理费用、处理多少，以订单记录为准')
-    assert.equal(copy.steps[1].detail, '本机不会自动处理费用。')
+    // 定稿第 3 条：第 2 步一律「请不要重新下单」。费用只加在标题，不再单列「本机不会自动处理费用」。
+    assert.equal(copy.steps[1].title, '请不要重新下单，那会变成两笔费用')
+    assert.match(copy.steps[1].detail, /这次打印不会自己接着打/)
+    assert.doesNotMatch(copy.steps[1].detail, /本机不会自动处理费用/)
   }
   for (const fact of ['free', 'paid']) {
     const money = { fact, amountCents: fact === 'paid' ? 200 : 0 }
     const noRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-PAPER', canRetry: false })
     const withRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-PAPER', canRetry: true })
-    assert.doesNotMatch(noRetry.steps[1].detail, /只有本页的「重新提交打印」能整份重打/, `${fact} 不能重提时第 2 步不该指向不存在的按钮`)
-    assert.match(noRetry.steps[1].detail, /本页没有「重新提交打印」/)
+    assert.doesNotMatch(noRetry.steps[1].detail, /重新提交打印/, `${fact} 不能重提时第 2 步不该指向不存在的按钮`)
+    assert.match(noRetry.steps[1].detail, /是否补打，以订单记录为准；你可以稍后再来。/)
     assert.doesNotMatch(noRetry.steps[1].detail, /续打|接着打/)
-    assert.match(withRetry.steps[1].detail, /只有本页的「重新提交打印」能整份重打/)
+    assert.match(withRetry.steps[1].detail, /用下面的「重新提交打印」整份重打/)
+    assert.doesNotMatch(withRetry.steps[1].detail, /只有本页的「重新提交打印」能整份重打/)
   }
 })
 
@@ -414,6 +417,89 @@ test('S15c7 失败页胶囊只写故障，办理方式写全本单 0 元，收�
   assert.deepEqual(failedModel.paymentRow(free), { key: 'pay', label: '办理方式', value: '免费试运营，本单 0 元' })
   assert.deepEqual(failedModel.paymentRow(paid), { key: 'pay', label: '支付状态', value: '已付 2.00 元' })
   assert.equal(failedModel.paymentRow({ fact: 'unknown', amountCents: null }).value, '以订单为准')
+})
+
+test('S15c7 第 2 步一律请不要重新下单，重新提交打印写在这一步', async () => {
+  const unattended = await import(unattendedUrl)
+  const contact = (nearby) => ({
+    servicePhone: '18369161921',
+    serviceHours: '工作日 9:00–18:00',
+    otherOnlineTerminalNearby: nearby,
+    miniappPublished: false,
+    selfNoteTab: false,
+  })
+  unattended.bindSupportContactPeek(() => contact(false))
+  try {
+    for (const variant of ['out-of-paper', 'paper-jam', 'offline']) {
+      for (const fact of ['free', 'paid']) {
+        for (const canRetry of [false, true]) {
+          const copy = failedModel.failureCopy({
+            variant,
+            confirmedJam: false,
+            money: { fact, amountCents: fact === 'paid' ? 200 : 0 },
+            orderNo: 'ORD-STEP2',
+            canRetry,
+          })
+          const step = copy.steps[1]
+          assert.equal(step.title, fact === 'paid' ? '请不要重新下单，那会变成两笔费用' : '请不要重新下单', `${variant}/${fact}`)
+          assert.doesNotMatch(step.title, /机器恢复后可点下方/)
+          if (variant === 'out-of-paper') assert.doesNotMatch(step.detail, /这次打印不会自己接着打/)
+          else assert.match(step.detail, /^这次打印不会自己接着打。\n/)
+          if (canRetry) {
+            assert.match(step.detail, /机器恢复后，用下面的「重新提交打印」整份重打/)
+            assert.match(step.detail, /也可以稍后再来。$/)
+            if (fact === 'paid') assert.match(step.detail, /，不再收费；/)
+            else assert.doesNotMatch(step.detail, /不再收费|不会重复收费/)
+          } else {
+            assert.equal(
+              step.detail.replace(/^这次打印不会自己接着打。\n/, ''),
+              '是否补打，以订单记录为准；你可以稍后再来。',
+            )
+            assert.doesNotMatch(step.detail, /重新提交打印/)
+          }
+          assert.doesNotMatch(`${step.title}\n${step.detail}`, /请稍后再来|请稍后重试|这台机器暂时打不了|本机不会自动处理费用|本页没有「重新提交打印」/)
+        }
+      }
+    }
+    const jammed = failedModel.failureCopy({
+      variant: 'paper-jam',
+      confirmedJam: true,
+      money: { fact: 'free', amountCents: 0 },
+      orderNo: 'ORD-STEP2',
+      canRetry: true,
+    })
+    assert.equal(jammed.steps[0].title, '已出的纸取走收好，不要开机盖、不要拽纸')
+    assert.equal(jammed.steps[0].detail, '卡着的纸撕在里面更难取，也可能弄坏机器。')
+    assert.equal(
+      failedModel.failureCopy({
+        variant: 'paper-jam',
+        confirmedJam: false,
+        money: { fact: 'free', amountCents: 0 },
+        orderNo: 'ORD-STEP2',
+        canRetry: false,
+      }).steps[0].detail,
+      '可能卡了纸，撕在里面更难取，也可能弄坏机器。',
+    )
+    unattended.bindSupportContactPeek(() => contact(true))
+    const nearby = failedModel.failureCopy({
+      variant: 'offline',
+      money: { fact: 'free', amountCents: 0 },
+      orderNo: 'ORD-STEP2',
+      canRetry: true,
+    })
+    assert.match(nearby.steps[1].detail, /也可以换一台机器继续，或稍后再来。$/)
+    assert.doesNotMatch(nearby.steps[1].detail, /也可以稍后再来/)
+    const nearbyNone = failedModel.failureCopy({
+      variant: 'out-of-paper',
+      money: { fact: 'paid', amountCents: 200 },
+      orderNo: 'ORD-STEP2',
+      canRetry: false,
+    })
+    assert.match(nearbyNone.steps[1].detail, /也可以换一台机器继续，或稍后再来。$/)
+    assert.doesNotMatch(nearbyNone.steps[1].detail, /你可以稍后再来/)
+  } finally {
+    unattended.bindSupportContactPeek(() => contact(false))
+  }
 })
 
 test('缺纸、卡纸、离线的带走链接过期句不带服务电话，普通失败仍带', async () => {
