@@ -32,7 +32,7 @@ import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
 import { foldCjkRadicalStrings, foldCjkRadicals, foldCjkRadicalsInJsonText } from '../../common/text/cjk-radical-fold'
 import type { OptimizeRejectRule } from './resume-optimize-reject-rule'
 import { maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
-import { maskLayoutAdjustOutbound } from './layout-adjust-mask'
+import { maskLayoutAdjustOutbound, stripLayoutTokensForFacts } from './layout-adjust-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { detectResumeName, RESUME_STRUCTURE_PROMPT_RULE } from './resume-structure'
 import {
@@ -656,10 +656,11 @@ export class LlmResumeOptimizeService {
     if (arrayLength(r['skills']) > currentResume.skills.length) return null
     if (arrayLength(r['certificates']) > currentResume.certificates.length) return null
 
-    const normFact = normalizeResumeFactText(factSource)
+    const normFact = normalizeResumeFactText(stripLayoutTokensForFacts(factSource))
     const inFact = makeFactMatcher(factSource)
     const hasNoNewNumbers = (value: string): boolean => {
-      for (const token of value.match(/\d+(?:\.\d+)?%?/g) ?? []) {
+      const visible = stripLayoutTokensForFacts(value)
+      for (const token of visible.match(/\d+(?:\.\d+)?%?/g) ?? []) {
         if (!normFact.includes(normalizeResumeFactText(token))) return false
       }
       return true
