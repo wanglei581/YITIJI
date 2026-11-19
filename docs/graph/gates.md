@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2237 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2247 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2373,7 +2373,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 163 个文件</summary>
+<summary><code>services/api/scripts/</code> — 173 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2450,6 +2450,16 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/pickup-arrival-p2b8-release-outcome-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/pickup-arrival-p2b8-sum-claim-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/pickup-arrival-p2b8-verify-race-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-abnormal-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-answer-outside-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-channel-amount-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-channel-submitted-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-detail-flag-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-local-write-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-multi-refund-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-registration-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-submit-write-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9-verify-reason-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/pickup-arrival-price-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/png-fixtures.ts` | `verify-brand-logo-image.ts`<br/>`verify-branding.ts` |
 | `services/api/scripts/support/policy-one-step-http-cases.ts` | `verify-content-pipeline-e2e.ts` |
