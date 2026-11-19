@@ -1,7 +1,7 @@
 // 付款屏（稿 pay-1113.js 的 pay-service）并排：等待、核实、付好了、没付成、超时、免费兜底。
 // 「手机上买过」后端还没有核销接口，运行页不接，这里不拍。
 // 稿上的 1.00 元是演示价；运行页这台机器也设成 1.00 元，金额对得上。渠道用微信（正式通道），
-// 运行页照实写「请用微信扫这张码」，与稿「请用微信或支付宝扫这张码」的差别是裁决定的。
+// 运行页照实写「请用微信扫这张码」，与稿里两家渠道并列那句的差别是裁决定的。
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
 import { machinePricing } from '../../fixtures/machine-pricing'
