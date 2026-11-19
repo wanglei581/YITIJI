@@ -447,6 +447,41 @@ test('two price changes do not show confirm-new-amount and do-not-pay together @
   expect(pageErrors).toEqual([])
 })
 
+// 第二次 409：公示价已经是 50 分/页，屏上现价是 409 带回的 40 分/页。
+// 上面那条第二次两边都是 40，拆掉「信任屏上现价」也不会红。这里必须仍只留核对句。
+test('second price change trusts the on-screen unit when the public unit differs @kiosk', async ({ page, api }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  const pages = W2_FILE.pages
+  const first = 20 * pages
+  const mid = 30 * pages
+  const latest = 40 * pages
+  registerShell(api, [])
+  const prices = registerPriceConfig(api, [20, 50])
+  await routeQuote(page, () => ({ unitCents: 20, pages }))
+  const jobs = await routeJobs(
+    page,
+    [{ status: 409, unitCents: 30 }, { status: 409, unitCents: 40 }],
+    prices.markChanged,
+  )
+
+  await openConfirm(page)
+  await expectConfirmAmount(page, first)
+  await originalConfirm(page).click()
+  await expect(reconfirm(page, mid)).toBeEnabled()
+  await reconfirm(page, mid).click()
+
+  await expect(page.getByRole('alert')).toContainText(`你确认的是 ${yuan(mid)}，现在应付 ${yuan(latest)}`)
+  await expect(page.getByRole('alert')).toContainText('请核对新金额后再点确认')
+  await expect(reconfirm(page, latest)).toBeEnabled()
+  await expect(page.getByText('不要按本屏金额付款')).toHaveCount(0)
+  await expect(page.getByText('本屏报价已不是现价')).toHaveCount(0)
+  expect(jobs).toHaveLength(2)
+  expect(jobs[1]?.['quotedAmountCents']).toBe(mid)
+  await expect(page).toHaveURL(/\/print\/confirm/)
+  expect(pageErrors).toEqual([])
+})
+
 function registerHomeReads(api: ApiRouter): void {
   api.respond('GET', '/api/v1/jobs', {
     status: 200,
