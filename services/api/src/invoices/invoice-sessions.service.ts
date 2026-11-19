@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common'
 import { randomBytes, randomUUID } from 'crypto'
 import { RedisService } from '../common/redis/redis.service'
 import { assessInvoiceEligibility, INVOICE_BLOCK_MESSAGES } from './invoice-eligibility'
@@ -86,7 +86,10 @@ export class InvoiceSessionsService {
     const facts = await this.requests.loadFacts(input.orderKind, input.orderId)
     const decision = facts ? assessInvoiceEligibility(facts, input.endUserId) : null
     if (!facts || !decision?.ok) {
-      throw bad('INVOICE_NOT_ALLOWED', decision?.message || INVOICE_BLOCK_MESSAGES.not_owner)
+      // 与会员提交口（invoice-requests.service.ts）同一个状态码：挡单是状态冲突，不是参数错。
+      throw new ConflictException({
+        error: { code: 'INVOICE_NOT_ALLOWED', message: decision?.message || INVOICE_BLOCK_MESSAGES.not_owner },
+      })
     }
     const sessionId = randomUUID().replace(/-/g, '')
     const sceneToken = mintInvoiceSceneToken()

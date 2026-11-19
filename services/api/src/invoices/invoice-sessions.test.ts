@@ -152,8 +152,11 @@ test('已退款的单提交不了，第二次提交也不成功', async () => {
       origin: 'https://kiosk.example',
     }),
     (error: unknown) => {
-      const body = (error as { getResponse?: () => { error?: { message?: string } } }).getResponse?.()
+      const body = (error as { getResponse?: () => { error?: { code?: string; message?: string } } }).getResponse?.()
       assert.equal(body?.error?.message, INVOICE_BLOCK_MESSAGES.refunded)
+      // 同一个挡单条件，一体机建会话口与会员提交口返回同一个状态码和错误码（409 INVOICE_NOT_ALLOWED）。
+      assert.equal((error as { getStatus?: () => number }).getStatus?.(), 409)
+      assert.equal(body?.error?.code, 'INVOICE_NOT_ALLOWED')
       return true
     },
   )
