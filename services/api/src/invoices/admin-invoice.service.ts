@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { assessInvoiceEligibility, INVOICE_BLOCK_MESSAGES } from './invoice-eligibility'
+import { InvoiceRequestsService } from './invoice-requests.service'
 
 export interface AdminInvoiceView {
   id: string
@@ -21,6 +23,7 @@ interface InvoiceRow {
   id: string
   orderKind: string
   orderId: string
+  endUserId: string
   titleType: string
   title: string
   taxId: string | null
@@ -38,12 +41,14 @@ const NOT_FOUND = '这张订单没有开票申请。'
 const MARK_BLOCKED = '只有已提交的申请可以标已开。'
 const RETURN_BLOCKED = '只有已提交的申请可以退回。'
 const REASON_REQUIRED = '退回原因要填写。'
+const GO_RETURN = '请点「退回」，写明原因。'
 
 @Injectable()
 export class AdminInvoiceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly requests: InvoiceRequestsService,
   ) {}
 
   async getByOrder(orderKind: 'print' | 'service', orderId: string): Promise<AdminInvoiceView> {
@@ -62,6 +67,7 @@ export class AdminInvoiceService {
     if (invoiceNo && invoiceNo.length > 40) {
       throw new BadRequestException({ error: { code: 'INVOICE_NO_INVALID', message: '发票号码请控制在 40 个字以内。' } })
     }
+    await this.assertStillIssuable(id)
     const updated = await this.prisma.invoiceRequest.updateMany({
       where: { id, status: 'submitted' },
       data: { status: 'issued', issuedAt: new Date(), invoiceNo, operatorId: input.operatorId, returnReason: null },
@@ -107,6 +113,24 @@ export class AdminInvoiceService {
       payload: { operatorId: input.operatorId, orderKind: row.orderKind, orderId: row.orderId, reasonLength: reason.length, reasonNote: '原因见申请' },
     })
     return toView(row)
+  }
+
+  /**
+   * 标已开前用提交时同一套判断复核订单：申请提交后订单可能已退款或正在退款。
+   * 这一份申请本身就是未退回的申请，复核时不把它算成「已提交过」。
+   */
+  private async assertStillIssuable(id: string): Promise<void> {
+    const row = await this.load(id)
+    if (row.status !== 'submitted') {
+      throw new ConflictException({ error: { code: 'INVOICE_NOT_SUBMITTED', message: MARK_BLOCKED } })
+    }
+    const kind = row.orderKind === 'print' || row.orderKind === 'service' ? row.orderKind : null
+    const facts = kind ? await this.requests.loadFacts(kind, row.orderId) : null
+    const decision = facts ? assessInvoiceEligibility({ ...facts, openInvoiceStatus: null }, row.endUserId) : null
+    if (!decision?.ok) {
+      const reason = decision?.message || INVOICE_BLOCK_MESSAGES.not_owner
+      throw new ConflictException({ error: { code: 'INVOICE_ORDER_NOT_ISSUABLE', message: `${reason}${GO_RETURN}` } })
+    }
   }
 
   private async load(id: string): Promise<InvoiceRow> {

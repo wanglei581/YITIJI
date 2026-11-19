@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { AdminInvoiceController } from './admin-invoice.controller'
 import { AdminInvoiceService } from './admin-invoice.service'
+import { InvoiceRequestsService } from './invoice-requests.service'
 
 const EMAIL = 'person@example.com'
 const TAX_ID = '91000000MA0000000N'
@@ -30,7 +31,30 @@ function errorBody(error: unknown): { code?: string; message?: string } {
   return body?.error ?? {}
 }
 
+interface OrderRow {
+  id: string
+  endUserId: string | null
+  terminalId: string | null
+  payStatus: string
+  amountCents: number
+  discountCents: number
+  refundedAmountCents: number
+  refunds: Array<{ status: string }>
+}
+
 function createHarness() {
+  const orders: OrderRow[] = [
+    {
+      id: 'order-1',
+      endUserId: 'member-1',
+      terminalId: 'terminal-1',
+      payStatus: 'paid',
+      amountCents: 200,
+      discountCents: 0,
+      refundedAmountCents: 0,
+      refunds: [],
+    },
+  ]
   const invoices: InvoiceRow[] = [
     {
       id: 'inv-1',
@@ -52,7 +76,18 @@ function createHarness() {
   ]
   const audits: Array<Record<string, unknown>> = []
   const prisma = {
+    order: {
+      findUnique: async ({ where }: { where: { id: string } }) => orders.find((row) => row.id === where.id) ?? null,
+    },
+    serviceOrder: {
+      findUnique: async () => null,
+    },
+    terminal: {
+      findUnique: async () => ({ org: { type: 'licensed_hr_agency' } }),
+    },
     invoiceRequest: {
+      findFirst: async ({ where }: { where: { orderKind: string; orderId: string } }) =>
+        invoices.find((row) => row.orderKind === where.orderKind && row.orderId === where.orderId && row.status !== 'returned') ?? null,
       findMany: async ({ where }: { where: Record<string, unknown> }) =>
         invoices.filter((row) => Object.entries(where).every(([key, value]) => row[key as keyof InvoiceRow] === value)),
       updateMany: async ({ where, data }: { where: { id: string; status: string }; data: Partial<InvoiceRow> }) => {
@@ -69,8 +104,9 @@ function createHarness() {
       return 'audit-1'
     },
   }
-  const service = new AdminInvoiceService(prisma as never, audit as never)
-  return { invoices, audits, service, controller: new AdminInvoiceController(service) }
+  const requests = new InvoiceRequestsService(prisma as never)
+  const service = new AdminInvoiceService(prisma as never, audit as never, requests)
+  return { orders, invoices, audits, service, controller: new AdminInvoiceController(service) }
 }
 
 test('订单详情能看到抬头、税号、邮箱和金额，标已开两次只有一次成功', async () => {
@@ -150,4 +186,30 @@ test('退回必须写原因，退回之后不能再标已开', async () => {
       return true
     },
   )
+})
+
+test('申请提交后订单退了款，标已开要 409，并引导去退回；库里仍是已提交，审计不写', async () => {
+  for (const change of [
+    { payStatus: 'refunded', refundedAmountCents: 200, refunds: [{ status: 'success' }] },
+    { payStatus: 'refunding', refundedAmountCents: 0, refunds: [{ status: 'pending' }] },
+    { payStatus: 'paid', refundedAmountCents: 0, refunds: [{ status: 'pending' }] },
+    { payStatus: 'partial_refunded', refundedAmountCents: 100, refunds: [{ status: 'success' }] },
+  ]) {
+    const { service, orders, invoices, audits } = createHarness()
+    Object.assign(orders[0]!, change)
+    await assert.rejects(
+      () => service.markIssued('inv-1', { invoiceNo: 'NO-1', operatorId: OPERATOR }),
+      (error: unknown) => {
+        assert.equal((error as { getStatus?: () => number }).getStatus?.(), 409)
+        assert.equal(errorBody(error).code, 'INVOICE_ORDER_NOT_ISSUABLE')
+        assert.match(errorBody(error).message ?? '', /开不了发票。请点「退回」，写明原因。$/)
+        return true
+      },
+    )
+    assert.equal(invoices[0]?.status, 'submitted', JSON.stringify(change))
+    assert.equal(invoices[0]?.invoiceNo, null)
+    assert.equal(audits.length, 0)
+    const returned = await service.returnRequest('inv-1', { reason: '订单已退款', operatorId: OPERATOR })
+    assert.equal(returned.status, 'returned')
+  }
 })

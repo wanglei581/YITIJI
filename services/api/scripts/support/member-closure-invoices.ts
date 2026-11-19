@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict'
 import type { AuditService } from '../../src/audit/audit.service'
 import { AdminInvoiceService } from '../../src/invoices/admin-invoice.service'
+import { InvoiceRequestsService } from '../../src/invoices/invoice-requests.service'
 import { CLOSED_MEMBER_INVOICE_RETURN_REASON } from '../../src/member-privacy/member-closure-retention'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 
@@ -38,7 +39,7 @@ export async function seedClosureInvoices(
   const named = await deps.put('invoiceRequest', { orderKind: 'print', orderId: `named-${orderId}`, endUserId, titleType: 'personal',
     title: CLOSURE_INVOICE_NAME, email: CLOSURE_INVOICE_EMAIL, amountCents: 200, status: 'submitted' })
   closureInvoiceAuditTargets.push(named.id)
-  const admin = new AdminInvoiceService(deps.prisma, deps.audit)
+  const admin = new AdminInvoiceService(deps.prisma, deps.audit, new InvoiceRequestsService(deps.prisma))
   const returned = await admin.returnRequest(named.id, { reason: CLOSURE_INVOICE_REASON, operatorId: deps.operatorId })
   assert.equal(returned.status, 'returned')
   assert.equal(returned.returnReason, CLOSURE_INVOICE_REASON, '夹具：退回原因原文应先落在申请行上')

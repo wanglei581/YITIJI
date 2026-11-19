@@ -858,6 +858,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:invoice-member
           pnpm --filter @ai-job-print/api verify:invoice-admin
           pnpm --filter @ai-job-print/api verify:invoice-privacy
+          # 开票真库：标已开前复核退款、改绑不误判公共点位、退款事实映射。写本库带标签的行，跑完删净。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:invoice-real-db
           # 贴牌第一步：品牌与备案默认值 = 现状、机构覆盖只影响该机构终端、Logo 只收 PNG / WebP（按文件头判、禁 SVG、
           # 清洗元数据）、一体机 kiosk-profile 只认已验签终端（防枚举）。写隔离库，结束恢复平台设置。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding
@@ -1334,6 +1336,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
           VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-closure
+          # 开票真库（见 build-and-verify 同名条目）：PostgreSQL 上同一组事实再跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:invoice-real-db
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download

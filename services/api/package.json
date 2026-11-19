@@ -411,6 +411,7 @@
     "verify:invoice-member": "node -r @swc-node/register --test src/invoices/member-invoice.test.ts",
     "verify:invoice-admin": "node -r @swc-node/register --test src/invoices/admin-invoice.test.ts",
     "verify:invoice-privacy": "node -r @swc-node/register --test src/invoices/invoice-privacy.test.ts",
+    "verify:invoice-real-db": "node -r @swc-node/register scripts/verify-invoice-real-db.ts",
     "verify:branding": "node -r @swc-node/register scripts/verify-brand-logo-image.ts && node -r @swc-node/register scripts/verify-branding.ts",
     "verify:license": "node -r @swc-node/register scripts/verify-license-state.ts && node -r @swc-node/register scripts/verify-license.ts && node -r @swc-node/register scripts/verify-license-writes.ts && node -r @swc-node/register scripts/verify-license-runtime.ts",
     "verify:branding-license-migrations": "node -r @swc-node/register scripts/verify-branding-license-migrations.ts",
