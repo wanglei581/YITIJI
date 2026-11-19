@@ -4,6 +4,7 @@
  * 合规句：docs/compliance/pilot-compliance-procedures.md「发票申请流程」。
  * 过期、已提交、提交成功与服务端 invoice-sessions.service.ts 同一句。
  * 稿里「这台屏幕不保存税号」属于一体机屏，手机上不用（税号存在服务端，手机上说这句会被读成「这一页不保存」）。
+ * 下一步（回一体机重新扫码、回一体机查看）都写在状态句里，这几屏不放没有动作的按钮。
  */
 import { servicePhoneLine, type PublicSupportContact } from '../../copy/unattendedCopy'
 
@@ -32,6 +33,3 @@ export const INVOICE_TITLE_TOO_LONG = '抬头请控制在 80 个字以内。'
 export const INVOICE_EMAIL_INVALID = '接收邮箱格式不对。电子发票发到这个邮箱。'
 export const INVOICE_SUBMIT_LABEL = '提交'
 export const INVOICE_RETRY_LABEL = '重试'
-export const INVOICE_BACK_SCAN = '请回到一体机，重新扫码'
-export const INVOICE_BACK_LOOK = '请回到一体机查看'
-export const INVOICE_BACK_ORDER = '请回到一体机查看订单'

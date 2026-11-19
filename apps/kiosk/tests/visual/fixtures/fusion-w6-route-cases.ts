@@ -80,7 +80,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/k/u/:scene', url: `/k/u/${W6_UPLOAD_SCENE}`, marker: screen('upload-scene-entry'), featureText: '网络连接失败，请稍后重试' },
   { pattern: '/k/l/:ticketId', url: `/k/l/${W6_LOGIN_TICKET}`, expectedPath: '/member/qr-login', marker: screen('member-qr-login'), featureText: '手机确认登录' },
   // 2026-11-19 开票手机页。冷开没有 fragment，停在「链接不能用来填写」。/k/i 夹具兑换回 503。
-  { pattern: '/invoice/phone', url: '/invoice/phone', marker: screen('phone-invoice'), featureText: '这个链接不能用来填写开票信息。请回到一体机，重新扫码。' },
+  // 返工包 P2c1b 第 7 条：冷链接那一屏原先靠一个没有动作的按钮凑触控目标，按钮去掉后只剩一句说明。
+  // 这里改走带凭据的表单屏（这页的主状态，抬头类型、输入框、提交都是真动作）；冷链接一屏由 phone-invoice-fusion-w5.spec.ts 钉住。
+  { pattern: '/invoice/phone', url: '/invoice/phone#sessionId=w6-invoice-session&submitToken=w6-invoice-submit-token', marker: screen('phone-invoice'), featureText: '用手机扫码填写开票信息' },
   { pattern: '/k/i/:scene', url: `/k/i/${W6_INVOICE_SCENE}`, marker: screen('invoice-scene-entry'), featureText: '网络连接失败，请稍后重试' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },
   { pattern: '/resume/job-fit/*', url: '/resume/job-fit', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },

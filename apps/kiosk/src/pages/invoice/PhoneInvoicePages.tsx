@@ -17,9 +17,6 @@ import {
 } from '../../services/api/invoiceSessions'
 import {
   INVOICE_ALREADY,
-  INVOICE_BACK_LOOK,
-  INVOICE_BACK_ORDER,
-  INVOICE_BACK_SCAN,
   INVOICE_BLOCKED_NEXT,
   INVOICE_COLD,
   INVOICE_COMPANY_HINT,
@@ -127,8 +124,6 @@ export function InvoiceSceneEntry() {
         {state === 'retryable' && (
           <button type="button" className="ph-entry-retry" onClick={() => setAttempt((value) => value + 1)}>{INVOICE_RETRY_LABEL}</button>
         )}
-        {state === 'unusable' && <button type="button" className="ph-entry-retry">{INVOICE_BACK_SCAN}</button>}
-        {state === 'submitted' && <button type="button" className="ph-entry-retry">{INVOICE_BACK_LOOK}</button>}
       </StateCard>
     </Shell>
   )
@@ -165,9 +160,7 @@ export function PhoneInvoicePage() {
   if (!creds) {
     return (
       <Shell screen="phone-invoice" state="cold">
-        <StateCard icon={BanIcon} text={INVOICE_COLD} alert>
-          <button type="button" className="ph-entry-retry">{INVOICE_BACK_SCAN}</button>
-        </StateCard>
+        <StateCard icon={BanIcon} text={INVOICE_COLD} alert />
       </Shell>
     )
   }
@@ -242,18 +235,14 @@ export function PhoneInvoicePage() {
   if (phase === 'expired') {
     return (
       <Shell screen="phone-invoice" state="expired">
-        <StateCard icon={BanIcon} text={INVOICE_EXPIRED} alert>
-          <button type="button" className="ph-entry-retry">{INVOICE_BACK_SCAN}</button>
-        </StateCard>
+        <StateCard icon={BanIcon} text={INVOICE_EXPIRED} alert />
       </Shell>
     )
   }
   if (phase === 'already') {
     return (
       <Shell screen="phone-invoice" state="already">
-        <StateCard icon={BanIcon} text={INVOICE_ALREADY} alert>
-          <button type="button" className="ph-entry-retry">{INVOICE_BACK_LOOK}</button>
-        </StateCard>
+        <StateCard icon={BanIcon} text={INVOICE_ALREADY} alert />
       </Shell>
     )
   }
@@ -262,7 +251,6 @@ export function PhoneInvoicePage() {
       <Shell screen="phone-invoice" state="blocked">
         <StateCard icon={BanIcon} text={INVOICE_BLOCKED_NEXT} alert>
           {reason ? <p>{reason}</p> : null}
-          <button type="button" className="ph-entry-retry">{INVOICE_BACK_ORDER}</button>
         </StateCard>
       </Shell>
     )
