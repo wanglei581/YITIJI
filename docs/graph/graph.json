@@ -15360,7 +15360,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 838,
+      "reachableFileCount": 846,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18441,7 +18441,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1027
+      "sourceFileCount": 1035
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -23714,6 +23714,9 @@
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
+    "apps/kiosk/src/pages/renshi/PolicyUnavailable.tsx": [
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
     "apps/kiosk/src/pages/renshi/RegisterPanel.tsx": [
       "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
@@ -23746,6 +23749,9 @@
     ],
     "apps/kiosk/src/pages/renshi/policyModel.ts": [
       "apps/kiosk/scripts/verify-kiosk-parked-policy.mjs",
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/renshi/policySearchModel.ts": [
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css": [
@@ -36956,12 +36962,14 @@
           "apps/kiosk/src/pages/renshi/PolicyNotices.tsx",
           "apps/kiosk/src/pages/renshi/PolicyPanel.tsx",
           "apps/kiosk/src/pages/renshi/PolicyTouchLayout.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyUnavailable.tsx",
           "apps/kiosk/src/pages/renshi/RegisterPanel.tsx",
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/renshi/SocialPanel.tsx",
           "apps/kiosk/src/pages/renshi/builtinData.ts",
           "apps/kiosk/src/pages/renshi/components.tsx",
           "apps/kiosk/src/pages/renshi/policyModel.ts",
+          "apps/kiosk/src/pages/renshi/policySearchModel.ts",
           "apps/kiosk/src/pages/renshi/shared.ts",
           "apps/kiosk/src/pages/renshi/usePolicyFocus.ts",
           "apps/kiosk/src/pages/service-hubs/PolicyTouchHub.tsx"
