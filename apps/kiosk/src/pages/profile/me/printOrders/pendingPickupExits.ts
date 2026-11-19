@@ -15,6 +15,27 @@ export interface PendingPickupExitCard {
   locked: boolean
 }
 
+export type PickupBannerPresence = 'off' | 'loading' | 'hidden' | 'rows' | 'error'
+
+/** 横幅小字。有待取单时改口，避免仍说「不在下面的列表里」。读失败时不写这句，由下面那一块说真话。 */
+export function pendingPickupBannerNote(presence: PickupBannerPresence): string | null {
+  if (presence === 'rows') return '还没取的手机单列在这一条下面。'
+  if (presence === 'error') return null
+  return '还没核销出打印任务的单，不在下面的列表里'
+}
+
+/** 小程序开着就给出到店单横幅。没有打印任务、单在别的机器上，也不藏这行。 */
+export function mobilePickupBanner(
+  miniOn: boolean,
+  presence: PickupBannerPresence,
+): { title: string; note: string | null } | null {
+  if (!miniOn) return null
+  return {
+    title: '手机上下的到店单，到机器上输到机码取件',
+    note: pendingPickupBannerNote(presence),
+  }
+}
+
 /** 读失败时的两句。没有打印任务时不写「下面…不受影响」。 */
 export function pendingPickupErrorLines(hasTasks: boolean): readonly string[] {
   const lead = '手机上还没取的单这次没读到。'

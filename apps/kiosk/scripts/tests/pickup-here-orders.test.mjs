@@ -211,6 +211,23 @@ test('有待取单、没有打印任务时，待取单块下面接去打印和�
   assert.match(section, /data-testid="pending-pickup-list"[^>]*className="me-stack me-pin"|className="me-stack me-pin"[^>]*data-testid="pending-pickup-list"/)
 })
 
+test('S15c8 没有打印任务时仍给出到店单横幅和小字', async () => {
+  const exits = await import(transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/pendingPickupExits.ts')))
+  const title = '手机上下的到店单，到机器上输到机码取件'
+  const rows = exits.mobilePickupBanner(true, 'rows')
+  assert.equal(rows.title, title)
+  assert.equal(rows.note, '还没取的手机单列在这一条下面。')
+  const failed = exits.mobilePickupBanner(true, 'error')
+  assert.equal(failed.title, title)
+  assert.equal(failed.note, null)
+  assert.equal(exits.mobilePickupBanner(true, 'hidden').note, '还没核销出打印任务的单，不在下面的列表里')
+  assert.equal(exits.mobilePickupBanner(false, 'rows'), null)
+  const page = readFileSync(join(kioskRoot, 'src/pages/profile/me/MyPrintOrdersPage.tsx'), 'utf8')
+  assert.match(page, /mobilePickupBanner\(miniOn, pendingPickup\.presence\)/)
+  assert.match(page, /\{pickupBanner \?/)
+  assert.doesNotMatch(page, /hideClaimShortcut/)
+})
+
 test('S15c7：待取单是横排小按钮，读失败两句分两行且按钮在右边', async () => {
   const jsxUrl = import.meta.resolve('react/jsx-runtime')
   const reactUrl = import.meta.resolve('react')

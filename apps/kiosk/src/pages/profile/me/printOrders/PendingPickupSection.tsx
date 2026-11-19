@@ -71,13 +71,6 @@ export function usePendingPickupOrders(token: string | null): {
   return { presence, rows, reloading, reload }
 }
 
-/** 横幅小字。有待取单时改口，避免仍说「不在下面的列表里」。读失败时不写这句，由下面那一块说真话。 */
-export function pendingPickupBannerNote(presence: PendingPickupPresence): string | null {
-  if (presence === 'rows') return '还没取的手机单列在这一条下面。'
-  if (presence === 'error') return null
-  return '还没核销出打印任务的单，不在下面的列表里'
-}
-
 /** 没有待取单时不占地方。读失败只说这一块，不把已有打印任务一起藏起来。 */
 export function PendingPickupSection({
   presence,

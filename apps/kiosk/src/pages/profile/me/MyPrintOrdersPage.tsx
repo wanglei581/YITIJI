@@ -28,8 +28,8 @@ import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock } from './qx/QxMeState
 import { MeActs, MeBtn, MeP, MeRow, MeRows, MeSeg } from '../touch/MeKit'
 import { MeEmptyPack, MeExitCard } from '../touch/MeStatePacks'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
-import { PendingPickupSection, pendingPickupBannerNote, usePendingPickupOrders } from './printOrders/PendingPickupSection'
-import { pendingPickupExitCards } from './printOrders/pendingPickupExits'
+import { PendingPickupSection, usePendingPickupOrders } from './printOrders/PendingPickupSection'
+import { mobilePickupBanner, pendingPickupExitCards } from './printOrders/pendingPickupExits'
 import {
   formatAmountCents,
   isFreeMemberOrder,
@@ -250,16 +250,15 @@ export function MyPrintOrdersPage() {
         : state === 'ready' && items.length === 0 && pendingPickup.presence === 'hidden'
           ? 'empty'
           : 'ready'
-  const pickupNote = pendingPickupBannerNote(pendingPickup.presence)
   const miniOn = whenMiniapp(useSupportContact(isLoggedIn), 'on') !== ''
   const allLoadedFree = items.length > 0 && items.every(isFreeMemberOrder)
-  const hideClaimShortcut = items.length === 0 && pendingPickup.presence === 'rows'
+  const pickupBanner = mobilePickupBanner(miniOn, pendingPickup.presence)
   const pickupBlock = (
     <>
-      {miniOn && !hideClaimShortcut ? (
+      {pickupBanner ? (
         <button type="button" className="me-line" disabled={winding} title={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={() => navigate('/print/pickup-claim')}>
-          <b>手机上下的到店单，到机器上输到机码取件</b>
-          {pickupNote ? <small>{pickupNote}</small> : null}
+          <b>{pickupBanner.title}</b>
+          {pickupBanner.note ? <small>{pickupBanner.note}</small> : null}
         </button>
       ) : null}
       <PendingPickupSection
