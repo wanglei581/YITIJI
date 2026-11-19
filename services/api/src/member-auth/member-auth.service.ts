@@ -18,6 +18,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { enforceMemberSmsHourlyLimit } from './sms/sms-egress-limits'
 import { SMS_SENDER, type SmsSender } from './sms/sms-sender'
+import { MiniappAccessTokenService } from '../miniapp-access-token/miniapp-access-token.service'
 import { exchangeMiniappJsCode } from './wx-jscode'
 
 export type LegalConsentSource = 'sms_login' | 'qr_login' | 'wx_login'
@@ -64,6 +65,8 @@ export interface MemberLoginResult {
  */
 @Injectable()
 export class MemberAuthService {
+  private readonly tokens: MiniappAccessTokenService
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -71,7 +74,11 @@ export class MemberAuthService {
     @Inject(SMS_SENDER) private readonly sms: SmsSender,
     @Optional() @Inject(AdvisorQaMemory) private readonly qaMemory?: AdvisorQaMemory,
     @Optional() @Inject(ConversationMemoryBridge) private readonly memoryBridge?: ConversationMemoryBridge,
-  ) {}
+    @Optional() @Inject(MiniappAccessTokenService) accessTokens?: MiniappAccessTokenService,
+  ) {
+    // 手动 new 的旧调用点不传这一参。凭证仍然只有这一份实现，缓存落在同一个 Redis。
+    this.tokens = accessTokens ?? new MiniappAccessTokenService(redis)
+  }
 
   /** 发送短信验证码:冷却 + 多维频控 + 写 Redis(TTL 5min)+ 下发。 */
   /** `terminalId`：控制器验签过的一体机终端编号（P1-5 单终端短信额度用），不是一体机发起时为空。 */
@@ -548,30 +555,7 @@ export class MemberAuthService {
         HttpStatus.SERVICE_UNAVAILABLE,
       )
     }
-    const cacheKey = `wx:miniapp:access_token:${appid}`
-    let accessToken = await this.redis.get(cacheKey)
-    if (!accessToken) {
-      const tokenRes = await fetch('https://api.weixin.qq.com/cgi-bin/stable_token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grant_type: 'client_credential', appid, secret }),
-      })
-      if (!tokenRes.ok) {
-        throw new HttpException(
-          { error: { code: 'WX_TOKEN_FAILED', message: '微信服务暂不可用，请稍后再试' } },
-          HttpStatus.BAD_GATEWAY,
-        )
-      }
-      const tokenData = (await tokenRes.json()) as { access_token?: string; errcode?: number }
-      if (!tokenData.access_token) {
-        throw new HttpException(
-          { error: { code: 'WX_TOKEN_FAILED', message: '微信服务暂不可用，请稍后再试' } },
-          HttpStatus.BAD_GATEWAY,
-        )
-      }
-      accessToken = tokenData.access_token
-      await this.redis.setEx(cacheKey, 7100, accessToken)
-    }
+    const accessToken = await this.tokens.getAccessToken()
     const phoneRes = await fetch(
       `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${encodeURIComponent(accessToken)}`,
       {

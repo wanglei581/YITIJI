@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common'
+import { MiniappAccessTokenService } from '../miniapp-access-token/miniapp-access-token.service'
 
 /**
  * 微信小程序码生成。
@@ -19,11 +20,8 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common'
  * 属于伪造能力（CLAUDE.md §9）。
  */
 
-const TOKEN_URL = 'https://api.weixin.qq.com/cgi-bin/token'
 const CODE_URL = 'https://api.weixin.qq.com/wxa/getwxacodeunlimit'
 const REQUEST_TIMEOUT_MS = 10_000
-/** 比微信的 7200 秒提前 5 分钟过期，避免边界上用到刚失效的 token。 */
-const TOKEN_SAFETY_MARGIN_MS = 5 * 60_000
 /** 微信规定 scene 最长 32 个可见字符。 */
 const SCENE_MAX_LENGTH = 32
 const SCENE_PATTERN = /^[A-Za-z0-9!#$&'()*+,/:;=?@\-._~%]{1,32}$/
@@ -50,9 +48,8 @@ export interface MiniappCodeResult {
 @Injectable()
 export class MiniappCodeService {
   private readonly logger = new Logger(MiniappCodeService.name)
-  private cachedToken: { value: string; expiresAt: number } | null = null
-  /** 并发请求共享同一次换取，避免同时打微信换 token 触发频控。 */
-  private tokenInflight: Promise<string> | null = null
+
+  constructor(private readonly accessTokens: MiniappAccessTokenService) {}
 
   /** 未配置时返回 false，调用方据此给出诚实的「未开放」而不是坏掉的二维码。 */
   isConfigured(): boolean {
@@ -78,7 +75,7 @@ export class MiniappCodeService {
       )
     }
 
-    const token = await this.accessToken()
+    const token = await this.accessTokens.getAccessToken((input, init) => this.fetchWithTimeout(String(input), init ?? {}))
     const envVersion = this.envVersion()
     const response = await this.postJson(`${CODE_URL}?access_token=${encodeURIComponent(token)}`, {
       scene,
@@ -125,35 +122,6 @@ export class MiniappCodeService {
     } catch {
       return { errcode: null }
     }
-  }
-
-  private async accessToken(): Promise<string> {
-    const cached = this.cachedToken
-    if (cached && cached.expiresAt > Date.now()) return cached.value
-    if (this.tokenInflight) return this.tokenInflight
-    this.tokenInflight = this.fetchToken().finally(() => { this.tokenInflight = null })
-    return this.tokenInflight
-  }
-
-  private async fetchToken(): Promise<string> {
-    const appid = process.env['WECHAT_MINIAPP_APPID'] ?? ''
-    const secret = process.env['WECHAT_MINIAPP_APPSECRET'] ?? ''
-    const url =
-      `${TOKEN_URL}?grant_type=client_credential` +
-      `&appid=${encodeURIComponent(appid)}` +
-      `&secret=${encodeURIComponent(secret)}`
-    const response = await this.fetchWithTimeout(url, { method: 'GET' })
-    const data = (await response.json()) as { access_token?: string; expires_in?: number; errcode?: number }
-    if (!data.access_token) {
-      this.logger.warn(`wx token failed: errcode=${data.errcode ?? 'unknown'}`)
-      throw new HttpException(
-        { error: { code: 'MINIAPP_TOKEN_FAILED', message: '小程序凭据校验失败' } },
-        HttpStatus.BAD_GATEWAY,
-      )
-    }
-    const ttlMs = Math.max(0, (data.expires_in ?? 7200) * 1000 - TOKEN_SAFETY_MARGIN_MS)
-    this.cachedToken = { value: data.access_token, expiresAt: Date.now() + ttlMs }
-    return data.access_token
   }
 
   private async postJson(url: string, payload: unknown): Promise<Response> {

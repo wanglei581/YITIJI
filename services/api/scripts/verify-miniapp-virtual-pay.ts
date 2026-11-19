@@ -44,6 +44,7 @@ import {
 } from '../src/virtual-pay/virtual-pay-settings'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { assertVirtualPayDelivery } from './support/miniapp-virtual-pay-delivery'
+import { assertVirtualPayReconcile } from './support/miniapp-virtual-pay-reconcile'
 import { assertOfficialVirtualPaySignatures, assertVirtualPayOrders } from './support/miniapp-virtual-pay-orders'
 
 const API_ROOT = resolve(__dirname, '..')
@@ -370,6 +371,7 @@ async function main(): Promise<void> {
     console.log('PASS 注销断开账号和 openid，一单只能有一条权益')
     await assertVirtualPayOrders({ prisma, call, jwt, redis })
     await assertVirtualPayDelivery({ prisma, base })
+    await assertVirtualPayReconcile({ prisma, redis })
   } finally {
     await app.close()
     await prisma.onModuleDestroy()

@@ -79,27 +79,36 @@ check(
   !/error:\s*\{[^}]*(secret|accessToken|access_token)/i.test(service),
 )
 
-// ── 四、token 必须缓存（微信有频次限制）───────────────────────────────
-// 只查名字出现过是不够的：删掉字段声明后，其余位置的 this.cachedToken 仍会命中，
-// 断言照样绿（2026-09-08 变异测试实测漏过）。要钉**声明**与**命中即返回**两处行为。
+// ── 四、token 只有一处（微信有频次限制）───────────────────────────────
+// 2026-11-19：小程序码不再自己 GET cgi-bin/token、也不再留进程内缓存。
+// 缓存、提前过期、并发单飞都挪到 miniapp-access-token.service.ts，和会员登录共用。
+// 删掉下面任意一条，就会重新出现第二份凭证。
+const tokenService = readFileSync(resolve(here, '../src/miniapp-access-token/miniapp-access-token.service.ts'), 'utf8')
 check(
-  'access_token 有缓存字段',
-  /private\s+cachedToken:\s*\{[^}]*expiresAt:\s*number[^}]*\}\s*\|\s*null/.test(service),
-  '缺少缓存字段声明',
+  '小程序码不再自己换 access_token',
+  !/cgi-bin\/token/.test(service) && !/stable_token/.test(service) && !/cachedToken/.test(service),
+  '小程序码必须走公用凭证',
+)
+check(
+  '小程序码调用公用凭证',
+  /accessTokens\.getAccessToken\(/.test(service),
+)
+check(
+  '公用凭证只走 stable_token',
+  /cgi-bin\/stable_token/.test(tokenService) && !/cgi-bin\/token/.test(tokenService),
 )
 check(
   '缓存命中时直接返回，不再打微信',
-  /const cached = this\.cachedToken[\s\S]{0,120}?return cached\.value/.test(service),
-  '有字段但每次仍去换 token，等于没缓存',
+  /const cached = await this\.redis\.get\(cacheKey\)[\s\S]{0,40}if \(cached\) return cached/.test(tokenService),
+  '有缓存键但每次仍去换 token，等于没缓存',
 )
 check(
-  '缓存留了提前量，不卡在边界',
-  /TOKEN_SAFETY_MARGIN_MS/.test(service),
-  '按 expires_in 原值缓存会在边界上用到刚失效的 token',
+  '缓存留了提前量，不卡在 7200 秒边界',
+  /MINIAPP_ACCESS_TOKEN_TTL_SECONDS = 7100/.test(tokenService),
 )
 check(
   '并发换取共享同一次请求',
-  /tokenInflight/.test(service),
+  /this\.inflight/.test(tokenService),
   '并发打微信换 token 会触发频控',
 )
 

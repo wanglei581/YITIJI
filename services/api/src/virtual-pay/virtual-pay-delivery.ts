@@ -4,8 +4,9 @@ export interface ConfirmPaidInput {
   outTradeNo: string
   openId: string
   env: number
-  productId: string
-  quantity: number
+  /** 发货推送才有道具。查单不返回道具，不传就不核。 */
+  productId?: string
+  quantity?: number
   priceCents: number
   wxOrderId: string | null
   paidAt: Date | null
@@ -92,8 +93,8 @@ async function grantPaid(prisma: PrismaService, input: ConfirmPaidInput): Promis
 function mismatch(order: CreditOrder, input: ConfirmPaidInput): ConfirmPaidFailure | null {
   if (order.openId !== input.openId) return 'openid_mismatch'
   if (order.env !== input.env) return 'env_mismatch'
-  if (order.productId !== input.productId) return 'product_mismatch'
-  if (input.quantity !== 1) return 'quantity_mismatch'
+  if (input.productId != null && order.productId !== input.productId) return 'product_mismatch'
+  if (input.quantity != null && input.quantity !== 1) return 'quantity_mismatch'
   if (order.priceCents !== input.priceCents) return 'amount_mismatch'
   return null
 }
