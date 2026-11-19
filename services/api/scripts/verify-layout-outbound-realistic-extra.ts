@@ -23,6 +23,9 @@ export function runExtendedSegmentCases(assertCovered: Covered): void {
   assertCovered('十加八身份证换行', '1101011990\n03072315', ID_CARD)
   assertCovered('九加七银行卡斜线', '622202123/4567890', '6222021234567890')
   assertCovered('九加七银行卡换行', '622202123\n4567890', '6222021234567890')
+  assertCovered('七加四回车换行手机号', '1380013\r\n8000', PHONE)
+  assertCovered('十加八身份证回车换行', '1101011990\r\n03072315', ID_CARD)
+  assertCovered('九加七银行卡回车换行', '622202123\r\n4567890', '6222021234567890')
   assertCovered('全角斜线手机号', '138\uFF0F0013\uFF0F8000', PHONE)
   assertCovered('通用分隔和斜线混用的手机号', '138 - 0013/8000', PHONE)
   assertCovered(
