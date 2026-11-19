@@ -832,7 +832,7 @@ async function main() {
     // 7e：未知错误码 → 统一默认安全文案，且不泄露原始敏感信息。
     const unknownFailId = await createClaimAndFail('失败任务-未知码', '2019-01-02T00:00:00.000Z', 'INTERNAL_SEGFAULT_0x1234', RAW_SENSITIVE_MESSAGE)
     const userView2 = await printJobs.getStatus(unknownFailId)
-    const defaultExpected = '打印任务失败，请联系工作人员处理或稍后重试'
+    const defaultExpected = '打印任务失败，请稍后重试。'
     const leaked2 = SENSITIVE_FRAGMENTS.filter((frag) => JSON.stringify(userView2).includes(frag))
     if (userView2.failureReasonForUser === defaultExpected && userView2.errorMessage === defaultExpected && leaked2.length === 0) {
       pass('7e. 未知错误码 → 默认安全兜底文案，且不泄露原始敏感信息')

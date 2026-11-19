@@ -54,3 +54,54 @@ export function publicScanDeviceHealth(value: string | null | undefined): Public
   if (value === null || value === undefined) return null
   return (SCAN_DEVICE_HEALTHS as readonly string[]).includes(value) ? (value as PublicScanDeviceHealth) : 'unknown'
 }
+
+/** Win32 PrinterState 的卡纸位。与终端程序 printer-status-map 的 PAPER_JAM_BIT 同一位。 */
+const WIN32_PAPER_JAM_BIT = 0x8
+
+/**
+ * 公开打印机状态要读的心跳列。
+ * 列名留在本文件。管理服务只展开，队列列名不散进管理服务。
+ */
+export const KIOSK_PUBLIC_PRINTER_STATUS_SELECT = {
+  printerStatus: true,
+  printerQueueRawStatus: true,
+} as const
+
+/**
+ * 公开 printer-status 给一体机用。
+ * 心跳落库的 printerStatus 把卡纸并进 error（终端程序不改）。
+ * 只有落库值已经是 error，且原始五列看得出卡纸（DetectedErrorState 为 8，或 PrinterState 带卡纸位），
+ * 才把公开值改成 paper_jam。缺纸、离线、开盖、缺粉保持原值。原始串不放进公开响应。
+ * 落库心跳不动，队列闸门仍按 error 处理。
+ */
+export function publicPrinterStatusForKiosk(
+  printerStatus: string | null | undefined,
+  rawStatus: string | null | undefined,
+): string | null {
+  if (printerStatus == null) return null
+  if (printerStatus !== 'error') return printerStatus
+  if (typeof rawStatus !== 'string') return printerStatus
+  const raw = rawStatus.trim()
+  if (!raw || raw === 'not_found' || raw === 'query_failed') return printerStatus
+  const parts = raw.split(',')
+  if (parts.length < 3) return printerStatus
+  const detected = Number.parseInt(parts[1] ?? '', 10)
+  if (detected === 8) return 'paper_jam'
+  if (parts.length < 4) return printerStatus
+  const stateText = parts[3] ?? ''
+  if (stateText === '') return printerStatus
+  const state = Number.parseInt(stateText, 10)
+  if (!Number.isFinite(state)) return printerStatus
+  if ((state & WIN32_PAPER_JAM_BIT) !== 0) return 'paper_jam'
+  return printerStatus
+}
+
+/** 从一条心跳读出一体机公开状态。原始串只在这里用，不进响应。 */
+export function publicPrinterStatusFromHeartbeat(
+  heartbeat: {
+    printerStatus?: string | null
+    printerQueueRawStatus?: string | null
+  } | null | undefined,
+): string | null {
+  return publicPrinterStatusForKiosk(heartbeat?.printerStatus, heartbeat?.printerQueueRawStatus)
+}

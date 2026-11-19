@@ -15360,7 +15360,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 847,
+      "reachableFileCount": 851,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18441,7 +18441,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1036
+      "sourceFileCount": 1040
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -23481,6 +23481,10 @@
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
     "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
@@ -23501,6 +23505,10 @@
       "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/printOrders/pendingPickupExits.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -32135,6 +32143,7 @@
       "services/api/scripts/verify-queue-dispatch-printer-status.ts"
     ],
     "services/api/src/terminals/printer-status.ts": [
+      "services/api/scripts/verify-print-queue-timeout.ts",
       "services/api/scripts/verify-scan-device-sessions.ts"
     ],
     "services/api/src/terminals/release-observation.service.ts": [
@@ -32292,6 +32301,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-print-completion-evidence.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-print-queue-timeout.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -35881,9 +35891,11 @@
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
+          "apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json",
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
+          "apps/kiosk/src/pages/profile/me/printOrders/pendingPickupExits.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx",
           "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css",
@@ -36738,9 +36750,11 @@
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
+          "apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json",
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
+          "apps/kiosk/src/pages/profile/me/printOrders/pendingPickupExits.ts",
           "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx",
@@ -48345,6 +48359,8 @@
           "services/api/src/print-jobs/print-queue-timeout.controller.ts",
           "services/api/src/print-jobs/print-queue-timeout.ts",
           "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/printer-status.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ],
         "missing": []

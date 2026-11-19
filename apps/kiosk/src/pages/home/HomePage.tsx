@@ -11,6 +11,7 @@ import { localAgentSnapshot, probeLocalAgent, subscribeLocalAgent } from '../../
 import { ContinueHandoverGuard } from './components/ContinueHandoverGuard'
 import { ContinuePanel } from './components/ContinuePanel'
 import { HomeTouchView } from './components/HomeTouchView'
+import { homeBandStatus } from './homeDomainStatus'
 import { placeLabel } from './homeTouchCopy'
 import { HOME_V6_ROUTES, type HomeV6ActionId } from './homeV6Domains'
 import { useHomeJobFairHighlight } from './hooks/useHomeJobFairHighlight'
@@ -64,19 +65,16 @@ export function HomePage() {
   }
 
   // 读状态的请求本身没回来（服务断了、超时）：什么都读不到，不写「打印机在线」，也不写成「打印机离线」。
-  const deviceStatus = device.loading
-    ? { tone: 'unknown' as const, label: '设备检查中' }
-    : device.requestFailed
-      ? { tone: 'warn' as const, label: '服务暂时连不上' }
-      : localAgent === 'unreachable'
-        ? { tone: 'unknown' as const, label: '状态未知' }
-      : device.printerReady
-        ? { tone: 'ok' as const, label: device.printerLabel }
-        : device.kind === 'error'
-          ? { tone: 'bad' as const, label: device.printerLabel }
-          : device.kind === 'offline'
-            ? { tone: 'warn' as const, label: device.printerLabel }
-            : { tone: 'unknown' as const, label: '状态未知' }
+  // 公开状态已经是卡纸时，本机探针连不上也不盖成「状态未知」（homeBandStatus）。
+  const deviceStatus = homeBandStatus({
+    loading: device.loading,
+    requestFailed: device.requestFailed === true,
+    localAgentUnreachable: localAgent === 'unreachable',
+    printerReady: device.printerReady,
+    kind: device.kind,
+    printerLabel: device.printerLabel,
+    errorCode: device.printer.errorCode ?? null,
+  })
 
   return (
     <HomeTouchView

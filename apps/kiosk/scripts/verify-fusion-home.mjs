@@ -98,7 +98,8 @@ check(
   '首页复用 KioskRoot 已有终端状态快照，不发起第二次轮询'
 )
 check(
-  home.includes("label: '状态未知'") &&
+  read('src/pages/home/homeDomainStatus.ts').includes("label: '状态未知'") &&
+    home.includes('homeBandStatus(') &&
     !/78%|62%|碳粉充足|扫描仪就绪/.test(footer),
   '纸张、碳粉、扫描仪不伪造原型百分比或就绪状态'
 )

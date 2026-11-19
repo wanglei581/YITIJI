@@ -50,6 +50,40 @@ async function loadHold(presence) {
   })
 }
 
+test('公开打印机状态是卡纸时，本机探针连不上也写打印机卡纸', async () => {
+  const m = await loadModule('src/pages/home/homeDomainStatus.ts')
+  const jam = {
+    loading: false,
+    requestFailed: false,
+    localAgentUnreachable: true,
+    printerReady: false,
+    kind: 'error',
+    printerLabel: '打印机卡纸',
+    errorCode: 'paperJam',
+  }
+  assert.deepEqual(m.homeBandStatus(jam), { tone: 'bad', label: '打印机卡纸' })
+  assert.equal(m.homeBandStatus({ ...jam, localAgentUnreachable: false }).label, '打印机卡纸')
+  assert.equal(
+    m.homeBandStatus({ ...jam, errorCode: 'paperEmpty', printerLabel: '打印机缺纸' }).label,
+    '状态未知',
+  )
+  assert.equal(
+    m.homeBandStatus({ ...jam, kind: 'offline', errorCode: 'offline', printerLabel: '打印机离线' }).label,
+    '状态未知',
+  )
+  assert.equal(m.homeBandStatus({ ...jam, loading: true }).label, '设备检查中')
+  assert.equal(m.homeBandStatus({ ...jam, requestFailed: true }).label, '服务暂时连不上')
+  assert.deepEqual(m.homeBandStatus({
+    loading: false,
+    requestFailed: false,
+    localAgentUnreachable: false,
+    printerReady: true,
+    kind: 'ready',
+    printerLabel: '打印机在线',
+    errorCode: null,
+  }), { tone: 'ok', label: '打印机在线' })
+})
+
 test('令牌指纹：同一张同一个值，不同令牌不同值，8 位十六进制，不含令牌本身', async () => {
   const m = await loadHold(await loadPresence())
   const a = 'member-token-wang-xiaoyu'

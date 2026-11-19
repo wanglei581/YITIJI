@@ -7,6 +7,7 @@ import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { useRemainingSeconds } from '../../hooks/useCountdown'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { ApiHttpError } from '../../services/api/httpAdapter'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import {
   getPrintJobStatus,
@@ -27,11 +28,12 @@ import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { PrintDoneUnverified } from './components/PrintDoneUnverified'
 import { UNKNOWN_NO_TASK_SUBTITLE, UNKNOWN_TASK_SUBTITLE } from './components/printDoneUnverifiedCopy'
 import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
-import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, retryBlockedReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
+import { failureCopy, failureSummaryRows, faultScreenTakeawayExpired, faultScreenTakeawayMiss, feeInfoCopy, paymentRow, printerJamConfirmed, retryBlockedReason, shownFailureReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
+import { rememberConfirmedJam } from './printDoneJamLatch'
 import { CONTACT_ENTRY_LABEL, PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintDoneRecordSection } from './components/PrintDoneSections'
-import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, publicOrderNo, reprintHint, screenFailureReason, type OutOfPaperMoney } from './printProgressModel'
+import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, presentScreenFailure, publicOrderNo, reprintHint, screenFailureReason, type OutOfPaperMoney } from './printProgressModel'
 import './styles/print-fulfill-qx.css'
 import './styles/print-done-touch.css'
 
@@ -131,10 +133,11 @@ function interpretStatus(taskId: string, result: PrintJobStatusResult): { kind: 
   return { kind: 'settled', value: { taskId, result: 'unknown' } }
 }
 
-function failVisual(errorCode?: string): 'paper-jam' | 'out-of-paper' | 'result-unconfirmed' | 'failed' {
+function failVisual(errorCode?: string): 'paper-jam' | 'out-of-paper' | 'offline' | 'result-unconfirmed' | 'failed' {
   if (errorCode === PRINT_JOB_UNCONFIRMED) return 'result-unconfirmed'
   if (errorCode === 'PAPER_EMPTY') return 'out-of-paper'
   if (errorCode === 'PRINTER_ERROR') return 'paper-jam'
+  if (errorCode === 'PRINTER_OFFLINE') return 'offline'
   return 'failed'
 }
 
@@ -166,13 +169,24 @@ export function PrintDonePage() {
       ? verification.result
       : 'loading'
   const failureReason = verification?.taskId === taskId
-    ? preferUnattended(verification.failureReason ?? '', problem)
+    ? presentScreenFailure({
+      errorCode: verification.errorCode,
+      failureReasonForUser: verification.failureReason,
+    }, support)
     : problem
   const isUnconfirmed =
     verification?.taskId === taskId && verification.errorCode === PRINT_JOB_UNCONFIRMED
   const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : resultState
   // 重新提交打印要打印机现在能出纸才有意义；只在失败态读状态（成功态、核验中不发这条请求）。
   const device = useTerminalDeviceStatus(resultState === 'failed')
+  // 这一页只要读到过一次确认卡纸就记住。之后状态变成就绪，标题和胶囊也不退回「可能卡纸」。
+  const jamLatchTaskId = useRef<string | null>(null)
+  jamLatchTaskId.current = rememberConfirmedJam(
+    jamLatchTaskId.current,
+    taskId,
+    visual === 'paper-jam' && printerJamConfirmed(device),
+  )
+  const jamHeld = Boolean(taskId) && jamLatchTaskId.current === taskId
   // 没配服务电话时，「查看《隐私政策》里的联系方式」要有个真能点开的入口。
   const openContact = needsContactEntry(support) ? () => navigate(PRIVACY_CONTACT_ROUTE) : undefined
 
@@ -337,12 +351,18 @@ export function PrintDonePage() {
         if (!cancelled) setTakeaway(result)
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          setTakeawayError(preferUnattended(userMessageOf(err, `带走链接没取到。${printProblemLine()}`), `带走链接没取到。${printProblemLine()}`))
+        if (cancelled) return
+        const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : 'failed'
+        const fallback = faultScreenTakeawayMiss(visual)
+        const faultScreen = visual === 'paper-jam' || visual === 'out-of-paper' || visual === 'offline'
+        if (faultScreen && err instanceof ApiHttpError && err.status >= 500) {
+          setTakeawayError(fallback)
+          return
         }
+        setTakeawayError(preferUnattended(userMessageOf(err, fallback), fallback))
       })
     return () => { cancelled = true }
-  }, [getToken, resultState, state.paymentSessionToken, taskId])
+  }, [getToken, resultState, state.paymentSessionToken, taskId, verification?.errorCode])
 
   const takeawayCopy = doneTakeaway(file ? { pages: file.pages } : null, params)
 
@@ -528,17 +548,31 @@ export function PrintDonePage() {
     }
 
     // 普通失败、卡纸、缺纸三态共用一块版式（PrintDoneFailed）。收款事实：缺纸页优先用服务端回执，其余按进页时带来的金额。
-    const variant: FailureVariant = visual === 'out-of-paper' ? 'out-of-paper' : visual === 'paper-jam' ? 'paper-jam' : 'failed'
+    const variant: FailureVariant = visual === 'out-of-paper' ? 'out-of-paper' : visual === 'paper-jam' ? 'paper-jam' : visual === 'offline' ? 'offline' : 'failed'
     const money: OutOfPaperMoney = variant === 'out-of-paper'
       ? outOfPaperMoneyOf(takeaway, amountCents)
       : { fact: paymentFactOf(amountCents), amountCents }
     const faultOrderNo = publicOrderNo(takeaway?.orderNo) ?? displayOrderNo
     const canRetry = Boolean(takeaway?.canRetry)
+    const confirmedJam = variant === 'paper-jam' && jamHeld
     return (
       <PrintDoneFailed
         variant={variant}
-        copy={failureCopy({ variant, money, orderNo: faultOrderNo, canRetry, pickupSource: state.pickupSource === true })}
-        rows={failureSummaryRows({ orderNo: faultOrderNo, file: file ?? null, params: params ?? null, money, reason: failureReason })}
+        copy={failureCopy({
+          variant,
+          money,
+          orderNo: faultOrderNo,
+          canRetry,
+          pickupSource: state.pickupSource === true,
+          confirmedJam,
+        })}
+        rows={failureSummaryRows({
+          orderNo: faultOrderNo,
+          file: file ?? null,
+          params: params ?? null,
+          money,
+          reason: shownFailureReason(variant, verification?.failureReason ?? '', failureReason, confirmedJam),
+        })}
         free={amountCents === 0}
         retry={{ available: canRetry, blockedReason: retryBlockedReason(device), busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}
         takeaway={{
@@ -547,7 +581,7 @@ export function PrintDonePage() {
           expired: Boolean(takeaway && takeawayExpired),
           error: takeawayError && takeawayError !== printProblemLine() ? takeawayError : null,
         }}
-        expiredLine={`带走链接已过期。${printProblemLine()}`}
+        expiredLine={faultScreenTakeawayExpired(variant)}
         canReportIssue={canReportIssue}
         isLoggedIn={isLoggedIn}
         onFeeInfo={() => setFeeInfoOpen(true)}
