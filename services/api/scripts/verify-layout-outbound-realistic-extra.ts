@@ -39,8 +39,10 @@ export function runExtendedSegmentCases(assertCovered: Covered): void {
 /**
  * 整段像日期、时间或年份串的不遮。三段都要原样看见。
  * 月日不合法、或者根本不是日期的长数字仍然遮。
+ * 区间要起不晚于止、年份在 1950–2100；紧凑 8 位年月日后面再接数字段的也遮。年份串不看先后。
  */
 export function runDateExemptionCases(assertKept: Kept, assertCovered: Covered): void {
+  runDateTighteningCases(assertKept, assertCovered)
   assertKept('不补零的点分年月日区间', '2018.9.1-2022.6.30')
   assertKept('不补零的斜线年月日区间', '2018/9/1-2022/6/30')
   assertKept('不补零的年月区间', '2018.10-2022.6')
@@ -54,6 +56,20 @@ export function runDateExemptionCases(assertKept: Kept, assertCovered: Covered):
   assertKept('钟点时间段仍不遮', '9:00-18:00')
   assertCovered('不像日期的斜线手机号仍遮', '138/0013/8000', PHONE)
   assertCovered('月日不合法的紧凑区间仍遮', '20231345-20230505', '2023134520230505')
+}
+
+/** 日期豁免收紧：形似日期的号码不能借豁免出站，正常的日期写法照旧原样送出。 */
+function runDateTighteningCases(assertKept: Kept, assertCovered: Covered): void {
+  assertCovered('月份不合法的紧凑区间仍遮', '20231301-20230505', '2023130120230505')
+  assertCovered('倒序的紧凑区间仍遮', '20240505-20230101', '2024050520230101')
+  assertCovered('倒序的点分年月日区间仍遮', '2024.5.5-2023.1.1', '202455202311')
+  assertCovered('年份早于 1950 的区间仍遮', '1949.10.1-1950.1.1', '1949101195011')
+  assertCovered('紧凑日期后接年份仍遮', '20230501-2024', '202305012024')
+  assertCovered('生日后接四位顺序码仍遮', '19900307-2015', '199003072015')
+  assertCovered('紧凑区间后再接数字段仍遮', '20230501-20230505-2024', '20230501202305052024')
+  assertKept('起止同一天的紧凑区间', '20230501-20230501')
+  assertKept('年份串不看先后', '1997-2024-2013')
+  assertKept('学年学期串', '2020-2021-1-2021-2022-2')
 }
 
 type Report = {
@@ -247,22 +263,34 @@ function randomDate(rng: () => number): string {
   const m2 = 1 + Math.floor(rng() * 12)
   const d1 = 1 + Math.floor(rng() * 28)
   const d2 = 1 + Math.floor(rng() * 28)
-  if (kind === 0) return `${y1}.${m1}.${d1}-${y2}.${m2}.${d2}`
-  if (kind === 1) return `${y1}/${m1}/${d1}-${y2}/${m2}/${d2}`
+  const [from, to] = orderDates([y1, m1, d1], [y2, m2, d2])
+  if (kind === 0) return `${from[0]}.${from[1]}.${from[2]}-${to[0]}.${to[1]}.${to[2]}`
+  if (kind === 1) return `${from[0]}/${from[1]}/${from[2]}-${to[0]}/${to[1]}/${to[2]}`
   if (kind === 2) return yearMonthRange(y1, m1, y2, m2)
   if (kind === 3) {
-    return `${compactDate(y1, m1, d1)}-${compactDate(y2, m2, d2)}`
+    return `${compactDate(from[0], from[1], from[2])}-${compactDate(to[0], to[1], to[2])}`
   }
+  // 年份串是年份列表，不看先后，照旧乱序。
   if (kind === 4) return `${y1}-${y2}-${y3}`
   const h1 = Math.floor(rng() * 24)
   const h2 = Math.floor(rng() * 24)
   return `${h1}:${pad2(Math.floor(rng() * 60))}-${h2}:${pad2(Math.floor(rng() * 60))}`
 }
 
-/** 年月区间补足到 11 位，豁免不成立时这组会把日期遮掉。 */
+type Ymd = readonly [number, number, number]
+
+/** 区间要起不晚于止才豁免。随机出来的两头按先后排好，写法和取数顺序都不变。 */
+function orderDates(left: Ymd, right: Ymd): [Ymd, Ymd] {
+  const key = (date: Ymd): number => date[0] * 10000 + date[1] * 100 + date[2]
+  return key(left) <= key(right) ? [left, right] : [right, left]
+}
+
+/** 年月区间补足到 11 位，豁免不成立时这组会把日期遮掉。同一年时止月不早于补足后的起月。 */
 function yearMonthRange(y1: number, m1: number, y2: number, m2: number): string {
-  const left = m1 < 10 ? 10 : m1
-  return `${y1}.${left}-${y2}.${m2}`
+  const [from, to] = orderDates([y1, m1, 1], [y2, m2, 1])
+  const left = from[1] < 10 ? 10 : from[1]
+  const right = from[0] === to[0] ? Math.max(left, to[1]) : to[1]
+  return `${from[0]}.${left}-${to[0]}.${right}`
 }
 
 function compactDate(year: number, month: number, day: number): string {
