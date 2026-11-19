@@ -207,6 +207,11 @@ function main(): void {
 
   assertUntouched('年月日期轴', '2015.09-2019.06')
   assertUntouched('破折号日期轴', '2020.07—2024.06')
+  assertKept('斜线年月区间', '2020/09 - 2024/06')
+  assertKept('点与破折号年月区间', '2019.09\u20142023.06')
+  assertKept('中文年月区间', '2021年3月-2024年5月')
+  assertKept('斜线年月日', '2020/09/01')
+  assertKept('钟点时间段', '9:00-18:00')
   assertJsonKept('纯数字年月不拼', '{"start":"201509","end":"201906"}', '201509')
   assertJsonKept('纯数字年月数值不拼', '{"start":201509,"end":201906}', '201509')
   assertJsonKept('点开的年月不拼', '{"from":"2015.09","to":"2019.06"}', '2015.09')
@@ -340,6 +345,28 @@ function assertJsonKept(label: string, json: string, visible: string): void {
   })
   if (!out.maskedResumeJson.includes(visible)) fail(`${label} 被收成占位符`)
   if (out.restore(out.maskedResumeJson) !== json) fail(`${label} 还原后与原文不一致`)
+  pass(label)
+}
+
+/** 日期和时间段要原样出现在三段出站正文里，不能换成占位符。 */
+function assertKept(label: string, raw: string): void {
+  const original = `说明${raw}结束`
+  const json = JSON.stringify({ summary: raw })
+  const out = maskLayoutAdjustOutbound({
+    originalText: original,
+    resumeValues: raw,
+    resumeJson: json,
+    maxOriginalChars: original.length + 800,
+  })
+  const parts = [
+    ['原文', out.maskedOriginal, original],
+    ['字段值', out.maskedResumeValues, raw],
+    ['简历JSON', out.maskedResumeJson, json],
+  ] as const
+  for (const [part, masked, source] of parts) {
+    if (!masked.includes(raw)) fail(`${label} ${part} 被收成占位符`)
+    if (out.restore(masked) !== source) fail(`${label} ${part} 还原后与原文不一致`)
+  }
   pass(label)
 }
 
