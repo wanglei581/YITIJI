@@ -73,11 +73,15 @@ export function extendCheckDigit(folded: string, end: number): number {
   return end
 }
 
+/** 开括号和第一位数字之间可以有空格。只看紧邻的前一个字符会把开括号留在外面。 */
 export function numberSpanStart(text: string, folded: string, runStart: number, end: number): number {
   const before = text[runStart - 1] ?? ''
   const digitRun = folded.slice(runStart, end).replace(/\D/gu, '')
   if ((before === '+' || before === '＋') && digitRun.startsWith('86')) return runStart - 1
-  if (before === '(' || before === '（') return runStart - 1
+  let cursor = runStart - 1
+  while (cursor >= 0 && SEPARATOR_CHARS.has(text[cursor] ?? '')) cursor -= 1
+  const opener = text[cursor] ?? ''
+  if (opener === '(' || opener === '（') return cursor
   return runStart
 }
 

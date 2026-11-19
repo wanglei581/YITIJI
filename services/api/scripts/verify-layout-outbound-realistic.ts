@@ -12,7 +12,11 @@
  * 运行：pnpm --filter @ai-job-print/api verify:layout-outbound-realistic
  */
 import { maskLayoutAdjustOutbound } from '../src/ai/resume/layout-adjust-mask'
-import { runDateExemptionCases, runExtendedSegmentCases } from './verify-layout-outbound-realistic-extra'
+import {
+  runDateExemptionCases,
+  runExtendedSegmentCases,
+  runParenCases,
+} from './verify-layout-outbound-realistic-extra'
 
 let passCount = 0
 
@@ -239,6 +243,7 @@ function main(): void {
 
   runExtendedSegmentCases(assertCovered)
   runDateExemptionCases(assertKept, assertCovered)
+  runParenCases({ pass, fail })
   assertPlaceholderCollision()
   assertPrivateUseKept()
   assertTruncationHoleDoesNotCrossWire()

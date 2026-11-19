@@ -2,6 +2,7 @@
  * 排版出站现实写法的补充用例。由 verify-layout-outbound-realistic 拉起，
  * 不单独进 CI。分段不再按固定组数列举，日期豁免和随机拼接都在这里钉住。
  */
+import { maskLayoutAdjustOutbound } from '../src/ai/resume/layout-adjust-mask'
 const PHONE = '13800138000'
 const ID_CARD = '110101199003072315'
 
@@ -44,4 +45,54 @@ export function runDateExemptionCases(assertKept: Kept, assertCovered: Covered):
   assertKept('钟点时间段仍不遮', '9:00-18:00')
   assertCovered('不像日期的斜线手机号仍遮', '138/0013/8000', PHONE)
   assertCovered('月日不合法的紧凑区间仍遮', '20231345-20230505', '2023134520230505')
+}
+
+type Report = {
+  pass: (message: string) => void
+  fail: (message: string) => never
+}
+
+/** 开括号和数字之间有空格时，开括号也要进占位符，出站不能留下孤立的「(」。 */
+export function runParenCases(report: Report): void {
+  assertOpeningParenInside(report, '( 010 ) 88888888', '(', '01088888888', '括号内夹空格时开括号收进占位符')
+  assertOpeningParenInside(report, '（ 138 ） 0013-8000', '（', PHONE, '全角括号内夹空格时开括号收进占位符')
+}
+
+function assertOpeningParenInside(
+  report: Report,
+  raw: string,
+  opener: string,
+  secretDigits: string,
+  label: string,
+): void {
+  const original = `说明${raw}结束`
+  const resumeJson = JSON.stringify({ summary: raw })
+  const out = maskLayoutAdjustOutbound({
+    originalText: original,
+    resumeValues: raw,
+    resumeJson,
+    maxOriginalChars: original.length + 800,
+  })
+  const parts = [
+    ['原文', out.maskedOriginal, original],
+    ['字段值', out.maskedResumeValues, raw],
+    ['简历JSON', out.maskedResumeJson, resumeJson],
+  ] as const
+  for (const [part, masked, source] of parts) {
+    if (masked.includes(opener)) report.fail(`${label} ${part} 留下了开括号`)
+    if (digitsOnly(masked).includes(secretDigits)) report.fail(`${label} ${part} 还能拼出原号码`)
+    if (out.restore(masked) !== source) report.fail(`${label} ${part} 还原后与原文不一致`)
+  }
+  report.pass(label)
+}
+
+function digitsOnly(text: string): string {
+  let out = ''
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index] ?? ''
+    const code = char.charCodeAt(0)
+    const folded = code >= 0xff10 && code <= 0xff19 ? String.fromCharCode(code - 0xff10 + 0x30) : char
+    if (folded >= '0' && folded <= '9') out += folded
+  }
+  return out
 }
