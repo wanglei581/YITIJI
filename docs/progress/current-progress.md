@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-11-19：一体机按次付款的地基与付款屏（P2e-1，分支 `claude/kiosk-pay-service-p2e1`，未推送）
+
+- 来由：补全线第二十七任派的收费第一包，清单第 7 项。起点 `origin/main` `f25d2b65f`。简历、面试、扫描三包（P2e-2/3/4）接在这一包上。
+- 服务单客户端 `apps/kiosk/src/services/api/serviceOrders.ts`：建单、查单（含 `refresh=1`）、关单；`ServiceOrderView` 照后端逐字段；受费用接口要带的 `x-kiosk-session-id`、`x-service-order-id` 由 `serviceOrderHeaders` 构造；状态判定按本地时钟对 `expiresAt` 判超时，管理员改价、改向个人收费总开关、改绑机构关掉的待付单归入没付成，可免费再试是 `status==='paid' && attemptsUsed>=1 && retryUntil>now`。没有扩 `ApiHttpError`。
+- 这一趟的订单号记在 sessionStorage（`apps/kiosk/src/services/serviceTrip.ts`），带着建单时的使用周期编号：整页重载会换编号，查单、关单仍要用建单时那个。键登记进 `auth/kioskSensitiveSession.ts` 清场表，每条清场路径都清。`useKioskSessionReporting.ts` 导出 `currentKioskVisitId`、`kioskVisitReadyForCharge`（建单前补发并等 start 落库）；建单遇 `SERVICE_SESSION_REQUIRED` 稍等 1.5 秒再建一次，再不成出标准句，不循环。
+- 付款屏 `/pay/resume`、`/pay/interview`、`/pay/scan`（`apps/kiosk/src/pages/pay/`），照触屏稿 `pay-1113.js` 的 pay-service：等待、核实中、付好了（停 1.6 秒去下一步）、没付成、超时、免费兜底（本机这一项 0 元时画稿里的免费屏；建单回 409 时刷新本机价目后直接去下一步）。渠道照实写（微信「请用微信扫这张码」、沙箱「测试支付通道 · 非真实收款」），简历 TRIP 句按运行页改，金额用建单返回的 `amountCents`，写「X.XX 元」。不付了返回会关掉待付单，付好了的返回不关。轮询普通查单 3 秒一次，核实间隔不少于 10 秒，每分钟封顶 28 次。「手机上买过」后端没有核销接口，不接。三条路由分开登记，授权收尾与使用统计各归简历、面试、扫描。
+- 后端只加开发与联调用的沙箱模拟付成 `POST /api/v1/payment/sandbox/simulate-service-order`（新文件 `service-order-sandbox.controller.ts`：生产 404、只认沙箱通道、按库内服务单造签名合法的回调、走真回调同一条验签入账路径），用例 `verify:service-order-sandbox-simulate` 进 CI。服务单的建单、查单、关单、结算、退款没有改，`online-payment.service.ts`、`refund.service.ts` 没动。
+- 路由登记：routes、`KioskRoot` 青序与触屏两张表、route-manifest、W6 用例与波次表、视觉证据处置、授权收尾、使用统计、迁移对照表一行。`userErrorMessage` 补服务单 8 个码，`verify-backend-error-copy-coverage` 加服务单一组。浏览器用例 `pay-service.spec.ts` 16 条挂进 `test:browser:truth`；并排截图按需跑（touch-pairs「付款 并排」）。
+- 本机真服务走了四遍（模拟付成、模拟付失败再出一张码、等真 5 分钟超时、中途把价改成 0）。没改简历、面试、扫描、打印的页面与调用，没碰小程序、两个后台和生产配置，价目仍 0。没有推送，没有上线。
+
 ## 2026-11-19：合并车 D（政策两路）、打印状态补稿入冻结清单、第四次发布（分支 `claude/train-1119d`，未上线）
 
 - 第四次发布已完成：线上 `47e3a99af`（合并车 B #1653 + 车 C #1655），发布运行 44449481189（11/19 11:16 成功），两条只加不改迁移执行（共 117 条），`DEPLOYMENT_OWNERSHIP` 已写入生产，招聘托管仍关，价目仍 0，只读巡检 PASS 12。回退标签 `prod-before-release-1118` 指向发布前的 `9b50f8e0f`。
