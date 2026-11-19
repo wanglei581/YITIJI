@@ -376,7 +376,7 @@ const ACTION_LABELS: Record<string, string> = {
   'service_order.admin_refund': '管理员发起服务单原路退款',
 }
 
-const ROLE_LABELS: Record<string, string> = {
+export const ROLE_LABELS: Record<string, string> = {
   admin: '管理员',
   partner: '合作机构',
   kiosk: '一体机',
@@ -429,17 +429,6 @@ const TARGET_LABELS: Record<string, string> = {
   ad_playlist: '播放方案',
 }
 
-const ACTOR_NAME_KEYS = ['actorName', 'operatorName', 'userName', 'username', 'displayName', 'realName']
-
-export interface AuditActorInput {
-  actorRole: string
-  actorId: string | null
-  payloadJson?: string | null
-  currentUser?: { id: string; name: string } | null
-  /** 列表记录上若多带了姓名字段，从这里读；没有就只显示角色。 */
-  record?: object | null
-}
-
 export function getAuditActionLabel(action: string): string {
   return ACTION_LABELS[action] ?? '其他操作'
 }
@@ -451,54 +440,4 @@ export function getAuditTargetLabel(targetType: string | null | undefined): stri
 
 export function getAuditRoleLabel(role: string): string {
   return ROLE_LABELS[role] ?? '其他角色'
-}
-
-function looksLikeOpaqueId(value: string): boolean {
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) return true
-  if (/^c[a-z0-9]{20,}$/i.test(value)) return true
-  if (/^[0-9a-f]{24,}$/i.test(value)) return true
-  return value.length >= 16 && /^[A-Za-z0-9_-]+$/.test(value)
-}
-
-function readablePersonName(value: unknown, actorId: string | null): string | null {
-  if (typeof value !== 'string') return null
-  const text = value.trim()
-  if (!text || text.length > 40) return null
-  if (actorId && text === actorId) return null
-  if (looksLikeOpaqueId(text)) return null
-  return text
-}
-
-function nameFromRecord(record: object | null | undefined, actorId: string | null): string | null {
-  if (!record) return null
-  const bag = record as Record<string, unknown>
-  for (const key of ACTOR_NAME_KEYS) {
-    const name = readablePersonName(bag[key], actorId)
-    if (name) return name
-  }
-  return null
-}
-
-function nameFromPayload(payloadJson: string | null | undefined, actorId: string | null): string | null {
-  if (!payloadJson) return null
-  try {
-    const parsed = JSON.parse(payloadJson) as unknown
-    if (!parsed || typeof parsed !== 'object') return null
-    return nameFromRecord(parsed, actorId)
-  } catch {
-    return null
-  }
-}
-
-export function getAuditActorLabel(input: AuditActorInput): string {
-  const fromRecord = nameFromRecord(input.record, input.actorId)
-  if (fromRecord) return fromRecord
-  const fromPayload = nameFromPayload(input.payloadJson, input.actorId)
-  if (fromPayload) return fromPayload
-  const me = input.currentUser
-  if (me && input.actorId && me.id === input.actorId) {
-    const mine = readablePersonName(me.name, input.actorId)
-    if (mine) return mine
-  }
-  return ROLE_LABELS[input.actorRole] ?? '其他'
 }
