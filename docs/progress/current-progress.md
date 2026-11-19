@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-19：小程序微信虚拟支付后端第一段（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
+
+- 来由：补全线第二十五任 P2d1，清单第 6 项。从 `origin/main` `47e3a99af` 开出。只做后端第一段：开关默认关、下单并签名、接收发货推送并记一次权益、每 5 分钟查单兜底、会员查看自己的可用权益。小程序、一体机、管理员页面和设计稿都没改。用掉权益、失败退款、后台查看与退款留到第二包。
+- 平台开关 `charge.miniappVirtualPay.enabled` 只认字符串 `true`，没有这一行就是关。打开必须带 confirm，并写审计。能卖的前提是它和个人收费总开关都开。每个服务的道具 ID 和价格只经后台接口写入，仓库里不放真实价格或道具 ID。环境变量缺了，或生产环境用了沙箱，下单会被拒绝并写诊断，进程照常启动。
+- `POST /api/v1/member/virtual-pay/orders` 用这一次 `wx.login` 的 code 换 session_key 和 openid。openid 必须等于当前会员的 `wxOpenId`，否则拒绝并且不建单。session_key 只在这一次请求的内存里用完，不落库、不进日志、不进审计。用户态签名用 session_key 字符串本身的 UTF-8 字节当 HMAC 密钥，不先做 base64 解码。服务端 `pay_sig` 签实际发出的 body。官方示例的两段签名都复算对得上。
+- `GET/POST /api/v1/wechat/miniapp/message`：GET 按 token 验签后原样回 echostr；POST 安全模式验 `msg_signature`、解密并核 AppID。发货事件 `xpay_goods_deliver_notify` 核对 openid、道具、金额和 env，幂等地标成已支付并记一条权益。同一单重复推送、以及 PostgreSQL 上并发 20 次，都只有一条。验签或 AppID 不对返回 401。金额或道具对不上只写诊断，不记权益。
+- 新表 `VirtualPayOrder` 和 `MemberServiceCredit`，SQLite 与 PostgreSQL 都加了只增迁移。会员注销时断开账号和 openid，账务行留下。`consumedAt` 和 `refundedAt` 本包不写。
+- 每 5 分钟对仍待支付、且落在时窗里的订单调 `query_order`。查到已支付走发货同一条幂等路径。超时未付关单。access_token 只留 `MiniappAccessTokenService` 一处（稳定版凭证接口加 Redis 缓存），会员登录和小程序码都改用它。
+- `GET /api/v1/member/service-credits` 只回本人仍可用的权益：服务种类和记入时间。开关关着也照常回，不让已经记下的消失。用掉的、退款的和别人的不出现。
+- 没有改打印、服务单和退款。没有推送，没有上线。图谱由生成器重生，没有手改 `docs/graph/`。
+
 ## 2026-11-18：每天免费 AI 次数，扣次自己认后台新上限，另一进程用自己的缓存（分支 `claude/ai-quota-q23c-1118`，未推送）
 
 - 管理员把简历每天免费次数从 20 改成 11、这个人已经用了 11 次时，本进程的配置缓存过期以后，不看用量面板、也不看余量，下一次扣次仍按 11 拒绝。接口返回「今天的 AI 次数用完了，明天 0 点恢复」。一体机上这条提示本来就有，这次没改页面。

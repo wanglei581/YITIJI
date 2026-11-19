@@ -44,6 +44,7 @@ import {
 } from '../src/virtual-pay/virtual-pay-settings'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { assertVirtualPayDelivery } from './support/miniapp-virtual-pay-delivery'
+import { assertVirtualPayCredits } from './support/miniapp-virtual-pay-credits'
 import { assertVirtualPayReconcile } from './support/miniapp-virtual-pay-reconcile'
 import { assertOfficialVirtualPaySignatures, assertVirtualPayOrders } from './support/miniapp-virtual-pay-orders'
 
@@ -174,14 +175,22 @@ async function main(): Promise<void> {
   const { VirtualPayAdminService } = await import('../src/virtual-pay/virtual-pay-admin.service')
   const { VirtualPayOrderController } = await import('../src/virtual-pay/virtual-pay-order.controller')
   const { VirtualPayOrderService } = await import('../src/virtual-pay/virtual-pay-order.service')
+  const { VirtualPayCreditsController } = await import('../src/virtual-pay/virtual-pay-credits.controller')
+  const { VirtualPayCreditsService } = await import('../src/virtual-pay/virtual-pay-credits.service')
   const { WechatMiniappMessageController } = await import('../src/virtual-pay/wechat-miniapp-message.controller')
   const { WechatMiniappMessageService } = await import('../src/virtual-pay/wechat-miniapp-message.service')
   const admin = new VirtualPayAdminService(prisma, audit)
   const orderService = new VirtualPayOrderService(prisma, audit)
+  const credits = new VirtualPayCreditsService(prisma)
   const messages = new WechatMiniappMessageService(prisma, audit)
 
   @Module({
-    controllers: [VirtualPayAdminController, VirtualPayOrderController, WechatMiniappMessageController],
+    controllers: [
+      VirtualPayAdminController,
+      VirtualPayOrderController,
+      VirtualPayCreditsController,
+      WechatMiniappMessageController,
+    ],
     providers: [
       { provide: PrismaService, useValue: prisma },
       { provide: RedisService, useValue: redis },
@@ -189,6 +198,7 @@ async function main(): Promise<void> {
       { provide: AuditService, useValue: audit },
       { provide: VirtualPayAdminService, useValue: admin },
       { provide: VirtualPayOrderService, useValue: orderService },
+      { provide: VirtualPayCreditsService, useValue: credits },
       { provide: WechatMiniappMessageService, useValue: messages },
       EndUserAuthGuard,
       JwtAuthGuard,
@@ -372,6 +382,7 @@ async function main(): Promise<void> {
     await assertVirtualPayOrders({ prisma, call, jwt, redis })
     await assertVirtualPayDelivery({ prisma, base })
     await assertVirtualPayReconcile({ prisma, redis })
+    await assertVirtualPayCredits({ prisma, call, jwt, redis })
   } finally {
     await app.close()
     await prisma.onModuleDestroy()

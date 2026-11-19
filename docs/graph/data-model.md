@@ -2,14 +2,14 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`124` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`126` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 124 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 126 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
 flowchart TD
-  EndUser["EndUser<br/><small>34 字段</small>"]
+  EndUser["EndUser<br/><small>36 字段</small>"]
   Organization["Organization<br/><small>35 字段</small>"]
   Terminal["Terminal<br/><small>37 字段</small>"]
   FileObject["FileObject<br/><small>50 字段</small>"]
@@ -87,7 +87,7 @@ flowchart TD
 | **ContractReviewTask** | 30 | EndUser | 8 个文件<br/>`contract-review/__tests__/contract-review-orchestrator.test.ts`<br/>`contract-review/contract-review-lifecycle.service.ts`<br/>`contract-review/contract-review-orchestrator.service.ts`<br/>… |
 | **CopyJob** | 21 | Order | 7 个文件<br/>`admin-print-scan/admin-fulfillment-lists.ts`<br/>`copy-jobs/copy-agent.service.ts`<br/>`copy-jobs/copy-authorization.ts`<br/>… |
 | **DocumentProcessTask** | 19 | EndUser、FileObject、PiiFinding | 6 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`materials/materials-manual-confirmation.service.ts`<br/>`materials/materials.service.ts`<br/>… |
-| **EndUser** | 34 | AiResumeResult、AiServiceLog、AiUsageRecord、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、PrintTask、ScanTask、UserAiConsent、UserDataRequest | 15 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
+| **EndUser** | 36 | AiResumeResult、AiServiceLog、AiUsageRecord、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、MemberServiceCredit、PrintTask、ScanTask、UserAiConsent、UserDataRequest、VirtualPayOrder | 16 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
 | **ExternalJumpLog** | 13 | EndUser | 6 个文件<br/>`activity/activity.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/resume/fair-visit-plan.service.ts`<br/>… |
 | **FairCompany** | 22 | FairCompanyPosition、FairVenueHallCompany、JobFair | 8 个文件<br/>`activity/activity.service.ts`<br/>`companies/companies.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **FairCompanyBooth** | 9 | — | **无代码读写** |
@@ -122,6 +122,7 @@ flowchart TD
 | **License** | 21 | Organization | 4 个文件<br/>`licenses/license-gate.ts`<br/>`licenses/license-queries.ts`<br/>`licenses/license-write.ts`<br/>… |
 | **MemberLegalConsent** | 10 | EndUser | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
+| **MemberServiceCredit** | 10 | EndUser、VirtualPayOrder | 2 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`virtual-pay/virtual-pay-delivery.ts` |
 | **MockInterviewReport** | 6 | MockInterviewSession | 2 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
 | **MockInterviewSession** | 22 | MockInterviewReport、MockInterviewTurn | 7 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **MockInterviewTurn** | 13 | MockInterviewSession | 7 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>`mock-interview/mock-interview-charge.ts`<br/>… |
@@ -138,7 +139,7 @@ flowchart TD
 | **PaymentAttempt** | 13 | Order | 5 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/online-payment.service.ts`<br/>… |
 | **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **PlatformQualification** | 19 | FileObject | 1 个文件<br/>`common/recruitment-capability.ts` |
-| **PlatformSetting** | 4 | — | 9 个文件<br/>`branding/brand-logo.service.ts`<br/>`branding/branding.service.ts`<br/>`orgs/partner-stats.service.ts`<br/>… |
+| **PlatformSetting** | 4 | — | 10 个文件<br/>`branding/brand-logo.service.ts`<br/>`branding/branding.service.ts`<br/>`orgs/partner-stats.service.ts`<br/>… |
 | **PolicyEligibilityRule** | 10 | PolicyPost | 1 个文件<br/>`policies/policy-eligibility.service.ts` |
 | **PolicyPost** | 29 | Organization、PolicyEligibilityRule | 15 个文件<br/>`activity/activity.service.ts`<br/>`ai/llm/assistant-policy-context.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 4 个文件<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>… |
@@ -181,6 +182,7 @@ flowchart TD
 | **UserAiConsent** | 8 | EndUser | 5 个文件<br/>`ai-access/ai-access.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserDataRequest** | 22 | EndUser | 10 个文件<br/>`admin-users/admin-user-closure-read.ts`<br/>`member-privacy/member-closure-requests.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **UserNotification** | 10 | — | 1 个文件<br/>`member-privacy/member-closure.service.ts` |
+| **VirtualPayOrder** | 14 | EndUser、MemberServiceCredit | 4 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`virtual-pay/virtual-pay-delivery.ts`<br/>`virtual-pay/virtual-pay-order.service.ts`<br/>… |
 
 ## 没有任何代码读写的模型（8）
 
