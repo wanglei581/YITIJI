@@ -23,8 +23,8 @@ import { CONTACT_ENTRY_LABEL } from './printContactEntry'
 const ASK_LABEL = '问小青：取纸或异常怎么办'
 const ASK_DRAFT = '打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。'
 
-/** 「文件带走」二维码的二维码边长（不小于 168）。 */
-const TAKEAWAY_QR_SIZE = 188
+/** 「文件带走」二维码的二维码边长（不小于 168；稿 .pf-take 的二维码块是 172）。 */
+const TAKEAWAY_QR_SIZE = 172
 
 export interface TakeawayCardState {
   /** 已换成可扫的完整地址；没有（还没签发、已过期、签发失败）为 null。 */

@@ -240,3 +240,84 @@ test('paper-jam takeaway HTTP 500 keeps the order line and does not ask to retry
   const phoneHits = await jam.evaluate((el) => (el.innerText.match(/服务电话/g) ?? []).length)
   expect(phoneHits).toBe(1)
 })
+
+/** 站内软跳转（pushState + popstate），不重载：会员登录只在内存里，setReactRouterState 会 reload 掉登录。 */
+async function softNavigate(page: Page, path: string, usr: unknown): Promise<void> {
+  await page.evaluate(
+    ({ nextPath, state }) => {
+      window.history.pushState({ usr: state, key: 's15c9-login-fail', idx: 1 }, '', nextPath)
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+    },
+    { nextPath: path, state: usr },
+  )
+}
+
+test('logged-in out-of-paper failure keeps the orders row and the closing line above the scroll edge @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
+    status: 200,
+    json: { enabled: false, idleTimeoutSec: 180, items: [] },
+  })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+    status: 200,
+    json: { printerStatus: 'paper_empty', paperLevel: 'empty', isOnline: true },
+  })
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/print-orders', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      errorCode: 'PAPER_EMPTY',
+      failureReasonForUser: '打印机缺纸，当前无法打印。',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: new Date(Date.now() + 29 * 60 * 1000).toISOString(),
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: 0,
+      canRetry: true,
+    },
+  })
+
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  await softNavigate(page, '/print/done', { ...flowState, amountCents: 0 })
+  const paper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
+  await expect(paper).toBeVisible()
+  // 内容最满的一态：重提置灰带原因、文件带走卡、「查看打印订单」、小字都在。
+  await expect(paper.getByTestId('print-retry-blocked-reason')).toBeVisible()
+  await expect(paper.getByRole('region', { name: '文件带走' })).toBeVisible()
+  await expect(paper.getByRole('button', { name: '查看打印订单' })).toBeVisible()
+  await expect(paper.getByTestId('print-fulfill-fallback')).toContainText('订单记录保留着')
+
+  // 首屏不滚动：这一行和下面那句的下沿都在滚动区下沿之上（滚动区下沿取内容块和它外层所有会裁内容的盒子里最靠上的一条）。
+  const geo = await paper.evaluate((root) => {
+    const bottomOf = (selector: string) => root.querySelector(selector)?.getBoundingClientRect().bottom ?? Number.NaN
+    let clip = Number.POSITIVE_INFINITY
+    for (let el: HTMLElement | null = root as HTMLElement; el; el = el.parentElement) {
+      const style = getComputedStyle(el)
+      if (style.overflowY !== 'visible') clip = Math.min(clip, el.getBoundingClientRect().bottom - parseFloat(style.borderBottomWidth || '0'))
+    }
+    return {
+      rowBottom: bottomOf('.qxt-rowlink'),
+      fineBottom: bottomOf('[data-testid="print-fulfill-fallback"]'),
+      clip,
+      scrollTop: (root as HTMLElement).scrollTop,
+    }
+  })
+  expect(geo.scrollTop).toBe(0)
+  expect(geo.rowBottom, '「查看打印订单」行的下沿在滚动区下沿之上').toBeLessThanOrEqual(geo.clip)
+  expect(geo.fineBottom, '下面那句小字的下沿在滚动区下沿之上').toBeLessThanOrEqual(geo.clip)
+})

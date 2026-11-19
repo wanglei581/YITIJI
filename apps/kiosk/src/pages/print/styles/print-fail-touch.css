@@ -58,7 +58,8 @@
 }
 
 /* 失败态比未确认页多一行金额与设备上报，摘要行收到 72，三步收紧，整屏仍落在底栏之上。
-   内容再多也不压扁任何一块：多出来的往下滚，不让摘要卡被挤掉半行。 */
+   内容再多也不压扁任何一块：多出来的往下滚，不让摘要卡被挤掉半行。
+   这几条是失败与「无法确认」（.pft-unk）共用的底子；失败四态再照稿收紧，见下面「打印失败四态照稿」一段。 */
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail > * {
   flex-shrink: 0;
 }
@@ -81,6 +82,57 @@
 
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail .qxt-step small {
   white-space: pre-line;
+}
+
+/* ── 打印失败四态照稿（PrintDoneFailed：.pft-fail 不带 .pft-unk；稿 st-fail-*，print-state-1119.js 的 .pf-fail）──
+   标题区下空 16，三步卡不设最小高（字 26 / 22，约 104）、卡间距 10，信息表行 62，带走卡约 202，
+   块间距从 12 起、余量均分。登录后多出的「查看打印订单」行和下面那句小字也要在一屏里（S15c9 第 1 条）。
+   「无法确认」仍用上面的 112 / 88，不在这一段里。 */
+[data-qx-page='print-done'] .qxt-body:has(> .pft-fail:not(.pft-unk)) {
+  padding-top: 16px;
+  padding-bottom: 0;
+}
+
+/* 底边距放进滚动块里面：排满时最后一句贴着它，滚动区下沿就是底栏上沿。 */
+[data-qx-page='print-done'] .qxt-body > .pft-fail:not(.pft-unk) {
+  padding-top: 0;
+  padding-bottom: 12px;
+}
+
+/* 没登录时不画「查看打印订单」（稿上总画着）：比稿少一块，余量只分给剩下几道间距，空带会比稿宽出一截。
+   小字下面再留一份同样宽的空当，顶替那一行的位置；底边距并进这一份。 */
+[data-qx-page='print-done'] .qxt-body > .pft-fail:not(.pft-unk):not(:has(> .qxt-rowlink)) {
+  padding-bottom: 0;
+}
+
+[data-qx-page='print-done'] .qxt-body > .pft-fail:not(.pft-unk):not(:has(> .qxt-rowlink))::after {
+  content: '';
+  flex: none;
+}
+
+[data-qx-page='print-done'] .pft-fail:not(.pft-unk) .qxt-steps {
+  gap: 10px;
+}
+
+[data-qx-page='print-done'] .pft-fail:not(.pft-unk) .qxt-steps-big .qxt-step {
+  min-height: 0;
+  padding: 16px 26px;
+}
+
+[data-qx-page='print-done'] .pft-fail:not(.pft-unk) .qxt-steps-big .qxt-step b {
+  font-size: 26px;
+  line-height: 1.3;
+}
+
+[data-qx-page='print-done'] .pft-fail:not(.pft-unk) .qxt-steps-big .qxt-step small {
+  font-size: 22px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
+[data-qx-page='print-done'] .pft-fail:not(.pft-unk) .pft-fail-sum .qxt-sum-r {
+  min-height: 62px;
+  padding: 8px 24px;
 }
 
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits .qxt-btn-exit {
@@ -153,12 +205,12 @@
   font-weight: 700;
 }
 
-/* 「文件带走」触屏卡：标题 + 二维码（不小于 168）+ 剩余时间 + 说明 */
+/* 「文件带走」触屏卡：标题 + 二维码（不小于 168，稿 172）+ 剩余时间 + 说明。内边距照稿 .pf-take。 */
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-take-card {
   display: flex;
   align-items: center;
-  gap: 28px;
-  padding: 18px 28px;
+  gap: 26px;
+  padding: 14px 24px;
   border-radius: 30px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
