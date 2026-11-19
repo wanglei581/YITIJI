@@ -740,3 +740,214 @@ test('同一轮只读一次配置，角标和收费句不各拿一份', async (t
     t.mock.timers.reset()
   }
 })
+
+// ── 首页短价（P2e-5）：同一轮把五个生效价原样透出，读不到的是未知（null），不当成 0。──
+
+const PRICE_KEYS = ['resume_optimize', 'mock_interview', 'print_bw_page', 'print_color_page', 'scan']
+const UNKNOWN = Object.fromEntries(PRICE_KEYS.map((key) => [key, null]))
+
+test('五个生效价逐键透出：读到的原样给出，缺键、负数、小数、字符串记未知，不默认成 0', () => {
+  const { kioskHomeEffectivePrices } = reader
+  const config = configWith({ resume_optimize: 150, mock_interview: 200, print_bw_page: 50, print_color_page: 120, scan: 0 })
+  assert.deepEqual({ ...kioskHomeEffectivePrices(config) }, {
+    resume_optimize: 150, mock_interview: 200, print_bw_page: 50, print_color_page: 120, scan: 0,
+  })
+  const odd = configWith({ resume_optimize: 150, print_bw_page: 50, print_color_page: 120, scan: 30 })
+  delete odd.pricing.effective.mock_interview
+  odd.pricing.effective.print_color_page = -1
+  odd.pricing.effective.scan = '30'
+  odd.pricing.effective.print_bw_page = 50.5
+  assert.deepEqual({ ...kioskHomeEffectivePrices(odd) }, {
+    resume_optimize: 150, mock_interview: null, print_bw_page: null, print_color_page: null, scan: null,
+  })
+  assert.equal(Object.isFrozen(kioskHomeEffectivePrices(config)), true, '透出的价是只读快照')
+})
+
+test('整段价目读不到：五个价都是未知，没有一个变成 0', () => {
+  const { kioskHomeEffectivePrices, UNKNOWN_HOME_PRICES } = reader
+  assert.deepEqual({ ...UNKNOWN_HOME_PRICES }, UNKNOWN)
+  for (const config of [null, undefined, 'x', {}, { pricing: null }, { pricing: {} }, { pricing: { effective: null } }, { homeFreeBadge: true }]) {
+    const prices = kioskHomeEffectivePrices(config)
+    assert.deepEqual({ ...prices }, UNKNOWN, `配置 ${JSON.stringify(config)} 不能读出价`)
+    assert.equal(Object.values(prices).includes(0), false)
+  }
+})
+
+function startPricePolling(loadConfig, overrides = {}) {
+  const events = []
+  const stop = reader.startKioskHomeFreeBadgePolling((badge, charged) => { events.push(['visible', badge, charged]) }, {
+    getTerminalId: () => 'term-1',
+    loadConfig,
+    onPrices: (prices) => { events.push(['prices', { ...prices }]) },
+    ...overrides,
+  })
+  return { events, stop }
+}
+
+test('轮询：同一轮先交五个价、再交角标与收费；每一轮开头先把价撤回未知', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] })
+  let config = configWith({ resume_optimize: 150, mock_interview: 200, print_bw_page: 50, print_color_page: 120, scan: 0 })
+  const polling = startPricePolling(async () => config)
+  try {
+    await flush()
+    assert.deepEqual(polling.events, [
+      ['prices', UNKNOWN],
+      ['visible', false, false],
+      ['prices', { resume_optimize: 150, mock_interview: 200, print_bw_page: 50, print_color_page: 120, scan: 0 }],
+      ['visible', false, true],
+    ])
+    config = allFree
+    polling.events.length = 0
+    t.mock.timers.tick(reader.REFRESH_MS)
+    assert.deepEqual(polling.events, [['prices', UNKNOWN], ['visible', false, false]], '下一轮先撤下，不沿用上一轮的价')
+    await flush()
+    assert.deepEqual(polling.events.slice(2), [
+      ['prices', { resume_optimize: 0, mock_interview: 0, print_bw_page: 0, print_color_page: 0, scan: 0 }],
+      ['visible', true, false],
+    ])
+  } finally {
+    polling.stop()
+    t.mock.timers.reset()
+  }
+})
+
+test('轮询：读失败、超时、换终端都把五个价撤回未知，旧轮次和旧终端的价不发布', async (t) => {
+  const failed = startPricePolling(async () => { throw new Error('配置读失败') })
+  try {
+    await flush()
+    assert.deepEqual(failed.events.at(-2), ['prices', UNKNOWN])
+    assert.equal(failed.events.some(([kind, value]) => kind === 'prices' && Object.values(value).includes(0)), false)
+  } finally {
+    failed.stop()
+  }
+
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+  const slow = []
+  const late = startPricePolling(() => enqueue(slow))
+  try {
+    t.mock.timers.tick(reader.HOME_FREE_BADGE_ROUND_TIMEOUT_MS)
+    slow[0].resolve(configWith({ scan: 100 }))
+    await flush()
+    assert.deepEqual(late.events.at(-2), ['prices', UNKNOWN], '超时之后才到的价不再采用')
+    assert.equal(late.events.filter(([kind]) => kind === 'prices').every(([, value]) => value.scan === null), true)
+  } finally {
+    late.stop()
+    t.mock.timers.reset()
+  }
+
+  let terminalId = 'A'
+  let listener = () => {}
+  const queued = []
+  const moved = startPricePolling(() => enqueue(queued), {
+    getTerminalId: () => terminalId,
+    subscribeIdentity: (next) => {
+      listener = next
+      return () => { listener = () => {} }
+    },
+  })
+  try {
+    terminalId = 'B'
+    listener()
+    assert.deepEqual(moved.events.at(-2), ['prices', UNKNOWN], '终端号一变，价先撤回未知')
+    queued[0].resolve(configWith({ scan: 100 }))
+    await flush()
+    assert.equal(moved.events.filter(([kind]) => kind === 'prices').some(([, value]) => value.scan === 100), false, 'A 的价不能发布到 B')
+    queued[1].resolve(configWith({ scan: 30 }))
+    await flush()
+    assert.deepEqual(moved.events.at(-2), ['prices', { resume_optimize: 0, mock_interview: 0, print_bw_page: 0, print_color_page: 0, scan: 30 }])
+  } finally {
+    moved.stop()
+  }
+
+  const pending = []
+  const stopped = startPricePolling(() => enqueue(pending))
+  const before = stopped.events.length
+  stopped.stop()
+  pending[0].resolve(configWith({ scan: 100 }))
+  await flush()
+  assert.equal(stopped.events.length, before, '停止之后不再发布价')
+})
+
+test('不接价的调用方照旧只收角标与收费，没传 onPrices 不出错', async () => {
+  const seen = []
+  const stop = reader.startKioskHomeFreeBadgePolling((badge, charged) => { seen.push([badge, charged]) }, {
+    getTerminalId: () => 'term-1',
+    loadConfig: async () => configWith({ scan: 100 }),
+  })
+  try {
+    await flush()
+    assert.deepEqual(seen.at(-1), [false, true])
+  } finally {
+    stop()
+  }
+})
+
+// 用真实 reader 与真实钩子：快照里的五个价和角标、收费出自同一轮配置。
+function mountSnapshot(nextConfig) {
+  const hooks = createHookState()
+  const calls = { config: 0 }
+  const readerMod = load('src/hooks/kioskHomeFreeBadgeReader.ts', (name) => {
+    if (name === '@ai-job-print/shared') return { TERMINAL_CHARGE_SERVICE_KEYS: PRICE_KEYS }
+    if (name === '../services/api/terminalConfig') {
+      return {
+        getTerminalId: () => 'term-1',
+        peekCachedKioskTerminalConfig: () => null,
+        getCachedKioskTerminalConfig: async () => {
+          calls.config += 1
+          const value = nextConfig()
+          if (value instanceof Error) throw value
+          return value
+        },
+      }
+    }
+    if (name === '../services/api/screensaver') return { subscribeTerminalIdentity: () => () => {} }
+    throw new Error(`Unexpected dependency ${name}`)
+  })
+  const hookMod = load('src/hooks/useKioskHomeFreeBadge.ts', (name) => {
+    if (name === 'react') return hooks
+    if (name === './kioskHomeFreeBadgeReader') return readerMod
+    throw new Error(`Unexpected dependency ${name}`)
+  })
+  const snapshot = () => {
+    hooks.begin()
+    return hookMod.useKioskHomePriceSnapshot()
+  }
+  const first = snapshot()
+  hooks.flushEffects()
+  return { first, snapshot, calls, stop: () => hooks.stop() }
+}
+
+test('钩子快照：五个价与角标、收费同一轮；挂载前与读失败时是未知，不是 0', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] })
+  let config = configWith({ resume_optimize: 150, mock_interview: 200, print_bw_page: 50, print_color_page: 120, scan: 0 })
+  const home = mountSnapshot(() => config)
+  try {
+    assert.deepEqual({ ...home.first.prices }, UNKNOWN, '还没读到时五个价都是未知')
+    assert.equal(home.first.badge, false)
+    assert.equal(home.first.charged, false)
+    await flush()
+    const paid = home.snapshot()
+    assert.deepEqual({ ...paid.prices }, { resume_optimize: 150, mock_interview: 200, print_bw_page: 50, print_color_page: 120, scan: 0 })
+    assert.equal(paid.charged, true)
+    assert.equal(paid.badge, false)
+    assert.equal(home.calls.config, 1, '价和角标同一轮只读一次配置')
+
+    const broken = configWith({ resume_optimize: 150, print_bw_page: 50, print_color_page: 120, scan: 30 })
+    delete broken.pricing.effective.mock_interview
+    config = broken
+    t.mock.timers.tick(reader.REFRESH_MS)
+    await flush()
+    const partial = home.snapshot()
+    assert.equal(partial.prices.mock_interview, null, '缺的键保持未知')
+    assert.equal(partial.prices.scan, 30)
+    assert.equal(home.calls.config, 2)
+
+    config = new Error('读失败')
+    t.mock.timers.tick(reader.REFRESH_MS)
+    await flush()
+    assert.deepEqual({ ...home.snapshot().prices }, UNKNOWN, '读失败不沿用上一轮的价')
+  } finally {
+    home.stop()
+    t.mock.timers.reset()
+  }
+})
