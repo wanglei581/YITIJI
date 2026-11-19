@@ -194,6 +194,12 @@ test('错误码表里带号码的句子在取文案时才现算：服务联系�
   }
 })
 
+test('排版一次放不下时，屏上告诉人删短或按现在的版式导出', () => {
+  const text = userErrors.userMessageOf({ code: 'AI_LAYOUT_ADJUST_TOO_LONG' }, '兜底')
+  assert.equal(text, '这份简历一次放不下。请先删短一些内容，再试一次；也可以直接按现在的版式导出。')
+  assert.equal(copy.containsStaffHandoff(text), false)
+})
+
 test('错误码表整表与 5xx 通用句：任何一句都不叫用户去找现场的人，且码表没有被清空', () => {
   const codes = userErrors.SHARED_USER_MESSAGE_CODES
   assert.ok(codes.length > 40, '码表被清空或没读到，整表检查是空转')

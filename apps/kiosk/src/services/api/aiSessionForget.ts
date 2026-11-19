@@ -8,7 +8,7 @@
 import { parseId } from '../../pages/ai-plan/advisorArtifactModel'
 import { API_BASE_URL, API_MODE } from './client'
 
-/** 服务端铸的小青会话号：randomBytes(16) 的小写十六进制。客户端的 session-…、演示的 mock-… 不收。 */
+/** 小青会话号：16 字节小写十六进制。旧的 session-…、演示的 mock-… 不收。 */
 const ASSISTANT_SESSION_ID_RE = /^[0-9a-f]{32}$/
 const MAX_REMEMBERED = 10
 

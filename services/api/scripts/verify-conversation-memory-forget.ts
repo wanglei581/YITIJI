@@ -37,6 +37,7 @@ import { SMS_SENDER } from '../src/member-auth/sms/sms-sender'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { runInflightForgetScenarios } from './verify-conversation-memory-forget-inflight'
+import { runGuestLoginLogoutScenarios } from './verify-conversation-memory-forget-logout-switch'
 
 process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 
@@ -739,7 +740,7 @@ async function main(): Promise<void> {
       '场景 12：清当前作业不清同会员的另一个作业',
     )
 
-    await runInflightForgetScenarios({
+    const inflightCtx = {
       check,
       textMark,
       chat,
@@ -756,7 +757,9 @@ async function main(): Promise<void> {
       createQa,
       bearer,
       modelGate,
-    })
+    }
+    await runInflightForgetScenarios(inflightCtx)
+    await runGuestLoginLogoutScenarios(inflightCtx)
 
     console.log(`\nverify:conversation-memory-forget ${failCount === 0 ? '通过' : '未通过'}：PASS ${passCount} / FAIL ${failCount}`)
     if (failCount > 0) process.exitCode = 1

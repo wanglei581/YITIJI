@@ -420,6 +420,7 @@ export class LlmChatService {
   /** 空闲超过 SESSION_TTL_MS 的会话立刻丢掉。每分钟扫，不等下一次对话。 */
   @Cron(CronExpression.EVERY_MINUTE)
   sweep(now = Date.now()): number {
+    this.epoch.sweep()
     const before = this.sessions.size
     this.pruneSessions(now)
     const removed = before - this.sessions.size
@@ -463,16 +464,23 @@ export class LlmChatService {
         if (this.sessions.size >= size) break
       }
       if (this.sessions.size >= MAX_ASSISTANT_SESSIONS) this.evictOldest()
-      sessionId = randomBytes(16).toString('hex')
+      // 这次到访自己铸的 32 位十六进制号还没被占用，就沿用。离场清场在回复回来之前
+      // 才能按这个号作废。已经有人占着（含别的归属）、还在路上，或清场墓碑还在，就另铸。
+      const unusedVisitId = /^[0-9a-f]{32}$/.test(requestedId)
+        && !this.sessions.has(requestedId)
+        && !this.inflight.has(requestedId)
+        && !this.epoch.wasRetired(requestedId)
+      sessionId = unusedVisitId ? requestedId : randomBytes(16).toString('hex')
       session = { messages: [], updatedAt: now, ownerKey }
       created = true
       this.sessions.set(sessionId, session)
     }
     // 政策查询是第一次 await。先登记并抓住代次，查询挂起期间的登出和清场才作废得了这次写回。
     const capturedEpoch = this.epoch.capture(sessionId)
+    this.epoch.hold(sessionId)
+    try {
     this.noteInflight(sessionId, ownerKey)
     const channel = resolveAssistantChannel(input.channel)
-    try {
     const currentPolicy = policyPrompt ?? (input.policyId === undefined ? undefined : await this.readPolicyContext(input.policyId))
     if (currentPolicy === null) {
       if (created && this.sessions.get(sessionId) === session && session.messages.length === 0) {
@@ -569,6 +577,7 @@ export class LlmChatService {
       ...(fixedNotice ? { fixedNotice: true } : {}),
     }
     } finally {
+      this.epoch.release(sessionId)
       this.endInflight(sessionId)
     }
   }

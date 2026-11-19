@@ -277,8 +277,9 @@ export class AssistantSummaryService {
     const transcript = turns
       .slice(-16)
       .map((turn) => {
+        // 先遮盖再截断。证件号跨在 800 字上时，先截断会把前 10 位明文送出去。
         const masked = turn.role === 'user'
-          ? maskUserTextForLlmText(turn.content.slice(0, 800), 'assistant_summary')
+          ? maskUserTextForLlmText(turn.content, 'assistant_summary').slice(0, 800)
           : turn.content.slice(0, 800)
         return `${turn.role === 'user' ? '用户' : '小青'}：${masked}`
       })

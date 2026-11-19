@@ -185,10 +185,10 @@ export class LlmFairVisitPlanService {
   async build(ctx: FairVisitPlanContext): Promise<FairVisitPlanPayload> {
     const system = buildSystemPrompt(ctx.mode)
 
-    // S0-2 / 风险 R2：简历先截断再遮盖高置信 PII 才送模型。
+    // S0-2 / 风险 R2：简历先遮盖高置信 PII，再截到 8000 字才送模型。
     // 参会准备单不依赖姓名 / 手机 / 身份证 / 邮箱 / 住址，遮盖不影响结论质量。
     const user = [
-      `【简历原文】\n${maskUserTextForLlmText(ctx.resumeText.slice(0, 8000), 'fair_visit_plan')}`,
+      `【简历原文】\n${maskUserTextForLlmText(ctx.resumeText, 'fair_visit_plan').slice(0, 8000)}`,
       `【招聘会】\n${JSON.stringify(ctx.fair)}`,
       `【fairCompanies】\n${JSON.stringify(ctx.fairCompanies.slice(0, 40)).slice(0, 9000)}`,
     ].join('\n\n')
