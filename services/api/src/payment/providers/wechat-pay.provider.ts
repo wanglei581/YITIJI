@@ -492,7 +492,11 @@ export class WechatPayProvider implements PaymentProvider {
       resp = await this.request('GET', `/v3/refund/domestic/refunds/${encodeURIComponent(input.refundNo)}`)
     } catch (e) {
       if ((e as Error).message?.includes('RESOURCE_NOT_EXISTS') || (e as Error).message?.includes('HTTP_404')) {
-        return { status: 'unknown', channelRefundNo: null }
+        return {
+          status: 'unknown',
+          channelRefundNo: null,
+          refundState: (e as Error).message?.includes('RESOURCE_NOT_EXISTS') ? 'RESOURCE_NOT_EXISTS' : null,
+        }
       }
       throw e
     }
@@ -507,7 +511,7 @@ export class WechatPayProvider implements PaymentProvider {
     if (status === 'failed' && raw !== 'ABNORMAL' && raw !== 'CLOSED') {
       return { status: 'unknown', channelRefundNo: asString(resp['refund_id']), refundAmountCents }
     }
-    return { status, channelRefundNo: asString(resp['refund_id']), refundAmountCents }
+    return { status, channelRefundNo: asString(resp['refund_id']), refundAmountCents, refundState: raw }
   }
 
   /**
