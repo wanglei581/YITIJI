@@ -265,8 +265,13 @@ expectMatches(
 )
 expectMatches(
   homeSrc,
-  /device\.requestFailed\s*\? \{ tone: 'warn' as const, label: '服务暂时连不上' \}/,
-  'HomePage 读状态的请求没回来时页头写「服务暂时连不上」',
+  /homeBandStatus\(\{[\s\S]*requestFailed: device\.requestFailed === true/,
+  'HomePage 把请求失败交给 homeBandStatus，不在页里另写顶栏文案',
+)
+expectMatches(
+  homeDomainSrc,
+  /if \(input\.requestFailed\) return \{ tone: 'warn', label: '服务暂时连不上' \}/,
+  '读状态的请求没回来时页头写「服务暂时连不上」',
 )
 expectMatches(
   homeViewSrc,
