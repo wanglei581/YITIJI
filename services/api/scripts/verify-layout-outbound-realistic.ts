@@ -8,6 +8,7 @@
  * 简历 JSON 里相邻的数字字段拼起来再遮。括号里的区号单独成字段时也接。
  * 占位符用本次请求才有的标记，用户原文里的形似占位符原样保留。
  * 出站正文去掉这些分隔符、折成半角之后，拼不出原号码。还原与原文逐字一致。
+ * 固定种子再随机拼 500 组，换一个种子再来 500 组：号码拼不回去，日期仍是原文。
  *
  * 运行：pnpm --filter @ai-job-print/api verify:layout-outbound-realistic
  */
@@ -16,6 +17,7 @@ import {
   runDateExemptionCases,
   runExtendedSegmentCases,
   runParenCases,
+  runRandomSegmentCases,
 } from './verify-layout-outbound-realistic-extra'
 
 let passCount = 0
@@ -244,6 +246,7 @@ function main(): void {
   runExtendedSegmentCases(assertCovered)
   runDateExemptionCases(assertKept, assertCovered)
   runParenCases({ pass, fail })
+  runRandomSegmentCases({ pass, fail })
   assertPlaceholderCollision()
   assertPrivateUseKept()
   assertTruncationHoleDoesNotCrossWire()

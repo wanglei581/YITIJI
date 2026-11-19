@@ -122,6 +122,35 @@ export function coverRealisticNumbers(text: string, book: LayoutDigitBook): stri
 }
 
 /**
+ * 整段日期先换成标记再送进遮盖引擎。
+ * 引擎里带标签的手机号没有尾边界，会把 1997-2024-2013 切掉最后一位当成手机号。
+ * 标记里有字母，引擎不会把它当成号码。出来之后再换回原文。
+ */
+export function shieldLayoutDates(text: string, book: LayoutDigitBook): string {
+  const folded = foldDigits(text)
+  const spans: Array<[number, number]> = []
+  let index = 0
+  while (index < folded.length) {
+    if (!isDigit(folded[index] ?? '')) {
+      index += 1
+      continue
+    }
+    const runStart = index
+    const joined = readJoinedDigits(folded, index)
+    const extended = matchExtendedSegments(folded, index)
+    const chosen = extended !== null && extended.end > joined.end ? extended : null
+    const rawEnd = chosen === null ? joined.end : chosen.end
+    const digitCount = chosen === null ? joined.digits : chosen.digits
+    const end = extendCheckDigit(folded, rawEnd)
+    if (digitCount >= 11 && isLayoutDateOrTime(folded.slice(runStart, end))) {
+      spans.push([runStart, end])
+    }
+    index = end
+  }
+  return replaceSpans(text, spans, book)
+}
+
+/**
  * 取舍：顺着原文扫字符串值，不把整段 JSON 去掉标点再拼。
  * 去掉标点会把键名和不相邻的数字也接上，还原做不到逐字。
  * 键名跳过。普通文字、日期轴，以及不是分隔符的转义，都断开，不参与拼接。

@@ -23,6 +23,7 @@ import {
   createLayoutTokenBook,
   foldDigits,
   layoutTokenPattern,
+  shieldLayoutDates,
   type LayoutDigitBook,
 } from './layout-adjust-digit-cover'
 
@@ -95,6 +96,16 @@ function shieldPlaceholderLiterals(text: string, book: LayoutDigitBook): string 
 
 function isPlaceholderSpelling(value: string): boolean {
   return new RegExp(`^${llmMaskPlaceholderPattern('u').source}$`, 'u').test(value)
+}
+
+/** 日期标记换回原文。出站要看到日期本身，不能停在标记上。 */
+function unshieldLayoutDates(text: string, extra: ReadonlyMap<string, string>): string {
+  let out = text
+  for (const [token, original] of extra) {
+    if (!out.includes(token) || !isLayoutDateOrTime(foldDigits(original))) continue
+    out = out.split(token).join(original)
+  }
+  return out
 }
 
 /** 引擎遮完再换回用户原文。还原函数不再认 `[类别_序号]`，这段字就留在正文里。 */
@@ -188,7 +199,8 @@ export function maskLayoutAdjustOutbound(input: {
   ]
   if (glued.some((text) => text.length > LLM_MASK_INPUT_LIMIT)) tooLong()
   // 引擎会把 \r\n 收成 \n。先遮住，占位符里留的才是用户原文。
-  const prepared = glued.map((text) => coverRealisticNumbers(text, book))
+  // 日期也先换走：带标签的手机号规则会把年份串切掉一位。
+  const prepared = glued.map((text) => shieldLayoutDates(coverRealisticNumbers(text, book), book))
   const masked = maskUserTextsForLlmReversible(prepared, 'resume_layout_adjust')
   const occurrences = new Map<string, string[]>()
   for (const [token, list] of masked.occurrences) occurrences.set(token, [...list])
@@ -198,12 +210,10 @@ export function maskLayoutAdjustOutbound(input: {
   )
   const [engineOriginal = '', engineValues = '', engineJson = ''] = masked.texts
   // 原文先领序号。贴着字数上限的证件号要换成 10 字标记，才不会被截出窗口。
-  const coveredOriginal = unshieldPlaceholderLiterals(cover(engineOriginal), extra)
-  const maskedResumeValues = unshieldPlaceholderLiterals(cover(engineValues), extra)
-  const maskedResumeJson = unshieldPlaceholderLiterals(
-    coverAdjacentJsonValues(cover(engineJson), book),
-    extra,
-  )
+  const finish = (text: string): string => unshieldLayoutDates(unshieldPlaceholderLiterals(text, extra), extra)
+  const coveredOriginal = finish(cover(engineOriginal))
+  const maskedResumeValues = finish(cover(engineValues))
+  const maskedResumeJson = finish(coverAdjacentJsonValues(cover(engineJson), book))
   const maskedOriginal = cutMaskedLayoutText(coveredOriginal, input.maxOriginalChars)
   dropAbsentTokens(extra, [maskedOriginal, maskedResumeValues, maskedResumeJson])
   return {
