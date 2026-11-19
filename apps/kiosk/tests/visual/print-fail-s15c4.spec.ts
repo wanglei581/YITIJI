@@ -425,7 +425,8 @@ test('failure screens keep one service phone and can be shot for the blank-band 
     await expect(step3).toContainText('服务电话')
     if (scene.canRetry) {
       await expect(root.getByRole('button', { name: '重新提交打印' })).toBeVisible()
-      await expect(step3).toContainText('重新提交打印')
+      await expect(root.locator('ol li').nth(1)).toContainText('重新提交打印')
+      await expect(step3).not.toContainText('重新提交打印')
     }
     await expect(page.getByText('工作人员')).toHaveCount(0)
     await shot(page, scene.name)
