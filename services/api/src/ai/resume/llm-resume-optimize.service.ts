@@ -660,9 +660,9 @@ export class LlmResumeOptimizeService {
     const strippedFactSource = stripLayoutTokensForFacts(factSource, tokens)
     const normFact = normalizeResumeFactText(strippedFactSource)
     const factMatcher = makeFactMatcher(strippedFactSource)
-    // 字段值是本次占位符时（电话、邮箱被遮），只在 strippedFactSource 里找不到，得按集合认它仍是事实。
+    // 字段值也按同一份集合去标记再比：只剩标记的（电话、邮箱被遮）算空值，夹着标记的（证书编号被遮）比剩下的字。
     const inFact = (value: string | undefined): boolean =>
-      factMatcher(value) || (typeof value === 'string' && value.length > 0 && tokens.has(value))
+      factMatcher(value === undefined ? undefined : stripLayoutTokensForFacts(value, tokens))
     const hasNoNewNumbers = (value: string): boolean => {
       const visible = stripLayoutTokensForFacts(value, tokens)
       for (const token of visible.match(/\d+(?:\.\d+)?%?/g) ?? []) {

@@ -331,6 +331,29 @@ async function main(): Promise<void> {
     }
     pass('3f. 事实核对只去本次真正发出的标记，删处留空格')
 
+    // 走完整条排版：标记两边紧挨数字，去成空串会把 4 和 1.8 粘成原文没有的 41.8。
+    const glued: StubMutate = (resume) => {
+      resume.experience[0] = { ...resume.experience[0], description: `首屏从4${resume.basic.phone ?? ''}1.8秒。` }
+    }
+    setResponses([glued])
+    const gluedKept = await svc.adjustLayoutDraft({ currentResume: baseResume, originalText: ORIGINAL_TEXT, action: 'reformat' })
+    assertStubHealthy()
+    if (gluedKept.resume.experience[0].description !== `首屏从4${baseResume.basic.phone}1.8秒。`) fail('3g. 标记紧挨数字的合法输出被误拒或没还原')
+    pass('3g. 标记紧挨数字的合法输出不被误拒，号码照常还原')
+
+    // 证书里的编号被遮成本次标记。字段值和原文按同一份去标记文本比，原样回抄不能被当成编造。
+    const certNo = '软件设计师 证书编号 0123456789012'
+    setResponses([null])
+    const certKept = await svc.adjustLayoutDraft({
+      currentResume: { ...baseResume, certificates: [...baseResume.certificates, certNo] },
+      originalText: `${ORIGINAL_TEXT}\n证书 ${certNo}`,
+      action: 'reformat',
+    })
+    assertStubHealthy()
+    if (!lastUserPrompt.includes('软件设计师 证书编号 ⦃') || lastUserPrompt.includes('0123456789012')) fail('3h. 证书编号应以本次标记出站')
+    if (!certKept.resume.certificates.includes(certNo)) fail('3h. 字段值夹着本次标记时被误拒或没还原')
+    pass('3h. 字段值夹着本次标记，按同一份去标记文本比对，不误拒')
+
     // 14. 只写了公司、没写职务的经历（11/08 包 2 并入 B8 ② 时补）：版式调整照样保留，职务留空，也不许补出职务。
     if (!LAYOUT_ADJUST_SYSTEM_PROMPT.includes('只有公司没有职务的经历,role 留空字符串,仍保留该条经历,不得编造职务')) {
       fail('14c. 版式调整提示词必须写明：只有公司没有职务时 role 留空、保留该条、不得编造职务')
