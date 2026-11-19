@@ -10,6 +10,7 @@ import type { PrismaService } from '../prisma/prisma.service'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from './pending-refund-signal'
 import { resolveChannelBeforeHold } from './refund-channel-hold-gate'
 import type { ChannelQueryFault } from './refund-channel-query'
+import { closeOrderIfPaperUnreleased } from './close-order-if-unreleased'
 import { markOrderIfPaperUnreleased, paperAlreadyReleased } from './refund-paper-exclusion'
 import { settlementAfterSuccess } from './refund-remainder'
 
@@ -237,26 +238,48 @@ export async function resolvePrintReturnHold(
         data: { status: 'closed' },
       })
       if (closedRefund.count !== 1) throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
-      const closedOrder = await tx.order.updateMany({
-        where: { id: orderId, payStatus: order.payStatus, NOT: { payStatus: 'partial_refunded' } },
-        data: { payStatus: 'closed', taskStatus: task && task.status === 'pending' ? 'cancelled' : order.taskStatus },
-      })
-      if (closedOrder.count !== 1) {
-        const currentPay = await tx.order.findUnique({ where: { id: orderId }, select: { payStatus: true } })
-        if (currentPay?.payStatus === 'partial_refunded') {
+      const closedOrder = await closeOrderIfPaperUnreleased(tx, db.dbKind, orderId, order.payStatus)
+      if (!closedOrder) {
+        const current = await tx.order.findUnique({
+          where: { id: orderId },
+          select: { payStatus: true, taskStatus: true, printTaskId: true },
+        })
+        const taskNow = current?.printTaskId
+          ? await tx.printTask.findUnique({
+            where: { id: current.printTaskId },
+            select: { status: true, printOutcome: true },
+          })
+          : null
+        if (current?.payStatus === 'partial_refunded') {
           throw deny('PARTIAL_REFUND_CANNOT_CLOSE', PARTIAL_CLOSE_MESSAGE)
         }
+        const taken = paperAlreadyReleased({
+          taskStatus: taskNow?.status ?? null,
+          orderTaskStatus: current?.taskStatus ?? null,
+          printOutcome: taskNow?.printOutcome ?? null,
+        })
+        if (taken) throw deny('PAPER_ALREADY_OUT_CANNOT_CLOSE', '纸已经出去，不能关单。钱还在的话请走核对后仍退款。')
         throw deny('REFUND_HOLD_ALREADY_RESOLVED', '这笔待人工退款刚刚已经被处理，请刷新后再看。')
       }
-      if (task && task.printOutcome !== 'printed' && (task.status === 'pending' || task.status === 'failed')) {
-        await tx.printTask.updateMany({
-          where: { id: task.id, status: { in: ['pending', 'failed'] } },
+      if (task && (task.status === 'pending' || task.status === 'failed')) {
+        const cancelled = await tx.printTask.updateMany({
+          where: {
+            id: task.id,
+            status: { in: ['pending', 'failed'] },
+            OR: [
+              { printOutcome: null },
+              { printOutcome: { not: 'printed' } },
+            ],
+          },
           data: {
             status: 'cancelled',
             errorCode: 'ORDER_CLOSED',
             errorMessage: `${NOT_REFUNDED_NOTE}，纸也不会再出`,
           },
         })
+        if (cancelled.count !== 1) {
+          throw deny('PAPER_ALREADY_OUT_CANNOT_CLOSE', '纸已经出去，不能关单。钱还在的话请走核对后仍退款。')
+        }
         await tx.order.updateMany({
           where: { id: orderId, taskStatus: { in: ['pending', 'failed'] } },
           data: { taskStatus: 'cancelled' },
