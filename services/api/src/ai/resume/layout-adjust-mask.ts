@@ -161,12 +161,12 @@ function tooLong(): never {
   })
 }
 
-/** 截到 limit。切点落在占位符里就退到占位符前面；末尾剩下的数字整段丢掉。 */
 /** 事实核对前去掉本次标记。标记里的十六进制和序号不是简历上的数字。 */
 export function stripLayoutTokensForFacts(text: string): string {
   return text.replace(layoutTokenPattern('gu'), '')
 }
 
+/** 截到 limit。切点落在占位符里就退到占位符前面；末尾剩下的数字整段丢掉。 */
 export function cutMaskedLayoutText(text: string, limit: number): string {
   if (limit <= 0) return ''
   if (text.length <= limit) return text
