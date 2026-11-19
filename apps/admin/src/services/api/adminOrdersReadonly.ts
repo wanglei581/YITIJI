@@ -1,7 +1,8 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
-import { currentHoldDemo, resolveHoldDemo } from './adminOrdersHoldDemo'
+import { currentHoldDemo, registerHoldDemo, resolveHoldDemo } from './adminOrdersHoldDemo'
 import { findServiceDemo, refundServiceDemo, retryServiceDemoRefund, serviceDemoPage } from './adminOrdersServiceDemo'
+import type { ChannelResultRegistrationInput, ChannelResultRegistrationOutcome } from './adminOrdersRegistration'
 
 export type AdminOrderAftercareStatus = 'manual_check_required' | null
 
@@ -96,6 +97,8 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   refundRemainderCents?: number | null
   /** 有渠道受理过、还没落定的退款（与服务端三步处置同一个判断）。为 true 时三步按钮都禁用。服务单不返回。 */
   channelInFlight?: boolean
+  /** 长期查不到渠道结果、可以按商户平台核实结果登记的那一笔。服务单不返回。 */
+  channelResultRegistration?: { refundNo: string; amountCents: number; submittedAt: string } | null
 }
 
 export interface AdminOrderReadonlyPage {
@@ -177,6 +180,7 @@ interface AdminOrdersReadonlyService {
   refundOrder(id: string, refundReason: string): Promise<AdminOrderRefundResult>
   resolvePrintReturnHold(id: string, action: 'confirm-refunded' | 'release-paper' | 'close'): Promise<PrintReturnResolutionResult>
   refundAfterPaperCheck(id: string, refundReason: string): Promise<AdminOrderRefundResult>
+  registerChannelResult(id: string, input: ChannelResultRegistrationInput): Promise<ChannelResultRegistrationOutcome>
   /** 线下 / 人工确认收款入账；仅 `payStatus==='unpaid'` 的订单可成功，其余由后端拒绝并回错误码。 */
   markPaidOrder(id: string, paymentSource: AdminOrderMarkPaidSource): Promise<AdminOrderMarkPaidResult>
   retryServiceRefund(id: string): Promise<AdminOrderReadonlyDetail>
@@ -258,6 +262,8 @@ const httpAdapter: AdminOrdersReadonlyService = {
     post<PrintReturnResolutionResult>(`/admin/orders/${encodeURIComponent(id)}/print-return/${action}`, {}),
   refundAfterPaperCheck: (id, refundReason) =>
     post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund-after-paper-check`, { refundReason }),
+  registerChannelResult: (id, input) =>
+    post<ChannelResultRegistrationOutcome>(`/admin/orders/${encodeURIComponent(id)}/print-return/register-channel-result`, input),
   markPaidOrder: (id, paymentSource) =>
     post<AdminOrderMarkPaidResult>(`/admin/orders/${encodeURIComponent(id)}/mark-paid`, { paymentSource }),
 }
@@ -327,6 +333,8 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   refundLedgerCents: null,
   refundRemainderCents: null,
   channelInFlight: false,
+  // 契约门禁要求把服务端可能返回的嵌套字段写全。这张单不在待人工，页面不会显示登记入口。
+  channelResultRegistration: { refundNo: 'RFD-MOCK-REGISTRATION', amountCents: 0, submittedAt: now() },
 }
 
 /** 存量订单未记录计费页数，供列表和详情验证空值展示。 */
@@ -471,6 +479,11 @@ const mockAdapter: AdminOrdersReadonlyService = {
   },
   async refundAfterPaperCheck(_id, refundReason) {
     return mockAdapter.refundOrder(_id, refundReason)
+  },
+  async registerChannelResult(id, input) {
+    const held = registerHoldDemo(id, input)
+    if (held) return held
+    throw new ApiHttpError('REGISTRATION_NOT_IN_FLIGHT', '这笔退款不在渠道处理中，不用登记。请刷新后再看。', 400)
   },
 }
 

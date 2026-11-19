@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { adminOrdersReadonlyService } from '../../services/api/adminOrdersReadonly'
+import type { ChannelResultRegistrationOutcome } from '../../services/api/adminOrdersRegistration'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { ChannelResultRegistration } from './ChannelResultRegistration'
 import type { OrderDetailControls } from './useOrderDetail'
 import { amountText, autoRefundStatusText, orderPaperReleased, payStatusPresentation } from './orderDisplay'
 
@@ -39,6 +41,15 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
     } finally {
       setPending(null)
     }
+  }
+
+  const registered = async (outcome: ChannelResultRegistrationOutcome) => {
+    const state = `支付状态 ${payStatusPresentation(outcome.payStatus).label}，退款状态 ${autoRefundStatusText(outcome.refundStatus)}。`
+    setNote(outcome.recordedBy === 'channel'
+      ? `渠道这时已经有了答复，已按渠道答复记账，没有用这次登记。${state}`
+      : `已按商户平台核实结果登记。${state}`)
+    void refresh()
+    await openDetail(detail.id)
   }
 
   const submitVerified = async () => {
@@ -99,6 +110,7 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
             <>
               <p className="text-xs text-neutral-500">改为出纸和关单都不会把这笔钱记成已退回。关单后纸也不会再出。</p>
               {channelPending ? <p className="text-xs font-semibold text-neutral-700">退款还在渠道处理中，结果出来前不能处置。</p> : null}
+              {channelPending ? <ChannelResultRegistration detail={detail} onDone={registered} /> : null}
             </>
           )}
         </>

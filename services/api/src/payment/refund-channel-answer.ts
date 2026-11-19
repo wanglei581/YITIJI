@@ -31,13 +31,40 @@ function deny(code: string, message: string): BadRequestException {
 }
 
 /** 返回 true 表示这次至少记下了一笔属于这单实付的成功退款。 */
+/** 按商户平台核实结果登记（第 8 条）。登记和渠道答复走同一条记账路径，登记审计写在同一事务里。 */
+export type ChannelResultRegistration = {
+  result: 'refunded' | 'not_refunded'
+  channelRefundNo: string | null
+  note: string | null
+}
+
 export async function recordChannelAnswers(
   db: PrismaService,
   orderId: string,
   answers: DefinitiveChannelAnswer[],
   operatorId: string,
+  registration?: ChannelResultRegistration,
 ): Promise<boolean> {
   return db.$transaction(async (tx) => {
+    if (registration) {
+      await tx.auditLog.create({
+        data: {
+          actorId: null,
+          actorRole: 'admin',
+          action: 'refund.channel_result_registered',
+          targetType: 'order',
+          targetId: orderId,
+          payloadJson: JSON.stringify({
+            refundNos: answers.map((answer) => answer.refundNo),
+            result: registration.result,
+            channelRefundNo: registration.channelRefundNo,
+            note: registration.note,
+            operatorId,
+            basis: '按商户平台核实结果登记',
+          }),
+        },
+      })
+    }
     let paidBack = false
     let refundReason: string | null = null
     for (const answer of answers) {
@@ -72,6 +99,7 @@ export async function recordChannelAnswers(
             recordedAmountCents: row.amountCents,
             channelAmountCents: answer.verdict === 'success' ? answer.amountCents : null,
             operatorId,
+            source: registration ? 'registration' : 'channel',
           }),
         },
       })

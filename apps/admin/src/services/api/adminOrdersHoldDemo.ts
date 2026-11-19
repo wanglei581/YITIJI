@@ -1,11 +1,13 @@
 import { ApiHttpError } from './client'
 import type { AdminOrderReadonlyDetail, PrintReturnResolutionResult } from './adminOrdersReadonly'
+import type { ChannelResultRegistrationInput, ChannelResultRegistrationOutcome } from './adminOrdersRegistration'
 
 /**
  * 只有浏览器用例写入这个键时才出现。默认列表不带这张单，也不带运营关注角标。
  * manual：渠道退款已经失败，三步都能做。pending：退款还在渠道处理中，三步都不能做。
  * channel-manual：渠道受理过、记成待人工（例如金额对不上搁置），三步都不能做。
  * window-local：取件窗口关闭后本地停放的待人工，渠道没受理过，三步都能做。
+ * channel-stuck：渠道受理过、满 24 小时还查不到结果，三步不能做，可以按商户平台核实结果登记。
  * 能不能做只看 channelInFlight，和服务端同一个判断。
  */
 const HOLD_DEMO_KEY = 'mock:order-hold'
@@ -14,8 +16,8 @@ const LEDGER_NO = 'RFD-HOLD-MANUAL'
 const LEDGER_CENTS = 200
 
 type HoldAction = 'confirm-refunded' | 'release-paper' | 'close'
-type HoldDemoMode = 'manual' | 'pending' | 'channel-manual' | 'window-local'
-const HOLD_DEMO_MODES: readonly HoldDemoMode[] = ['manual', 'pending', 'channel-manual', 'window-local']
+type HoldDemoMode = 'manual' | 'pending' | 'channel-manual' | 'window-local' | 'channel-stuck'
+const HOLD_DEMO_MODES: readonly HoldDemoMode[] = ['manual', 'pending', 'channel-manual', 'window-local', 'channel-stuck']
 
 let loaded = false
 let holdOrder: AdminOrderReadonlyDetail | null = null
@@ -80,7 +82,7 @@ function freshHoldOrder(mode: HoldDemoMode): AdminOrderReadonlyDetail {
     },
     statusLogs: [{ fromStatus: 'pending', toStatus: 'failed', errorCode: null, createdAt }],
     autoRefund: false,
-    refundStatus: mode === 'pending' ? 'pending' : mode === 'manual' ? 'failed' : 'manual_review',
+    refundStatus: mode === 'pending' || mode === 'channel-stuck' ? 'pending' : mode === 'manual' ? 'failed' : 'manual_review',
     refundFailureReason: mode === 'manual' ? '渠道退款失败' : null,
     printRefundDisposition: 'manual',
     printRefundReason: mode === 'window-local'
@@ -89,7 +91,10 @@ function freshHoldOrder(mode: HoldDemoMode): AdminOrderReadonlyDetail {
     refundLedgerNo: LEDGER_NO,
     refundLedgerCents: LEDGER_CENTS,
     refundRemainderCents: null,
-    channelInFlight: mode === 'pending' || mode === 'channel-manual',
+    channelInFlight: mode === 'pending' || mode === 'channel-manual' || mode === 'channel-stuck',
+    channelResultRegistration: mode === 'channel-stuck'
+      ? { refundNo: LEDGER_NO, amountCents: LEDGER_CENTS, submittedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString() }
+      : null,
   }
 }
 
@@ -148,5 +153,44 @@ export function resolveHoldDemo(id: string, action: HoldAction): PrintReturnReso
     taskStatus,
     refundNo: order.refundLedgerNo,
     amountCents: order.refundLedgerCents ?? 0,
+  }
+}
+
+/** 按商户平台核实结果登记的演示。不是这张演示单时返回 null。 */
+export function registerHoldDemo(id: string, input: ChannelResultRegistrationInput): ChannelResultRegistrationOutcome | null {
+  const order = currentHoldDemo()
+  if (!order || order.id !== id) return null
+  if (!order.channelResultRegistration || order.channelResultRegistration.refundNo !== input.refundNo) {
+    throw new ApiHttpError('REGISTRATION_NOT_IN_FLIGHT', '这笔退款不在渠道处理中，不用登记。请刷新后再看。', 400)
+  }
+  if (input.confirmOrderNo.trim() !== order.orderNo) {
+    throw new ApiHttpError('REGISTRATION_ORDER_NO_MISMATCH', '重输的订单号和这张单对不上，没有登记。', 400)
+  }
+  const at = new Date().toISOString()
+  order.channelInFlight = false
+  order.channelResultRegistration = null
+  order.updatedAt = at
+  if (input.result === 'refunded') {
+    order.payStatus = 'refunded'
+    order.refundStatus = 'success'
+    order.taskStatus = 'cancelled'
+    order.printRefundDisposition = null
+    order.refundedAmountCents = order.refundLedgerCents ?? 0
+    order.refundedAt = at
+    order.opsAttention = false
+    order.opsAttentionCode = null
+    order.refundRequired = false
+  } else {
+    order.payStatus = 'paid'
+    order.refundStatus = 'failed'
+    order.refundFailureReason = '按商户平台核实：没退出去'
+  }
+  return {
+    orderId: order.id,
+    payStatus: order.payStatus,
+    refundStatus: order.refundStatus ?? 'failed',
+    refundNo: input.refundNo,
+    amountCents: order.refundLedgerCents ?? 0,
+    recordedBy: 'registration',
   }
 }

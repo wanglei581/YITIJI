@@ -231,6 +231,7 @@ const ACTION_LABELS: Record<string, string> = {
   'refund.channel_abnormal': '退款渠道异常，钱停在渠道中间账户',
   'refund.channel_ambiguous': '退款渠道结果待确认',
   'refund.channel_answer': '按渠道答复记下退款结果',
+  'refund.channel_result_registered': '按商户平台核实结果登记退款',
   'refund.channel_error': '退款渠道异常',
   'refund.created': '创建退款申请',
   'refund.hold_rejected': '拒绝这笔待人工处置',
