@@ -19,6 +19,7 @@ import { BadRequestException, Module, ValidationPipe, type ValidationError } fro
 import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import { AuditService } from '../src/audit/audit.service'
+import { installBodyParsers } from '../src/config/body-parsers'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
@@ -42,6 +43,7 @@ import {
   MINIAPP_VIRTUAL_PAY_GOODS_AUDIT_ACTION,
 } from '../src/virtual-pay/virtual-pay-settings'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { assertVirtualPayDelivery } from './support/miniapp-virtual-pay-delivery'
 import { assertOfficialVirtualPaySignatures, assertVirtualPayOrders } from './support/miniapp-virtual-pay-orders'
 
 const API_ROOT = resolve(__dirname, '..')
@@ -171,11 +173,14 @@ async function main(): Promise<void> {
   const { VirtualPayAdminService } = await import('../src/virtual-pay/virtual-pay-admin.service')
   const { VirtualPayOrderController } = await import('../src/virtual-pay/virtual-pay-order.controller')
   const { VirtualPayOrderService } = await import('../src/virtual-pay/virtual-pay-order.service')
+  const { WechatMiniappMessageController } = await import('../src/virtual-pay/wechat-miniapp-message.controller')
+  const { WechatMiniappMessageService } = await import('../src/virtual-pay/wechat-miniapp-message.service')
   const admin = new VirtualPayAdminService(prisma, audit)
   const orderService = new VirtualPayOrderService(prisma, audit)
+  const messages = new WechatMiniappMessageService(prisma, audit)
 
   @Module({
-    controllers: [VirtualPayAdminController, VirtualPayOrderController],
+    controllers: [VirtualPayAdminController, VirtualPayOrderController, WechatMiniappMessageController],
     providers: [
       { provide: PrismaService, useValue: prisma },
       { provide: RedisService, useValue: redis },
@@ -183,6 +188,7 @@ async function main(): Promise<void> {
       { provide: AuditService, useValue: audit },
       { provide: VirtualPayAdminService, useValue: admin },
       { provide: VirtualPayOrderService, useValue: orderService },
+      { provide: WechatMiniappMessageService, useValue: messages },
       EndUserAuthGuard,
       JwtAuthGuard,
       RolesGuard,
@@ -191,7 +197,8 @@ async function main(): Promise<void> {
   class FixtureModule {}
   Module({})(FixtureModule)
 
-  const app = await NestFactory.create(FixtureModule, { logger: false, abortOnError: false })
+  const app = await NestFactory.create(FixtureModule, { logger: false, abortOnError: false, bodyParser: false })
+  installBodyParsers(app)
   try {
     app.setGlobalPrefix('api/v1')
     app.useGlobalPipes(new ValidationPipe({
@@ -362,6 +369,7 @@ async function main(): Promise<void> {
     assert.equal(closedCredit.refundedAt, null)
     console.log('PASS 注销断开账号和 openid，一单只能有一条权益')
     await assertVirtualPayOrders({ prisma, call, jwt, redis })
+    await assertVirtualPayDelivery({ prisma, base })
   } finally {
     await app.close()
     await prisma.onModuleDestroy()

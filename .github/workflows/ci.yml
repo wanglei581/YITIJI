@@ -1182,6 +1182,18 @@ jobs:
           createdb -h localhost -U ci p1d_charge_verify
           pnpm verify:terminal-charge-binding-race:postgres
           pnpm verify:terminal-charge-public-reset:postgres
+      - name: Miniapp virtual pay delivery concurrency on isolated PostgreSQL
+        # 同一发货推送并发 20 次，权益表唯一约束只能留下一条。
+        # 门禁自己 db push，库名含 verify，不碰 ai_job_print_ci。
+        working-directory: services/api
+        env:
+          PGPASSWORD: ci
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/vpay_verify
+          POSTGRES_URL: postgresql://ci:ci@localhost:5432/vpay_verify
+          VERIFICATION_DATABASE_TARGET: isolated
+        run: |
+          createdb -h localhost -U ci vpay_verify
+          pnpm verify:miniapp-virtual-pay:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
