@@ -46,7 +46,9 @@ jobs:
     # 四个作业一起钉回此前一直验证通过的 24.04。升级 Playwright 并验过之后再改回 ubuntu-latest。
     runs-on: ubuntu-24.04
     # 2026-09-29：Verify suites 已 321 条，#1122 真 Redis 登录门禁每次多等限流窗口，30 分钟被强制取消（run 36577612869）。
-    timeout-minutes: 45
+    # 2026-11-19：runner 从慢镜像下载 fonts-noto-cjk，「Install CJK font + sqlite3 + redis-server」一步用了 1253 秒，
+    # 45 分钟在 Verify suites 中途被取消（run 44463840500，主线 44381141637 等此前四次同因）。只放宽时限，检查不变。
+    timeout-minutes: 75
     services:
       # C-2D 会员资产 E2E（verify:member-assets-c2d）需要 Redis：
       # 短信验证码 / 频控 / 会员会话全部落 Redis（dev SMS provider = log）。
@@ -1089,7 +1091,8 @@ jobs:
     #（kiosk-browser-smoke「Install Playwright Chromium」报 does not support chromium on ubuntu26.04-x64），
     # 四个作业一起钉回此前一直验证通过的 24.04。升级 Playwright 并验过之后再改回 ubuntu-latest。
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # 2026-11-19：同样装 fonts-noto-cjk，慢镜像下曾在安装这一步撞 20 分钟时限（主线 run 44381141637）。只放宽时限，检查不变。
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:16
