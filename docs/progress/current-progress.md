@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-11-19：合并车 D（政策两路）、打印状态补稿入冻结清单、第四次发布（分支 `claude/train-1119d`，未上线）
+
+- 第四次发布已完成：线上 `47e3a99af`（合并车 B #1653 + 车 C #1655），发布运行 44449481189（11/19 11:16 成功），两条只加不改迁移执行（共 117 条），`DEPLOYMENT_OWNERSHIP` 已写入生产，招聘托管仍关，价目仍 0，只读巡检 PASS 12。回退标签 `prod-before-release-1118` 指向发布前的 `9b50f8e0f`。
+- 打印状态补稿（PR #1654，`docs/design/kiosk-touch-2026-10/print-state-1119.js`）：产品负责人 11/19 看过 15 张竖屏截图后在补稿窗口回「可以，进冻结清单」，`FROZEN.json` 按规定 `--update`（只多 `print-state-1119.js`、`index.html` 换新哈希）。程序照定稿八条在分支 `claude/print-status-s15c-1118` 返工，还没进车。
+- 本车装两路：政策截止日期、关键词与拒绝（PL1d，`claude/policy-expiry-1117`）；一体机政策页照稿四轮（PL2c–f，`claude/policy-kiosk-ui-1117`）。`apps/kiosk/tests/visual/policy-layout-1119.spec.ts` 挂进 `test:browser:truth`（原先没有 CI 步骤跑到）。
+- 车上修两处门禁：`services/api/scripts/verify-policy-expiry.ts` 两处截止日与冻结时钟配对，行尾写明 `time-bomb-ok`；`apps/kiosk/src/pages/service-hubs/policy-touch.css` 摘录遮罩的裸 `#000` 改关键字 `black`。两处都是本机照 ci.yml 跑 build-and-verify 抓到的，各自收货没跑这两条。
+- 原计划同车的小青原话与排版遮盖（`claude/move-1434-1113`）这次撤下：本机全作业里 `verify:resume-layout-adjust`「新增数字应被拒绝」时过时不过，真因是排版遮盖的占位符里带随机十六进制、事实核对把它当成原文数字（该分支后续提交已修，收货要求连跑 20 次）；等收完再进下一车。
+
 ## 2026-11-18：每天免费 AI 次数，扣次自己认后台新上限，另一进程用自己的缓存（分支 `claude/ai-quota-q23c-1118`，未推送）
 
 - 管理员把简历每天免费次数从 20 改成 11、这个人已经用了 11 次时，本进程的配置缓存过期以后，不看用量面板、也不看余量，下一次扣次仍按 11 拒绝。接口返回「今天的 AI 次数用完了，明天 0 点恢复」。一体机上这条提示本来就有，这次没改页面。
