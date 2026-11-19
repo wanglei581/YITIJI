@@ -262,7 +262,13 @@ export function MyPrintOrdersPage() {
           {pickupNote ? <small>{pickupNote}</small> : null}
         </button>
       ) : null}
-      <PendingPickupSection presence={pendingPickup.presence} rows={pendingPickup.rows} onReload={pendingPickup.reload} />
+      <PendingPickupSection
+        presence={pendingPickup.presence}
+        rows={pendingPickup.rows}
+        hasTasks={items.length > 0}
+        reloading={pendingPickup.reloading}
+        onReload={pendingPickup.reload}
+      />
     </>
   )
 
@@ -334,7 +340,7 @@ export function MyPrintOrdersPage() {
         {filtered.length === 0 ? (
           <div className="me-state">
             <MeP>{filterKey !== 'all' && nextCursor ? '已加载记录中暂无此类，点「加载更多」继续查找。' : '这个筛选下没有订单。'}</MeP>
-            <div className="me-stack">
+            <div className="me-stack me-orders-exits">
               <MeExitCard art="checklist" artWidth={120} title="查看全部" desc="全部订单都在「全部」里" onClick={() => setFilterKey('all')} />
               <LicenseLock><MeExitCard art="usb" artWidth={120} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} /></LicenseLock>
             </div>
@@ -418,7 +424,7 @@ export function MyPrintOrdersPage() {
       eyebrow="我的 · 打印订单"
       sub={items.length > 0
         ? `共 ${total} 条已产生打印任务的单`
-        : uiState === 'empty' || (items.length === 0 && pendingPickup.presence === 'rows')
+        : uiState === 'empty' || (items.length === 0 && (pendingPickup.presence === 'rows' || pendingPickup.presence === 'error'))
           ? '还没有归入账号的打印任务'
           : undefined}
       fine={allLoadedFree ? '只显示当前登录账号的打印订单；状态与到机码一律由系统返回。' : undefined}
