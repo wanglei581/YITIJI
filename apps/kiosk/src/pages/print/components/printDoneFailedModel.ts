@@ -13,8 +13,7 @@ import type { PrintJobParams } from '@ai-job-print/shared'
 import { helpNeededLine, printProblemLine, resolveSupportContact, servicePhoneLine } from '../../../copy/unattendedCopy'
 import { MINIAPP_DISPLAY_NAME } from '../../../copy/miniappLinkCopy'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_CARD } from '../../../lib/fileName'
-import { formatCents } from '../cashierStatus'
-import { jamOrderKeptLine, jobSubline, orderKeptFaultLine, outOfPaperPill, paidLabelOf, sameCodeResumeLine, type OutOfPaperMoney } from '../printProgressModel'
+import { jamOrderKeptLine, jobSubline, orderKeptFaultLine, paidLabelOf, sameCodeResumeLine, type OutOfPaperMoney } from '../printProgressModel'
 
 export type FailureVariant = 'failed' | 'paper-jam' | 'out-of-paper' | 'offline'
 
@@ -122,7 +121,7 @@ export function failureCopy(input: {
     return {
       title: fault,
       subtitle: confirmed ? jamOrderKeptLine(money.fact) : orderKeptFaultLine(money.fact, '机器出了故障'),
-      pill: `${paidLabelOf(money)} · ${fault}`,
+      pill: fault,
       stepsLabel: STEPS_LABEL,
       steps: [
         { title: '把出纸口里已经出来的纸取走收好', detail: '别留在机器上。' },
@@ -141,7 +140,7 @@ export function failureCopy(input: {
     return {
       title: '打印机离线',
       subtitle: orderKeptFaultLine(money.fact, '打印机没连上'),
-      pill: `${paidLabelOf(money)} · 打印机离线`,
+      pill: '打印机离线',
       stepsLabel: STEPS_LABEL,
       steps: [
         LOOK_AT_TRAY,
@@ -171,7 +170,7 @@ export function failureCopy(input: {
     return {
       title: '打印机缺纸',
       subtitle: outOfPaperKeptLine(money.fact),
-      pill: outOfPaperPill(money),
+      pill: '打印机缺纸',
       stepsLabel: STEPS_LABEL,
       steps: [
         LOOK_AT_TRAY,
@@ -290,10 +289,16 @@ export function failureSummaryRows(input: {
   return rows
 }
 
+/** 摘要里的金额。定稿写「已付 2.00 元」，不带货币符号。 */
+function yuanLabel(cents: number): string {
+  const safe = Number.isFinite(cents) ? Math.round(cents) : 0
+  return `${(safe / 100).toFixed(2)} 元`
+}
+
 export function paymentRow(money: OutOfPaperMoney): SummaryRow {
-  if (money.fact === 'free') return { key: 'pay', label: '办理方式', value: '免费试运营' }
+  if (money.fact === 'free') return { key: 'pay', label: '办理方式', value: '免费试运营，本单 0 元' }
   if (money.fact === 'paid' && money.amountCents != null) {
-    return { key: 'pay', label: '支付状态', value: `已付 ${formatCents(money.amountCents)}` }
+    return { key: 'pay', label: '支付状态', value: `已付 ${yuanLabel(money.amountCents)}` }
   }
   return { key: 'pay', label: '支付状态', value: '以订单为准' }
 }

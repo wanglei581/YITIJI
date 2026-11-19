@@ -97,7 +97,8 @@ test('PRINTER_ERROR 不出现确定的「打印机卡纸」，公开状态 paper
   })
   assert.equal(confirmed.title, '打印机卡纸')
   assert.equal(confirmed.subtitle, progress.jamOrderKeptLine('free'))
-  assert.match(confirmed.pill, / · 打印机卡纸$/)
+  assert.equal(confirmed.pill, '打印机卡纸')
+  assert.doesNotMatch(confirmed.pill, /免费试运营|已付/)
   assert.match(screenText(confirmed), /打印机卡纸/)
 
   const paperJam = deviceStatus.mapTerminalPrinterStatus({ heartbeatOnline: true, printerStatus: 'paper_jam' })
@@ -382,9 +383,37 @@ test('缺纸胶囊和卡纸、离线同一写法，写成前缀加打印机缺�
   const offline = failedModel.failureCopy({ variant: 'offline', money: paid, orderNo: 'ORD-PILL', canRetry: false })
   assert.match(paper.subtitle, /你的订单和已付金额都保留着。机器缺纸，加纸后不会自动续打，我们已经收到提醒，会尽快处理/)
   assert.match(paperFree.subtitle, /你的订单还在。机器缺纸，加纸后不会自动续打，我们已经收到提醒，会尽快处理/)
-  assert.equal(paper.pill, progress.outOfPaperPill(paid))
-  assert.equal(offline.pill.split(' · ')[0], paper.pill.split(' · ')[0])
-  assert.doesNotMatch(paper.pill, /工作人员/)
+  assert.equal(paper.pill, '打印机缺纸')
+  assert.equal(paperFree.pill, '打印机缺纸')
+  assert.equal(offline.pill, '打印机离线')
+  assert.doesNotMatch(paper.pill, /免费试运营|已付|工作人员/)
+  assert.doesNotMatch(offline.pill, /免费试运营|已付/)
+})
+
+test('S15c7 失败页胶囊只写故障，办理方式写全本单 0 元，收费点位写已付金额', () => {
+  const free = { fact: 'free', amountCents: 0 }
+  const paid = { fact: 'paid', amountCents: 200 }
+  const cases = [
+    ['out-of-paper', '打印机缺纸'],
+    ['paper-jam', '打印机出了故障（可能卡纸）'],
+    ['offline', '打印机离线'],
+  ]
+  for (const [variant, fault] of cases) {
+    const copy = failedModel.failureCopy({ variant, money: free, orderNo: 'ORD-PILL7', canRetry: false })
+    assert.equal(copy.pill, fault, `${variant} 胶囊应只写故障`)
+    assert.doesNotMatch(copy.pill, /免费试运营|本单 0 元|已付| · /)
+  }
+  const jammed = failedModel.failureCopy({
+    variant: 'paper-jam',
+    confirmedJam: true,
+    money: paid,
+    orderNo: 'ORD-PILL7',
+    canRetry: false,
+  })
+  assert.equal(jammed.pill, '打印机卡纸')
+  assert.deepEqual(failedModel.paymentRow(free), { key: 'pay', label: '办理方式', value: '免费试运营，本单 0 元' })
+  assert.deepEqual(failedModel.paymentRow(paid), { key: 'pay', label: '支付状态', value: '已付 2.00 元' })
+  assert.equal(failedModel.paymentRow({ fact: 'unknown', amountCents: null }).value, '以订单为准')
 })
 
 test('缺纸、卡纸、离线的带走链接过期句不带服务电话，普通失败仍带', async () => {

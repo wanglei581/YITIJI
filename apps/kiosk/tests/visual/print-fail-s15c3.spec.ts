@@ -21,7 +21,7 @@ const flowState = {
   ...W2_ORDER,
 }
 
-const FREE_JAM_PILL = '免费试运营，本单 0 元 · 打印机出了故障（可能卡纸）'
+const FREE_JAM_PILL = '打印机出了故障（可能卡纸）'
 
 async function lineCount(locator: ReturnType<Page['locator']>): Promise<number> {
   return locator.evaluate((el) => {

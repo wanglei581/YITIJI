@@ -726,10 +726,10 @@ test('失败摘要行：订单号、文件、参数、支付事实；原因已�
   const rowsOf = (money, reason) => failedModel.failureSummaryRows({ orderNo: 'ORD-20261003-ROW', file, params, money, reason })
   const paid = rowsOf({ fact: 'paid', amountCents: 200 }, '新任务已确认失败')
   assert.deepEqual(paid.map((row) => row.label), ['订单号', '文件', '参数', '支付状态', '设备上报'])
-  assert.equal(paid.find((row) => row.key === 'pay').value, '已付 ¥2.00')
+  assert.equal(paid.find((row) => row.key === 'pay').value, '已付 2.00 元')
   assert.equal(paid.find((row) => row.key === 'file').value, 'w2-sample.pdf')
   assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').label, '办理方式')
-  assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').value, '免费试运营')
+  assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').value, '免费试运营，本单 0 元')
   assert.equal(rowsOf({ fact: 'unknown', amountCents: null }, '').find((row) => row.key === 'pay').value, '以订单为准')
   const helpLine = '打印有问题？查看《隐私政策》里的联系方式，或问小青'
   assert.equal(rowsOf({ fact: 'paid', amountCents: 200 }, helpLine).some((row) => row.key === 'reason'), false)
