@@ -951,3 +951,61 @@ test('钩子快照：五个价与角标、收费同一轮；挂载前与读失�
     t.mock.timers.reset()
   }
 })
+
+// 卡片上的短价（稿 pay-1113.js「首页短价」）只由同一轮的五个价决定。
+const homeCopy = load('src/pages/home/homeTouchCopy.ts', (name) => {
+  throw new Error(`Unexpected dependency ${name}`)
+})
+
+function prices(cents) {
+  return { resume_optimize: 0, mock_interview: 0, print_bw_page: 0, print_color_page: 0, scan: 0, ...cents }
+}
+
+test('卡片短价：五个价都读到、至少一个大于 0 才标价；全 0 或读不齐一行不画', () => {
+  const { homePriceLines } = homeCopy
+  assert.equal(homePriceLines(prices({})), null, '全 0：这台机器不收费，不标价')
+  assert.equal(homePriceLines(UNKNOWN), null, '五个都未知：不标价')
+  for (const key of PRICE_KEYS) {
+    assert.equal(homePriceLines(prices({ resume_optimize: 200, scan: 100, [key]: null })), null, `${key} 未知：一个都不画`)
+  }
+  assert.notEqual(homePriceLines(prices({ print_color_page: 120 })), null, '只有彩色收费也算收费机器')
+})
+
+test('卡片短价：金额写 X.XX 元，0 元写免费，彩色单价不上首页，不写货币符号', () => {
+  const { homePriceLines } = homeCopy
+  assert.deepEqual(homePriceLines(prices({ resume_optimize: 100, mock_interview: 100, print_bw_page: 100, print_color_page: 150, scan: 100 })), {
+    resume: ['每次 1.00 元 · 诊断免费'],
+    interview: ['每次 1.00 元'],
+    print: ['打印 黑白每页 1.00 元', '扫描 每次 1.00 元'],
+  })
+  const mixed = homePriceLines(prices({ resume_optimize: 1250, mock_interview: 0, print_bw_page: 50, print_color_page: 120, scan: 0 }))
+  assert.deepEqual(mixed, {
+    resume: ['每次 12.50 元 · 诊断免费'],
+    interview: ['免费'],
+    print: ['打印 黑白每页 0.50 元', '扫描 免费'],
+  })
+  const text = JSON.stringify(mixed)
+  assert.doesNotMatch(text, /¥|￥|1\.20|工作人员/)
+})
+
+test('首页把同一份快照的价交给卡片，不另读价目', () => {
+  const view = read('src/pages/home/components/HomeTouchView.tsx')
+  assert.match(view, /const cardPrice = homePriceLines\(priceSnapshot\.prices\)/)
+  for (const key of ['resume', 'interview', 'print']) assert.match(view, new RegExp(`priceLines=\\{cardPrice\\?\\.${key}\\}`))
+  assert.doesNotMatch(view, /priceLines=\{cardPrice\?\.policy\}/)
+})
+
+test('同一轮里价与角标、收费互斥：标价时角标一定不亮', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] })
+  const home = mountSnapshot(() => configWith({ scan: 100 }))
+  try {
+    await flush()
+    const snapshot = home.snapshot()
+    assert.notEqual(homeCopy.homePriceLines(snapshot.prices), null)
+    assert.equal(snapshot.badge, false)
+    assert.equal(snapshot.charged, true)
+  } finally {
+    home.stop()
+    t.mock.timers.reset()
+  }
+})
