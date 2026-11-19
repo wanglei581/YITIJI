@@ -9,6 +9,7 @@
 - 新表 `VirtualPayOrder` 和 `MemberServiceCredit`，SQLite 与 PostgreSQL 都加了只增迁移。会员注销时断开账号和 openid，账务行留下。`consumedAt` 和 `refundedAt` 本包不写。
 - 每 5 分钟对仍待支付、且落在时窗里的订单调 `query_order`。查到已支付走发货同一条幂等路径。超时未付关单。access_token 只留 `MiniappAccessTokenService` 一处（稳定版凭证接口加 Redis 缓存），会员登录和小程序码都改用它。
 - `GET /api/v1/member/service-credits` 只回本人仍可用的权益：服务种类和记入时间。开关关着也照常回，不让已经记下的消失。用掉的、退款的和别人的不出现。
+- 虚拟支付模块导入共享的 `JwtVerifierModule`，管理员登录守卫才能在全应用里拿到验签服务。否则应用起不来。
 - 没有改打印、服务单和退款。没有推送，没有上线。图谱由生成器重生，没有手改 `docs/graph/`。
 
 ## 2026-11-18：每天免费 AI 次数，扣次自己认后台新上限，另一进程用自己的缓存（分支 `claude/ai-quota-q23c-1118`，未推送）

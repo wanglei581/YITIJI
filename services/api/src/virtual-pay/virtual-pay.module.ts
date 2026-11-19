@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { MiniappAccessTokenModule } from '../miniapp-access-token/miniapp-access-token.module'
 import { VirtualPayAdminController } from './virtual-pay-admin.controller'
 import { VirtualPayAdminService } from './virtual-pay-admin.service'
@@ -11,7 +12,7 @@ import { WechatMiniappMessageController } from './wechat-miniapp-message.control
 import { WechatMiniappMessageService } from './wechat-miniapp-message.service'
 
 @Module({
-  imports: [MiniappAccessTokenModule],
+  imports: [JwtVerifierModule, MiniappAccessTokenModule],
   controllers: [
     VirtualPayAdminController,
     VirtualPayOrderController,
