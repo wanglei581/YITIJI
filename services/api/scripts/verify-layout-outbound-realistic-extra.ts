@@ -11,7 +11,7 @@ const ID_CARD = '110101199003072315'
 type Covered = (label: string, raw: string, secretDigits: string, json?: string) => void
 type Kept = (label: string, raw: string) => void
 
-/** 扩展分隔把 1–8 位的数字段接成号码。三段都放进原文、字段值和简历 JSON。 */
+/** 扩展分隔把 1–10 位的数字段接成号码。三段都放进原文、字段值和简历 JSON。 */
 export function runExtendedSegmentCases(assertCovered: Covered): void {
   assertCovered('七加四斜线手机号', '1380013/8000', PHONE)
   assertCovered('七加四换行手机号', '1380013\n8000', PHONE)
@@ -19,6 +19,10 @@ export function runExtendedSegmentCases(assertCovered: Covered): void {
   assertCovered('身份证六四四四换行', '110101\n1990\n0307\n2315', ID_CARD)
   assertCovered('固话四四四斜线', '0755/8888/8888', '075588888888')
   assertCovered('固话四四四换行', '0755\n8888\n8888', '075588888888')
+  assertCovered('十加八身份证斜线', '1101011990/03072315', ID_CARD)
+  assertCovered('十加八身份证换行', '1101011990\n03072315', ID_CARD)
+  assertCovered('九加七银行卡斜线', '622202123/4567890', '6222021234567890')
+  assertCovered('九加七银行卡换行', '622202123\n4567890', '6222021234567890')
   assertCovered('全角斜线手机号', '138\uFF0F0013\uFF0F8000', PHONE)
   assertCovered('通用分隔和斜线混用的手机号', '138 - 0013/8000', PHONE)
   assertCovered(
@@ -107,7 +111,7 @@ const EXTENDED_SEPARATORS = ['/', '\uFF0F', '\n', '\r\n', '\r']
 const GENERIC_SEPARATORS = [' ', '-', '.', '\t', ' - ', '\u00B7', '\u2014', '\uFF0D', '\uFF0E']
 
 /**
- * 两个固定种子各 500 组。号码按 1 到 8 位分段，混进日期和普通文字。
+ * 两个固定种子各 500 组。号码按 1 到 10 位分段，混进日期和普通文字。
  * 号码不以 19 或 20 开头，避免被日期豁免放过。日期和号码之间夹着汉字，避免粘成一段。
  */
 export function runRandomSegmentCases(report: Report): void {
@@ -196,7 +200,7 @@ function randomSecret(rng: () => number): string {
   return `0755${digitsFrom(rng, 8)}`
 }
 
-/** 每段 1 到 8 位，至少跨过一次扩展分隔。括号只包后面的段，避免把开括号留在段外。 */
+/** 每段 1 到 10 位，至少跨过一次扩展分隔。括号只包后面的段，避免把开括号留在段外。 */
 function formatSecret(secret: string, rng: () => number): string {
   const parts = splitDigits(secret, rng)
   const extendedAt = Math.floor(rng() * (parts.length - 1))
@@ -215,7 +219,7 @@ function splitDigits(secret: string, rng: () => number): string[] {
   let index = 0
   while (index < secret.length) {
     const remain = secret.length - index
-    const max = Math.min(8, remain)
+    const max = Math.min(10, remain)
     const length = 1 + Math.floor(rng() * max)
     parts.push(secret.slice(index, index + length))
     index += length

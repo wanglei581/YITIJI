@@ -4,7 +4,7 @@
  * 通用分隔符是空格、制表符、各种短横和点、零宽字符，括号里面可以再夹空格。
  * 斜线、全角斜线、真实换行和回车不进通用表，否则年月区间会被收成占位符。
  * 扩展分隔（半角斜线、全角斜线、换行、回车，以及 JSON 里的反斜杠加 n、r、t、斜线）
- * 把数字切成段时，每段 1 到 8 位、合起来 11 位及以上，就按一个号码读完。
+ * 把数字切成段时，每段 1 到 10 位、合起来 11 位及以上，就按一个号码读完。
  * 和通用分隔混在同一串里也成立。不再按手机、身份证、银行卡的固定组数逐条列举。
  */
 
@@ -87,12 +87,12 @@ export function numberSpanStart(text: string, folded: string, runStart: number, 
 
 /**
  * 从这一位数字起，顺着扩展分隔把后段接上。
- * 每一段都是 1 到 8 位。没跨过扩展分隔时返回空，交给通用分隔那条路。
- * 下一段超过 8 位就停在上一段末尾，不把超长的一段吞进来。
+ * 每一段都是 1 到 10 位。没跨过扩展分隔时返回空，交给通用分隔那条路。
+ * 下一段超过 10 位就停在上一段末尾，不把超长的一段吞进来。
  */
 export function matchExtendedSegments(folded: string, start: number): { end: number; digits: number } | null {
   const first = segmentLength(folded, start)
-  if (first < 1 || first > 8) return null
+  if (first < 1 || first > 10) return null
   let cursor = start + first
   let digits = first
   let sawExtended = false
@@ -100,7 +100,7 @@ export function matchExtendedSegments(folded: string, start: number): { end: num
     const bridge = bridgeAcross(folded, cursor, true)
     if (bridge === null) break
     const length = segmentLength(folded, bridge.next)
-    if (length < 1 || length > 8) break
+    if (length < 1 || length > 10) break
     if (bridge.sawExtended) sawExtended = true
     digits += length
     cursor = bridge.next + length
