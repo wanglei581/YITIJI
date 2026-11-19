@@ -5,7 +5,7 @@
  *   改为出纸不放行（查渠道仍是异常，提示写明中间账户）；待人工说明是这句诊断；
  *   商户处理完异常退款、渠道通知退成之后照常收口为已退。
  * - 已经记成失败的退款又收到 ABNORMAL：改回待人工（和渠道答复矛盾），三步不放行。
- * - 发起退款时渠道直接回 ABNORMAL：不抛渠道失败、不回滚。过期付款那一路同样不记失败。
+ * - 发起退款时渠道直接回 ABNORMAL（微信应答原样解析）：不抛渠道失败、不回滚。过期付款那一路同样不记失败。
  */
 import assert from 'node:assert/strict'
 import { createSign, generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto'
@@ -24,7 +24,8 @@ import {
   WECHAT_TIMESTAMP_HEADER,
   WechatPayProvider,
 } from '../../src/payment/providers/wechat-pay.provider'
-import { CHANNEL_ABNORMAL_DETAIL } from '../../src/payment/refund-abnormal'
+import { parseWechatRefundCreate, parseWechatRefundQuery } from '../../src/payment/providers/wechat-pay-refund'
+import { CHANNEL_ABNORMAL_DETAIL, isChannelAbnormal } from '../../src/payment/refund-abnormal'
 import { queryRefundChannel } from '../../src/payment/refund-channel-query'
 import { RefundService } from '../../src/payment/refund.service'
 import { resolvePrintReturnHold } from '../../src/payment/resolve-print-return-hold'
@@ -163,7 +164,12 @@ export async function runP2b9AbnormalCases(
     assert.equal(contraCode?.code, 'REFUND_CHANNEL_UNCONFIRMED')
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: contra.id } })).payStatus, 'paid')
 
-    // 3. 发起退款时渠道直接回 ABNORMAL：不抛渠道失败、不回滚。
+    // 3. 发起退款时渠道直接回 ABNORMAL：微信应答原样解析出退款异常；退款服务不抛渠道失败、不回滚。
+    const created = parseWechatRefundCreate({ status: 'ABNORMAL', refund_id: 'wx-abn-create' })
+    assert.equal(created.status, 'failed', '归一化 status 仍是 failed（服务单沿用）')
+    assert.equal(isChannelAbnormal(created), true, '退款申请应答要带出退款异常原文')
+    assert.equal(isChannelAbnormal(parseWechatRefundQuery({ status: 'ABNORMAL', refund_id: 'wx-abn-query', amount: { refund: 200 } })), true)
+    assert.equal(isChannelAbnormal(parseWechatRefundCreate({ status: 'CLOSED', refund_id: 'wx-closed' })), false, '退款关闭才是没退出去')
     const direct = await seed('direct', 'none', 'paid')
     const directService = new RefundService(db, new AuditService(db), new PaymentProviderRegistry([
       { channel: 'wechat', refund: async () => ({ status: 'failed', channelRefundNo: 'wx-abn-direct', refundState: 'ABNORMAL' }) } as unknown as PaymentProvider,
