@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 675,
+    "endpointCount": 676,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -12427,6 +12427,16 @@
         ]
       },
       {
+        "controller": "services/api/src/payment/service-order-sandbox.controller.ts",
+        "handler": "SimulateServiceOrderDto.simulate",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/payment/sandbox/simulate-service-order",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
         "controller": "services/api/src/payment/payment.controller.ts",
         "handler": "PaymentController.wechatRefundNotify",
         "method": "POST",
@@ -15360,7 +15370,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 846,
+      "reachableFileCount": 854,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17122,6 +17132,117 @@
           "wrappers": []
         },
         {
+          "component": "PayServicePage",
+          "endpoints": [
+            "GET /:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/pay/PayServicePage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/pay/interview",
+          "styles": [
+            "apps/kiosk/src/pages/pay/pay-service.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
+            "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "PayServicePage",
+          "endpoints": [
+            "GET /:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/pay/PayServicePage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/pay/resume",
+          "styles": [
+            "apps/kiosk/src/pages/pay/pay-service.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
+            "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "PayServicePage",
+          "endpoints": [
+            "GET /:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/pay/PayServicePage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/pay/scan",
+          "styles": [
+            "apps/kiosk/src/pages/pay/pay-service.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
+            "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
+          ],
+          "wrappers": []
+        },
+        {
           "component": "PrintScanHomePage",
           "endpoints": [
             "GET /:param",
@@ -18441,7 +18562,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1035
+      "sourceFileCount": 1043
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20493,6 +20614,7 @@
         "usedBy": [
           "services/api/src/admin-ops/derived-service-return-alerts.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/payment/service-order-sandbox.controller.ts",
           "services/api/src/payment/service-order.admin.ts",
           "services/api/src/payment/service-order.payment.ts",
           "services/api/src/payment/service-order.ref.ts",
@@ -24889,6 +25011,9 @@
     "apps/kiosk/src/services/resumeParseIntent.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
+    "apps/kiosk/src/services/serviceTrip.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
     "apps/kiosk/src/services/terminalAuth.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
@@ -27151,6 +27276,7 @@
       "services/api/scripts/verify-service-order-open-ref-postgres.ts"
     ],
     "services/api/scripts/support/service-order-verify-fixture.ts": [
+      "services/api/scripts/verify-service-order-sandbox-simulate.ts",
       "services/api/scripts/verify-service-orders-charge.ts",
       "services/api/scripts/verify-service-orders-concurrency.ts",
       "services/api/scripts/verify-service-orders-settle.ts",
@@ -31142,7 +31268,12 @@
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
+    "services/api/src/payment/service-order.intercept.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs"
+    ],
     "services/api/src/payment/service-order.payment.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
+      "services/api/scripts/verify-service-order-sandbox-simulate.ts",
       "services/api/scripts/verify-service-orders-concurrency.ts",
       "services/api/scripts/verify-service-orders-settle.ts"
     ],
@@ -31151,8 +31282,15 @@
       "services/api/scripts/verify-service-orders.ts"
     ],
     "services/api/src/payment/service-order.ref.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
       "services/api/scripts/verify-service-orders-settle.ts"
+    ],
+    "services/api/src/payment/service-order.service.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs"
+    ],
+    "services/api/src/payment/service-order.settle.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs"
     ],
     "services/api/src/payment/terminal-charge-public-reset.ts": [
       "services/api/scripts/verify-terminal-charge-public-reset.ts"
@@ -33870,7 +34008,12 @@
           "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/auth/memberAuthApi.ts",
           "services/api/src/member-auth/member-phone-rebind.service.ts",
-          "services/api/src/member-auth/sms/sms-budget.ts"
+          "services/api/src/member-auth/sms/sms-budget.ts",
+          "services/api/src/payment/service-order.intercept.ts",
+          "services/api/src/payment/service-order.payment.ts",
+          "services/api/src/payment/service-order.ref.ts",
+          "services/api/src/payment/service-order.service.ts",
+          "services/api/src/payment/service-order.settle.ts"
         ],
         "missing": []
       },
@@ -34997,6 +35140,7 @@
           "apps/kiosk/src/services/api/throwHttpError.ts",
           "apps/kiosk/src/services/assistantDraft.ts",
           "apps/kiosk/src/services/resumeParseIntent.ts",
+          "apps/kiosk/src/services/serviceTrip.ts",
           "apps/kiosk/src/services/terminalAuth.ts",
           "apps/kiosk/src/services/terminalSessionRecovery.ts",
           "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -50153,6 +50297,25 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:service-order-open-ref:postgres"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/service-order-verify-fixture.ts",
+          "services/api/src/payment/service-order.payment.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-service-order-sandbox-simulate.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:service-order-sandbox-simulate"
       ],
       "wired": true
     },

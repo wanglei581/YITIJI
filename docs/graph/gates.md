@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2269 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2273 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -455,7 +455,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 676 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 677 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1119,6 +1119,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/services/print/priceConfigApi.ts` | `verify-price-single-source.mjs` |
 | `apps/kiosk/src/services/print/printJobsApi.ts` | `verify-print-confirm-honest.mjs`<br/>`verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-print-scan-first-release.ts` |
 | `apps/kiosk/src/services/resumeParseIntent.ts` | `verify-kiosk-ai-declaration.mjs` |
+| `apps/kiosk/src/services/serviceTrip.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/services/terminalAuth.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-terminal-session-self-heal.mjs` |
 | `apps/kiosk/src/services/terminalSessionRecovery.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-terminal-session-self-heal.mjs` |
 | `apps/kiosk/src/styles/ai-primitives.css` | `verify-kiosk-ai-primitives.mjs` |
@@ -2466,7 +2467,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/resume-optimize-regression-corpus.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/scan-panel-wording.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/serializable-race-barrier.ts` | `verify-first-admin-bootstrap-postgres.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-print-retry-lock-postgres.ts`<br/>`verify-service-order-open-ref-postgres.ts` |
-| `services/api/scripts/support/service-order-verify-fixture.ts` | `verify-service-orders-charge.ts`<br/>`verify-service-orders-concurrency.ts`<br/>`verify-service-orders-settle.ts`<br/>`verify-service-orders.ts` |
+| `services/api/scripts/support/service-order-verify-fixture.ts` | `verify-service-order-sandbox-simulate.ts`<br/>`verify-service-orders-charge.ts`<br/>`verify-service-orders-concurrency.ts`<br/>`verify-service-orders-settle.ts`<br/>`verify-service-orders.ts` |
 | `services/api/scripts/support/sqlite-cli.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/terminal-charge-fixture.ts` | `verify-admin-billing.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-copy-c1b.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-service-orders-concurrency.ts`<br/>`verify-service-orders-settle.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/scripts/support/upload-session-verifier.ts` | `verify-upload-sessions-bind.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-upload-sessions-signature.ts`<br/>`verify-upload-sessions.ts` |
@@ -2552,7 +2553,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 733 个文件</summary>
+<summary><code>services/api/src/</code> — 736 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -3122,9 +3123,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/refund-amount-hold.ts` | `verify-refund-idempotent.ts` |
 | `services/api/src/payment/refund-convergence.task.ts` | `verify-api20-manual-refund.ts`<br/>`verify-refund-convergence.ts` |
 | `services/api/src/payment/refund.service.ts` | `verify-admin-orders-refund.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-order.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-service-orders-concurrency.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
-| `services/api/src/payment/service-order.payment.ts` | `verify-service-orders-concurrency.ts`<br/>`verify-service-orders-settle.ts` |
+| `services/api/src/payment/service-order.intercept.ts` | `verify-backend-error-copy-coverage.mjs` |
+| `services/api/src/payment/service-order.payment.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-service-order-sandbox-simulate.ts`<br/>`verify-service-orders-concurrency.ts`<br/>`verify-service-orders-settle.ts` |
 | `services/api/src/payment/service-order.policy.ts` | `verify-service-orders-concurrency.ts`<br/>`verify-service-orders.ts` |
-| `services/api/src/payment/service-order.ref.ts` | `verify-service-order-open-ref-postgres.ts`<br/>`verify-service-orders-settle.ts` |
+| `services/api/src/payment/service-order.ref.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-service-order-open-ref-postgres.ts`<br/>`verify-service-orders-settle.ts` |
+| `services/api/src/payment/service-order.service.ts` | `verify-backend-error-copy-coverage.mjs` |
+| `services/api/src/payment/service-order.settle.ts` | `verify-backend-error-copy-coverage.mjs` |
 | `services/api/src/payment/terminal-charge-public-reset.ts` | `verify-terminal-charge-public-reset.ts` |
 | `services/api/src/payment/terminal-charge-settings.ts` | `verify-service-orders-concurrency.ts`<br/>`verify-terminal-charge-binding-race.ts`<br/>`verify-terminal-charge-public-reset.ts`<br/>`verify-terminal-charge-settings.ts` |
 | `services/api/src/payment/terminal-charge.contract.ts` | `verify-admin-billing.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-service-orders-settle.ts`<br/>`verify-terminal-charge-binding-race.ts`<br/>`verify-terminal-charge-public-reset.ts`<br/>`verify-terminal-charge-settings.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
