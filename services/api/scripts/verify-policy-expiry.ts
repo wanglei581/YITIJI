@@ -479,7 +479,7 @@ async function main(): Promise<void> {
     console.log('  PASS 打印建单前拒绝已过截止日期的办事清单')
 
     const boundary = await seedPublished(`跨日截止_${suffix}`, '北京时间跨零点', {
-      validThrough: new Date('2026-11-17T00:00:00.000Z'),
+      validThrough: new Date('2026-11-17T00:00:00.000Z'), // time-bomb-ok: 下面 withFrozenNow 把当前时间冻结在 2026-11-17，截止日与之配对
     })
     await withFrozenNow(new Date('2026-11-17T15:59:59.999Z'), async () => {
       assert.equal(policyDeadlineThreshold().toISOString(), '2026-11-17T00:00:00.000Z')
@@ -498,7 +498,7 @@ async function main(): Promise<void> {
     redis = new Redis(redisUrl, { maxRetriesPerRequest: 1, connectTimeout: 2_000 })
     const community = new CommunityService(prisma, new RedisService(redis))
     const cachedPolicy = await seedPublished(`社区跨日_${suffix}`, '缓存里的政策', {
-      validThrough: new Date('2026-11-17T00:00:00.000Z'),
+      validThrough: new Date('2026-11-17T00:00:00.000Z'), // time-bomb-ok: 下面 withFrozenNow 把当前时间冻结在 2026-11-17，截止日与之配对
       createdAt: new Date('2099-01-01T00:00:00.000Z'),
     })
     const hostingKey = isRecruitmentContentHostingEnabled() ? 'hosting' : 'closed'
