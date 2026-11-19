@@ -41,6 +41,8 @@ async function main(): Promise<void> {
     await runP2b8ReleaseOutcomeCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
     const { runP2b8ChannelBusinessCases } = await import('./support/pickup-arrival-p2b8-channel-business-cases')
     await runP2b8ChannelBusinessCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
+    const { runP2b8FaultTextCases } = await import('./support/pickup-arrival-p2b8-fault-text-cases')
+    await runP2b8FaultTextCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
   } finally {
     await prisma.onModuleDestroy()
   }

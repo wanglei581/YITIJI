@@ -45,8 +45,15 @@ export function classifyChannelRefundStatus(
 }
 
 function channelFaultText(error: unknown): string {
-  const raw = error instanceof Error ? error.message : '查询渠道没有完成'
-  return raw.replace(/\s+/g, ' ').slice(0, 120)
+  const raw = error instanceof Error ? error.message : String(error)
+  const redacted = raw
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/\b1[3-9]\d{9}\b/g, '')
+    .replace(/\b\d{17}[\dXx]\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120)
+  return redacted || '查询渠道没有完成'
 }
 
 /** 查询本身失败。状态保持原样，写诊断，不放行这次处置。 */
