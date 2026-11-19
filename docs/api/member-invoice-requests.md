@@ -99,7 +99,9 @@ Authorization: Bearer <会员 token>
 
 ## GET /api/v1/me/invoice-requests/:id
 
-只返回本人的这一份。别人的申请，或编号不存在，都是 404，`code` 为 `INVOICE_REQUEST_NOT_FOUND`，`message` 为「没有找到这份开票申请。」响应里不带税号和邮箱。
+只返回本人的这一份。别人的申请，或编号不存在，都是 404，`code` 为 `INVOICE_REQUEST_NOT_FOUND`，`message` 为「没有找到这份开票申请。」
+
+这组会员接口一体机带会员令牌也能调，而一体机永远不该拿到完整税号和邮箱，所以响应里没有完整的 `taxId`、`email`，只有打码后的 `taxIdMasked`、`emailMasked`；退回原因里抄到的邮箱和统一社会信用代码也按同样规则打码。完整值只在后台订单详情给管理员开票用。
 
 `data`：
 
@@ -110,13 +112,13 @@ Authorization: Bearer <会员 token>
 | `orderId` | 订单编号 |
 | `titleType` | `personal` 或 `company` |
 | `title` | 抬头 |
-| `taxId` | 单位的统一社会信用代码；个人为 `null` |
-| `email` | 接收邮箱。按个人信息保留规则清掉后为 `null` |
+| `taxIdMasked` | 单位的统一社会信用代码，只留前 4 位和后 4 位，中间是星号，例如 `9100**********000N`；个人为 `null` |
+| `emailMasked` | 接收邮箱，只留第一个字符和 `@` 后面的域名，例如 `f***@example.com`。按个人信息保留规则清掉后为 `null` |
 | `amountCents` | 提交时的实付金额快照，整数，单位分 |
 | `status` | `submitted` 已提交；`issued` 已开；`returned` 已退回 |
 | `issuedAt` | 标已开的时间，ISO 8601；还没开是 `null` |
 | `invoiceNo` | 发票号码，选填，没有是 `null` |
-| `returnReason` | 退回原因；没退回是 `null` |
+| `returnReason` | 退回原因；没退回是 `null`。里面的邮箱、统一社会信用代码已打码 |
 | `createdAt` | 提交时间，ISO 8601 |
 
 不返回操作人。

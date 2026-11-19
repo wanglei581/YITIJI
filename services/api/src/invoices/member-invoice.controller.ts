@@ -7,7 +7,8 @@ import { SubmitMemberInvoiceDto } from './member-invoice.dto'
 
 /**
  * 小程序与一体机共用的会员开票接口。会员编号只来自登录态。
- * 列表不返回税号和邮箱；单条查询只返回本人那一份。
+ * 列表不返回税号和邮箱；单条查询只返回本人那一份，税号和邮箱只回打码后的 taxIdMasked、emailMasked。
+ * 一体机带会员令牌也能调这里，所以这组接口任何响应都不带完整税号和邮箱。
  */
 @Controller('me')
 @UseGuards(EndUserAuthGuard)

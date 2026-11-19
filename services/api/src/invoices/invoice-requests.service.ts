@@ -6,6 +6,7 @@ import {
   type InvoiceFacts,
   type InvoiceOpenStatus,
 } from './invoice-eligibility'
+import { maskEmail, maskInvoiceText, maskTaxId } from './invoice-masking'
 import { normalizeInvoiceTitle } from './invoice-title'
 
 export interface SubmitInvoiceInput {
@@ -33,14 +34,15 @@ export interface MemberInvoiceOrderView {
   requestId: string | null
 }
 
+/** 会员单条视图。税号、邮箱只有打码后的样子（一体机带会员令牌也能调这个接口）。 */
 export interface MemberInvoiceRequestView {
   id: string
   orderKind: string
   orderId: string
   titleType: string
   title: string
-  taxId: string | null
-  email: string | null
+  taxIdMasked: string | null
+  emailMasked: string | null
   amountCents: number
   status: string
   issuedAt: string | null
@@ -252,13 +254,13 @@ export class InvoiceRequestsService {
       orderId: row.orderId,
       titleType: row.titleType,
       title: row.title,
-      taxId: row.taxId,
-      email: row.email,
+      taxIdMasked: maskTaxId(row.taxId),
+      emailMasked: maskEmail(row.email),
       amountCents: row.amountCents,
       status: row.status,
       issuedAt: row.issuedAt ? row.issuedAt.toISOString() : null,
       invoiceNo: row.invoiceNo,
-      returnReason: row.returnReason,
+      returnReason: maskInvoiceText(row.returnReason),
       createdAt: row.createdAt.toISOString(),
     }
   }

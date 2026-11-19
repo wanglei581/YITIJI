@@ -274,8 +274,14 @@ test('已退款的单提交要失败，同一订单不能有两条未退回申�
   const view = await requests.getForMember(MEMBER, created.id)
   assert.equal(view.status, 'submitted')
   assert.equal(view.title, '某单位')
-  assert.equal(view.taxId, TAX_ID)
-  assert.equal(view.email, EMAIL)
+  // 期望值改动（返工包 P2c1b 第 5 条）：会员单条接口一体机带会员令牌也能调，所以只回打码后的税号和邮箱，
+  // 字段改名 taxIdMasked、emailMasked；原先断言的完整 taxId、email 正是要堵的口子。
+  assert.equal(view.taxIdMasked, '9100**********000N')
+  assert.equal(view.emailMasked, 'p***@example.com')
+  assert.equal('taxId' in view, false)
+  assert.equal('email' in view, false)
+  assert.equal(JSON.stringify(view).includes(TAX_ID), false)
+  assert.equal(JSON.stringify(view).includes(EMAIL), false)
   assert.equal('operatorId' in view, false)
 
   await assert.rejects(
@@ -336,4 +342,25 @@ test('提交认登录的会员，不认请求体里写的别人', async () => {
   assert.equal(response.data.orderKind, 'service')
   assert.equal('taxId' in response.data, false)
   assert.equal('email' in response.data, false)
+})
+
+test('会员单条接口：退回原因里抄到的邮箱和税号也打码，个人申请没有税号', async () => {
+  const { requests, invoices } = createHarness()
+  const created = await requests.submit(MEMBER, {
+    orderKind: 'print',
+    orderId: 'order-ok',
+    titleType: 'personal',
+    title: '张三',
+    email: EMAIL,
+  })
+  const row = invoices.find((item) => item.id === created.id)!
+  row.status = 'returned'
+  row.returnReason = `邮箱 ${EMAIL} 收不到；单位税号 ${TAX_ID} 也对不上，请改成单位抬头再交`
+  const view = await requests.getForMember(MEMBER, created.id)
+  assert.equal(view.taxIdMasked, null)
+  assert.equal(view.emailMasked, 'p***@example.com')
+  assert.equal(view.returnReason, '邮箱 p***@example.com 收不到；单位税号 9100**********000N 也对不上，请改成单位抬头再交')
+  const text = JSON.stringify(view)
+  assert.equal(text.includes(EMAIL), false)
+  assert.equal(text.includes(TAX_ID), false)
 })
