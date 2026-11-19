@@ -3,46 +3,29 @@
  *
  * 检测前先把全角数字、全角 X 折成半角，占位符里存的仍是原文，还原才能逐字对上。
  * 数字段之间可以隔空格、制表符、各种短横和点、零宽字符，也可以把一段用括号包住。
- * 连续多个空格、空格包住的短横，同样把两边接成一串。合计达到 11 位的按一整串遮。
+ * 括号里面可以再夹空格。连续多个空格、空格包住的短横，同样把两边接成一串。
+ * 合计达到 11 位的按一整串遮。
+ * 斜线、换行、回车不进这张通用表，只在分段对得上号码时才接：
+ * 手机 3-4-4、身份证 6-8-4、银行卡每组 4 位、固话区号 3 到 4 位再加 7 到 8 位。
+ * JSON 字符串里写成反斜杠加 n、r、t 的，也按这个规律认。
  * 简历 JSON 再按字段对齐：相邻字符串值或数值拼起来够 11 位的，各换成自己的占位符。
  * 占位符是本次请求的标记，用户原文里写不出同样的一串。
- * 年月日期轴不是号码，原样留下，排版还要看见时间。
+ * 年月日期轴、中文日期和时间段不是号码，原样留下，排版还要看见时间。
  */
 import { randomBytes } from 'node:crypto'
+import {
+  extendCheckDigit,
+  isDigit,
+  matchStructuredNumber,
+  numberSpanStart,
+  readJoinedDigits,
+  skipSeparators,
+} from './layout-adjust-digit-segments'
 
 export interface LayoutDigitBook {
   /** 同一段原文共用一个占位符，三段还原才对得上。 */
   issue(original: string): string
 }
-
-/**
- * 段与段之间的分隔。可以连续出现，也可以和括号一起把一段包住。
- * 短横：- – — ‐ ‑ － ﹣。点：. · • ． ・。制表符含正文里的 U+0009，
- * 以及 JSON 字符串里写成反斜杠加 t 的那两个字符。
- */
-const SEPARATOR_CHARS = new Set<string>([
-  ' ',
-  '\t',
-  '\u00A0',
-  '\u3000',
-  '-',
-  '\u2010',
-  '\u2011',
-  '\u2013',
-  '\u2014',
-  '\uFE63',
-  '\uFF0D',
-  '.',
-  '\u00B7',
-  '\u2022',
-  '\u30FB',
-  '\uFF0E',
-  '\u200B',
-  '\u200C',
-  '\u200D',
-  '\uFEFF',
-  '\u2060',
-])
 
 const DATE_AXIS = /^(?:19|20)\d{2}[.-](?:0[1-9]|1[0-2])(?:[.-](?:0[1-9]|[12]\d|3[01]))?(?:-(?:19|20)\d{2}[.-](?:0[1-9]|1[0-2])(?:[.-](?:0[1-9]|[12]\d|3[01]))?)*$/u
 /** 纯数字的年、年月、年月日。两段这样的值接起来不是人写的号码。 */
@@ -110,17 +93,13 @@ function pickNonce(inputs: readonly string[]): string {
   return `a${randomBytes(3).toString('hex').slice(0, 5)}`
 }
 
-function isDigit(char: string): boolean {
-  return char >= '0' && char <= '9'
-}
-
-/** 年月用点或短横连起来的日期轴。各种点和短横先折成半角，空白和转义制表符拿掉再认。 */
+/** 年月用点、斜线或短横连起来的日期轴。各种点和短横先折成半角，空白和转义分隔拿掉再认。 */
 function isDateAxis(foldedSpan: string): boolean {
   const normalized = foldedSpan
-    .replace(/\\t/gu, '')
+    .replace(/\\t|\\n|\\r|\\\//gu, '')
     .replace(/[·•・．]/gu, '.')
-    .replace(/[‐‑–—﹣－]/gu, '-')
-    .replace(/[ \t\u00A0\u3000]/gu, '')
+    .replace(/[‐‑–—﹣－/]/gu, '-')
+    .replace(/[ \t\n\r\u00A0\u3000]/gu, '')
   return DATE_AXIS.test(normalized)
 }
 
@@ -139,17 +118,19 @@ export function coverRealisticNumbers(text: string, book: LayoutDigitBook): stri
     }
     const runStart = index
     const joined = readJoinedDigits(folded, index)
+    const structuredEnd = matchStructuredNumber(folded, index)
+    if (structuredEnd !== null && structuredEnd > joined.end) {
+      const end = extendCheckDigit(folded, structuredEnd)
+      if (!isDateAxis(folded.slice(runStart, end))) spans.push([numberSpanStart(text, folded, runStart, end), end])
+      index = end
+      continue
+    }
     const digits = joined.digits
     index = joined.end
-    let end = index
-    const tail = folded[end]
-    if ((tail === 'X' || tail === 'x') && end > runStart && isDigit(folded[end - 1] ?? '')) end += 1
-    let start = runStart
-    const before = text[runStart - 1] ?? ''
-    const digitRun = folded.slice(runStart, end).replace(/\D/gu, '')
-    if ((before === '+' || before === '＋') && digitRun.startsWith('86')) start -= 1
-    else if (before === '(' || before === '（') start -= 1
-    if (digits >= 11 && !isDateAxis(folded.slice(runStart, end))) spans.push([start, end])
+    const end = extendCheckDigit(folded, index)
+    if (digits >= 11 && !isDateAxis(folded.slice(runStart, end))) {
+      spans.push([numberSpanStart(text, folded, runStart, end), end])
+    }
     index = Math.max(index, end)
   }
   return replaceSpans(text, spans, book)
@@ -303,57 +284,23 @@ function isJoinableNumber(raw: string): boolean {
   let index = 0
   const digitsOnly = folded.replace(/\D/gu, '')
   if ((folded[0] === '+' || folded[0] === '＋') && digitsOnly.startsWith('86')) index = 1
-  if (folded[index] === '(' || folded[index] === '（') index += 1
+  if (folded[index] === '(' || folded[index] === '（') {
+    index += 1
+    index = skipSeparators(folded, index)
+  }
   if (!isDigit(folded[index] ?? '')) return false
   const joined = readJoinedDigits(folded, index)
-  let end = joined.end
-  const tail = folded[end] ?? ''
-  if ((tail === 'X' || tail === 'x') && end > index && isDigit(folded[end - 1] ?? '')) end += 1
+  let end = extendCheckDigit(folded, joined.end)
+  const saved = end
+  end = skipSeparators(folded, end)
+  const close = folded[end] ?? ''
+  if (close === ')' || close === '）') {
+    end += 1
+    end = skipSeparators(folded, end)
+  } else {
+    end = saved
+  }
   return end === folded.length && joined.digits > 0
-}
-
-/** 从第一位数字起，把隔着分隔符或括号的后续数字段一起读完。 */
-function readJoinedDigits(folded: string, start: number): { end: number; digits: number } {
-  let index = start
-  let digits = 0
-  while (index < folded.length && isDigit(folded[index] ?? '')) {
-    while (index < folded.length && isDigit(folded[index] ?? '')) {
-      digits += 1
-      index += 1
-    }
-    const nextDigit = bridgeToNextDigit(folded, index)
-    if (nextDigit === null) break
-    index = nextDigit
-  }
-  return { end: index, digits }
-}
-
-/**
- * 数字段之后如果是括号和分隔符，并且后面还是数字，返回下一段数字的下标。
- * 接不上就返回 null。JSON 里的制表符是反斜杠加 t，按一个分隔符读。
- */
-function bridgeToNextDigit(folded: string, index: number): number | null {
-  let cursor = index
-  const close = folded[cursor] ?? ''
-  if (close === ')' || close === '）') cursor += 1
-  let separators = 0
-  while (cursor < folded.length) {
-    const length = separatorLength(folded, cursor)
-    if (length === 0) break
-    cursor += length
-    separators += 1
-  }
-  const open = folded[cursor] ?? ''
-  if (open === '(' || open === '（') cursor += 1
-  if (!isDigit(folded[cursor] ?? '')) return null
-  if (separators === 0 && close !== ')' && close !== '）' && open !== '(' && open !== '（') return null
-  return cursor
-}
-
-function separatorLength(folded: string, index: number): number {
-  const char = folded[index] ?? ''
-  if (char === '\\' && folded[index + 1] === 't') return 2
-  return SEPARATOR_CHARS.has(char) ? 1 : 0
 }
 
 function countDigits(folded: string): number {
