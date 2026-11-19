@@ -170,8 +170,10 @@ function assertNoSqliteDrift(db: string, label: string): void {
 //   122 = 117 + AiServiceFact + AiSafetyTerm + BrandLogo + License + CopyJob。
 // 123（收费 P1，+1）：TerminalServicePrice —— 每台终端五个服务的配置价。
 // 124（收费 P2a，+1）：ServiceOrder —— 简历优化、模拟面试、扫描的按次付款。只加列不改这个数。
+// 125（用户自助开票第一包，+1）：InvoiceRequest —— 开票申请（打印单与服务单都能挂，同一订单至多一条未退回）。
+//   有 endUserId，已进会员注销的去标识保留清单（member-closure-retention.ts），不进删除清单。
 //   同一常量同时守 SQLite 与 PostgreSQL，两条作业都会用到。
-const EXPECTED_MODEL_COUNT = 124
+const EXPECTED_MODEL_COUNT = 125
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
