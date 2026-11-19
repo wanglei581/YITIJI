@@ -28,6 +28,7 @@ import {
   type ProductionRuntimeEnv,
 } from '../src/config/production-runtime-gates'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
+import { retainClosureRecords } from '../src/member-privacy/member-closure-retention'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { RedisService } from '../src/common/redis/redis.service'
 import {
@@ -314,6 +315,44 @@ async function main(): Promise<void> {
     const anon = await call('GET', '/api/v1/admin/billing/miniapp-virtual-pay')
     assert.equal(anon.status, 401)
     console.log('PASS 道具必须确认，坏的道具 ID 或价格写不进去')
+
+    const memberId = 'vpay-closure-member'
+    await prisma.endUser.create({
+      data: { id: memberId, phoneHash: 'vpay-closure-hash', phoneEnc: 'vpay-closure-enc', wxOpenId: 'openid-closure' },
+    })
+    const order = await prisma.virtualPayOrder.create({
+      data: {
+        endUserId: memberId,
+        openId: 'openid-closure',
+        serviceKind: 'resume_optimize',
+        productId: FAKE_PRODUCT_ID,
+        priceCents: FAKE_PRICE_CENTS,
+        env: 0,
+        outTradeNo: 'vpclosure0001',
+      },
+    })
+    await prisma.memberServiceCredit.create({
+      data: { endUserId: memberId, serviceKind: 'resume_optimize', sourceOrderId: order.id, status: 'available' },
+    })
+    await assert.rejects(
+      () => prisma.memberServiceCredit.create({
+        data: { endUserId: memberId, serviceKind: 'resume_optimize', sourceOrderId: order.id, status: 'available' },
+      }),
+      (error: unknown) => (error as { code?: string }).code === 'P2002',
+    )
+    await prisma.$transaction(async (tx) => {
+      await retainClosureRecords(tx, memberId, (text) => text)
+    })
+    const closedOrder = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: order.id } })
+    const closedCredit = await prisma.memberServiceCredit.findUniqueOrThrow({ where: { sourceOrderId: order.id } })
+    assert.equal(closedOrder.endUserId, null)
+    assert.equal(closedOrder.openId, null)
+    assert.equal(closedOrder.priceCents, FAKE_PRICE_CENTS)
+    assert.equal(closedCredit.endUserId, null)
+    assert.equal(closedCredit.status, 'available')
+    assert.equal(closedCredit.consumedAt, null)
+    assert.equal(closedCredit.refundedAt, null)
+    console.log('PASS 注销断开账号和 openid，一单只能有一条权益')
   } finally {
     await app.close()
     await prisma.onModuleDestroy()

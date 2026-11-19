@@ -138,6 +138,17 @@ export async function retainClosureRecords(tx: PrismaTransactionClient, endUserI
     })
   }
   counts.ServiceOrder = serviceOrders.length
+  // 虚拟支付订单是收款记录：行留下，账号和 openid 清掉。权益行留下，只断开账号。
+  const virtualPayOrders = await tx.virtualPayOrder.findMany({ where: { endUserId } })
+  for (const row of virtualPayOrders) {
+    await tx.virtualPayOrder.update({ where: { id: row.id }, data: { endUserId: null, openId: null } })
+  }
+  counts.VirtualPayOrder = virtualPayOrders.length
+  const serviceCredits = await tx.memberServiceCredit.findMany({ where: { endUserId } })
+  for (const row of serviceCredits) {
+    await tx.memberServiceCredit.update({ where: { id: row.id }, data: { endUserId: null } })
+  }
+  counts.MemberServiceCredit = serviceCredits.length
   // UserDataRequest 的计数/执行来源由执行器保存；导出能力失效，失败原文不再留存。
   counts.UserDataRequest = await tx.userDataRequest.count({ where: { endUserId } })
   await tx.userDataRequest.updateMany({ where: { endUserId, requestType: { not: 'delete' } }, data: {
