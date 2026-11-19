@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { readAiServiceLogRetentionDays } from '../ai/ai-result.cleanup.task'
 import { deidentifyClosedMemberInvoices } from '../member-privacy/member-closure-retention'
 import { InvoiceEmailCleanupTask } from './invoice-email-cleanup.task'
-import { clearExpiredInvoiceEmails } from './invoice-email-retention'
+import { clearExpiredInvoiceEmails, readInvoiceEmailRetentionDays } from './invoice-email-retention'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const TAX_ID = '91000000MA0000000N'
@@ -184,8 +183,14 @@ test('注销擦掉本人申请里的个人抬头和邮箱：退回原因里的�
   assert.equal(other.returnReason, `${NAME} ${OWN_EMAIL}`)
 })
 
-test('已开或已退回满期才清邮箱，已提交和未满期留下，天数与 AI 服务日志相同', async () => {
-  assert.equal(readAiServiceLogRetentionDays({}), 90)
+// 期望值改动（返工包 P2c1b 第 11 条）：邮箱保留天数单独设 INVOICE_EMAIL_RETENTION_DAYS（默认 90），
+// 不再借用 AI_SERVICE_LOG_RETENTION_DAYS；原先断言「天数与 AI 服务日志相同」正是要拆开的绑定。
+test('已开或已退回满期才清邮箱，已提交和未满期留下，天数单独设、默认 90', async () => {
+  assert.equal(readInvoiceEmailRetentionDays({}), 90)
+  assert.equal(readInvoiceEmailRetentionDays({ AI_SERVICE_LOG_RETENTION_DAYS: '7' }), 90, '调小 AI 日志天数不该连带开票邮箱')
+  assert.equal(readInvoiceEmailRetentionDays({ INVOICE_EMAIL_RETENTION_DAYS: '180' }), 180)
+  assert.equal(readInvoiceEmailRetentionDays({ INVOICE_EMAIL_RETENTION_DAYS: '0' }), 90)
+  assert.equal(readInvoiceEmailRetentionDays({ INVOICE_EMAIL_RETENTION_DAYS: 'abc' }), 90)
   const now = new Date()
   const { rows, tx } = createStore([
     {
@@ -265,7 +270,7 @@ test('已开或已退回满期才清邮箱，已提交和未满期留下，天�
     },
   ])
   const keptClearedAt = rows.find((row) => row.id === 'already-clear')!.emailClearedAt
-  const result = await clearExpiredInvoiceEmails(tx as never, readAiServiceLogRetentionDays({}), now)
+  const result = await clearExpiredInvoiceEmails(tx as never, readInvoiceEmailRetentionDays({}), now)
   assert.equal(result.clearedCount, 2)
   assert.equal(rows.length, 5)
   assert.equal(rows.find((row) => row.id === 'old-issued')!.email, null)
@@ -278,9 +283,13 @@ test('已开或已退回满期才清邮箱，已提交和未满期留下，天�
   assert.equal(rows.find((row) => row.id === 'already-clear')!.emailClearedAt, keptClearedAt)
 })
 
-test('每小时任务现读保留天数，清掉的审计不带邮箱和税号', async () => {
+test('每小时任务现读开票邮箱自己的保留天数（不看 AI 日志天数），清掉的审计不带邮箱和税号', async () => {
+  // 期望值改动（返工包 P2c1b 第 11 条）：任务改读 INVOICE_EMAIL_RETENTION_DAYS。AI 日志天数故意设成 7，
+  // 若任务还借用它，9 天前退回的 wait 会被误清。
+  const savedInvoice = process.env['INVOICE_EMAIL_RETENTION_DAYS']
   const saved = process.env['AI_SERVICE_LOG_RETENTION_DAYS']
-  process.env['AI_SERVICE_LOG_RETENTION_DAYS'] = '10'
+  process.env['INVOICE_EMAIL_RETENTION_DAYS'] = '10'
+  process.env['AI_SERVICE_LOG_RETENTION_DAYS'] = '7'
   try {
     const now = new Date()
     const { rows, tx } = createStore([
@@ -328,6 +337,7 @@ test('每小时任务现读保留天数，清掉的审计不带邮箱和税号',
     assert.equal(rows.find((row) => row.id === 'wait')!.taxId, TAX_ID)
     assert.equal(audits.length, 1)
     assert.equal(audits[0]?.['action'], 'invoice.email_cleared')
+    assert.equal((audits[0]?.['payload'] as Record<string, unknown>)['retentionDays'], 10)
     const payload = JSON.stringify(audits[0]?.['payload'])
     assert.equal(payload.includes('due@example.com'), false)
     assert.equal(payload.includes(TAX_ID), false)
@@ -335,5 +345,7 @@ test('每小时任务现读保留天数，清掉的审计不带邮箱和税号',
   } finally {
     if (saved === undefined) delete process.env['AI_SERVICE_LOG_RETENTION_DAYS']
     else process.env['AI_SERVICE_LOG_RETENTION_DAYS'] = saved
+    if (savedInvoice === undefined) delete process.env['INVOICE_EMAIL_RETENTION_DAYS']
+    else process.env['INVOICE_EMAIL_RETENTION_DAYS'] = savedInvoice
   }
 })
