@@ -101,9 +101,9 @@
 
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits .pft-fail-retry {
   grid-column: auto;
-  background: var(--qxt-teal-wash);
-  color: var(--qxt-teal-ink);
-  border-color: var(--qxt-teal-ink);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  border-color: transparent;
 }
 
 :is([data-qx-page='print-done'], [data-qx-page='print-progress']) .pft-fail-exits .pft-fail-alert {

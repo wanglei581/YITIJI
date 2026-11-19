@@ -607,6 +607,19 @@ test('S15c7 置灰原因只说为什么和何时亮，带走链接与小字照�
   assert.match(view.slice(closeAt, closeAt + 280), /retry\.available && retry\.blockedReason/)
 })
 
+test('S15c8 重新提交打印亮起时是深色主按钮，置灰仍是浅底', () => {
+  const css = readFileSync(join(kioskRoot, 'src/pages/print/styles/print-fail-touch.css'), 'utf8')
+  const ready = css.match(/\.pft-fail-exits \.pft-fail-retry \{([^}]+)\}/)
+  const blocked = css.match(/\.pft-fail-retry\[aria-disabled='true'\] \{([^}]+)\}/)
+  assert.ok(ready && blocked, '亮起和置灰两套样式都还在')
+  assert.match(ready[1], /background:\s*var\(--qx-deep\)/)
+  assert.match(ready[1], /color:\s*var\(--qxt-cream\)/)
+  assert.match(ready[1], /border-color:\s*transparent/)
+  assert.doesNotMatch(ready[1], /--qxt-teal-wash|--qxt-teal-ink/)
+  assert.match(blocked[1], /background:\s*var\(--qxt-well\)/)
+  assert.match(blocked[1], /color:\s*var\(--qxt-ink-3\)/)
+})
+
 test('S15c8 失败页胶囊贴着时钟，用常规字号，不再拉满', () => {
   const css = readFileSync(join(kioskRoot, 'src/pages/print/styles/print-fail-touch.css'), 'utf8')
   const right = css.match(/:has\(\.pft-fail-status\) \.qxt-hdr-right \{([^}]+)\}/)
