@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { deidentifyClosedMemberInvoices } from '../member-privacy/member-closure-retention'
+import { MemberDataExportMapper } from '../member-privacy/member-data-export.mapper'
 import { InvoiceEmailCleanupTask } from './invoice-email-cleanup.task'
 import { clearExpiredInvoiceEmails, readInvoiceEmailRetentionDays } from './invoice-email-retention'
 
@@ -347,5 +348,45 @@ test('每小时任务现读开票邮箱自己的保留天数（不看 AI 日志�
     else process.env['AI_SERVICE_LOG_RETENTION_DAYS'] = saved
     if (savedInvoice === undefined) delete process.env['INVOICE_EMAIL_RETENTION_DAYS']
     else process.env['INVOICE_EMAIL_RETENTION_DAYS'] = savedInvoice
+  }
+})
+
+test('会员数据导出收本人的开票申请：字段写清，税号和邮箱只导打码后的样子，退回原因里抄到的也打码', async () => {
+  const EMAIL = 'finance.desk@example.com'
+  const created = new Date(Date.now() - 3 * DAY_MS)
+  const invoiceRows = [
+    { id: 'inv-mine', endUserId: 'member-1', orderKind: 'print', orderId: 'order-1', titleType: 'company', title: COMPANY_NAME, taxId: TAX_ID,
+      email: EMAIL, amountCents: 300, status: 'returned', issuedAt: null, invoiceNo: null,
+      returnReason: `邮箱 ${EMAIL} 收不到，税号 ${TAX_ID} 对不上`, operatorId: 'admin-secret', emailClearedAt: null, createdAt: created },
+    { id: 'inv-other', endUserId: 'member-2', orderKind: 'print', orderId: 'order-2', titleType: 'personal', title: '会员乙', taxId: null,
+      email: 'member-b@example.com', amountCents: 100, status: 'submitted', issuedAt: null, invoiceNo: null, returnReason: null,
+      operatorId: null, emailClearedAt: null, createdAt: created },
+  ]
+  let invoiceSelect: Record<string, unknown> = {}
+  const empty = { findMany: async () => [], findUnique: async () => null }
+  const prisma = new Proxy({} as Record<string, unknown>, {
+    get: (_target, model: string) => model !== 'invoiceRequest' ? empty : {
+      findMany: async ({ where, select }: { where: { endUserId: string }; select: Record<string, boolean> }) => {
+        invoiceSelect = select
+        return invoiceRows
+          .filter((row) => row.endUserId === where.endUserId)
+          .map((row) => Object.fromEntries(Object.keys(select).map((key) => [key, (row as Record<string, unknown>)[key]])))
+      },
+    },
+  })
+  const envelope = await new MemberDataExportMapper(prisma as never).build({ endUserId: 'member-1', requestId: 'request-1' })
+  const exported = (envelope.sections as unknown as { invoiceRequests: Array<Record<string, unknown>> }).invoiceRequests
+  assert.equal(exported.length, 1)
+  assert.deepEqual(Object.keys(exported[0]!).sort(), [
+    'amountCents', 'createdAt', 'emailMasked', 'id', 'invoiceNo', 'issuedAt', 'orderId', 'orderKind', 'returnReason', 'status', 'taxIdMasked', 'title', 'titleType',
+  ])
+  assert.equal(exported[0]!['taxIdMasked'], '9100**********000N')
+  assert.equal(exported[0]!['emailMasked'], 'f***@example.com')
+  assert.equal(exported[0]!['returnReason'], '邮箱 f***@example.com 收不到，税号 9100**********000N 对不上')
+  assert.equal(exported[0]!['title'], COMPANY_NAME)
+  assert.equal('operatorId' in invoiceSelect, false, '导出不查操作人')
+  const text = JSON.stringify(envelope)
+  for (const secret of [TAX_ID, EMAIL, 'member-b@example.com', '会员乙', 'admin-secret']) {
+    assert.equal(text.includes(secret), false, `导出里出现了 ${secret}`)
   }
 })

@@ -127,3 +127,25 @@ Authorization: Bearer <会员 token>
 | `createdAt` | 提交时间，ISO 8601 |
 
 不返回操作人。
+
+## 会员数据导出里的开票申请
+
+本人申请「导出我的资料清单」时，导出包（`member-data-export-v1`）多一个分区 `sections.invoiceRequests`，是本人的全部开票申请，按提交时间从新到旧。每一项：
+
+| 字段 | 取值 |
+|---|---|
+| `id` | 申请编号 |
+| `orderKind` | `print` 或 `service` |
+| `orderId` | 订单编号 |
+| `titleType` | `personal` 或 `company` |
+| `title` | 抬头。会员注销后，个人抬头是 `[已去标识]` |
+| `taxIdMasked` | 与上面单条接口同样打码的统一社会信用代码；个人为 `null` |
+| `emailMasked` | 与上面单条接口同样打码的接收邮箱；清掉后为 `null` |
+| `amountCents` | 提交时的实付金额快照，整数，单位分 |
+| `status` | `submitted`、`issued` 或 `returned` |
+| `issuedAt` | 标已开的时间，没开是 `null` |
+| `invoiceNo` | 发票号码，没有是 `null` |
+| `returnReason` | 退回原因，其中的邮箱与统一社会信用代码已打码；没退回是 `null` |
+| `createdAt` | 提交时间 |
+
+不导出操作人。税号和邮箱只给打码后的样子，与会员接口同一口径。
