@@ -6,12 +6,15 @@ export const VIRTUAL_PAY_HTTP_TIMEOUT_MS = 10_000
 
 export interface WechatQueryOrderResponse {
   errcode?: number
+  errmsg?: string
   order?: {
     status?: number
     paid_fee?: number
+    left_fee?: number
     env_type?: number
     wx_order_id?: string
     paid_time?: number
+    wx_refund_id?: string
   }
 }
 

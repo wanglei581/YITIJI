@@ -1,7 +1,19 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
+import {
+  evaluateMiniappVirtualPayRuntime,
+  type MiniappVirtualPayBlock,
+} from '../config/production-runtime-gates'
 import { PrismaService } from '../prisma/prisma.service'
 import { MINIAPP_VIRTUAL_PAY_ENABLED_KEY } from './virtual-pay.contract'
+import {
+  getVirtualPayOrderForAdmin,
+  listVirtualPayOrdersForAdmin,
+  type VirtualPayAdminOrderListQuery,
+  type VirtualPayAdminOrderListResponse,
+  type VirtualPayAdminOrderView,
+} from './virtual-pay-admin-orders'
+import { VirtualPayRefundService, type VirtualPaySyncResult } from './virtual-pay-refund.service'
 import {
   MINIAPP_VIRTUAL_PAY_DISABLE_AUDIT_ACTION,
   MINIAPP_VIRTUAL_PAY_ENABLE_AUDIT_ACTION,
@@ -12,22 +24,40 @@ import {
   type VirtualPaySettingsView,
 } from './virtual-pay-settings'
 
+export interface VirtualPayAdminSettingsView extends VirtualPaySettingsView {
+  runtime: {
+    ready: boolean
+    block: MiniappVirtualPayBlock | null
+    env: 0 | 1 | null
+  }
+}
+
 @Injectable()
 export class VirtualPayAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly refunds?: VirtualPayRefundService,
   ) {}
 
-  getSettings(): Promise<VirtualPaySettingsView> {
-    return readVirtualPaySettings(this.prisma)
+  async getSettings(): Promise<VirtualPayAdminSettingsView> {
+    const base = await readVirtualPaySettings(this.prisma)
+    const runtime = evaluateMiniappVirtualPayRuntime()
+    return {
+      ...base,
+      runtime: {
+        ready: runtime.ready,
+        block: runtime.block,
+        env: runtime.env,
+      },
+    }
   }
 
   async setEnabled(
     enabled: boolean,
     confirm: boolean | undefined,
     operatorId: string,
-  ): Promise<VirtualPaySettingsView> {
+  ): Promise<VirtualPayAdminSettingsView> {
     await writeMiniappVirtualPayEnabled(
       this.prisma,
       enabled,
@@ -42,7 +72,7 @@ export class VirtualPayAdminService {
         payload: { operatorId, previous: saved.previous, next: saved.next },
       }),
     )
-    return readVirtualPaySettings(this.prisma)
+    return this.getSettings()
   }
 
   async setGoods(
@@ -51,7 +81,7 @@ export class VirtualPayAdminService {
     priceCents: number,
     confirm: boolean | undefined,
     operatorId: string,
-  ): Promise<VirtualPaySettingsView> {
+  ): Promise<VirtualPayAdminSettingsView> {
     await writeVirtualPayGoods(
       this.prisma,
       serviceKind,
@@ -73,6 +103,33 @@ export class VirtualPayAdminService {
         },
       }),
     )
-    return readVirtualPaySettings(this.prisma)
+    return this.getSettings()
+  }
+
+  listOrders(query: VirtualPayAdminOrderListQuery): Promise<VirtualPayAdminOrderListResponse> {
+    return listVirtualPayOrdersForAdmin(this.prisma, query)
+  }
+
+  async getOrder(id: string): Promise<VirtualPayAdminOrderView> {
+    const item = await getVirtualPayOrderForAdmin(this.prisma, id)
+    if (!item) {
+      throw new NotFoundException({
+        error: { code: 'VPAY_ORDER_NOT_FOUND', message: '没有找到这笔虚拟支付订单' },
+      })
+    }
+    return item
+  }
+
+  refundOrder(
+    id: string,
+    input: { confirm?: boolean; reason?: string; operatorId: string },
+  ): Promise<VirtualPayAdminOrderView> {
+    if (!this.refunds) throw new Error('VPAY_REFUND_SERVICE_UNAVAILABLE')
+    return this.refunds.initiateRefund(id, input)
+  }
+
+  syncOrder(id: string, operatorId: string): Promise<VirtualPaySyncResult> {
+    if (!this.refunds) throw new Error('VPAY_REFUND_SERVICE_UNAVAILABLE')
+    return this.refunds.syncOrder(id, operatorId)
   }
 }

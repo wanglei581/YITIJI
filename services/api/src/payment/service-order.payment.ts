@@ -8,6 +8,8 @@ import type { PaymentProviderRegistry } from './payment-provider.factory'
 import type { RefundNotifyEvent, RefundQueryResult } from './payment-provider.types'
 import { isChannelAbnormal } from './refund-abnormal'
 import { deliverServiceRefundAlert, noteServiceRefundAbnormal } from './service-order-refund-abnormal'
+import { MINIAPP_CREDIT_PROVIDER } from '../virtual-pay/virtual-pay.contract'
+import { restoreMiniappCreditForServiceOrder } from '../virtual-pay/virtual-pay-credit-redeem'
 import {
   SERVICE_REFUND_BACKOFF_MS,
   SERVICE_REFUND_LEASE_MS,
@@ -205,6 +207,9 @@ export async function executeServiceOrderRefund(
   const existing = await db.serviceOrder.findUnique({ where: { id: orderId } })
   if (!existing) return 'skipped'
   if (existing.status === 'refunded') return 'refunded'
+  if (existing.provider === MINIAPP_CREDIT_PROVIDER) {
+    return restoreMiniappCreditForServiceOrder(db, audit, existing, reason)
+  }
   const manual = opts?.manual === true
   const cap = manual ? SERVICE_REFUND_RETRY_CAP + 1 : SERVICE_REFUND_RETRY_CAP
   const retryable = existing.status === 'refunding' || existing.status === 'refund_failed'

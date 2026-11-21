@@ -117,6 +117,12 @@ export class ApiRouter {
       status: 200,
       json: { forgotten: 0 },
     })
+    // P2d2：登录会员进入 /pay/resume 或 /pay/interview 且本机收费时查可用小程序虚拟支付权益。
+    // 默认空列表，既有用例按原扫码付款流走不中断；要测「手机上买过」的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/member/service-credits', {
+      status: 200,
+      json: { items: [] },
+    })
     // 无人值守服务联系方式。默认给出公示号码与服务时间，两个布尔都是假：
     // 单点位不出现「换一台机器」，小程序未发布不出现「手机上能看到 / 用手机继续」。
     // 要看换机、小程序已发布或 404 的用例自行 respond 覆盖。

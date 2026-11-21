@@ -22,6 +22,7 @@ import { getTerminalId, refreshKioskTerminalConfig } from '../../services/api/te
 import { errorCodeOf } from '../../services/api/userErrorMessage'
 import { forgetServiceTrip, readServiceTrip, serviceTripOwnerFor, type ServiceTrip } from '../../services/serviceTrip'
 import { keepServiceTripOrder, openServiceTripOrder, retireServiceTripOrder } from '../../services/serviceTripOrder'
+import { useMiniappCreditFlow } from './useMiniappCreditFlow'
 import {
   PAY_OK_ADVANCE_MS, PAY_POLL_MS, createPayPollGuardState, initialPollDelayMs, isRateLimitedError,
   noteOrderAnchor, planPollRequest, planRefreshOnlyRequest, recordGetRequest, recordGetSuccess, recordRateLimit,
@@ -52,10 +53,13 @@ export interface PayFlow extends FlowState {
   view: PayScreen
   remainMs: number | null
   busy: boolean
+  /** 权益被并发抢走或退回后切回扫码的诚实提示。 */
+  creditNotice: string | null
   onRefresh: () => void
   onRetry: () => void
   onLeave: (closeOrder: boolean) => void
   onStart: () => void
+  onUseCredit: () => void
 }
 
 const INITIAL: FlowState = { screen: 'loading', order: null, phase: null, error: null, checking: false, postExpiryChecking: false, rateLimited: false }
@@ -68,7 +72,7 @@ function settledPatch(screen: PayScreen, error: unknown = null, extra?: Partial<
 export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: string }): PayFlow {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { user } = useAuth()
+  const { user, getToken } = useAuth()
   const serviceKey = PAY_SERVICE_KEY[what]
   const endUserId = user?.id ?? null
   const [state, setState] = useState<FlowState>(INITIAL)
@@ -81,9 +85,20 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
   const inflightRef = useRef<Promise<void> | null>(null)
   const rescheduleRef = useRef<((delayMs: number) => void) | null>(null)
   const leavingRef = useRef(false)
+  const endUserIdRef = useRef(endUserId)
+  endUserIdRef.current = endUserId
 
-  /** 这一次结果还算不算数：人没走，也没换成更新的一次。 */
   const current = useCallback((gen: number) => gen === genRef.current && !leavingRef.current, [])
+  const dropMissingOrder = useCallback((trip: ServiceTrip) => {
+    forgetServiceTrip(trip.serviceKey, trip.orderId); tripRef.current = null
+    setState(settledPatch('timeout', null, { phase: 'timed_out' }))
+  }, [])
+  const trackInflight = useCallback(async (task: () => Promise<void>) => {
+    const run = task(); inflightRef.current = run
+    try { await run } finally { if (inflightRef.current === run) inflightRef.current = null }
+  }, [])
+  const goNext = useCallback(() => { leavingRef.current = true; navigate(targets.next, { replace: true }) }, [navigate, targets.next])
+  const passFree = useCallback(() => { setState({ ...INITIAL, screen: 'free' }); goNext() }, [goNext])
 
   const applyView = useCallback((view: ServiceOrderView, fromRefresh: boolean) => {
     orderRef.current = view
@@ -107,38 +122,14 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     })
   }, [])
 
-  const dropMissingOrder = useCallback((trip: ServiceTrip) => {
-    forgetServiceTrip(trip.serviceKey, trip.orderId)
-    tripRef.current = null
-    setState(settledPatch('timeout', null, { phase: 'timed_out' }))
-  }, [])
-
-  const trackInflight = useCallback(async (task: () => Promise<void>) => {
-    const run = task()
-    inflightRef.current = run
-    try {
-      await run
-    } finally {
-      if (inflightRef.current === run) inflightRef.current = null
-    }
-  }, [])
-
-  const goNext = useCallback(() => {
-    leavingRef.current = true
-    navigate(targets.next, { replace: true })
-  }, [navigate, targets.next])
-
-  const passFree = useCallback(() => {
-    setState({ ...INITIAL, screen: 'free' })
-    goNext()
-  }, [goNext])
-
   const create = useCallback(async (gen: number) => {
+    const startedUserId = endUserId
+    const alive = () => current(gen) && endUserIdRef.current === startedUserId
     setState({ ...INITIAL, screen: 'loading' })
     try {
-      const opened = await openServiceTripOrder({ serviceKey, pathname, endUserId })
-      if (!current(gen)) {
-        // 人已经走了，或已经换成更新的一次：这张晚到的单不要了，关掉。
+      const opened = await openServiceTripOrder({ serviceKey, pathname, endUserId: startedUserId })
+      if (!alive()) {
+        // 人已经走了，或已经换成更新的一次/另一个人：这张晚到的单不要了，关掉。
         void retireServiceTripOrder(opened.trip, opened.view.status)
         return
       }
@@ -147,12 +138,12 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       noteOrderAnchor(guardRef.current, Date.now())
       applyView(opened.view, false)
     } catch (error) {
-      if (!current(gen)) return
+      if (!alive()) return
       if (errorCodeOf(error) === 'SERVICE_FREE_ON_THIS_TERMINAL') {
         // 这项现在免费：先把本机价目缓存刷成新的，再直接去下一步，下一步就不会再把人送回付款屏。
         const terminalId = getTerminalId()
         if (terminalId) await refreshKioskTerminalConfig(terminalId).catch(() => undefined)
-        if (!current(gen)) return
+        if (!alive()) return
         passFree()
         return
       }
@@ -160,24 +151,39 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     }
   }, [applyView, current, endUserId, passFree, pathname, serviceKey])
 
+  const { creditNotice, checkOwned, onUseCredit } = useMiniappCreditFlow({
+    what, serviceKey, pathname, endUserId, getToken, busy,
+    isLeaving: () => leavingRef.current,
+    nextGen: () => ++genRef.current,
+    isCurrent: current,
+    setBusy,
+    onClearError: () => setState((prev) => ({ ...prev, error: null })),
+    onRedeemError: (error) => setState((prev) => ({ ...prev, error })),
+    onRedeemed: (redeemedView, trip) => { tripRef.current = trip; orderRef.current = redeemedView; goNext() },
+    onFree: passFree,
+    onFallbackQr: create,
+  })
+
   const enter = useCallback(async (gen: number) => {
+    const startedUserId = endUserId
+    const alive = () => current(gen) && endUserIdRef.current === startedUserId
     const terminalId = getTerminalId()
     // 演示模式与没有终端身份（手机、桌面）不收费：直接前往合法站内下一步。
     if (API_MODE !== 'http' || !terminalId) return passFree()
     try {
       const config = await refreshKioskTerminalConfig(terminalId)
-      if (!current(gen)) return
+      if (!alive()) return
       if (pricingSaysFree(config, serviceKey)) return passFree()
     } catch {
       // 读不到本机价目就照常建单，由服务端按生效价判；免费时它会回 409。
     }
-    const stored = readServiceTrip(serviceKey, { owner: serviceTripOwnerFor(endUserId) })
+    const stored = readServiceTrip(serviceKey, { owner: serviceTripOwnerFor(startedUserId) })
     if (stored) {
       try {
         recordGetRequest(guardRef.current, Date.now(), false)
         let view = await getServiceOrder(stored.orderId, stored.kioskSessionId)
         recordGetSuccess(guardRef.current)
-        if (!current(gen)) return
+        if (!alive()) return
         let fromRefresh = false
         if (view.status === 'pending' && !view.paymentFailed && serviceOrderExpiredLocally(view, Date.now())) {
           const refreshAt = Date.now()
@@ -185,7 +191,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
             recordGetRequest(guardRef.current, refreshAt, true)
             view = await getServiceOrder(stored.orderId, stored.kioskSessionId, { refresh: true })
             recordGetSuccess(guardRef.current)
-            if (!current(gen)) return
+            if (!alive()) return
             fromRefresh = true
           }
         }
@@ -201,7 +207,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         }
         // 没付成、超时、退款中、已关的旧单：用不上了，先确认关掉待付的，关不掉就留住原单号提示核实。
         const retired = await retireServiceTripOrder(stored, view.status)
-        if (!current(gen)) return
+        if (!alive()) return
         if (!retired.ok) {
           tripRef.current = stored
           orderRef.current = view
@@ -209,7 +215,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
           return
         }
       } catch (error) {
-        if (!current(gen)) return
+        if (!alive()) return
         if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') forgetServiceTrip(serviceKey, stored.orderId)
         else {
           const rateLimited = isRateLimitedError(error)
@@ -220,20 +226,29 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         }
       }
     }
+    if (await checkOwned()) {
+      if (!alive()) return
+      setState({ ...INITIAL, screen: 'owned' })
+      return
+    }
+    if (!alive()) return
     await create(gen)
-  }, [applyView, create, current, endUserId, passFree, serviceKey])
+  }, [applyView, checkOwned, create, current, endUserId, passFree, serviceKey])
 
-  // 进屏即出码。挂上之后隔一拍再开始：开发模式下组件会挂两次，第一次在这一拍之前就被撤掉，不会多建一张单。
+  // 进屏或切换用户（endUserId 变更）立即作废旧代次、清掉旧人引用并重新判定；开发模式挂两次也会被撤掉。
   useEffect(() => {
     leavingRef.current = false
+    tripRef.current = null
+    orderRef.current = null
+    guardRef.current = createPayPollGuardState()
+    setState(INITIAL)
     const gen = ++genRef.current
     const timer = window.setTimeout(() => void enter(gen), 0)
     return () => {
       window.clearTimeout(timer)
       genRef.current += 1
     }
-    // 只在进屏时跑一次。
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [endUserId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const pollOnce = useCallback(async (manual: boolean): Promise<{ nextDelayMs: number; sent: boolean }> => {
     const trip = tripRef.current
@@ -470,5 +485,5 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
 
   const remainMs = state.order && WAITING.has(view) ? Math.max(0, Date.parse(state.order.expiresAt) - nowMs) : null
 
-  return { ...state, view, remainMs, busy, onRefresh, onRetry, onLeave, onStart: goNext }
+  return { ...state, view, remainMs, busy, creditNotice, onRefresh, onRetry, onLeave, onStart: goNext, onUseCredit }
 }

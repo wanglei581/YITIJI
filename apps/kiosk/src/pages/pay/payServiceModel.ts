@@ -98,12 +98,24 @@ export function payFailLine(name: string): string {
 }
 
 export const PAY_TIMEOUT_LINE = `${PAY_TIMEOUT_FULL}可以再出一张码，或返回。`
+export const PAY_OWNED_HEAD = '手机上买过这一次'
+export const PAY_OWNED_BODY = '这次直接用，屏上不出收款码。点「用这一次」之后，这一趟就开始。'
+export const PAY_CREDIT_TAKEN_LINE = '这张权益刚被用掉或已退回，下面改为现场扫码支付'
+export const PAY_CREDIT_REFUNDED_LINE = '这次权益已自动退回你的账号，下次还能继续用。'
 
-/** 退款几态（稿里没有）：用稿的退回句，退款卡住时补标准句 1。 */
-export function payRefundLine(phase: ServiceOrderPhase | null): string {
+/** 退款几态（稿里没有）：现金单用稿的退回句，小程序权益单如实写退回账号不误导成银行卡退款。 */
+export function payRefundLine(phase: ServiceOrderPhase | null, provider: string | null = null): string {
+  if (phase === 'refunded' && provider === 'miniapp_credit') return PAY_CREDIT_REFUNDED_LINE
   if (phase === 'refunded') return `这一次没有开始。钱已经退回原付款账户，${CHANNEL}。可以再出一张码，或返回。`
   if (phase === 'refund_failed') return `这一次没有开始。钱会退回原付款账户，${CHANNEL}。${helpNeededLine()}。可以再出一张码，或返回。`
   return `这一次没有开始。钱${PAY_BACK}。可以再出一张码，或返回。`
+}
+
+export function payCreditRedeemErrorLine(error: unknown): string {
+  if (errorCodeOf(error) === 'ACCOUNT_UNAVAILABLE') {
+    return `你的账号当前不可用，暂时不能使用已购权益。${helpNeededLine()}。`
+  }
+  return userMessageOf(error, '这次没能用上手机上买的权益，请再点一次「用这一次」，或返回重试。')
 }
 
 /**
@@ -146,8 +158,8 @@ export function formatRemain(ms: number): string {
 
 // ── 每一态的顶栏、底栏 ──────────────────────────────────────────────────
 
-/** error：没出成码（没有单，钱没有扣）。lookup：查不到结果。close_failed：关单失败，保留原单号。 */
-export type PayScreen = 'loading' | 'wait' | 'check' | 'ok' | 'fail' | 'timeout' | 'refund' | 'free' | 'error' | 'lookup' | 'close_failed'
+/** error：没出成码（没有单，钱没有扣）。lookup：查不到结果。close_failed：关单失败，保留原单号。owned：手机上买过这一次。 */
+export type PayScreen = 'loading' | 'owned' | 'wait' | 'check' | 'ok' | 'fail' | 'timeout' | 'refund' | 'free' | 'error' | 'lookup' | 'close_failed'
 
 export interface PayChrome {
   eyebrow: string
@@ -160,13 +172,20 @@ export interface PayChrome {
   primary: string
 }
 
-export function payChrome(screen: PayScreen, name: string, refundPhase: ServiceOrderPhase | null = null): PayChrome {
+export function payChrome(
+  screen: PayScreen,
+  name: string,
+  refundPhase: ServiceOrderPhase | null = null,
+  provider: string | null = null,
+): PayChrome {
   const eyebrow = `这一次 · ${name}`
   const abort = { label: '不付了，返回', close: true }
   const leave = { label: '返回', close: false }
   switch (screen) {
     case 'loading':
       return { eyebrow, title: '请完成这一次支付', sub: '正在出这一次的付款码', status: { text: '正在出码', tone: 'reading' }, left: leave, ask: true, primary: '刷新付款结果' }
+    case 'owned':
+      return { eyebrow, title: '这次不用再付', sub: '手机上买过这一次', status: { text: '手机上买过这一次', tone: 'ok' }, left: leave, ask: true, primary: '用这一次' }
     case 'wait':
     case 'check':
       return { eyebrow, title: '请完成这一次支付', sub: '付好了才会开始', status: { text: '付好了才会开始', tone: 'ok' }, left: abort, ask: true, primary: '刷新付款结果' }
@@ -177,7 +196,9 @@ export function payChrome(screen: PayScreen, name: string, refundPhase: ServiceO
     case 'timeout':
       return { eyebrow, title: '等了 5 分钟，这一次没有付成', sub: '没收到这一次的钱', status: { text: '没收到这一次的钱', tone: 'warn' }, left: abort, ask: true, primary: '再出一张码' }
     case 'refund': {
-      const sub = refundPhase === 'refunded' ? '钱已经退回' : '钱会退回原付款账户'
+      const sub = refundPhase === 'refunded'
+        ? (provider === 'miniapp_credit' ? '权益已退回账号' : '钱已经退回')
+        : '钱会退回原付款账户'
       return { eyebrow, title: '这一次没有开始', sub, status: { text: sub, tone: 'warn' }, left: leave, ask: true, primary: '再出一张码' }
     }
     case 'free':

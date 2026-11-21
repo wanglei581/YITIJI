@@ -411,7 +411,8 @@ const kioskPayScreenNote = runFile('apps/admin/src/lib/kioskPayScreenNote.ts')
 const billing = runFile('apps/admin/src/routes/billing/index.tsx', {
   ...common, react: billingHooks,
   '../../services/api/adminBilling': {},
-  '../../lib/kioskPayScreenNote': kioskPayScreenNote,
+  './PersonalChargeSwitchCard': { PersonalChargeSwitchCard: () => null },
+  './virtualPay/VirtualPayTab': { VirtualPayTab: () => null },
 }, '\nexport { PriceConfigSection, ReconciliationSection }\n')
 billingStates = ['price']
 // 页头直接展开 Page，避免继续调用尚无数据的子区块。
