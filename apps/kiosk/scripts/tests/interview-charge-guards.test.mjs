@@ -7,7 +7,8 @@
  *   - C2（③）：handleStartError 跨用户切换与清场代次守卫，旧用户晚到响应一律丢弃、绝不覆盖新用户 paidTrip；
  *   - C3（④ iv-3）：iv-3 免费再试窗 retryUntil 精准到期自动撤掉「免费再试一次」切回收费入口，卸载清定时器；
  *   - C4（④+⑤ iv-run）：iv-run 免费再试窗 retryUntil 精准到期立即撤按钮、锁定报告入口并触发查单轮询展示真实退款态；
- *   - C5（⑤ iv-run）：refunding / refunded / refund_failed 及 409 SERVICE_RETRY_EXPIRED / SERVICE_ORDER_REFUNDED 均锁定报告入口。
+ *   - C5（⑤ iv-run）：refunding / refunded / refund_failed 及 409 SERVICE_RETRY_EXPIRED / SERVICE_ORDER_REFUNDED 均锁定报告入口；
+ *   - C8（P2e-3c）：paidReportLocked=true 时到点自动封场保留停录音/停播报与封场屏，但严格拦截自动 requestReport / endInterviewAtDeadline。
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -706,5 +707,153 @@ test('C5(⑤ iv-run): refund_failed 与 409 SERVICE_ORDER_REFUNDED / SERVICE_RET
     assert.equal(hUnmount.activeTimerCount, 0, '卸载后必须清理 iv-run 再试到期定时器')
   } finally {
     hUnmount.destroy()
+  }
+})
+
+async function mountDeadlineSeal(options) {
+  const rt = createFakeRuntime()
+  let endCalls = 0
+  let cancelCalls = 0
+  let stopPlaybackCalls = 0
+  let phases = []
+  let currentProps = {
+    state: { sessionId: 'locked-session', durationMin: 3, deadlineAtLocalMs: 1_001_000 },
+    live: undefined,
+    phase: 'done_suggest',
+    omitPrintAnswers: false,
+    answersRecorded: true,
+    paidReportLocked: true,
+    paidReportError: '这一次已进入退款流程，不再继续生成练习报告',
+    paidReportRetryFree: false,
+    ...options,
+  }
+  const recorderRef = { current: { cancel: () => { cancelCalls += 1 } } }
+  const recordTimerRef = { current: null }
+  const recordStartedAtRef = { current: null }
+  const pendingAnswerRef = { current: null }
+
+  const envKey = `__P2E3C_DEADLINE_${Math.random().toString(36).slice(2)}`
+  globalThis[envKey] = {
+    react: rt.react,
+    end: async (...a) => { endCalls += 1; return options.onEnd ? options.onEnd(...a) : 'reported' },
+  }
+  const jsxUrl = toDataUrl('export const jsx = (type, props) => ({ type, props }); export const jsxs = jsx; export const Fragment = Symbol("Fragment");')
+  const deadlineUrl = toDataUrl(transpile('src/pages/interview/session/interviewDeadline.ts'))
+  const hookSrc = ts.transpileModule(
+    readFileSync(join(kioskRoot, 'src/pages/interview/session/useInterviewDeadlineSeal.tsx'), 'utf8'),
+    {
+      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+      fileName: 'src/pages/interview/session/useInterviewDeadlineSeal.tsx',
+    },
+  ).outputText
+    .replaceAll('from "react/jsx-runtime"', `from '${jsxUrl}'`)
+    .replaceAll("from 'react/jsx-runtime'", `from '${jsxUrl}'`)
+    .replaceAll("from 'react'", `from '${toDataUrl(`const r = globalThis.${envKey}.react; export const { useEffect, useRef, useState } = r;`)}'`)
+    .replaceAll("from '../../../services/api/interview'", `from '${toDataUrl('export const getInterviewSession = () => Promise.reject(new Error("offline timing"))')}'`)
+    .replaceAll("from '../../../services/api/client'", `from '${toDataUrl('export const API_MODE = "http"')}'`)
+    .replaceAll("from './InterviewTimeUp'", `from '${toDataUrl('export const InterviewTimeUp = function InterviewTimeUp() { return null }')}'`)
+    .replaceAll("from './interviewTurnActions'", `from '${toDataUrl(`export const endInterviewAtDeadline = (...a) => globalThis.${envKey}.end(...a)`)}'`)
+    .replaceAll("from './interviewDeadline'", `from '${deadlineUrl}'`)
+
+  const { useInterviewDeadlineSeal } = await import(toDataUrl(`${hookSrc}\n// ${envKey}`))
+  const noop = () => {}
+  rt.setRunner(() => useInterviewDeadlineSeal({
+    ...currentProps,
+    getToken: () => null,
+    access: {},
+    navigate: noop,
+    recorderRef,
+    recordTimerRef,
+    recordStartedAtRef,
+    pendingAnswerRef,
+    stopPlayback: () => { stopPlaybackCalls += 1 },
+    setDraft: noop,
+    setVoice: noop,
+    setRecordSec: noop,
+    setPhase: (p) => { phases.push(p) },
+    setAssistantDown: noop,
+  }))
+  rt.render()
+  await rt.flushMicrotasks()
+
+  return {
+    get state() { return rt.latest },
+    get endCalls() { return endCalls },
+    get cancelCalls() { return cancelCalls },
+    get stopPlaybackCalls() { return stopPlaybackCalls },
+    get phases() { return phases },
+    rerender(patch) {
+      currentProps = { ...currentProps, ...patch }
+      rt.render()
+    },
+    advance: rt.advance,
+    flushMicrotasks: rt.flushMicrotasks,
+    destroy() {
+      rt.destroy()
+      delete globalThis[envKey]
+    },
+  }
+}
+
+test('C8(P2e-3c): paidReportLocked=true 时到点自动封场保留停录音/停播报与封场屏，严禁触发 endInterviewAtDeadline', async () => {
+  // 8a: 初始即锁定（退款/再试过期），1 秒后到点自动封场
+  const locked = await mountDeadlineSeal({
+    paidReportLocked: true,
+    answersRecorded: true,
+    paidReportError: '这一次已进入退款流程，不再继续生成练习报告',
+  })
+  try {
+    assert.equal(locked.endCalls, 0)
+    assert.equal(locked.state.sealedRef.current, false)
+    assert.equal(locked.state.timeUpScreen, null)
+
+    await locked.advance(1_000)
+    assert.equal(locked.state.sealedRef.current, true, '到点必须正常封场')
+    assert.equal(locked.cancelCalls, 1, '到点必须取消录音')
+    assert.equal(locked.stopPlaybackCalls, 1, '到点必须停止播报')
+    assert.equal(locked.endCalls, 0, 'paidReportLocked=true 时到点绝不能自动调 endInterviewAtDeadline')
+    assert.ok(locked.state.timeUpScreen, '到点封场必须切到 InterviewTimeUp 封场屏')
+    assert.equal(locked.state.timeUpScreen.props.variant, 'report-failed')
+    assert.equal(locked.state.timeUpScreen.props.paidReportLocked, true)
+    assert.equal(locked.phases.includes('finishing'), false)
+
+    // 即便手动误触封场屏 onRetry 也不得请求生成报告
+    locked.state.timeUpScreen.props.onRetry()
+    await locked.flushMicrotasks()
+    assert.equal(locked.endCalls, 0)
+  } finally {
+    locked.destroy()
+  }
+
+  // 8b: 运行途中由未锁定切换为 paidReportLocked=true 后到点 → 同样严格拦截
+  const lateLocked = await mountDeadlineSeal({
+    paidReportLocked: false,
+    answersRecorded: true,
+    paidReportError: null,
+  })
+  try {
+    await lateLocked.advance(500)
+    lateLocked.rerender({ paidReportLocked: true, paidReportError: '免费再试时间已过，费用会自动退回原付款账户' })
+    await lateLocked.advance(500)
+    assert.equal(lateLocked.state.sealedRef.current, true)
+    assert.equal(lateLocked.endCalls, 0, '运行途中变为锁定后，到点封场绝不能自动请求报告')
+    assert.ok(lateLocked.state.timeUpScreen)
+    assert.equal(lateLocked.state.timeUpScreen.props.variant, 'report-failed')
+  } finally {
+    lateLocked.destroy()
+  }
+
+  // 8c: 正向对照：未锁定（paidReportLocked=false）到点仍正常触发一次 endInterviewAtDeadline
+  const unlocked = await mountDeadlineSeal({
+    paidReportLocked: false,
+    answersRecorded: true,
+    paidReportError: null,
+  })
+  try {
+    await unlocked.advance(1_000)
+    assert.equal(unlocked.state.sealedRef.current, true)
+    assert.equal(unlocked.endCalls, 1, '未锁定时到点必须正常调用一次 endInterviewAtDeadline')
+  } finally {
+    unlocked.destroy()
   }
 })

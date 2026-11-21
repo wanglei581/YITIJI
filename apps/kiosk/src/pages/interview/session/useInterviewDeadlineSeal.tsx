@@ -63,6 +63,10 @@ export function useInterviewDeadlineSeal(args: {
   const sealedRef = useRef(false)
   const phaseRef = useRef(args.phase)
   phaseRef.current = args.phase
+  const paidReportLockedRef = useRef(Boolean(args.paidReportLocked))
+  paidReportLockedRef.current = Boolean(args.paidReportLocked)
+  const answersRecordedRef = useRef(args.answersRecorded)
+  answersRecordedRef.current = args.answersRecorded
   const sealRef = useRef<() => void>(() => {})
   const getTokenRef = useRef(args.getToken)
   getTokenRef.current = args.getToken
@@ -106,7 +110,7 @@ export function useInterviewDeadlineSeal(args: {
   }, [sessionId, accessToken])
 
   const requestReport = () => {
-    if (!args.state?.sessionId) return
+    if (!args.state?.sessionId || paidReportLockedRef.current) return
     setReportBusy(true)
     args.setPhase('finishing')
     void endInterviewAtDeadline({
@@ -140,6 +144,11 @@ export function useInterviewDeadlineSeal(args: {
     setDraft('')
     setVoice({ kind: 'idle' })
     stopPlayback()
+    // 付费报告因退款或免费再试过期已锁定时，保留到点封场体验，但严禁自动再请求生成报告。
+    if (paidReportLockedRef.current) {
+      setTimeUpStop(answersRecordedRef.current ? 'report-failed' : 'no-answers')
+      return
+    }
     if (phaseRef.current === 'finishing') return
     requestReport()
   }
