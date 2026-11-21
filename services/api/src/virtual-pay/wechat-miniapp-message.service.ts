@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
+import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { sendVirtualPayOpsAlert } from './virtual-pay-alert'
 import { confirmPaid } from './virtual-pay-delivery'
 import { VIRTUAL_PAY_DIAGNOSTIC_ACTION } from './virtual-pay-order.service'
 import {
@@ -12,6 +14,7 @@ import {
 } from './wechat-message-crypto'
 
 export const VIRTUAL_PAY_MESSAGE_AUDIT_ACTION = 'virtual_pay.message'
+export const VIRTUAL_PAY_CLOSED_RECOVERY_AUDIT_ACTION = 'virtual_pay.closed_order_paid_recovered'
 
 const DELIVER_EVENT = 'xpay_goods_deliver_notify'
 
@@ -26,9 +29,12 @@ export type MessageHttpResult =
  */
 @Injectable()
 export class WechatMiniappMessageService {
+  private readonly logger = new Logger(WechatMiniappMessageService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   verifyUrl(query: Record<string, unknown>): MessageHttpResult {
@@ -92,8 +98,34 @@ export class WechatMiniappMessageService {
       await this.diagnose('payload_incomplete', readString(payload['OutTradeNo']))
       return
     }
-    const result = await confirmPaid(this.prisma, notice)
-    if (!result.ok) await this.diagnose(result.reason, notice.outTradeNo)
+    const result = await confirmPaid(this.prisma, { ...notice, allowClosedRecovery: true })
+    if (!result.ok) {
+      await this.diagnose(result.reason, notice.outTradeNo)
+      return
+    }
+    if (result.recoveredFromClosed) {
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: VIRTUAL_PAY_CLOSED_RECOVERY_AUDIT_ACTION,
+        targetType: 'virtual_pay_order',
+        targetId: notice.outTradeNo,
+        payload: {
+          reason: 'closed_order_paid_recovered',
+          summary: '关单后到账补记',
+          wxOrderId: notice.wxOrderId,
+        },
+      })
+      await sendVirtualPayOpsAlert({
+        redis: this.redis,
+        outTradeNo: notice.outTradeNo,
+        episodeToken: 'closed-recovery',
+        type: 'virtual_pay_closed_order_recovered',
+        severity: 'warning',
+        title: `小程序虚拟支付订单 ${notice.outTradeNo} 关单后到账补记`,
+        logger: this.logger,
+      })
+    }
   }
 
   private diagnose(reason: string, outTradeNo: string | null): Promise<string | null> {

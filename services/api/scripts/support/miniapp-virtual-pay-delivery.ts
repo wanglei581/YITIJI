@@ -3,7 +3,10 @@ import { createCipheriv, createHash, randomBytes } from 'crypto'
 import { encryptPhone, hashPhone } from '../../src/common/crypto/phone-identity'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 import { VIRTUAL_PAY_DIAGNOSTIC_ACTION } from '../../src/virtual-pay/virtual-pay-order.service'
-import { VIRTUAL_PAY_MESSAGE_AUDIT_ACTION } from '../../src/virtual-pay/wechat-miniapp-message.service'
+import {
+  VIRTUAL_PAY_CLOSED_RECOVERY_AUDIT_ACTION,
+  VIRTUAL_PAY_MESSAGE_AUDIT_ACTION,
+} from '../../src/virtual-pay/wechat-miniapp-message.service'
 
 const MEMBER = 'vpay-deliver-member'
 const OPEN_ID = 'openid-deliver-member'
@@ -140,7 +143,67 @@ export async function assertVirtualPayDelivery(options: { prisma: PrismaService;
   assert.equal(await missingOrder.text(), '')
   assert.equal(await prisma.memberServiceCredit.count(), creditsBeforeMissing)
   assert.equal(await latestReason(prisma), 'order_missing')
-  console.log('PASS 发货推送验签解密；重复推送只有一条权益；金额或道具不对不记权益')
+
+  // 第 5 条：关单后到账不丢（字段不对仍拒绝；验签且字段全对 → 记 1 条权益 + 审计「关单后到账补记」 + 告警；重复推送仍只 1 条）
+  const closedOrder = await prisma.virtualPayOrder.create({
+    data: {
+      endUserId: MEMBER,
+      openId: OPEN_ID,
+      serviceKind: 'resume_optimize',
+      productId: PRODUCT_ID,
+      priceCents: PRICE_CENTS,
+      env: 0,
+      status: 'closed',
+      outTradeNo: 'vpclosedpaid01',
+    },
+    select: { id: true, outTradeNo: true },
+  })
+  const closedWrongAmt = await post(base, seal(deliverJson(closedOrder.outTradeNo, { ActualPrice: 1 })))
+  assert.equal(closedWrongAmt.status, 200)
+  assert.equal(await creditCount(prisma, closedOrder.id), 0, '关单后收到金额不符推送仍不得记权益')
+  assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: closedOrder.id } })).status, 'closed')
+  assert.equal(await latestReason(prisma), 'amount_mismatch')
+
+  const originalFetch = globalThis.fetch
+  const prevWebhook = process.env['ALERT_WEBHOOK_URL']
+  let closedAlertHits = 0
+  process.env['ALERT_WEBHOOK_URL'] = 'https://alert.local.test/closed-recovery'
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const target = String(input)
+    if (target.startsWith('https://alert.local.test/')) {
+      closedAlertHits += 1
+      return new Response(JSON.stringify({ errcode: 0 }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+    return originalFetch(input, init)
+  }) as typeof fetch
+  try {
+    const recovered = await post(base, seal(deliverJson(closedOrder.outTradeNo)))
+    assert.equal(recovered.status, 200)
+    assert.equal(await recovered.text(), '')
+    assert.equal(await creditCount(prisma, closedOrder.id), 1, '关单后收到有效已付推送必须补记 1 条权益')
+    assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: closedOrder.id } })).status, 'paid')
+    const recoveryAudits = await prisma.auditLog.findMany({
+      where: { action: VIRTUAL_PAY_CLOSED_RECOVERY_AUDIT_ACTION, targetId: closedOrder.outTradeNo },
+    })
+    assert.equal(recoveryAudits.length, 1, '关单后补记必须写 1 条审计')
+    assert.equal(JSON.parse(recoveryAudits[0]!.payloadJson).summary, '关单后到账补记')
+    assert.equal(closedAlertHits, 1, '关单后补记必须触发告警')
+
+    // 重复再推一次：权益仍 1 条、审计仍 1 条、不重复告警
+    const recoveredAgain = await post(base, seal(deliverJson(closedOrder.outTradeNo)))
+    assert.equal(recoveredAgain.status, 200)
+    assert.equal(await creditCount(prisma, closedOrder.id), 1)
+    const recoveryAuditsAgain = await prisma.auditLog.findMany({
+      where: { action: VIRTUAL_PAY_CLOSED_RECOVERY_AUDIT_ACTION, targetId: closedOrder.outTradeNo },
+    })
+    assert.equal(recoveryAuditsAgain.length, 1)
+    assert.equal(closedAlertHits, 1)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (prevWebhook === undefined) delete process.env['ALERT_WEBHOOK_URL']
+    else process.env['ALERT_WEBHOOK_URL'] = prevWebhook
+  }
+  console.log('PASS 发货推送验签解密；重复推送只有一条权益；金额或道具不对不记权益；关单后到账补记并告警')
 }
 
 export async function assertConcurrentDelivery(options: { prisma: PrismaService; base: string }): Promise<void> {

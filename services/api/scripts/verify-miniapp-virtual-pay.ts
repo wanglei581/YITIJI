@@ -220,7 +220,7 @@ async function main(): Promise<void> {
   const admin = new VirtualPayAdminService(prisma, audit)
   const orderService = new VirtualPayOrderService(prisma, audit)
   const credits = new VirtualPayCreditsService(prisma)
-  const messages = new WechatMiniappMessageService(prisma, audit)
+  const messages = new WechatMiniappMessageService(prisma, audit, redis as unknown as RedisService)
 
   @Module({
     controllers: [
