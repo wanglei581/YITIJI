@@ -27,10 +27,11 @@ import { PrintIcon } from './art/PrintIcon'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { PrintDoneUnverified } from './components/PrintDoneUnverified'
 import { UNKNOWN_NO_TASK_SUBTITLE, UNKNOWN_TASK_SUBTITLE } from './components/printDoneUnverifiedCopy'
+import { PrintDoneResultUnconfirmed } from './components/PrintDoneResultUnconfirmed'
 import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
 import { failureCopy, failureSummaryRows, faultScreenTakeawayExpired, faultScreenTakeawayMiss, feeInfoCopy, paymentRow, printerJamConfirmed, retryBlockedReason, shownFailureReason, unverifiedTaskCopy, type FailureVariant } from './components/printDoneFailedModel'
 import { rememberConfirmedJam } from './printDoneJamLatch'
-import { CONTACT_ENTRY_LABEL, PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
+import { PRIVACY_CONTACT_ROUTE, needsContactEntry } from './components/printContactEntry'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintDoneRecordSection } from './components/PrintDoneSections'
 import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, presentScreenFailure, publicOrderNo, reprintHint, screenFailureReason, type OutOfPaperMoney } from './printProgressModel'
@@ -474,76 +475,22 @@ export function PrintDonePage() {
     if (isUnconfirmed) {
       const paramLine = params ? jobSubline(file ? { pages: file.pages } : null, params) : null
       return (
-        <PrintTouchFrame
-          page="print-unconfirmed"
-          legacyBody={false}
-          eyebrow="打印结果"
-          kind="compact"
-          seal={null}
-          title="这次打印结果未确认。"
-          subtitle="系统已明确登记，等待人工核查"
-          status={{ tone: 'warn', label: '打印结果未确认' }}
-          terminalLabel="就业服务大厅"
-          back={{ label: '返回首页', onBack: () => navigate('/') }}
-          ask={printAsk('问小青：取纸或异常怎么办', '这次打印结果未确认。请说明取纸或遇到异常时怎么做。不要猜成功或失败，也不要让我重复打印。')}
-          primary={{
-            label: '使用帮助',
-            testId: 'print-fulfill-primary',
-            onClick: () => navigate('/help'),
-          }}
+        <PrintDoneResultUnconfirmed
+          orderNo={displayOrderNo}
+          fileName={file?.name ?? null}
+          paramLine={paramLine}
+          helpLine={helpNeededLine(support)}
+          canReportIssue={canReportIssue}
+          isLoggedIn={isLoggedIn}
+          onFeeInfo={() => setFeeInfoOpen(true)}
+          onFeedback={() => setFeedbackOpen(true)}
+          onHome={() => navigate('/')}
+          onHelp={() => navigate('/help')}
+          onOrders={() => navigate('/me/print-orders')}
+          onContact={openContact}
           navbar={navbar}
-        >
-          <div
-            data-w2-page="print-done"
-            data-print-flow-step={6}
-            data-testid="print-fulfill-state-result-unconfirmed"
-            className="qx-scroll pff-page pft-unc"
-          >
-            <ol className="qxt-steps qxt-steps-big pft-unc-steps" style={{ gridTemplateColumns: '1fr' }}>
-              <li className="qxt-step">
-                <span className="qxt-step-n">1</span>
-                <b>先看出纸口是否已有纸张</b>
-                <small>设备在断电、失联或硬件异常后，无法确认这次打印的实际结果。</small>
-              </li>
-              <li className="qxt-step">
-                <span className="qxt-step-n">2</span>
-                <b>无论有没有，这笔订单都已保留，不要重复打印</b>
-                <small>不猜成功也不猜失败，已登记等待人工核查。</small>
-              </li>
-              <li className="qxt-step">
-                <span className="qxt-step-n">3</span>
-                <b>
-                  {helpNeededLine()}
-                  {displayOrderNo ? `，报订单号 ${displayOrderNo}` : '，请报这一单的订单号'}
-                </b>
-                <small>报这一单的订单号。本机不猜成功或失败。</small>
-              </li>
-            </ol>
-            <dl className="qxt-sum pft-unc-sum">
-              {displayOrderNo ? <div className="qxt-sum-r"><dt>订单号</dt><dd>{displayOrderNo}</dd><span /></div> : null}
-              {file?.name ? <div className="qxt-sum-r"><dt>文件</dt><dd>{file.name}</dd><span /></div> : null}
-              {paramLine ? <div className="qxt-sum-r"><dt>参数</dt><dd>{paramLine}</dd><span /></div> : null}
-            </dl>
-            <div className="qxt-exits pft-unc-exits">
-              <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-unc-action" onClick={() => setFeeInfoOpen(true)}>查看订单说明</button>
-              {canReportIssue ? <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-unc-action" onClick={() => setFeedbackOpen(true)}>反馈问题</button> : null}
-              {openContact ? (
-                <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit pft-contact-entry" data-testid="print-contact-entry" onClick={openContact}>{CONTACT_ENTRY_LABEL}</button>
-              ) : null}
-            </div>
-            {isLoggedIn ? (
-              <button type="button" className="qxt-rowlink pft-unc-row" onClick={() => navigate('/me/print-orders')}>
-                <QxTouchIcon name="receipt" size={32} />
-                <span><b>查看打印订单</b></span>
-                <span className="qxt-chev"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
-              </button>
-            ) : null}
-            <p className="pft-unc-fine qxt-fine" data-testid="print-fulfill-fallback">
-              这次结果已登记，等待人工核查；订单保留。
-            </p>
-          </div>
-          {feedbackDialog}
-        </PrintTouchFrame>
+          dialog={feedbackDialog}
+        />
       )
     }
 
