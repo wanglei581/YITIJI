@@ -27068,6 +27068,10 @@
       "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
       "services/api/scripts/verify-pickup-arrival-price.ts"
     ],
+    "services/api/scripts/support/pickup-arrival-p2b9e-notify-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
     "services/api/scripts/support/pickup-arrival-price-cases.ts": [
       "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
       "services/api/scripts/verify-pickup-arrival-price.ts"
@@ -46945,6 +46949,7 @@
           "services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts",
           "services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts",
           "services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9e-notify-cases.ts",
           "services/api/scripts/support/pickup-arrival-price-cases.ts",
           "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts",
           "services/api/src/prisma/prisma.service.ts"
@@ -46991,6 +46996,7 @@
           "services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts",
           "services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts",
           "services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9e-notify-cases.ts",
           "services/api/scripts/support/pickup-arrival-price-cases.ts",
           "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts",
           "services/api/src/prisma/prisma.service.ts"

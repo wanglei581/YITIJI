@@ -91,7 +91,8 @@ export class AdminOrdersReadonlyService {
         staleSuccessUnprintedAttentionWhere(),
         { type: 'copy', copyJob: { is: { state: 'unconfirmed' } } },
         ...(unconfirmedIds.length > 0 ? [{ id: { in: unconfirmedIds } }] : []),
-        ...(conflictIds.length > 0 ? [{ id: { in: conflictIds }, payStatus: { notIn: ['refunded', 'closed'] } }] : []),
+        ...(conflictIds.channel.length > 0 ? [{ id: { in: conflictIds.channel } }] : []),
+        ...(conflictIds.paper.length > 0 ? [{ id: { in: conflictIds.paper }, payStatus: { notIn: ['refunded', 'closed'] } }] : []),
       ]
     } else if (params.refundRequired === true) {
       const collected = {
@@ -275,33 +276,50 @@ export class AdminOrdersReadonlyService {
   }
 
   private async manualReviewIds(rows: OrderRow[]): Promise<Set<string>> {
-    const candidates = rows.filter((row) => row.payStatus === 'paid').map((row) => row.id)
-    if (candidates.length === 0) return new Set()
-    const [refunds, conflicts] = await Promise.all([
-      this.prisma.refund.findMany({
-        where: { orderId: { in: candidates }, status: 'manual_review' },
-        select: { orderId: true },
-      }),
+    if (rows.length === 0) return new Set()
+    const allIds = rows.map((row) => row.id)
+    const paidIds = rows.filter((row) => row.payStatus === 'paid').map((row) => row.id)
+    const openPaperIds = rows.filter((row) => row.payStatus !== 'refunded' && row.payStatus !== 'closed').map((row) => row.id)
+    const [refunds, channelConflicts, paperConflicts] = await Promise.all([
+      paidIds.length > 0
+        ? this.prisma.refund.findMany({
+          where: { orderId: { in: paidIds }, status: 'manual_review' },
+          select: { orderId: true },
+        })
+        : Promise.resolve([]),
       this.prisma.auditLog.findMany({
-        where: {
-          targetId: { in: candidates },
-          action: { in: [CHANNEL_SUCCESS_CONFLICT_AUDIT, 'refund.notify_paper_already_released'] },
-        },
+        where: { targetId: { in: allIds }, action: CHANNEL_SUCCESS_CONFLICT_AUDIT },
         select: { targetId: true },
       }),
+      openPaperIds.length > 0
+        ? this.prisma.auditLog.findMany({
+          where: { targetId: { in: openPaperIds }, action: 'refund.notify_paper_already_released' },
+          select: { targetId: true },
+        })
+        : Promise.resolve([]),
     ])
     return new Set([
       ...refunds.map((refund) => refund.orderId),
-      ...conflicts.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
+      ...channelConflicts.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
+      ...paperConflicts.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
     ])
   }
 
-  private async successConflictOrderIds(): Promise<string[]> {
-    const rows = await this.prisma.auditLog.findMany({
-      where: { action: { in: [CHANNEL_SUCCESS_CONFLICT_AUDIT, 'refund.notify_paper_already_released'] } },
-      select: { targetId: true },
-    })
-    return [...new Set(rows.map((row) => row.targetId).filter((id): id is string => Boolean(id)))]
+  private async successConflictOrderIds(): Promise<{ channel: string[]; paper: string[] }> {
+    const [channelRows, paperRows] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where: { action: CHANNEL_SUCCESS_CONFLICT_AUDIT },
+        select: { targetId: true },
+      }),
+      this.prisma.auditLog.findMany({
+        where: { action: 'refund.notify_paper_already_released' },
+        select: { targetId: true },
+      }),
+    ])
+    return {
+      channel: [...new Set(channelRows.map((row) => row.targetId).filter((id): id is string => Boolean(id)))],
+      paper: [...new Set(paperRows.map((row) => row.targetId).filter((id): id is string => Boolean(id)))],
+    }
   }
 
   private async unconfirmedAttemptOrderIds(): Promise<string[]> {

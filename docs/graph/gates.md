@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2255 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2256 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2373,7 +2373,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 181 个文件</summary>
+<summary><code>services/api/scripts/</code> — 182 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2467,6 +2467,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9e-notify-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/pickup-arrival-price-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/png-fixtures.ts` | `verify-brand-logo-image.ts`<br/>`verify-branding.ts` |
 | `services/api/scripts/support/policy-one-step-http-cases.ts` | `verify-content-pipeline-e2e.ts` |

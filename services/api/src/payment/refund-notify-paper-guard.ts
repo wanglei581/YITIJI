@@ -6,16 +6,22 @@
  * 不把订单静默改成已退，记下冲突审计并返回 blocked 触发人工核对告警。
  * 任务还是待打印、纸也没出去：迟到的成功通知记成退款成功。打印任务状态不在这里改。
  */
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+import { NotFoundException } from '@nestjs/common'
 import type { PrismaTransactionClient } from '../prisma/prisma.service'
 import { REFUND_STATUS_MANUAL_REVIEW } from './refund-amount-hold'
 import { paperAlreadyReleased } from './refund-paper-exclusion'
 import {
   ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES,
   ONLINE_PAID_PENDING_REFUND_REASON,
+  payableCents,
 } from './pending-refund-signal'
+import { STALE_ATTEMPT_REFUND_REASON } from './print-no-paper-refund.constants'
+import { CHANNEL_SUCCESS_CONFLICT_AUDIT } from './refund-channel-answer'
+import { nonStaleSuccessCents } from './refund-remainder'
 
 const PAPER_ALREADY_RELEASED_AUDIT = 'refund.notify_paper_already_released'
+const AMOUNT_EXCEEDS_CONFLICT_DETAIL = '渠道退款已成功并已记账，但成功退款合计超过订单实付，已转待人工核对，请勿重复退款。'
+const ORDER_STATE_CONFLICT_DETAIL = '渠道退款已成功并已记账，但订单当前状态无法自动收口为已退，已转待人工核对，请勿重复退款。'
 
 export async function convergeNotifiedRefundSuccess(
   tx: PrismaTransactionClient,
@@ -112,15 +118,58 @@ export async function convergeNotifiedRefundSuccess(
     where: { id: input.refundId, status: { in: ['pending', 'failed', 'withdrawn', REFUND_STATUS_MANUAL_REVIEW] } },
     data: {
       status: 'success',
+      amountCents: input.amountCents,
       ...(input.channelRefundNo ? { channelRefundNo: input.channelRefundNo } : {}),
     },
   })
   if (casRefund.count === 0) return 'idempotent'
-  await tx.order.updateMany({
+
+  const freshOrder = await tx.order.findUnique({
+    where: { id: input.orderId },
+    select: {
+      amountCents: true,
+      discountCents: true,
+      payStatus: true,
+      printTaskId: true,
+      refundReason: true,
+      paymentSource: true,
+      paidAt: true,
+    },
+  })
+  if (!freshOrder) throw new NotFoundException('ORDER_NOT_FOUND')
+  // 过期付款补收退款不计入本笔实付合计，也不翻动正常订单支付状态（与 recordChannelAnswers 同口径）。
+  if (input.reason === STALE_ATTEMPT_REFUND_REASON) return 'completed'
+
+  const payable = payableCents(freshOrder)
+  const total = await nonStaleSuccessCents(tx, input.orderId)
+  if (payable > 0 && total > payable) {
+    // 渠道退成事实绝不回滚：保留 Refund.status = 'success'，不静默把订单改成已退，记冲突审计并告警。
+    await tx.auditLog.create({
+      data: {
+        actorId: null,
+        actorRole: 'system',
+        action: CHANNEL_SUCCESS_CONFLICT_AUDIT,
+        targetType: 'order',
+        targetId: input.orderId,
+        payloadJson: JSON.stringify({
+          code: 'REFUND_CHANNEL_AMOUNT_EXCEEDS',
+          refundNo: input.refundId,
+          totalSuccessCents: total,
+          payableCents: payable,
+          source: 'notify',
+          detail: AMOUNT_EXCEEDS_CONFLICT_DETAIL,
+        }),
+      },
+    })
+    return 'blocked'
+  }
+
+  const fully = payable <= 0 || total >= payable
+  const updated = await tx.order.updateMany({
     where: {
       id: input.orderId,
       OR: [
-        { payStatus: { in: ['refunding', 'paid'] } },
+        { payStatus: { in: ['refunding', 'paid', 'partial_refunded'] } },
         {
           payStatus: { in: [...ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES] },
           refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
@@ -130,14 +179,33 @@ export async function convergeNotifiedRefundSuccess(
       ],
     },
     data: {
-      payStatus: 'refunded',
-      refundedAt: new Date(),
+      payStatus: fully ? 'refunded' : 'partial_refunded',
+      refundedAt: fully ? new Date() : null,
       refundReason: input.reason,
-      refundedAmountCents: input.amountCents,
+      refundedAmountCents: total,
     },
   })
-  const fresh = await tx.order.findUnique({ where: { id: input.orderId }, select: { payStatus: true } })
-  if (!fresh) throw new NotFoundException('ORDER_NOT_FOUND')
-  if (fresh.payStatus !== 'refunded') throw new BadRequestException('ORDER_INVALID_TRANSITION')
+  if (updated.count === 0) {
+    // 严禁抛 ORDER_INVALID_TRANSITION 回滚渠道退成事实：保留 Refund.status = 'success'，写冲突审计并告警。
+    await tx.auditLog.create({
+      data: {
+        actorId: null,
+        actorRole: 'system',
+        action: CHANNEL_SUCCESS_CONFLICT_AUDIT,
+        targetType: 'order',
+        targetId: input.orderId,
+        payloadJson: JSON.stringify({
+          code: 'REFUND_NOTIFY_ORDER_STATE_CONFLICT',
+          payStatus: freshOrder.payStatus,
+          refundNo: input.refundId,
+          totalSuccessCents: total,
+          payableCents: payable,
+          source: 'notify',
+          detail: ORDER_STATE_CONFLICT_DETAIL,
+        }),
+      },
+    })
+    return 'blocked'
+  }
   return 'completed'
 }

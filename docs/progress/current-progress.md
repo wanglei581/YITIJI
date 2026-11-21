@@ -10,6 +10,7 @@
 - 24 小时内在途单加只查不处置端点与按钮：新增 `POST /admin/orders/:id/print-return/query-channel`（鉴权、限流、`mock-server-contract` 登记），前端在 `channelPending` 时提供「向渠道查询结果」并原地刷新详情保留中文结果提示；`refund-notify-paper-guard.ts` 打通 `manual_review` 收到微信成功通知收口（已关单重复通知仍幂等拦截）。
 - 按商户平台核实结果登记支持填实退金额（元转分、前后端校验 `0 < actualAmountCents <= refund.amountCents`，小于实付记 `partial_refunded` 留余款可退）；微信 `ABNORMAL` 满 24 小时不再误导为「长期查不到」或暴露登记按钮，引导商户平台处理后点「向渠道查询结果」收口；过期付款补收退款先查 provider 存在性并在 `db.refund.create` 原子写入 `channelSubmittedAt`。
 - 临时 PostgreSQL 16 @5677（UTC）与隔离 SQLite 全套打印到机价目、退款、服务单门禁、类型/lint/契约/文案/图谱/CI 门禁全绿；后台订单 Playwright 浏览器 18/18 通过；PG 5677 反向变异 5/5 必红并还原。
+- 2026-11-21 `P2b9e` 极小收口：微信退款成功通知（`refund-notify-paper-guard.ts` 及续退金额门 `refund-amount-hold.ts`、冲突判定 `print-return-disposition.ts` / `admin-orders-readonly.service.ts`）统一到与 `recordChannelAnswers` 同一口径——`casRefund` 同步落 `amountCents`，过期补收退款不翻动正常订单，非过期累计超应付或订单意外态绝不静默 `refunded` 或抛 `ORDER_INVALID_TRANSITION` 回滚，均保留 `Refund.status = 'success'`、写 `refund.channel_success_conflict`（`source: 'notify'`）、保持 `manual` / `opsAttention` 并触发 Webhook 回微信 200，`partial_refunded` 续退按累计实退正确落 `partial_refunded` 或 `refunded`；新增 PG/SQLite 双库真实 HTTP 回归（`pickup-arrival-p2b9e-notify-cases.ts`），PG 16 @5677（UTC）+ Redis 6677 全套门禁与 M1/M2 反向变异 2/2 必红并还原。
 
 ## 2026-11-19：收费第 2 期 b 返工第九轮，「已提交渠道」改成显式记录（未推送）
 

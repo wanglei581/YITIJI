@@ -173,9 +173,9 @@ function paperReleasedReason(audits: AuditFact[]): string | null {
   return null
 }
 
-function successConflictReason(audits: AuditFact[]): string | null {
+function channelSuccessConflictReason(audits: AuditFact[]): string | null {
   for (const audit of audits) {
-    if (audit.action !== CHANNEL_SUCCESS_CONFLICT_AUDIT && audit.action !== 'refund.notify_paper_already_released') continue
+    if (audit.action !== CHANNEL_SUCCESS_CONFLICT_AUDIT) continue
     const detail = readPayload(audit.payloadJson).detail
     if (typeof detail === 'string' && detail.trim()) return detail.trim()
   }
@@ -253,12 +253,18 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
   if (failedOther) return viewOf('manual', failedOther, '退款没有成功，待人工处理')
   const pendingOther = refunds.find((refund) => refund.status === 'pending')
   if (pendingOther) return viewOf('manual', pendingOther, '退款还在处理，待人工核对')
-  // 渠道退成事实已落库，但与出纸或实付合计冲突：留在待人工核对与告警，不得伪装成自动退成功。
-  const conflictDetail = successConflictReason(audits)
-  if (conflictDetail && order.payStatus !== 'refunded' && order.payStatus !== 'closed') {
+  // 渠道退成事实已落库，但与出纸、实付合计或订单状态冲突：留在待人工核对与告警，不得伪装成自动退成功。
+  const channelConflictDetail = channelSuccessConflictReason(audits)
+  if (channelConflictDetail) {
     const conflictRow = thisPaymentRefunds.find((refund) => refund.status === 'success')
       ?? refunds.find((refund) => refund.status === 'success')
-    if (conflictRow) return viewOf('manual', conflictRow, conflictDetail)
+    if (conflictRow) return viewOf('manual', conflictRow, channelConflictDetail)
+  }
+  const paperConflictDetail = paperReleasedReason(audits)
+  if (paperConflictDetail && order.payStatus !== 'refunded' && order.payStatus !== 'closed') {
+    const conflictRow = thisPaymentRefunds.find((refund) => refund.status === 'success')
+      ?? refunds.find((refund) => refund.status === 'success')
+    if (conflictRow) return viewOf('manual', conflictRow, paperConflictDetail)
   }
   const autoSuccess = thisPaymentRefunds.find((refund) => refund.status === 'success' && refund.reason != null && AUTO_REASONS.has(refund.reason))
   if (autoSuccess || (order.payStatus === 'refunded' && order.refundReason === PAID_NO_PAPER_AUTO_REASON)) {
