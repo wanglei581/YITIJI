@@ -16,6 +16,7 @@ export function InterviewSessionBar({
   voiceKind,
   busy,
   reportRetryFree,
+  reportLocked,
   onFinish,
   onSubmit,
   onStart,
@@ -28,6 +29,7 @@ export function InterviewSessionBar({
   voiceKind: InterviewVoiceState['kind']
   busy: boolean
   reportRetryFree?: boolean
+  reportLocked?: boolean
   onFinish: () => void
   onSubmit: () => void
   onStart: () => void
@@ -36,7 +38,7 @@ export function InterviewSessionBar({
 }) {
   const navigate = useNavigate()
   let label = '提交回答'
-  let run: 'finish' | 'submit' | 'start' | 'stop' | 'confirm' = 'submit'
+  let run: 'finish' | 'submit' | 'start' | 'stop' | 'confirm' | 'home' = 'submit'
   let disabled = busy
   if (phase === 'finishing') {
     label = '正在生成练习报告…'
@@ -44,6 +46,10 @@ export function InterviewSessionBar({
   } else if (phase === 'thinking') {
     label = '正在分析你的回答…'
     disabled = true
+  } else if (reportLocked) {
+    label = '回到首页'
+    run = 'home'
+    disabled = false
   } else if (reportRetryFree) {
     label = '免费再试一次'
     run = 'finish'
@@ -68,7 +74,8 @@ export function InterviewSessionBar({
     run = 'start'
   }
   const go = () => {
-    if (run === 'finish') onFinish()
+    if (run === 'home') navigate('/')
+    else if (run === 'finish') onFinish()
     else if (run === 'submit') onSubmit()
     else if (run === 'start') onStart()
     else if (run === 'stop') onStop()

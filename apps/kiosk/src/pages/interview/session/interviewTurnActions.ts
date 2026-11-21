@@ -131,7 +131,7 @@ export async function finishInterview(ctx: {
   setFinishRecovery: Dispatch<SetStateAction<InterviewFinishRecovery | null>>
   setAssistantDown: Dispatch<SetStateAction<boolean>>
   onReportSucceeded?: () => void
-  onReportFailed?: () => Promise<boolean>
+  onReportFailed?: (err?: unknown) => Promise<boolean>
 }): Promise<void> {
   const {
     state, access, omitPrintAnswers, onGoStage, navigate, stopPlayback, resetVoiceState,
@@ -160,7 +160,7 @@ export async function finishInterview(ctx: {
     const declined = aiDeclarationDeclineMessage(err)
     const code = errorCodeOf(err)
     if (!declined && code !== 'INTERVIEW_NO_ANSWERS' && code !== 'RESUME_AI_CONSENT_REQUIRED' && ctx.onReportFailed) {
-      if (await ctx.onReportFailed()) {
+      if (await ctx.onReportFailed(err)) {
         ctx.setPhase(hasNonSkippedCandidate(ctx.messages) ? 'done_suggest' : 'answering')
         return
       }
@@ -192,7 +192,7 @@ export async function endInterviewAtDeadline(ctx: {
   navigate: NavigateFunction
   setAssistantDown: Dispatch<SetStateAction<boolean>>
   onReportSucceeded?: () => void
-  onReportFailed?: () => Promise<boolean>
+  onReportFailed?: (err?: unknown) => Promise<boolean>
 }): Promise<'reported' | 'no-answers' | 'report-failed'> {
   if (ctx.pendingAnswer) {
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -220,7 +220,7 @@ export async function endInterviewAtDeadline(ctx: {
   } catch (err) {
     ctx.setAssistantDown(isAiGateDown(err))
     if (errorCodeOf(err) === 'INTERVIEW_NO_ANSWERS') return 'no-answers'
-    if (ctx.onReportFailed) await ctx.onReportFailed()
+    if (ctx.onReportFailed) await ctx.onReportFailed(err)
     return 'report-failed'
   }
 }

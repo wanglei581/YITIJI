@@ -52,8 +52,9 @@ export function useInterviewDeadlineSeal(args: {
   setAssistantDown: Dispatch<SetStateAction<boolean>>
   paidReportError?: string | null
   paidReportRetryFree?: boolean
+  paidReportLocked?: boolean
   onReportSucceeded?: () => void
-  onReportFailed?: () => Promise<boolean>
+  onReportFailed?: (err?: unknown) => Promise<boolean>
 }) {
   const [deadline, setDeadline] = useState(() => initialDeadline(args.state, args.live))
   const [remainingSec, setRemainingSec] = useState(() => remainingSecAt(deadline.deadlineAtLocalMs, Date.now()))
@@ -153,10 +154,11 @@ export function useInterviewDeadlineSeal(args: {
       busy={reportBusy}
       paidReportError={args.paidReportError}
       paidReportRetryFree={args.paidReportRetryFree}
+      paidReportLocked={args.paidReportLocked}
       onLeave={() => args.navigate('/interview-service')}
       onRestart={() => (args.onGoStage ? args.onGoStage('setup') : args.navigate('/interview/setup'))}
       onRetry={() => {
-        if (reportBusy || timeUpStop === 'no-answers') return
+        if (reportBusy || timeUpStop === 'no-answers' || args.paidReportLocked) return
         requestReport()
       }}
       onOpenTips={() => (args.onGoStage ? args.onGoStage('tips') : args.navigate('/interview/tips'))}

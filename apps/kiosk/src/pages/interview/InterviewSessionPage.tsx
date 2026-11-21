@@ -176,7 +176,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     state, live: storedLive, getToken, access, phase, omitPrintAnswers, answersRecorded, onGoStage, navigate,
     recorderRef, recordTimerRef, recordStartedAtRef, pendingAnswerRef, stopPlayback,
     setDraft, setVoice, setRecordSec, setPhase, setAssistantDown,
-    paidReportError: reportCharge.errorMessage, paidReportRetryFree: reportCharge.canFreeRetry,
+    paidReportError: reportCharge.errorMessage, paidReportRetryFree: reportCharge.canFreeRetry, paidReportLocked: reportCharge.reportLocked,
     onReportSucceeded: reportCharge.onReportSucceeded, onReportFailed: reportCharge.onReportFailed,
   })
   useInterviewLivePersist({
@@ -318,7 +318,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   }
 
   const submit = (args: { text: string; skip: boolean; voiceMeta?: { transcript: string; edited: boolean; durationSec: number } }) => {
-    if (deadline.sealedRef.current) return
+    if (deadline.sealedRef.current || reportCharge.reportLocked) return
     reportCharge.clearFailure()
     const job = submitInterviewAnswer({
       args, state, access, messages, draft, voiceKind: voice.kind, questionShownAtRef,
@@ -333,7 +333,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   }
 
   const finish = () => {
-    if (deadline.sealedRef.current) return
+    if (deadline.sealedRef.current || reportCharge.reportLocked) return
     reportCharge.clearFailure()
     void finishInterview({
       state, access, phase, voiceKind: voice.kind, messages, answersRecorded, omitPrintAnswers,
@@ -403,6 +403,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
           voiceKind={voice.kind}
           busy={busyTurn || voiceLocked}
           reportRetryFree={reportCharge.canFreeRetry}
+          reportLocked={reportCharge.reportLocked}
           onFinish={() => void finish()}
           onSubmit={() => void submit({ text: draft, skip: false })}
           onStart={() => void startRecording()}
@@ -484,6 +485,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         onRetryReport={() => void finish()}
         omitPrintAnswers={omitPrintAnswers}
         onOmitPrintAnswersChange={setOmitPrintAnswers}
+        reportLocked={reportCharge.reportLocked}
         transcriptTakeaway={<InterviewTranscriptTakeaway look="act" sessionId={state.sessionId} getAccess={() => accessRef.current} disabled={busyTurn} />}
       />
       </InterviewSessionPanels>

@@ -16,6 +16,7 @@ export function InterviewTimeUp({
   busy,
   paidReportError,
   paidReportRetryFree,
+  paidReportLocked,
   onLeave,
   onRestart,
   onRetry,
@@ -29,6 +30,7 @@ export function InterviewTimeUp({
   busy?: boolean
   paidReportError?: string | null
   paidReportRetryFree?: boolean
+  paidReportLocked?: boolean
   onLeave: () => void
   onRestart: () => void
   onRetry: () => void
@@ -42,16 +44,15 @@ export function InterviewTimeUp({
       : answersRecorded
         ? '报告现在生成不了。到点前提交的回答已保存，可以再试一次。'
         : '报告现在生成不了，可以再试一次。'
+  const blockRetry = noAnswers || Boolean(paidReportLocked) || (Boolean(paidReportError) && !paidReportRetryFree)
   const primaryLabel = busy
     ? '正在生成练习报告…'
-    : noAnswers
+    : blockRetry
       ? '再练一场'
       : paidReportRetryFree
         ? '免费再试一次'
-        : paidReportError
-          ? '再练一场'
-          : '再试一次生成报告'
-  const primaryAction = noAnswers || (Boolean(paidReportError) && !paidReportRetryFree) ? onRestart : onRetry
+        : '再试一次生成报告'
+  const primaryAction = blockRetry ? onRestart : onRetry
   return (
     <InterviewShell
       eyebrow="练面试 · 到点"
