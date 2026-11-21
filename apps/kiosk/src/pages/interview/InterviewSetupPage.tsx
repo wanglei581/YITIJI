@@ -134,7 +134,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
 
   const handleStartRef = useRef<(omitResume?: boolean, trip?: InterviewStartTrip) => Promise<void>>(async () => undefined)
   const onBeforeNavigatePay = useCallback((autoStart: boolean) => {
-    setAutoStartAfterPay(autoStart)
     patchInterviewWorkbenchSession({
       setup: {
         directionSelectionVersion: 1, interviewerType, industry, position, experience,
