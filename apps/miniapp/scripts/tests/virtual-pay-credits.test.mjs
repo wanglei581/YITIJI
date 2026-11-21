@@ -99,7 +99,7 @@ test('buyServiceCredit：严格先 wx.login 再下单、原样逐字节透传 si
   const statuses = []
   const result = await vpayModel.buyServiceCredit({
     serviceKind: 'resume_optimize',
-    baselineCounts: { resume_optimize: 0, mock_interview: 0 },
+    baseline: vpayModel.createCreditsBaseline(vpayModel.summarizeCredits({ items: [] })),
     wxObj,
     api,
     onStatus: (s) => statuses.push(s),
@@ -131,7 +131,9 @@ test('buyServiceCredit：严格先 wx.login 再下单、原样逐字节透传 si
   pollCalls = 0
   await vpayModel.buyServiceCredit({
     serviceKind: 'mock_interview',
-    baselineCounts: { resume_optimize: 1, mock_interview: 0 },
+    baseline: vpayModel.createCreditsBaseline(vpayModel.summarizeCredits({
+      items: [{ serviceKind: 'resume_optimize', createdAt: '2026-11-21T09:00:00.000Z' }],
+    })),
     wxObj,
     api,
     sleep: () => Promise.resolve(),
@@ -145,7 +147,9 @@ test('buyServiceCredit：支付成功但服务端 5 次查单仍未到账时绝�
   let polls = 0
   const result = await vpayModel.buyServiceCredit({
     serviceKind: 'mock_interview',
-    baselineCounts: { resume_optimize: 0, mock_interview: 1 },
+    baseline: vpayModel.createCreditsBaseline(vpayModel.summarizeCredits({
+      items: [{ serviceKind: 'mock_interview', createdAt: '2026-11-20T00:00:00.000Z' }],
+    })),
     wxObj: {
       login({ success }) { success({ code: 'code-1' }) },
       requestVirtualPayment({ success }) { success({}) },

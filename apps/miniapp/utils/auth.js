@@ -124,6 +124,28 @@ function isSameSession(expected) {
   return generation === expected;
 }
 
+/** 会话变更订阅表：登出或显式登录/换号时同步通知活跃页面清理定时器与敏感状态。 */
+const sessionListeners = new Set();
+
+function subscribeSessionChange(listener) {
+  if (typeof listener !== 'function') return () => {};
+  sessionListeners.add(listener);
+  return () => {
+    sessionListeners.delete(listener);
+  };
+}
+
+function notifySessionChange(reason) {
+  const snapshot = { generation, reason };
+  sessionListeners.forEach((listener) => {
+    try {
+      listener(snapshot);
+    } catch (_) {
+      // 单个页面清理异常不得阻断其他订阅者或登录态切换。
+    }
+  });
+}
+
 /** 推进代际：在途的一切按出发代际判定，自此一律失效。这一步不可能失败。 */
 function bumpSessionGeneration() {
   generation += 1;
@@ -157,6 +179,7 @@ function saveSession(data = {}, options = {}) {
     // 这段时间里上一个账号也读不出来。
     bumpSessionGeneration();
     sessionRevoked = true;
+    notifySessionChange('switching');
   }
 
   if (data.token) {
@@ -173,6 +196,7 @@ function saveSession(data = {}, options = {}) {
     && identityProven(data.token);
   if (!usable) return false;
   if (!isResignin) sessionRevoked = false;
+  if (!isResignin) notifySessionChange('login');
   return true;
 }
 
@@ -198,6 +222,7 @@ function logout() {
   sessionRevoked = true;
   clearSession();
   storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
+  notifySessionChange('logout');
 }
 
 /**
@@ -241,6 +266,8 @@ module.exports = {
   logoutIfSameSession,
   sessionGeneration,
   isSameSession,
+  subscribeSessionChange,
+  onSessionChange: subscribeSessionChange,
   getToken,
   isLoggedIn,
   getUser,

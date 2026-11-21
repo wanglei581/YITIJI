@@ -103,12 +103,12 @@
             <view class="sc-buy-desc">{{item.desc}}</view>
           </view>
           <view
-            class="sc-buy-btn tap {{buyingKind ? 'disabled' : ''}}"
+            class="sc-buy-btn tap {{(buyingKind || !baselineReady) ? 'disabled' : ''}}"
             hover-class="tap-press"
             data-kind="{{item.kind}}"
             bindtap="tapBuy"
             role="button"
-          >{{buyingKind === item.kind ? copy.buyingButton : copy.buyButton}}</view>
+          >{{buyingKind === item.kind ? copy.buyingButton : (!baselineReady ? copy.checkingButton : copy.buyButton)}}</view>
         </view>
         <view class="sc-buy-foot">{{copy.buyFooterNote}}</view>
       </view>

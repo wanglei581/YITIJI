@@ -12,6 +12,10 @@ function emptySummary() {
   return vpayModel.summarizeCredits([]);
 }
 
+function memberIdOf(sessionKey) {
+  return typeof sessionKey === 'string' ? sessionKey.split('#g')[0] : '';
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -21,6 +25,7 @@ Page({
     identityNotice: '',
     loading: false,
     loadedOnce: false,
+    baselineReady: false,
     error: '',
     totalCount: 0,
     summary: emptySummary().summary,
@@ -38,17 +43,27 @@ Page({
     this._guard.activate();
     this._unloaded = false;
     this._buySeq = 0;
-    this._counts = { resume_optimize: 0, mock_interview: 0 };
+    this._creditsSeq = 0;
+    this._appliedCreditsSeq = 0;
+    this._baselineSnapshot = null;
     this._pollTimer = null;
     this._pollResolve = null;
+    const subscribe = auth && (auth.subscribeSessionChange || auth.onSessionChange);
+    this._unsubSession = typeof subscribe === 'function'
+      ? subscribe(() => { if (!this._unloaded) this._enforceIdentity(); })
+      : null;
     this.setData({
       statusBarHeight: (app && app.globalData && app.globalData.statusBarHeight) || 20,
       clientSupported: vpayModel.supportsVirtualPayment(wx),
     });
   },
 
-  _identityKey() {
-    return memberIdentityKey(auth);
+  /** 会员身份 + 会话代次组合键：同会员登出重登也触发代次变更、立即解锁并清场。 */
+  _sessionKey() {
+    const base = memberIdentityKey(auth);
+    if (!isMemberIdentity(base)) return base;
+    const gen = typeof auth.sessionGeneration === 'function' ? auth.sessionGeneration() : 0;
+    return `${base}#g${gen}`;
   },
 
   _clearPollTimer() {
@@ -77,12 +92,15 @@ Page({
 
   _resetAll(notice) {
     this._buySeq += 1;
+    this._creditsSeq += 1;
+    this._appliedCreditsSeq = this._creditsSeq;
     this._clearPollTimer();
-    this._counts = { resume_optimize: 0, mock_interview: 0 };
+    this._baselineSnapshot = null;
     const blank = emptySummary();
     this.setData({
       loading: false,
       loadedOnce: false,
+      baselineReady: false,
       error: '',
       totalCount: 0,
       summary: blank.summary,
@@ -96,88 +114,111 @@ Page({
     });
   },
 
+  /**
+   * 核验当前会员身份与会话代次，会话变化时同步清场（含活动定时器与 buyingKind）。
+   * @returns {{ usable: boolean, changed: boolean }}
+   */
   _enforceIdentity() {
-    const identity = this._identityKey();
-    const usable = isMemberIdentity(identity);
-    const prevIdentity = this._guard.identity();
-    if (this._guard.setIdentity(identity)) {
-      const switched = isMemberIdentity(prevIdentity) && isMemberIdentity(identity) && prevIdentity !== identity;
+    const sessionKey = this._sessionKey();
+    const usable = isMemberIdentity(sessionKey);
+    const prevKey = this._guard.identity();
+    if (this._guard.setIdentity(sessionKey)) {
+      const prevMember = memberIdOf(prevKey);
+      const nextMember = memberIdOf(sessionKey);
+      const hadMember = isMemberIdentity(prevMember);
+      const switched = hadMember && isMemberIdentity(nextMember) && prevMember !== nextMember;
       const notice = switched
         ? vpayModel.VPAY_COPY.switchedDesc
-        : (isMemberIdentity(prevIdentity) && !usable ? vpayModel.VPAY_COPY.signedOutDesc : '');
+        : (hadMember && !usable ? vpayModel.VPAY_COPY.signedOutDesc : '');
       this._resetAll(notice);
       this.setData({ isLoggedIn: usable });
-      return usable;
+      return { usable, changed: hadMember };
     }
-    if (!usable && (this.data.totalCount || this.data.records.length || this.data.buyingKind || this.data.isLoggedIn)) {
+    if (!usable && (this.data.totalCount || this.data.records.length || this.data.buyingKind || this.data.baselineReady || this.data.isLoggedIn)) {
       this._resetAll('');
       this.setData({ isLoggedIn: false });
+      return { usable: false, changed: true };
     }
-    return usable;
+    return { usable, changed: false };
   },
 
   _accepts(token) {
-    return this._guard.accepts(token, this._identityKey());
+    return this._guard.accepts(token, this._sessionKey());
   },
 
-  _applyCredits(summarized) {
-    this._counts = Object.assign({ resume_optimize: 0, mock_interview: 0 }, summarized.counts);
+  _applyCredits(summarized, seq) {
+    if (typeof seq === 'number' && seq < this._appliedCreditsSeq) return false;
+    if (typeof seq === 'number') this._appliedCreditsSeq = seq;
+    this._baselineSnapshot = vpayModel.createCreditsBaseline(summarized);
     this.setData({
       totalCount: summarized.total,
       summary: summarized.summary,
       records: summarized.records,
       loading: false,
       loadedOnce: true,
+      baselineReady: true,
       error: '',
     });
+    return true;
   },
 
   onShow() {
     this._guard.activate();
-    const usable = this._enforceIdentity();
+    const status = this._enforceIdentity();
     this.setData({
-      isLoggedIn: usable,
+      isLoggedIn: status.usable,
       clientSupported: vpayModel.supportsVirtualPayment(wx),
     });
-    if (usable && !this.data.buyingKind) {
+    if (status.usable && !this.data.buyingKind) {
       this._loadCredits();
     }
   },
 
   onHide() {
-    // 常规列表请求在切后台时作废；正在进行的同一账号虚拟支付由 buySeq + identity + sessionGeneration 独立守卫。
+    // 常规列表请求在切后台时作废；同账号唤起微信收银台期间由 buySeq + sessionKey 独立守卫继续确认。
     this._guard.deactivate();
   },
 
   onUnload() {
     this._unloaded = true;
+    if (this._unsubSession) {
+      this._unsubSession();
+      this._unsubSession = null;
+    }
     this._buySeq += 1;
+    this._creditsSeq += 1;
+    this._appliedCreditsSeq = this._creditsSeq;
     this._clearPollTimer();
     this._guard.deactivate();
-    this._counts = { resume_optimize: 0, mock_interview: 0 };
+    this._baselineSnapshot = null;
     this.data.records = [];
     this.data.buyingKind = '';
+    this.data.baselineReady = false;
   },
 
   onPullDownRefresh() {
     const stop = () => wx.stopPullDownRefresh();
-    if (!this._enforceIdentity()) { stop(); return; }
+    if (!this._enforceIdentity().usable || this.data.buyingKind) { stop(); return; }
     this._loadCredits().then(stop, stop);
   },
 
   _loadCredits() {
-    if (!this._enforceIdentity()) return Promise.resolve();
+    if (!this._enforceIdentity().usable) return Promise.resolve();
     const token = this._guard.issue('credits');
+    const readSeq = (this._creditsSeq += 1);
     this.setData({ loading: true, error: '' });
     return vpayApi.listServiceCredits()
       .then((res) => {
         this._enforceIdentity();
         if (!this._accepts(token)) return;
-        this._applyCredits(vpayModel.summarizeCredits(res));
+        // 共享版本守卫：购买发起或更新结果落地后，更早发起的普通列表迟到响应一律丢弃。
+        if (readSeq < this._creditsSeq || readSeq < this._appliedCreditsSeq) return;
+        this._applyCredits(vpayModel.summarizeCredits(res), readSeq);
       })
       .catch((err) => {
         this._enforceIdentity();
         if (!this._accepts(token)) return;
+        if (readSeq < this._creditsSeq || readSeq < this._appliedCreditsSeq) return;
         this.setData({
           loading: false,
           loadedOnce: true,
@@ -193,7 +234,10 @@ Page({
   tapBuy(e) {
     const kind = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.kind;
     if (!vpayModel.isSupportedServiceKind(kind) || this.data.buyingKind || this.data.purchaseUnavailable) return;
-    if (!this._enforceIdentity()) return;
+    const status = this._enforceIdentity();
+    if (!status.usable || status.changed) return;
+    // 首次权益基线尚未成功拉取前禁止购买，杜绝把既有旧权益误判为本次新到账。
+    if (!this.data.baselineReady || !this._baselineSnapshot) return;
     if (!vpayModel.supportsVirtualPayment(wx)) {
       this.setData({
         clientSupported: false,
@@ -203,20 +247,20 @@ Page({
       return;
     }
 
-    const startIdentity = this._identityKey();
-    const startGen = typeof auth.sessionGeneration === 'function' ? auth.sessionGeneration() : 0;
-    const buySeq = this._buySeq + 1;
-    this._buySeq = buySeq;
-    const baselineCounts = Object.assign({}, this._counts);
+    const startSessionKey = this._sessionKey();
+    const buySeq = (this._buySeq += 1);
+    // 推进共享权益版本，作废任何早于本次购买发起、仍在途的普通列表请求。
+    this._creditsSeq += 1;
+    const baseline = this._baselineSnapshot;
 
     const isStale = () => {
       if (this._unloaded || this._buySeq !== buySeq) return true;
-      if (this._identityKey() !== startIdentity) return true;
-      if (typeof auth.sessionGeneration === 'function' && auth.sessionGeneration() !== startGen) return true;
+      if (this._sessionKey() !== startSessionKey) return true;
       return false;
     };
 
     this.setData({
+      loading: false,
       buyingKind: kind,
       buyNotice: '',
       buyNoticeTone: 'info',
@@ -224,7 +268,7 @@ Page({
 
     return vpayModel.buyServiceCredit({
       serviceKind: kind,
-      baselineCounts,
+      baseline,
       wxObj: wx,
       api: vpayApi,
       isStale,
@@ -239,9 +283,15 @@ Page({
     }).then((result) => {
       if (isStale()) {
         this._enforceIdentity();
+        if (!this._unloaded && this._buySeq === buySeq && this.data.buyingKind) {
+          this.setData({ buyingKind: '' });
+        }
         return result;
       }
-      if (!result || result.status === 'stale') return result;
+      if (!result || result.status === 'stale') {
+        if (!this._unloaded && this.data.buyingKind) this.setData({ buyingKind: '' });
+        return result;
+      }
 
       if (result.status === 'unsupported') {
         this.setData({
@@ -263,7 +313,10 @@ Page({
         return result;
       }
       if (result.status === 'confirmed') {
-        if (result.credits) this._applyCredits(result.credits);
+        if (result.credits) {
+          const applySeq = (this._creditsSeq += 1);
+          this._applyCredits(result.credits, applySeq);
+        }
         this.setData({
           buyingKind: '',
           buyNotice: result.message,
@@ -272,7 +325,10 @@ Page({
         return result;
       }
       if (result.status === 'pending_confirm') {
-        if (result.credits) this._applyCredits(result.credits);
+        if (result.credits) {
+          const applySeq = (this._creditsSeq += 1);
+          this._applyCredits(result.credits, applySeq);
+        }
         this.setData({
           buyingKind: '',
           buyNotice: result.message,

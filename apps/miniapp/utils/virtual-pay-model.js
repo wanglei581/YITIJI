@@ -44,6 +44,7 @@ const VPAY_COPY = {
   sectionRecords: '可用次数明细',
   buyButton: '购买 1 次',
   buyingButton: '处理中…',
+  checkingButton: '核对中…',
   unavailableTitle: '暂未开放手机端购买',
   unavailableNotice: '当前暂未开放手机端购买，请在一体机现场按屏上提示使用',
   unsupportedClientTitle: '微信版本暂不支持',
@@ -100,6 +101,7 @@ function summarizeCredits(raw) {
       serviceKind: kind,
       title: SERVICE_TITLE_BY_KIND[kind] || 'AI 服务',
       createdAtText: formatDateTimeLocal(row.createdAt),
+      fingerprint: row.id ? `id:${String(row.id)}` : `ts:${kind}:${String(row.createdAt || '')}`,
     });
   }
   const summary = SERVICE_CATALOG.map((item) => ({
@@ -113,6 +115,60 @@ function summarizeCredits(raw) {
     summary,
     records,
   };
+}
+
+function buildFingerprintCounts(records, serviceKind) {
+  const map = {};
+  const list = Array.isArray(records) ? records : [];
+  for (let i = 0; i < list.length; i += 1) {
+    const row = list[i];
+    if (!row || row.serviceKind !== serviceKind) continue;
+    const fp = String(row.fingerprint || row.id || '');
+    map[fp] = (map[fp] || 0) + 1;
+  }
+  return map;
+}
+
+/**
+ * 基于服务端成功返回的可用权益列表构造可信购买前基线。
+ * 后端 GET /member/service-credits 返回 { items: [{ serviceKind, createdAt }] }，无单条 id 时按
+ * serviceKind + createdAt 频次多重集与数量双重基线比对；若后端未来补充 id 字段则自动优先按 id 识别。
+ */
+function createCreditsBaseline(summarized) {
+  const counts = {
+    resume_optimize: Number(summarized && summarized.counts && summarized.counts.resume_optimize) || 0,
+    mock_interview: Number(summarized && summarized.counts && summarized.counts.mock_interview) || 0,
+  };
+  return {
+    ready: true,
+    counts,
+    fingerprints: {
+      resume_optimize: buildFingerprintCounts(summarized && summarized.records, 'resume_optimize'),
+      mock_interview: buildFingerprintCounts(summarized && summarized.records, 'mock_interview'),
+    },
+  };
+}
+
+/**
+ * 仅在存在已成功加载的可信购买前基线、且该服务种类数量发生净增长并出现新条目时才判为已确认到账；
+ * 基线未就绪或未观察到增长时一律返回 false，由页面诚实停留在「确认中」。
+ */
+function hasConfirmedNewCredit(baseline, nextCredits, serviceKind) {
+  if (!baseline || baseline.ready !== true) return false;
+  if (!nextCredits || !nextCredits.counts) return false;
+  const baseCount = Number(baseline.counts && baseline.counts[serviceKind]) || 0;
+  const nextCount = Number(nextCredits.counts[serviceKind]) || 0;
+  if (nextCount <= baseCount) return false;
+  const baseFp = baseline.fingerprints && baseline.fingerprints[serviceKind];
+  if (baseFp && Array.isArray(nextCredits.records)) {
+    const nextFp = buildFingerprintCounts(nextCredits.records, serviceKind);
+    const keys = Object.keys(nextFp);
+    for (let i = 0; i < keys.length; i += 1) {
+      if (nextFp[keys[i]] > (baseFp[keys[i]] || 0)) return true;
+    }
+    return false;
+  }
+  return true;
 }
 
 function supportsVirtualPayment(wxObj) {
@@ -249,7 +305,9 @@ function defaultSleep(ms) {
 async function buyServiceCredit(options = {}) {
   const {
     serviceKind,
-    baselineCounts = {},
+    baseline = null,
+    baselineCounts = null,
+    baselineReady = false,
     wxObj,
     api,
     isStale = () => false,
@@ -258,6 +316,12 @@ async function buyServiceCredit(options = {}) {
     maxPolls = DEFAULT_MAX_CONFIRM_POLLS,
     pollIntervalMs = DEFAULT_CONFIRM_POLL_INTERVAL_MS,
   } = options;
+
+  const effectiveBaseline = (baseline && baseline.ready === true)
+    ? baseline
+    : (baselineReady === true && baselineCounts && typeof baselineCounts === 'object'
+        ? { ready: true, counts: baselineCounts, fingerprints: null }
+        : { ready: false, counts: {}, fingerprints: null });
 
   if (!isSupportedServiceKind(serviceKind)) {
     return { status: 'error', code: 'VPAY_SERVICE_KIND_INVALID', message: '仅支持购买 AI 简历优化或 AI 模拟面试单次服务' };
@@ -307,7 +371,6 @@ async function buyServiceCredit(options = {}) {
   if (isStale()) return { status: 'stale' };
 
   onStatus({ phase: 'confirming', message: VPAY_COPY.confirmingNotice });
-  const baseCount = Number(baselineCounts[serviceKind]) || 0;
   let lastCredits = null;
   const totalAttempts = Math.max(1, Number(maxPolls) || DEFAULT_MAX_CONFIRM_POLLS);
 
@@ -317,7 +380,7 @@ async function buyServiceCredit(options = {}) {
       const fresh = await api.listServiceCredits();
       if (isStale()) return { status: 'stale' };
       lastCredits = summarizeCredits(fresh);
-      if ((lastCredits.counts[serviceKind] || 0) > baseCount) {
+      if (hasConfirmedNewCredit(effectiveBaseline, lastCredits, serviceKind)) {
         return {
           status: 'confirmed',
           credits: lastCredits,
@@ -353,6 +416,8 @@ module.exports = {
   isSupportedServiceKind,
   isVpayUnavailableCode,
   summarizeCredits,
+  createCreditsBaseline,
+  hasConfirmedNewCredit,
   supportsVirtualPayment,
   buildVirtualPaymentOptions,
   classifyVirtualPayFail,
