@@ -47,7 +47,8 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
     session?.deviceChoice ?? (material ? defaultDeviceChoice(material) : { source: 'feeder', colorMode: 'gray' })
   ))
 
-  const chargeCents = !recovery && pay.needsPayment && pay.chargeCents !== null && pay.chargeCents > 0
+  const payLoading = !recovery && pay.loading
+  const chargeCents = !recovery && !pay.loading && pay.needsPayment && pay.chargeCents !== null && pay.chargeCents > 0
     ? pay.chargeCents
     : null
   const goPay = useCallback((): void => {
@@ -118,17 +119,20 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
         primary: {
           label: recovering || start.phase === 'starting'
             ? '正在开始'
-            : chargeCents !== null
-              ? scanPayButtonLabel(chargeCents)
-              : '开始扫描',
+            : payLoading
+              ? '正在确认费用'
+              : chargeCents !== null
+                ? scanPayButtonLabel(chargeCents)
+                : '开始扫描',
           testId: 'scan-device-start',
-          disabled: (!recovery && !probe.freshReady) || !cap.allowed || recovering || start.phase === 'starting' || start.locked,
+          disabled: (!recovery && !probe.freshReady) || payLoading || !cap.allowed || recovering || start.phase === 'starting' || start.locked,
           onClick: () => {
             if (recovery) {
               setRecovering(true)
               void recoverDeviceSession({ action: 'retry', settings: choice, token: getToken(), onGoStage: onGoStage ?? (() => undefined) }).finally(() => setRecovering(false))
               return
             }
+            if (payLoading) return
             if (chargeCents) { goPay(); return }
             beginDeviceScan({
               material,
