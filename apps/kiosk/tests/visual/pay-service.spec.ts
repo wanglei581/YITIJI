@@ -245,7 +245,8 @@ test.describe('付款屏 @kiosk', () => {
     await page.waitForTimeout(50)
     const refreshBeforeExpiry = calls.filter((call) => call.method === 'GET' && call.refresh).length
     buzzerPaid = true
-    await page.clock.runFor(SERVICE_PAY_TTL_MS - 4 * 60_000 + 2_000)
+    // 先走到期后 500ms（在 1.6 秒自动跳下一步之前）确认落入 ok，再走完 1.6 秒自动前进。
+    await page.clock.runFor(SERVICE_PAY_TTL_MS - 4 * 60_000 + 500)
     await expectState(page, 'ok')
     expect(calls.filter((call) => call.method === 'GET' && call.refresh).length).toBeGreaterThan(refreshBeforeExpiry)
     await page.clock.runFor(2_000)
@@ -604,8 +605,9 @@ test.describe('付款屏 @kiosk', () => {
 
     await page.goto('/pay/resume')
     await expectState(page, 'wait')
-    await page.clock.pauseAt(start + 100)
-    virtualNow = start + 100
+    const pausedAt = (await page.evaluate(() => Date.now())) + 100
+    await page.clock.pauseAt(pausedAt)
+    virtualNow = pausedAt
     const stepMs = async (ms: number) => {
       for (let done = 0; done < ms; done += 1_000) {
         virtualNow += 1_000
