@@ -15370,7 +15370,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 855,
+      "reachableFileCount": 861,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -17975,6 +17975,7 @@
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
             "POST /:param/cancel",
+            "POST /:param/close",
             "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
@@ -18061,6 +18062,7 @@
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
             "POST /:param/cancel",
+            "POST /:param/close",
             "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
@@ -18123,6 +18125,7 @@
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
             "POST /:param/cancel",
+            "POST /:param/close",
             "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
@@ -18244,6 +18247,7 @@
             "GET /resume/records/:param/optimize",
             "GET /resume/records/:param/versions",
             "POST /:param/cancel",
+            "POST /:param/close",
             "POST /:param/confirm",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
@@ -18562,7 +18566,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1044
+      "sourceFileCount": 1050
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
