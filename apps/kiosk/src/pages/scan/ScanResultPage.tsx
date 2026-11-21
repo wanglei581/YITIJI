@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { formatLabelFromMime } from './scanOutputFormat'
@@ -8,12 +8,15 @@ import { ScanResultFailedView } from './ScanResultFailedView'
 import { ScanResultPreviewBlock } from './ScanResultPreviewBlock'
 import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
 import { ScanWorkbenchShell } from './ScanWorkbenchChrome'
+import { scanFailedOrderNotice, scanPaidAmountCentsForDone } from './scanPayModel'
 import { deriveOutcome, type ScanResultState } from './scanResultModel'
 import { scanShownText } from './scanShownText'
 import { type ScanStage } from './scanWorkbenchModel'
 import { readScanWorkbenchSession } from './scanWorkbenchSession'
+import { forgetScanServiceTrip, useScanTripOrder } from './useScanPayGate'
 import { useScanResultExits } from './useScanResultExits'
 import { useScanResultRescan } from './useScanResultRescan'
+import './styles/scan-pay.css'
 
 /**
  * 结果页：只做装配与渲染。
@@ -26,7 +29,8 @@ import { useScanResultRescan } from './useScanResultRescan'
  */
 export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
   const location = useLocation()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, user } = useAuth()
+  const endUserId = user?.id ?? null
   const stored = readScanWorkbenchSession()
   const locationState = (location.state ?? {}) as ScanResultState
   const state: ScanResultState = {
@@ -48,6 +52,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   const shownReason = reason ? scanShownText(reason, '扫描任务未能完成。请返回重试。') : null
   const file = state.file
   const outcome = deriveOutcome(state)
+  const isFailed = outcome === 'completed-no-file' || (!success && outcome !== 'completed')
   // 刚结束那一场的凭证还留在本机登记里（finishWithResult 刻意不抹 live）。
   // 这里只读，不改：它是「向服务端取用那枚一次性重扫授权」的唯一来源。
   const priorScanTaskId = stored?.live?.scanTaskId ?? null
@@ -55,6 +60,20 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   // 整屏预览只是这一屏的视图状态：不进地址、不进历史、不落存储。
   const [previewOpen, setPreviewOpen] = useState(false)
   const closePreview = useCallback(() => setPreviewOpen(false), [])
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  const { order } = useScanTripOrder({ pollWhileSettling: isFailed })
+  useEffect(() => {
+    setNowMs(Date.now())
+    if (!isFailed || !order?.retryUntil) return undefined
+    const delay = Date.parse(order.retryUntil) - Date.now() + 50
+    if (!Number.isFinite(delay) || delay <= 0) return undefined
+    const timer = window.setTimeout(() => setNowMs(Date.now()), delay)
+    return () => window.clearTimeout(timer)
+  }, [isFailed, order?.retryUntil])
+
+  const tripNotice = isFailed ? scanFailedOrderNotice(order, nowMs, outcome) : { kind: 'none' as const, text: null }
+  const paidAmountCents = isFailed ? null : scanPaidAmountCentsForDone(order)
 
   const { rescanAuthorized, safeRescanLost, handleRetry, handlePlainRestart } = useScanResultRescan({
     state, scanType, outcome, priorScanTaskId, priorControlToken, onGoStage,
@@ -63,7 +82,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
 
   const displayFormat = formatLabelFromMime(file?.mimeType)
 
-  if (outcome === 'completed-no-file' || (!success && outcome !== 'completed')) {
+  if (isFailed) {
     /* 11/08 产品负责人定第 2 条：屏上扫描中断后换成屏上扫描自己的结果屏（稿 cs-scan-failed），面板扫描照旧。
      * 判据是本机登记里的 deviceFlow：只有屏上扫描建会话那一处写 true（useScanDeviceStart），改用面板扫描
      * （scanDeviceRecovery）和任何一次生命周期终结（live: undefined、清场）都会把它清掉；它和结果快照
@@ -73,6 +92,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
         <ScanDeviceFailedView
           outcome={outcome}
           shownReason={shownReason}
+          tripNotice={tripNotice}
           leaveScanFlow={leaveScanFlow}
           onGoStage={onGoStage}
         />
@@ -83,6 +103,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
         outcome={outcome}
         formatFailure={formatFailure}
         shownReason={shownReason}
+        tripNotice={tripNotice}
         rescanAuthorized={rescanAuthorized}
         safeRescanLost={safeRescanLost}
         handleRetry={handleRetry}
@@ -94,6 +115,10 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
 
   const aiEnabled = scanType === 'resume' && Boolean(file)
   const printEnabled = Boolean(file)
+  const finishAnd = (action: () => void) => () => {
+    forgetScanServiceTrip(endUserId)
+    action()
+  }
 
   return (
     <ScanWorkbenchShell
@@ -107,8 +132,8 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
          走显式的那一条，不碰重扫授权。名字照稿 18 的出口名：「拿去打印」先去材料检查
          （原件要先过隐私检查），不能再叫「直接打印」。 */
       dock={{
-        left: { label: '重新扫描', onClick: handlePlainRestart, icon: 'refresh' },
-        primary: { label: '拿去打印', onClick: handlePrint, disabled: !printEnabled },
+        left: { label: '重新扫描', onClick: finishAnd(handlePlainRestart), icon: 'refresh' },
+        primary: { label: '拿去打印', onClick: finishAnd(handlePrint), disabled: !printEnabled },
       }}
     >
       <div className="sw-result qx-grow">
@@ -124,9 +149,10 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           isLoggedIn={isLoggedIn}
           aiEnabled={aiEnabled}
           printEnabled={printEnabled}
-          handleResumeAI={handleResumeAI}
-          handlePrint={handlePrint}
-          handleDocuments={handleDocuments}
+          paidAmountCents={paidAmountCents}
+          handleResumeAI={finishAnd(handleResumeAI)}
+          handlePrint={finishAnd(handlePrint)}
+          handleDocuments={finishAnd(handleDocuments)}
         />
         <p className="fs-p fs-foot">还没选下一步的临时文件，会按保存规则清理。扫完请取回原件。</p>
         {previewOpen && file ? (

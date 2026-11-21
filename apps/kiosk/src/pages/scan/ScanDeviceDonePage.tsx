@@ -5,22 +5,27 @@ import { useAuth } from '../../auth/useAuth'
 import { whenMiniapp } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { getMyDocuments } from '../../services/api/memberAssets'
+import { formatYuan } from '../pay/payServiceModel'
 import { SCAN_DEVICE_RAIL, ScanWorkbenchShell } from './ScanWorkbenchChrome'
 import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
 import { SCAN_GUEST_WAYS_LEAD, scanGuestWays } from './scanGuestWays'
 import { SCAN_MATERIALS } from './scanMaterials'
+import { scanPaidAmountCentsForDone } from './scanPayModel'
 import { type ScanStage } from './scanWorkbenchModel'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { beginDeviceScanAgain, readScanWorkbenchSession } from './scanWorkbenchSession'
+import { forgetScanServiceTrip, useScanTripOrder } from './useScanPayGate'
 import { useScanResultExits } from './useScanResultExits'
 import './styles/scan-device-flow.css'
 import './styles/scan-device-done.css'
+import './styles/scan-pay.css'
 
 type Owner = 'guest' | 'checking' | 'owned' | 'unproven'
 
 /** 屏上扫描完成。文件卡用真实预览，不把示意纸页当成扫到的那一页。 */
 export function ScanDeviceDonePage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
-  const { isLoggedIn, getToken } = useAuth()
+  const { isLoggedIn, getToken, user } = useAuth()
+  const endUserId = user?.id ?? null
   const contact = useSupportContact(isLoggedIn)
   const session = readScanWorkbenchSession()
   const file = session?.result?.success === true ? session.result.file : undefined
@@ -28,6 +33,8 @@ export function ScanDeviceDonePage({ onGoStage }: { onGoStage?: (stage: ScanStag
   const material = session?.material ?? null
   const scanType = session?.scanType ?? 'document'
   const exits = useScanResultExits({ file, scanType })
+  const { order } = useScanTripOrder()
+  const paidAmountCents = scanPaidAmountCentsForDone(order)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [owner, setOwner] = useState<Owner>(isLoggedIn ? 'checking' : 'guest')
 
@@ -57,7 +64,13 @@ export function ScanDeviceDonePage({ onGoStage }: { onGoStage?: (stage: ScanStag
     ? `这份扫描件已存进「我的文档」${whenMiniapp(contact, '，手机上打开职易达小程序也能看到')}`
     : ''
 
+  const finishAnd = (action: () => void) => () => {
+    forgetScanServiceTrip(endUserId)
+    action()
+  }
+
   const again = (): void => {
+    forgetScanServiceTrip(endUserId)
     revokeLiveScanSession(getToken())
     beginDeviceScanAgain()
     onGoStage?.('start')
@@ -75,7 +88,7 @@ export function ScanDeviceDonePage({ onGoStage }: { onGoStage?: (stage: ScanStag
       bandBack={false}
       dock={{
         omitLeft: true,
-        primary: { label: '拿去打印', onClick: exits.handlePrint },
+        primary: { label: '拿去打印', onClick: finishAnd(exits.handlePrint) },
       }}
     >
       <div className="cs-flow cs-done" data-testid="scan-device-done" data-owner={owner}>
@@ -118,12 +131,22 @@ export function ScanDeviceDonePage({ onGoStage }: { onGoStage?: (stage: ScanStag
         ) : null}
         {saved ? <div className="cs-saved" role="status">{saved}</div> : null}
         <div className="cs-rows">
-          <button type="button" className="cs-row" onClick={exits.handlePrint}>
+          <button type="button" className="cs-row" onClick={finishAnd(exits.handlePrint)}>
             <span className="ic"><QxTouchIcon name="printer" size={36} strokeWidth={2} /></span>
-            <span className="tx"><b>拿去打印</b><small>先检查文件和个人信息，再打印</small></span>
+            <span className="tx">
+              <b>拿去打印</b>
+              {paidAmountCents != null ? (
+                <small data-testid="scan-result-paid-copy">
+                  先检查文件和个人信息。打印另按页计价，到核对价格再看。扫描这一次已经付过{' '}
+                  <span className="fs-pay-keep">{formatYuan(paidAmountCents)}</span>。
+                </small>
+              ) : (
+                <small>先检查文件和个人信息，再打印</small>
+              )}
+            </span>
             <QxTouchIcon name="chevR" size={28} strokeWidth={2.4} />
           </button>
-          <button type="button" className="cs-row" disabled={!resume} onClick={exits.handleResumeAI}>
+          <button type="button" className="cs-row" disabled={!resume} onClick={finishAnd(exits.handleResumeAI)}>
             <span className="ic"><QxTouchIcon name="sparkle" size={36} strokeWidth={2} /></span>
             <span className="tx">
               <b>AI 简历识别</b>
@@ -135,7 +158,7 @@ export function ScanDeviceDonePage({ onGoStage }: { onGoStage?: (stage: ScanStag
             </span>
           </button>
           {saved ? (
-            <button type="button" className="cs-row" onClick={exits.handleDocuments}>
+            <button type="button" className="cs-row" onClick={finishAnd(exits.handleDocuments)}>
               <span className="ic"><QxTouchIcon name="folder" size={36} strokeWidth={2} /></span>
               <span className="tx"><b>前往我的文档</b><small>在「我的文档」里看和管理这份扫描件</small></span>
               <QxTouchIcon name="chevR" size={28} strokeWidth={2.4} />

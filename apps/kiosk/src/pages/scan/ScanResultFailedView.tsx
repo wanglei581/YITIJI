@@ -2,6 +2,7 @@ import type { NavigateOptions } from 'react-router-dom'
 import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import { FsRow } from '../print-scan/FsRow'
 import { ScanSample, ScanWorkbenchShell } from './ScanWorkbenchChrome'
+import { SCAN_RETRY_FREE_LABEL, type ScanFailedOrderNotice } from './scanPayModel'
 import type { ScanOutcome } from './scanWorkbenchSession'
 
 /**
@@ -15,6 +16,7 @@ export function ScanResultFailedView({
   outcome,
   formatFailure,
   shownReason,
+  tripNotice,
   rescanAuthorized,
   safeRescanLost,
   handleRetry,
@@ -24,6 +26,7 @@ export function ScanResultFailedView({
   outcome: ScanOutcome
   formatFailure: boolean
   shownReason: string | null
+  tripNotice?: ScanFailedOrderNotice
   rescanAuthorized: boolean
   safeRescanLost: boolean
   handleRetry: () => void
@@ -32,6 +35,7 @@ export function ScanResultFailedView({
 }) {
   const isNoFile = outcome === 'completed-no-file'
   const isExpired = outcome === 'expired'
+  const freeRetry = tripNotice?.kind === 'retry_free'
   return (
     <ScanWorkbenchShell
       page="scan-result"
@@ -50,11 +54,13 @@ export function ScanResultFailedView({
         left: { label: '返回打印扫描', leaveTo: '/print-scan' },
         primary: formatFailure
           ? (rescanAuthorized
-            ? { label: '选 JPG 格式重扫（同一份材料）', onClick: handleRetry }
-            : { label: '选 JPG 格式重新扫描', onClick: handlePlainRestart })
-          : rescanAuthorized
-          ? { label: '重试扫描（同一份材料）', onClick: handleRetry }
-          : { label: '重新开始一次扫描', onClick: handlePlainRestart },
+            ? { label: freeRetry ? SCAN_RETRY_FREE_LABEL : '选 JPG 格式重扫（同一份材料）', onClick: handleRetry }
+            : { label: freeRetry ? SCAN_RETRY_FREE_LABEL : '选 JPG 格式重新扫描', onClick: handlePlainRestart })
+          : freeRetry
+            ? { label: SCAN_RETRY_FREE_LABEL, onClick: rescanAuthorized ? handleRetry : handlePlainRestart }
+            : rescanAuthorized
+            ? { label: '重试扫描（同一份材料）', onClick: handleRetry }
+            : { label: '重新开始一次扫描', onClick: handlePlainRestart },
       }}
     >
       {/* 失败态：原因只写一处。此前意图带标题、状态条、面板标题三处都是「扫描未完成」，面板里的原因
@@ -80,7 +86,7 @@ export function ScanResultFailedView({
           </div>
           <div className="fs-pairgrid">
             <div className="fs-fact">
-              <b>重试扫描（同一份材料）</b>
+              <b>{freeRetry ? SCAN_RETRY_FREE_LABEL : '重试扫描（同一份材料）'}</b>
               <span>{rescanAuthorized ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。' : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>
             </div>
             <div className="fs-fact">
@@ -89,6 +95,11 @@ export function ScanResultFailedView({
             </div>
           </div>
         </div>
+        {tripNotice?.text ? (
+          <p className="fs-p" data-testid="scan-result-pay-notice" data-pay-notice={tripNotice.kind}>
+            {tripNotice.text}
+          </p>
+        ) : null}
         {safeRescanLost ? (
           <p className="fs-warn" data-testid="scan-safe-rescan-lost">
             <b>刚才那份安全重扫凭据已经用不了了</b>（超过 15 分钟，或者中间清过场 / 换过人）。

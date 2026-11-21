@@ -3,6 +3,7 @@ import { FolderIcon, PrinterIcon, SparklesIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useSupportContactSnapshot } from '../../hooks/useSupportContact'
 import { getMyDocuments } from '../../services/api/memberAssets'
+import { formatYuan } from '../pay/payServiceModel'
 import { scanGuestWays } from './scanGuestWays'
 import { scanResultDocumentsNote, type ScanDocumentsCheck } from './scanResultDocumentsNote'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
@@ -25,6 +26,7 @@ export function ScanResultExitRow({
   isLoggedIn,
   aiEnabled,
   printEnabled,
+  paidAmountCents,
   handleResumeAI,
   handlePrint,
   handleDocuments,
@@ -34,6 +36,7 @@ export function ScanResultExitRow({
   isLoggedIn: boolean
   aiEnabled: boolean
   printEnabled: boolean
+  paidAmountCents?: number | null
   handleResumeAI: () => void
   handlePrint: () => void
   handleDocuments: () => void
@@ -91,7 +94,14 @@ export function ScanResultExitRow({
         </span>
         <span className="sw-exit-body">
           <span className="sw-exit-title">拿去打印</span>
-          <small>先检查文件和个人信息，再选打印参数。金额由系统报价决定，本页不给价格。</small>
+          {paidAmountCents != null ? (
+            <small data-testid="scan-result-paid-copy">
+              先检查文件和个人信息。打印另按页计价，到核对价格再看。扫描这一次已经付过{' '}
+              <span className="fs-pay-keep">{formatYuan(paidAmountCents)}</span>。
+            </small>
+          ) : (
+            <small>先检查文件和个人信息，再选打印参数。金额由系统报价决定，本页不给价格。</small>
+          )}
         </span>
       </button>
       <button
