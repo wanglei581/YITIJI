@@ -12,6 +12,7 @@
  *   8. 开场后从不出报告就离开 → 不退（开场即做成照旧）；开场重试过（attemptsUsed=2）后首次报告失败仍给免费再试。
  *   9. 并发：同实例首次并发 end 合并只进 retry；双路并发 end 失败 + sweep 同时跑只退一次；做成后再失败/清扫绝不退。
  *  10. 免费机器（无服务单）→ 完全不碰。
+ *  11. 生成途中跨截止被清扫/离场退款或窗内起跑途中过期：事务原子判负，绝不落报告、必回 409、重读仍 409 且不重复退。
  */
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-interview-report-terminal-admin-secret-0123456789'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-interview-report-terminal-action-secret-0123456789'
@@ -34,6 +35,7 @@ import { join, resolve } from 'node:path'
 import { BadRequestException, Module, ServiceUnavailableException, ValidationPipe, type ValidationError } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
+import { Redis } from 'ioredis'
 import { AuditService } from '../src/audit/audit.service'
 import { AiLogService } from '../src/ai/ai-log.service'
 import { ResumeExtractionService } from '../src/ai/resume/resume-extraction.service'
@@ -171,14 +173,23 @@ async function main(): Promise<void> {
   const termCharge = `term-ivr-chg-${runId}`
   const termFree = `term-ivr-free-${runId}`
   const createdSessions: string[] = []
-  const store = new Map<string, string>()
-  const redis = {
-    async get(key: string) { return store.get(key) ?? null },
-    async setEx(key: string, _ttl: number, value: string) { store.set(key, value) },
-    async getDel(key: string) { const v = store.get(key) ?? null; store.delete(key); return v },
-    async setJsonIfVersionNotOlder() { return 'ok' as const },
-    async setIfAbsent(key: string, value: string) { if (store.has(key)) return false; store.set(key, value); return true },
-    async del(key: string) { return store.delete(key) ? 1 : 0 },
+  const redisUrl = process.env['REDIS_URL'] ?? ''
+  let redisClient: Redis | null = null
+  let redis: RedisService
+  if (redisUrl) {
+    redisClient = new Redis(redisUrl, { keyPrefix: `verify-ivr-${runId}:` })
+    assert.equal(await redisClient.ping(), 'PONG', 'REDIS_URL 指定了真 Redis，但 PING 失败')
+    redis = new RedisService(redisClient)
+  } else {
+    const store = new Map<string, string>()
+    redis = {
+      async get(key: string) { return store.get(key) ?? null },
+      async setEx(key: string, _ttl: number, value: string) { store.set(key, value) },
+      async getDel(key: string) { const v = store.get(key) ?? null; store.delete(key); return v },
+      async setJsonIfVersionNotOlder() { return 'ok' as const },
+      async setIfAbsent(key: string, value: string) { if (store.has(key)) return false; store.set(key, value); return true },
+      async del(key: string) { return store.delete(key) ? 1 : 0 },
+    } as unknown as RedisService
   }
 
   const prisma = new PrismaService()
@@ -243,7 +254,7 @@ async function main(): Promise<void> {
 
   const privacy = { async requireActiveConsent() {} } as unknown as MemberPrivacyService
   const aiLog = { record() {} } as unknown as AiLogService
-  const makeInterviewService = () => new MockInterviewService(
+  const makeInterviewService = (withRedis = false) => new MockInterviewService(
     prisma,
     llm,
     {} as InterviewReportPdfService,
@@ -253,10 +264,10 @@ async function main(): Promise<void> {
     audit,
     aiLog,
     privacy,
-    undefined,
+    withRedis ? redis : undefined,
     undefined,
   )
-  const interviewService = makeInterviewService()
+  const interviewService = makeInterviewService(Boolean(redisClient))
 
   @Module({
     controllers: [
@@ -321,7 +332,7 @@ async function main(): Promise<void> {
         data: { id, terminalCode: code, agentToken: `agent-${id}`, deviceFingerprint: `fp-${id}` },
       })
       const token = `tok-${id}`
-      store.set(`term:session:${token}`, JSON.stringify({ terminalId: id, generation: 0, issuedAt: new Date().toISOString() }))
+      await redis.setEx(`term:session:${token}`, 3600, JSON.stringify({ terminalId: id, generation: 0, issuedAt: new Date().toISOString() }))
       return token
     }
 
@@ -694,7 +705,7 @@ async function main(): Promise<void> {
       pass('Case 7: 开场后不出报告就离开不退；开场重试过仍给首次报告免费再试')
     }
 
-    // ── Case 8: 报告落库失败 → 同样算系统原因进再试与退款 ──────────────────
+    // ── Case 8: 报告落库失败 → 事务整体回滚，同样算系统原因进再试与退款 ─────
     {
       refundCalls = 0
       reportMode = 'ok'
@@ -702,29 +713,61 @@ async function main(): Promise<void> {
       const orderId = await paidOrder(ks)
       const iv = await createAndAnswerInterview({ terminalId: termCharge, token: chargeToken, kioskSessionId: ks, orderId })
       const origCreate = prisma.mockInterviewReport.create.bind(prisma.mockInterviewReport)
+      const origTx = prisma.$transaction.bind(prisma)
       let failWrites = 2
-      prisma.mockInterviewReport.create = (async (...args: Parameters<typeof origCreate>) => {
+      const wrapCreate = (fn: typeof origCreate) => (async (...args: Parameters<typeof origCreate>) => {
         if (failWrites > 0) {
           failWrites -= 1
           throw new Error('simulated_db_write_failure')
         }
-        return origCreate(...args)
+        return fn(...args)
       }) as typeof origCreate
+      prisma.mockInterviewReport.create = wrapCreate(origCreate)
+      prisma.$transaction = ((arg: unknown, ...rest: unknown[]) => {
+        if (typeof arg === 'function') {
+          return (origTx as (fn: (tx: unknown) => Promise<unknown>, ...r: unknown[]) => Promise<unknown>)(
+            async (tx) => {
+              const t = tx as typeof prisma
+              const proxyTx = new Proxy(t, {
+                get(target, prop, receiver) {
+                  if (prop === 'mockInterviewReport') {
+                    return new Proxy(target.mockInterviewReport, {
+                      get(mTarget, mProp, mReceiver) {
+                        if (mProp === 'create') return wrapCreate(mTarget.create.bind(mTarget))
+                        const v = Reflect.get(mTarget, mProp, mReceiver)
+                        return typeof v === 'function' ? v.bind(mTarget) : v
+                      },
+                    })
+                  }
+                  const v = Reflect.get(target, prop, receiver)
+                  return typeof v === 'function' ? v.bind(target) : v
+                },
+              })
+              return (arg as (tx: unknown) => Promise<unknown>)(proxyTx)
+            },
+            ...rest,
+          )
+        }
+        return (origTx as (...a: unknown[]) => unknown)(arg, ...rest)
+      }) as typeof prisma.$transaction
       try {
         assert.equal((await endInterview(iv.sessionId, iv.accessToken)).status, 500)
+        assert.equal(await prisma.mockInterviewReport.findUnique({ where: { sessionId: iv.sessionId } }), null)
         const afterDb1 = await loadOrder(orderId)
         assert.equal(afterDb1.status, 'consumed')
-        assert.equal(afterDb1.reportState, 'retry')
+        assert.equal(afterDb1.reportState, 'retry', '事务内落库失败必须回滚 done 并进入 retry')
         assert.equal(refundCalls, 0)
 
         assert.equal((await endInterview(iv.sessionId, iv.accessToken)).status, 500)
+        assert.equal(await prisma.mockInterviewReport.findUnique({ where: { sessionId: iv.sessionId } }), null)
         const afterDb2 = await loadOrder(orderId)
         assert.equal(afterDb2.status, 'refunded')
         assert.equal(refundCalls, 1)
       } finally {
         prisma.mockInterviewReport.create = origCreate
+        prisma.$transaction = origTx
       }
-      pass('Case 8: 报告落库失败进入再试与自动退')
+      pass('Case 8: 报告落库失败事务回滚，进入再试与自动退')
     }
 
     // ── Case 9: 并发测试（同实例合并、并发两次 end + 清扫只退一次、做成后不退）
@@ -844,7 +887,113 @@ async function main(): Promise<void> {
       pass('Case 10: 免费机器完全不碰，行为与原来一致')
     }
 
-    pass(`模拟面试报告失败免费再试与自动退款全部通过 (${usePostgres ? 'PostgreSQL' : 'SQLite'})`)
+    // ── Case 11: 模型生成途中跨截止被清扫/离场退款或中途过期 → 事务原子判负，绝不落报告 ──
+    {
+      // 11a: 窗内进模型，生成途中真实时钟跨过 retryUntil 且 sweep 胜出退款 → 必回 409、不落报告、后续再读仍 409
+      refundCalls = 0
+      reportMode = 'fail'
+      const ks11a = await openKiosk(termCharge, chargeToken)
+      const oid11a = await paidOrder(ks11a)
+      const iv11a = await createAndAnswerInterview({ terminalId: termCharge, token: chargeToken, kioskSessionId: ks11a, orderId: oid11a })
+      assert.equal((await endInterview(iv11a.sessionId, iv11a.accessToken)).status, 503)
+      const before11a = await loadOrder(oid11a)
+      assert.ok(before11a.retryUntil && before11a.retryUntil.getTime() > Date.now())
+      await prisma.serviceOrder.update({ where: { id: oid11a }, data: { retryUntil: new Date(Date.now() + 1_000) } })
+      reportMode = 'ok'
+      const origBuildReport = llm.buildReport.bind(llm)
+      llm.buildReport = (async (...args: Parameters<typeof origBuildReport>) => {
+        const deadline = (await loadOrder(oid11a)).retryUntil!.getTime()
+        await new Promise((r) => setTimeout(r, Math.max(0, deadline - Date.now() + 20)))
+        await serviceOrders.sweep(new Date())
+        assert.equal((await loadOrder(oid11a)).status, 'refunded', '竞态障壁必须在模型返回前由 sweep 退完')
+        return origBuildReport(...args)
+      }) as typeof origBuildReport
+      let res11a: Awaited<ReturnType<typeof endInterview>>
+      try {
+        res11a = await endInterview(iv11a.sessionId, iv11a.accessToken)
+      } finally {
+        llm.buildReport = origBuildReport
+      }
+      assert.equal(res11a.status, 409, `生成途中已被清扫退款时必须回 409，实际 ${res11a.status}`)
+      assert.equal(res11a.json.error?.code, 'SERVICE_ORDER_REFUNDED')
+      assert.equal(await prisma.mockInterviewReport.findUnique({ where: { sessionId: iv11a.sessionId } }), null, '生成途中已退款绝不能落库新报告')
+      const after11a = await loadOrder(oid11a)
+      assert.equal(after11a.status, 'refunded')
+      assert.notEqual(after11a.reportState, 'done')
+      assert.equal(refundCalls, 1)
+      const callsBeforeReread11a = reportCalls
+      const reread11a = await endInterview(iv11a.sessionId, iv11a.accessToken)
+      assert.equal(reread11a.status, 409, '退完后再读 end 仍必须返回 409')
+      assert.equal(reread11a.json.error?.code, 'SERVICE_ORDER_REFUNDED')
+      assert.equal(reportCalls, callsBeforeReread11a, '退完后再读 end 必须 0 次调模型')
+      assert.equal(await prisma.mockInterviewReport.findUnique({ where: { sessionId: iv11a.sessionId } }), null)
+
+      // 11b: 窗内进模型，生成途中跨过 retryUntil 但 sweep 尚未跑 → 事务原子判负、当场原子退一次、回 409 SERVICE_RETRY_EXPIRED、不落报告
+      refundCalls = 0
+      reportMode = 'fail'
+      const ks11b = await openKiosk(termCharge, chargeToken)
+      const oid11b = await paidOrder(ks11b)
+      const iv11b = await createAndAnswerInterview({ terminalId: termCharge, token: chargeToken, kioskSessionId: ks11b, orderId: oid11b })
+      assert.equal((await endInterview(iv11b.sessionId, iv11b.accessToken)).status, 503)
+      await prisma.serviceOrder.update({ where: { id: oid11b }, data: { retryUntil: new Date(Date.now() + 1_000) } })
+      reportMode = 'ok'
+      llm.buildReport = (async (...args: Parameters<typeof origBuildReport>) => {
+        const deadline = (await loadOrder(oid11b)).retryUntil!.getTime()
+        await new Promise((r) => setTimeout(r, Math.max(0, deadline - Date.now() + 20)))
+        return origBuildReport(...args)
+      }) as typeof origBuildReport
+      let res11b: Awaited<ReturnType<typeof endInterview>>
+      try {
+        res11b = await endInterview(iv11b.sessionId, iv11b.accessToken)
+      } finally {
+        llm.buildReport = origBuildReport
+      }
+      assert.equal(res11b.status, 409, `生成途中过期未清扫必须回 409，实际 ${res11b.status}`)
+      assert.equal(res11b.json.error?.code, 'SERVICE_RETRY_EXPIRED')
+      assert.equal(await prisma.mockInterviewReport.findUnique({ where: { sessionId: iv11b.sessionId } }), null, '生成途中过期绝不能落库新报告')
+      const after11b = await loadOrder(oid11b)
+      assert.equal(after11b.status, 'refunded')
+      assert.equal(after11b.refundReason, SERVICE_REFUND_REASON_RETRY_EXPIRED)
+      assert.notEqual(after11b.reportState, 'done')
+      assert.equal(refundCalls, 1)
+      await serviceOrders.sweep(new Date())
+      assert.equal(refundCalls, 1, '中途过期已退完的单，后续清扫绝不重复退')
+      const callsBeforeReread11b = reportCalls
+      const reread11b = await endInterview(iv11b.sessionId, iv11b.accessToken)
+      assert.equal(reread11b.status, 409)
+      assert.equal(reread11b.json.error?.code, 'SERVICE_ORDER_REFUNDED')
+      assert.equal(reportCalls, callsBeforeReread11b)
+
+      // 11c: 窗内进模型，生成途中用户离场（onSessionEnded 退款）→ 同样事务判负、回 409、不落报告
+      refundCalls = 0
+      reportMode = 'fail'
+      const ks11c = await openKiosk(termCharge, chargeToken)
+      const oid11c = await paidOrder(ks11c)
+      const iv11c = await createAndAnswerInterview({ terminalId: termCharge, token: chargeToken, kioskSessionId: ks11c, orderId: oid11c })
+      assert.equal((await endInterview(iv11c.sessionId, iv11c.accessToken)).status, 503)
+      reportMode = 'ok'
+      llm.buildReport = (async (...args: Parameters<typeof origBuildReport>) => {
+        await endKiosk(termCharge, chargeToken, ks11c)
+        assert.equal((await loadOrder(oid11c)).status, 'refunded')
+        return origBuildReport(...args)
+      }) as typeof origBuildReport
+      let res11c: Awaited<ReturnType<typeof endInterview>>
+      try {
+        res11c = await endInterview(iv11c.sessionId, iv11c.accessToken)
+      } finally {
+        llm.buildReport = origBuildReport
+      }
+      assert.equal(res11c.status, 409)
+      assert.equal(res11c.json.error?.code, 'SERVICE_ORDER_REFUNDED')
+      assert.equal(await prisma.mockInterviewReport.findUnique({ where: { sessionId: iv11c.sessionId } }), null)
+      const after11c = await loadOrder(oid11c)
+      assert.equal(after11c.status, 'refunded')
+      assert.equal(after11c.refundReason, SERVICE_REFUND_REASON_REPORT_LEFT)
+      assert.equal(refundCalls, 1)
+      pass('Case 11: 模型生成途中被清扫/离场退款或中途过期，事务原子判负、绝不落报告、必回 409 且重读仍 409')
+    }
+
+    pass(`模拟面试报告失败免费再试与自动退款全部通过 (${usePostgres ? 'PostgreSQL' : 'SQLite'}${redisClient ? ' + Redis' : ''})`)
   } finally {
     await app.close().catch(() => undefined)
     // 清理本轮数据（PG 隔离库不留脏数据）
@@ -854,6 +1003,7 @@ async function main(): Promise<void> {
     await prisma.terminalServicePrice.deleteMany({ where: { terminalId: { in: [termCharge, termFree] } } }).catch(() => undefined)
     await prisma.terminal.deleteMany({ where: { id: { in: [termCharge, termFree] } } }).catch(() => undefined)
     await prisma.onModuleDestroy().catch(() => undefined)
+    if (redisClient) await redisClient.quit().catch(() => undefined)
     if (sqliteDir) rmSync(sqliteDir, { recursive: true, force: true })
   }
 }

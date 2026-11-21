@@ -88,7 +88,7 @@ export async function assertInterviewReportAdmitted(
   deps: ServiceOrderSettleDeps,
   sessionId: string,
   now = new Date(),
-): Promise<void> {
+): Promise<string | null> {
   const active = await deps.prisma.serviceOrder.findFirst({
     where: { serviceKey: 'mock_interview', consumedRef: sessionId, status: 'consumed' },
     select: { id: true, serviceKey: true, status: true, reportState: true, retryUntil: true },
@@ -111,7 +111,7 @@ export async function assertInterviewReportAdmitted(
         error: { code: 'SERVICE_RETRY_EXPIRED', message: SERVICE_ERROR_RETRY_EXPIRED_MESSAGE },
       })
     }
-    return
+    return active.reportState === 'done' ? null : active.id
   }
   const refunded = await deps.prisma.serviceOrder.findFirst({
     where: {
@@ -122,7 +122,7 @@ export async function assertInterviewReportAdmitted(
     select: { id: true, serviceKey: true, status: true, reportState: true, retryUntil: true },
     orderBy: { updatedAt: 'desc' },
   })
-  if (!refunded) return
+  if (!refunded) return null
   const decision = decideInterviewReportAdmission({
     serviceKey: refunded.serviceKey,
     status: refunded.status,
@@ -135,6 +135,7 @@ export async function assertInterviewReportAdmitted(
       error: { code: 'SERVICE_ORDER_REFUNDED', message: SERVICE_ERROR_ORDER_REFUNDED_MESSAGE },
     })
   }
+  return null
 }
 
 /**

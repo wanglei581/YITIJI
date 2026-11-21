@@ -371,8 +371,8 @@ export class ServiceOrderService {
     }
   }
 
-  async assertInterviewReportAdmitted(sessionId: string): Promise<void> {
-    await assertInterviewReportAdmitted(this.settleDeps(), sessionId)
+  async assertInterviewReportAdmitted(sessionId: string): Promise<string | null> {
+    return assertInterviewReportAdmitted(this.settleDeps(), sessionId)
   }
 
   async noteInterviewReportMade(sessionId: string): Promise<void> {

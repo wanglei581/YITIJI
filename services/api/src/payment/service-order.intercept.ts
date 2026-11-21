@@ -167,7 +167,7 @@ export function interviewReportHooks(
   orders: ReportOrders | undefined,
   sessionId: string,
 ): {
-  beforeReportGenerate?: () => Promise<void>
+  beforeReportGenerate?: () => Promise<string | null>
   onReportMade?: () => Promise<void>
   onReportFailed?: () => Promise<void>
 } {
