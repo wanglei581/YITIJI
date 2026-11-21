@@ -1,5 +1,17 @@
 # 当前开发进度
 
+## 2026-11-21：模拟面试付款终收极小收口（P2e-3c，分支 `claude/kiosk-pay-interview-p2e3`，未推送）
+
+- 来由：补全线第三十任依据 Codex 终收对 `9e7425d20` 用真实 Redis 竞态探针与 Hook 探针挖出的最后 2 处极小阻塞（① 模型生成途中跨截止被清扫退款后仍落报告返 201；② `paidReportLocked=true` 未拦 `useInterviewDeadlineSeal.tsx` 到点自动请求报告）派发的极小收口包（P2e-3c），起点 `9e7425d20`。0 新增数据库迁移、未碰其他 worktree、未推送。
+- 后端单一原子事务胜负判定（P1）：
+  - `services/api/src/payment/service-order.settle.ts`（466 行）、`service-order.service.ts`（499 行，0 新增行）、`service-order.intercept.ts`（186 行）：`assertInterviewReportAdmitted` / `beforeReportGenerate` 放行时返回活跃付费服务单 ID（无服务单、免费机器或已 `done` 返回 `null`）。
+  - `services/api/src/mock-interview/interview-report-charge.ts`（240 行）：受付费服务单保护的场次在模型返回后改由单一 `prisma.$transaction` 原子判胜负——事务内先执行 `tx.serviceOrder.updateMany`（`status='consumed'` 且 `reportState=null` 或 `reportState='retry' && retryUntil>now` → `reportState='done', failureReason=null, retryUntil=null, settledAt=now`），**仅 `claimed.count === 1` 才在同一事务内写 `MockInterviewReport` 与 `MockInterviewSession(completed)`**；若 `claimed.count === 0` 则绝不落报告，先查是否有并发胜出的已落库报告（有则幂等返回），否则回滚会话 `status='in_progress'` 并复查服务单当前态（仍为已过期 `retry` 时走条件原子退款并抛 `409 SERVICE_RETRY_EXPIRED`；已是 `refunding`/`refunded`/`refund_failed` 则抛 `409 SERVICE_ORDER_REFUNDED`）；免费机器与无服务单场次照旧直接落库。
+  - `services/api/scripts/verify-service-order-interview-report.ts` 支持 `REDIS_URL` 直连真实 Redis（并传给 `MockInterviewService` 的 `RedisInflightLock`），更新 Case 8 代理事务内 `tx.mockInterviewReport.create` 证明落库失败整事务回滚，新增 **Case 11**（11a 生成途中跨截止被 `sweep` 退款、11b 生成途中跨截止未清扫、11c 生成途中 `onSessionEnded` 离场退款），全量断言必回 409、不落报告、不重复退、随后再读仍 409 且 0 次调模型。
+- 一体机前台到点自动封场锁定拦截（P2）：
+  - `apps/kiosk/src/pages/interview/session/useInterviewDeadlineSeal.tsx`（186 行）：新增 `paidReportLockedRef` / `answersRecordedRef` 守卫 `sealAtDeadline` 与 `requestReport`——当 `paidReportLocked === true` 时保留到点封场体验（取消录音、清计时器、停播报、切至 `InterviewTimeUp` 封场屏），但严格阻止自动调用 `requestReport` / `endInterviewAtDeadline`。
+  - `apps/kiosk/scripts/tests/interview-charge-guards.test.mjs` 新增 **C8** 单测（覆盖初始即锁定、运行途中切为锁定、封场屏 `onRetry` 二次防护及未锁定正向对照）。
+- 验证：SQLite + Redis 6671 与临时 PG 16 @5671（UTC）+ Redis 6671 双库跑通 `verify:service-order-interview-report`（Case 0–11，PG `prisma migrate diff` 零漂移）、`verify:service-order-open-ref:postgres`、`verify:service-orders`、`verify:service-orders-concurrency`、`verify:mock-interview`（25/25）、`verify:mock-interview-deadline`（130/130）；前端 `verify:lightflow-k2c-interview`（130 checks + 15/15 Node tests 含 C8）、`blk.sh` 锁下 Playwright `interview-pay.spec.ts`（12/12）与 `pay-service.spec.ts`（26/26）全绿；2 条反向变异 M1（撤 `claimed.count !== 1` 守卫 → Case 11 跑红）与 M2（撤 `paidReportLockedRef` 守卫 → C8 跑红）均逐字节 SHA-256 还原复绿；两端 `tsc --noEmit`、改动文件 `eslint --quiet`、全仓 `pnpm lint`、`verify:backend-error-copy-coverage`、`verify:kiosk-unattended-copy`、`generate-project-graph --check`、`verify-ci-gate-coverage`、`verify-repository-integrity` 全绿；临时 PG 5671 与 Redis 6671 已停净删除，端口空闲。未推送，未上线。
+
 ## 2026-11-21：模拟面试付款收口返工（P2e-3b，分支 `claude/kiosk-pay-interview-p2e3`，未推送）
 
 - 来由：补全线第三十任依据 Codex 独立收货 `a925eafee` 暴露的 2 处后端财务准入漏洞（含总指挥对第 ⑤ 条明确裁决）、3 处前台竞态与 2 处文件超 500 行派发的极小收口包（P2e-3b），起点为 `a925eafee`。未触碰其他 worktree、未新增数据库迁移、未改 P2e-1 前台地基/付款页及其他端。

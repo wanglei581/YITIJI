@@ -10040,6 +10040,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews",
@@ -10069,6 +10070,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews",
@@ -10098,6 +10100,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id",
@@ -10127,6 +10130,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id",
@@ -10156,6 +10160,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/answer",
@@ -10185,6 +10190,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/end",
@@ -10214,6 +10220,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/practice-sheet",
@@ -10243,6 +10250,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/report",
@@ -10272,6 +10280,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/report/print",
@@ -10301,6 +10310,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/start",
@@ -10330,6 +10340,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/transcribe",
@@ -10385,6 +10396,7 @@
           "MockInterviewTurn",
           "PrintTask",
           "RedemptionRecord",
+          "ServiceOrder",
           "UserAiConsent"
         ],
         "path": "/api/v1/mock-interviews/:id/turns/:idx/audio",
@@ -20622,6 +20634,7 @@
         "usedBy": [
           "services/api/src/admin-ops/derived-service-return-alerts.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/mock-interview/interview-report-charge.ts",
           "services/api/src/payment/service-order-sandbox.controller.ts",
           "services/api/src/payment/service-order.admin.ts",
           "services/api/src/payment/service-order.payment.ts",
