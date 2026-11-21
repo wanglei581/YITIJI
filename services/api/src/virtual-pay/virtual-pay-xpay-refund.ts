@@ -1,0 +1,198 @@
+import { randomBytes } from 'node:crypto'
+import type { Logger } from '@nestjs/common'
+import type { AuditService } from '../audit/audit.service'
+import type { PrismaService } from '../prisma/prisma.service'
+import { sendVirtualPayOpsAlert, type VirtualPayAlertRedis } from './virtual-pay-alert'
+import { calcPaySig } from './virtual-pay-sign'
+import { VIRTUAL_PAY_HTTP_TIMEOUT_MS } from './virtual-pay-xpay-client'
+import type { VirtualPayRefundReasonCode } from './virtual-pay.contract'
+
+export const VIRTUAL_PAY_REFUND_URI = '/xpay/refund_order'
+/** 官方错误码：禁止对核销状态的单进行退款（核对表 3.19、5.7）。 */
+export const VIRTUAL_PAY_REFUND_ERRCODE_CONSUMED = 268490013
+/** 官方错误码：退款进行中，稍后可使用相同参数重试（核对表 3.19、5.7）。 */
+export const VIRTUAL_PAY_REFUND_ERRCODE_IN_PROGRESS = 268490014
+/** 官方错误码：left_fee 与微信侧实际剩余可退不符（核对表 3.12、3.19）。 */
+export const VIRTUAL_PAY_REFUND_ERRCODE_LEFT_FEE_MISMATCH = 268490016
+
+export const VIRTUAL_PAY_REFUND_INITIATED_AUDIT_ACTION = 'virtual_pay.refund_initiated'
+export const VIRTUAL_PAY_REFUND_SUCCEEDED_AUDIT_ACTION = 'virtual_pay.refund_succeeded'
+export const VIRTUAL_PAY_REFUND_FAILED_AUDIT_ACTION = 'virtual_pay.refund_failed'
+export const VIRTUAL_PAY_ADMIN_SYNC_AUDIT_ACTION = 'virtual_pay.admin_sync'
+
+/** 商户退款单号：vpr + 24 位十六进制 = 27 位，满足 [8,32] 且 [A-Za-z0-9_-]（核对表 3.11）。 */
+export function newVirtualPayRefundOrderId(): string {
+  return `vpr${randomBytes(12).toString('hex')}`
+}
+
+export interface WechatRefundOrderInput {
+  openId: string
+  orderId: string
+  refundOrderId: string
+  leftFee: number
+  refundFee: number
+  bizMeta: string
+  refundReason: VirtualPayRefundReasonCode
+  reqFrom: '1' | '2' | '3'
+  env: number
+  appKey: string
+  token: string
+  fetchImpl: typeof fetch
+  timeoutMs?: number
+}
+
+export interface WechatRefundOrderResponse {
+  errcode?: number
+  errmsg?: string
+  refund_order_id?: string
+  refund_wx_order_id?: string
+  pay_order_id?: string
+  pay_wx_order_id?: string
+}
+
+/**
+ * 微信虚拟支付官方退款（/xpay/refund_order）。核对表 3.10–3.15、补充规则 10、18。
+ * pay_sig 只签实际发出的 body 字节；refund_reason 与 req_from 必须为字符串。
+ * 受理成功只代表启动退款任务，最终结果以 xpay_refund_notify 或 query_order 为准。
+ */
+export async function refundWechatVirtualPayOrder(
+  input: WechatRefundOrderInput,
+): Promise<WechatRefundOrderResponse> {
+  const timeoutMs = input.timeoutMs ?? VIRTUAL_PAY_HTTP_TIMEOUT_MS
+  const body = JSON.stringify({
+    openid: input.openId,
+    order_id: input.orderId,
+    refund_order_id: input.refundOrderId,
+    left_fee: input.leftFee,
+    refund_fee: input.refundFee,
+    biz_meta: input.bizMeta,
+    refund_reason: String(input.refundReason),
+    req_from: String(input.reqFrom),
+    env: input.env,
+  })
+  const paySig = calcPaySig(VIRTUAL_PAY_REFUND_URI, body, input.appKey)
+  const url =
+    `https://api.weixin.qq.com${VIRTUAL_PAY_REFUND_URI}` +
+    `?access_token=${encodeURIComponent(input.token)}` +
+    `&pay_sig=${encodeURIComponent(paySig)}`
+  const response = await input.fetchImpl(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!response.ok) throw new Error('VPAY_REFUND_HTTP')
+  return (await response.json()) as WechatRefundOrderResponse
+}
+
+export async function settleVirtualPayRefundSucceeded(
+  prisma: PrismaService,
+  audit: AuditService,
+  input: {
+    orderId: string
+    outTradeNo: string
+    refundOrderId?: string | null
+    wxRefundId?: string | null
+    refundedAt?: Date
+    source: 'notify' | 'reconcile' | 'admin_sync' | 'precheck'
+  },
+): Promise<{ settled: boolean; alreadyRefunded: boolean }> {
+  const refundedAt = input.refundedAt ?? new Date()
+  return prisma.$transaction(async (tx) => {
+    const fresh = await tx.virtualPayOrder.findUnique({
+      where: { id: input.orderId },
+      include: { credit: true },
+    })
+    if (!fresh) return { settled: false, alreadyRefunded: false }
+    if (fresh.status === 'refunded') {
+      if (fresh.credit && fresh.credit.status !== 'refunded') {
+        await tx.memberServiceCredit.updateMany({
+          where: { sourceOrderId: fresh.id, status: { in: ['available', 'refunding'] } },
+          data: { status: 'refunded', refundedAt: fresh.refundedAt ?? refundedAt },
+        })
+      }
+      return { settled: false, alreadyRefunded: true }
+    }
+    if (fresh.status !== 'paid' && fresh.status !== 'refunding' && fresh.status !== 'refund_failed') {
+      return { settled: false, alreadyRefunded: false }
+    }
+    const updated = await tx.virtualPayOrder.updateMany({
+      where: { id: fresh.id, status: fresh.status },
+      data: {
+        status: 'refunded',
+        refundOrderId: fresh.refundOrderId ?? input.refundOrderId ?? null,
+        wxRefundId: input.wxRefundId ?? fresh.wxRefundId ?? null,
+        refundedAt: fresh.refundedAt ?? refundedAt,
+        lastDiagnosticReason: null,
+      },
+    })
+    if (updated.count !== 1) return { settled: false, alreadyRefunded: false }
+    await tx.memberServiceCredit.updateMany({
+      where: { sourceOrderId: fresh.id, status: { in: ['available', 'refunding'] } },
+      data: { status: 'refunded', refundedAt },
+    })
+    await audit.writeRequired(tx, {
+      actorId: null,
+      actorRole: 'system',
+      action: VIRTUAL_PAY_REFUND_SUCCEEDED_AUDIT_ACTION,
+      targetType: 'virtual_pay_order',
+      targetId: fresh.outTradeNo,
+      payload: {
+        source: input.source,
+        refundOrderId: fresh.refundOrderId ?? input.refundOrderId ?? null,
+        wxRefundId: input.wxRefundId ?? fresh.wxRefundId ?? null,
+      },
+    })
+    return { settled: true, alreadyRefunded: false }
+  })
+}
+
+export async function markVirtualPayRefundFailed(
+  prisma: PrismaService,
+  audit: AuditService,
+  deps: {
+    redis?: VirtualPayAlertRedis | null
+    logger?: Pick<Logger, 'warn'>
+    fetchImpl?: typeof fetch
+  },
+  input: {
+    orderId: string
+    outTradeNo: string
+    reason: string
+    source: 'initiate' | 'notify' | 'reconcile' | 'admin_sync'
+    extra?: Record<string, unknown>
+  },
+): Promise<boolean> {
+  const moved = await prisma.$transaction(async (tx) => {
+    const updated = await tx.virtualPayOrder.updateMany({
+      where: { id: input.orderId, status: { in: ['refunding', 'refund_failed'] } },
+      data: { status: 'refund_failed', lastDiagnosticReason: input.reason },
+    })
+    if (updated.count !== 1) return false
+    await audit.writeRequired(tx, {
+      actorId: null,
+      actorRole: 'system',
+      action: VIRTUAL_PAY_REFUND_FAILED_AUDIT_ACTION,
+      targetType: 'virtual_pay_order',
+      targetId: input.outTradeNo,
+      payload: {
+        source: input.source,
+        reason: input.reason,
+        ...(input.extra ?? {}),
+      },
+    })
+    return true
+  })
+  if (!moved) return false
+  await sendVirtualPayOpsAlert({
+    redis: deps.redis,
+    fetchImpl: deps.fetchImpl,
+    outTradeNo: input.outTradeNo,
+    episodeToken: input.reason,
+    type: 'virtual_pay_refund_failed',
+    severity: 'error',
+    title: `小程序虚拟支付退款失败 ${input.outTradeNo}（${input.reason}）`,
+    logger: deps.logger,
+  })
+  return true
+}

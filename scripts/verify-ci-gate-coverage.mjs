@@ -92,6 +92,8 @@ const REQUIRED_COMMANDS = [
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters',
   // 服务单沙箱模拟付成：生产必须 404、只认沙箱通道。它一旦从 CI 摘掉，生产判断被删也不会有人发现。
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-sandbox-simulate',
+  // 小程序虚拟支付二期：权益核销、失败退回、官方退款与后台鉴权，不得静默脱离 CI。
+  'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:miniapp-virtual-pay-p2',
 ]
 
 const workflowText = readFileSync(workflowPath, 'utf8')

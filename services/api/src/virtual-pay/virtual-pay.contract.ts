@@ -8,6 +8,20 @@ import { TERMINAL_CHARGE_MAX_UNIT_CENTS } from '../payment/terminal-charge.contr
 
 export const MINIAPP_VIRTUAL_PAY_ENABLED_KEY = 'charge.miniappVirtualPay.enabled'
 
+/** 一体机用小程序已购虚拟支付权益抵扣后落入 ServiceOrder 的 provider 标识。 */
+export const MINIAPP_CREDIT_PROVIDER = 'miniapp_credit'
+
+/** 微信虚拟支付官方退款有效期（核对表 5.1）：支付后 365 天内。 */
+export const VIRTUAL_PAY_REFUND_WINDOW_DAYS = 365
+export const VIRTUAL_PAY_REFUND_WINDOW_MS = VIRTUAL_PAY_REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000
+
+/** 微信 /xpay/refund_order 的 req_from（字符串）：2 = 商户后台发起。核对表 3.11、补充规则 18。 */
+export const VIRTUAL_PAY_REFUND_REQ_FROM_MERCHANT = '2' as const
+
+/** 微信 /xpay/refund_order 的 refund_reason（字符串 '0'–'5'）。核对表 3.11、补充规则 18。 */
+export const VIRTUAL_PAY_REFUND_REASONS = ['0', '1', '2', '3', '4', '5'] as const
+export type VirtualPayRefundReasonCode = (typeof VIRTUAL_PAY_REFUND_REASONS)[number]
+
 export const MINIAPP_VIRTUAL_PAY_SERVICE_KINDS = ['resume_optimize', 'mock_interview'] as const
 
 export type MiniappVirtualPayServiceKind = (typeof MINIAPP_VIRTUAL_PAY_SERVICE_KINDS)[number]

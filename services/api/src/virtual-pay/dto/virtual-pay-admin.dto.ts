@@ -27,3 +27,15 @@ export class UpdateMiniappVirtualPayGoodsDto {
   @IsBoolean()
   confirm?: boolean
 }
+
+/** 发起微信虚拟支付官方原路退款：必须显式 confirm: true。 */
+export class RefundMiniappVirtualPayOrderDto {
+  @IsOptional()
+  @IsBoolean()
+  confirm?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string
+}
