@@ -45,7 +45,9 @@
     {"root": "pages/kiosk-login", "name": "kiosk-login", "pages": ["kiosk-login"]},
     {"root": "pages/kiosk-send", "name": "kiosk-send", "pages": ["kiosk-send"]},
     {"root": "pages/daily-report", "name": "daily-report", "pages": ["daily-report"]},
-    {"root": "pages/feedback", "name": "feedback", "pages": ["feedback"]}
+    {"root": "pages/feedback", "name": "feedback", "pages": ["feedback"]},
+    {"root": "pages/invoice-center", "name": "invoice-center", "pages": ["invoice-center"]},
+    {"root": "pages/service-credits", "name": "service-credits", "pages": ["service-credits"]}
   ],
   "preloadRule": {
     "pages/home/home": {"network": "all", "packages": ["resume-diagnose", "resume-optimize", "interview-entry", "career-plan", "notifications", "assistant", "resume-voice", "documents"]},
@@ -53,7 +55,7 @@
     "pages/assistant/assistant": {"network": "all", "packages": ["resume-upload", "resume-diagnose", "resume-optimize", "career-plan", "job-fit", "interview-entry", "print-upload", "ai-records"]},
     "pages/print/print": {"network": "all", "packages": ["documents", "package-create", "orders", "daily-report", "kiosk-login", "usb-import"]},
     "pages/ai/ai": {"network": "all", "packages": ["resume-build", "resume-voice", "resume-diagnose", "resume-optimize", "documents", "job-materials", "job-fit", "interview-entry", "self-explore", "career-plan", "assistant", "ai-records"]},
-    "pages/me/me": {"network": "all", "packages": ["resumes", "documents", "orders", "ai-records", "feedback", "settings", "notifications"]},
+    "pages/me/me": {"network": "all", "packages": ["resumes", "documents", "orders", "ai-records", "feedback", "settings", "notifications", "invoice-center", "service-credits"]},
     "pages/package-create/package-create": {"network": "all", "packages": ["store-select"]},
     "pages/store-select/store-select": {"network": "all", "packages": ["package-create", "package-confirm"]},
     "pages/package-confirm/package-confirm": {"network": "all", "packages": ["legal", "package-code", "package-create", "store-select", "orders"]},
@@ -77,7 +79,7 @@
     "pages/resumes/resumes": {"network": "all", "packages": ["resume-diagnose", "resume-optimize", "resume-upload"]},
     "pages/documents/documents": {"network": "all", "packages": ["print-upload"]},
     "pages/job-materials/job-materials": {"network": "all", "packages": ["print-upload"]},
-    "pages/orders/orders": {"network": "all", "packages": ["package-code", "package-create", "print-pickup", "documents", "order-detail"]},
+    "pages/orders/orders": {"network": "all", "packages": ["package-code", "package-create", "print-pickup", "documents", "order-detail", "invoice-center"]},
     "pages/order-detail/order-detail": {"network": "all", "packages": ["orders", "documents"]},
     "pages/ai-records/ai-records": {"network": "all", "packages": ["resume-diagnose", "resume-optimize", "resume-build", "job-fit", "career-plan", "self-explore", "interview-result"]},
     "pages/settings/settings": {"network": "all", "packages": ["privacy", "help", "about", "notifications", "documents"]},

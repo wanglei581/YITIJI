@@ -17,22 +17,18 @@ const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
 const pkg = require('../../utils/package-order')
-const printParams = require('../../utils/print-params')
-const { reprintNoteText } = require('../../utils/support-contact')
+const invoiceModel = require('../../utils/invoice-model')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const {
+  ORDER_TABS,
+  STATUS_MAP,
+  resolveActionMeta,
+  buildUiItemFields,
+  dedupeOrderRows,
+  filterByTab,
+} = require('./orders-display')
 
 const PAGE_SIZE = 20
-
-// PrintTask.status (后端) → UI 展示状态映射
-const STATUS_MAP = {
-  // 任务已建、在终端排队（取件页写「已进入打印队列」）。仍归「待取件」这一栏，但单子本身写「排队中」。
-  pending:   { key: 'waiting',  label: '排队中', tone: 'wheat' },
-  claimed:   { key: 'waiting',  label: '排队中', tone: 'wheat' },
-  printing:  { key: 'printing', label: '打印中',  tone: 'teal'  },
-  completed: { key: 'done',     label: '已完成', tone: 'ok'    },
-  failed:    { key: 'done',     label: '打印失败', tone: 'danger'},
-  cancelled: { key: 'done',     label: '已取消', tone: 'neutral'},
-}
 
 // 分 → 元、到机码分组：与材料包区共用 utils/package-order 的同一份实现，
 // 不再在本页维护第二份（同一函数曾在全仓有三份拷贝，改一处漂一处）。
@@ -55,11 +51,6 @@ function resolveDisplayStatus(item) {
     return { key: 'payment', label: '待付款', tone: 'wheat' }
   }
   return STATUS_MAP[item.status] || { key: 'done', label: item.status, tone: 'neutral' }
-}
-
-// 规格摘要：与取件页、订单详情同一份实现（utils/print-params.js displaySpec），含单双面。
-function buildSpec(item) {
-  return printParams.displaySpec(item) || '—'
 }
 
 // 金额：分 → 元字符串（0 分 = 免费）
@@ -88,99 +79,24 @@ function cancelConfirmContent(item) {
   return '取消后到机码立即失效，且不能恢复。确定取消这张订单？'
 }
 
-// 出纸 / 领取的那台机器。后端 9/29 契约给打印历史行补 terminal { displayName, locationLabel }；
-// 没有时照旧回落到其他名字字段，最后是「打印服务终端」。
-function terminalLabel(item) {
-  const t = item.terminal
-  if (t && typeof t === 'object' && t.displayName) {
-    return t.locationLabel ? `${t.displayName} · ${t.locationLabel}` : t.displayName
-  }
-  return item.terminalDisplayName || item.terminalName || item.storeName || item.locationLabel || '打印服务终端'
-}
-
-// 打印失败的原因（W-100）：服务端 /me/print-orders 只在失败行给白名单码 failureCode（#1171），
-// 不给现场用的原文。这里只认这 5 个码；别的码或没这个字段，一律不写原因，不猜。
-const FAILURE_NOTES = {
-  PAPER_EMPTY:           '打印机缺纸，这次没有出纸；需要的话可重新打印',
-  PRINTER_ERROR:         '打印机故障（可能卡纸），这次没有出纸；需要的话可重新打印',
-  PRINTER_OFFLINE:       '打印机离线，这次没有出纸；需要的话可重新打印',
-  PRINT_JOB_UNCONFIRMED: '已发到打印机，但没确认出纸，不会自动重打；没拿到纸可以重新下单',
-  PARTIAL_OUTPUT:        '只打出了一部分，没有整单重打；需要的话请重新下单',
-}
-// 到机码过期：这张单没有打印，用户能做的是重新下单。
-const EXPIRED_NOTE = '到机码已过期，这张单没有打印；需要的话请重新下单'
-
-function reasonNoteOf(item, effectiveStatus) {
-  if (effectiveStatus === 'failed') {
-    const code = item.failureCode
-    return typeof code === 'string' && Object.prototype.hasOwnProperty.call(FAILURE_NOTES, code) ? FAILURE_NOTES[code] : ''
-  }
-  if (item.pickupStatus === 'expired') return EXPIRED_NOTE
-  return ''
-}
-
 // 后端 item → UI 展示对象
 function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
   const amountCents = parseAmountCents(item.amountCents)
   const effectiveStatus = item.status || item.taskStatus || ''
-  // 到机码：尚未核销的 Order-only 阶段展示；失败后服务端仍允许同码续打时也展示。
   const pendingCode = !item.status && item.pickupStatus === 'pending'
-  const pickupRaw = (pendingCode || item.reprintAllowed === true) ? (item.pickupCode || '') : ''
-  const action = ds.key === 'done' && effectiveStatus === 'completed' ? 'reprint'
-               : (pickupRaw && ds.key === 'waiting')              ? 'pickup'
-               : null
-  return {
-    id:          item.id,
-    // 列表把两套 id 空间拼在一起：cloud 段来自 Order（toView 只发 taskStatus），
-    // legacy 段来自 PrintTask（select 里带 status）。详情端点 requireOwned() 只查
-    // prisma.order，拿 PrintTask.id 去打必回 PRINT_ORDER_NOT_FOUND。
-    // 所以「订单详情」只能对 Order 行开放；这个判别位和下面到机码那行用的是同一个。
-    cloudOrder:  !item.status,
-    // 能打开「订单详情」的 Order id：Order 行就是自己的 id；PrintTask 行（手机下单、到机核销后）
-    // 服务端补了 orderId 就用它（后端 9/29 契约：字段可选，没上线前按 null 处理）。
-    detailId:    !item.status ? item.id : (item.orderId || ''),
-    orderNo:     item.orderNo || item.id,
-    store:       terminalLabel(item),
-    title:       item.fileName || '打印文件',
-    spec:        buildSpec(item),
-    price:       formatPrice(amountCents),
-    status:      ds.key,
-    statusLabel: ds.label,
-    statusTone:  ds.tone,
-    reasonNote:  reasonNoteOf(item, effectiveStatus),
-    pickup:      fmtCode(pickupRaw),
-    pickupRaw,
-    reprintNote: pickupRaw ? reprintNoteText(item) : '',
-    expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',
-    taskStatus:  effectiveStatus,
-    payStatus:   item.payStatus || '',
-    paymentSource: item.paymentSource || '',
-    paidAt:      item.paidAt || null,
-    pickupStatus: item.pickupStatus || '',
-    canCancel:   canCancelCloudOrder(item),
-    cancelling:  false,
-    // 已完成可再打一份；到机码可见时显示"查看到机码"
-    action,
-    actionLabel: action === 'pickup' ? '查看到机码'
-               // 这个按钮实际是去「我的文档」重新选文件，不是按原单原样再打一份，名字要说实话。
-               : action === 'reprint' ? '去我的文档打印'
-               : '',
-    orderId: item.id,
-    amountCents,
-  }
+  const meta = resolveActionMeta(item, ds, effectiveStatus, pendingCode)
+  return Object.assign(
+    buildUiItemFields(item, ds, amountCents, effectiveStatus, meta, formatPrice(amountCents), fmtCode(meta.pickupRaw)),
+    { canCancel: canCancelCloudOrder(item) },
+  )
 }
 
 Page({
   data: {
     statusBarHeight: 20,
     activeTab: 'all',
-    tabs: [
-      { key: 'all',      label: '全部' },
-      { key: 'waiting',  label: '待取件' },
-      { key: 'printing', label: '打印中' },
-      { key: 'done',     label: '已完成' },
-    ],
+    tabs: ORDER_TABS,
     orders: [],    // 单件打印：全量（已转换为 uiItem）
     filtered: [],  // 单件打印：当前 tab 显示
     loading: false,
@@ -318,14 +234,7 @@ Page({
         this._enforceIdentity()
         // 迟到的响应到此为止：换了人、切了后台，或本通道已被重新发起过一次。
         if (!this._accepts(token)) return
-        const combined = [...(Array.isArray(cloudItems) ? cloudItems : []), ...(Array.isArray(items) ? items : [])]
-        const seen = new Set()
-        const uiItems = combined.filter(item => {
-          const key = item.id || item.printTaskId
-          if (!key || seen.has(key)) return false
-          seen.add(key)
-          return true
-        }).map(toUiItem)
+        const uiItems = dedupeOrderRows(cloudItems, items, toUiItem)
         const orders  = append ? [...this.data.orders, ...uiItems] : uiItems
         const nextCursor = items.nextCursor || null
         this.setData({
@@ -400,11 +309,7 @@ Page({
   },
 
   _filterTab(key, orders) {
-    const all = orders || this.data.orders
-    const filtered = key === 'all' ? all : all.filter(o => o.status === key)
-    const pkgAll = this.data.pkgRows
-    const pkgFiltered = key === 'all' ? pkgAll : pkgAll.filter(o => o.statusKey === key)
-    this.setData({ activeTab: key, filtered, pkgFiltered })
+    this.setData(filterByTab(orders || this.data.orders, this.data.pkgRows, key))
   },
 
   back() {
@@ -551,5 +456,14 @@ Page({
 
   toPrint() {
     wx.navigateTo({ url: '/pages/documents/documents' })
+  },
+
+  toInvoice() {
+    wx.navigateTo({ url: '/pages/invoice-center/invoice-center' })
+  },
+
+  toOrderInvoice(e) {
+    const orderId = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id
+    wx.navigateTo({ url: invoiceModel.buildInvoiceCenterUrl('print', orderId || '') })
   },
 })

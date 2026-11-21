@@ -1,5 +1,22 @@
 # 当前开发进度
 
+## 2026-11-21：微信小程序自助开票与虚拟支付返工收口 P2m-b（分支 `claude/miniapp-invoice-vpay-p2m`，未推送，未上线）
+
+- 来由：依据 Codex 独立收货复现的 6 项运行时竞态与状态缺陷（D1–D8），在 `d6e30ce23` 之上追加极小返工收口提交；零后端改动，未触碰禁止目录与停放页，全部改动代码/配置/测试文件 `< 500` 行（本进度文档为历史累计文档例外）。
+- ① 开票换号提交中止（D1）：`pages/invoice-center/invoice-center.js` 将 `_enforceIdentity()` 改为返回 `{ usable, changed }`，`submitForm()`（及开表单/查详情/翻页/重提入口）在身份或代次变更时立即中止，杜绝切号后读取已清空 `selectedOrder.orderKind` 抛空指针。
+- ② 虚拟支付可信基线防误判（D2 / D5）：`pages/service-credits/service-credits.js` 与 `service-credits.wxml` 在首次 `GET /member/service-credits` 成功前禁用购买按钮并在 `tapBuy` 硬拦截；`utils/virtual-pay-model.js` 新增 `createCreditsBaseline` 与 `hasConfirmedNewCredit`，基线未就绪或服务端只返回购买前旧权益时一律诚实停留在 `pending_confirm`，绝不误判为 `confirmed`。
+- ③ 普通列表与购买确认共享版本守卫（D3 / D4）：`service-credits.js` 引入单调递增 `_creditsSeq` / `_appliedCreditsSeq`，购买发起即推进版本，迟到的普通列表响应一律丢弃不再覆盖已确认结果。
+- ④ 会话代次绑定与即时清理（D4 / D6 / D7 / D8，保留同账号收银台 C4）：`utils/auth.js`（277 行）新增轻量 `subscribeSessionChange` / `onSessionChange` 并在显式登录/换号与登出时同步通知；开票与服务次数两页组合 `memberIdentityKey + sessionGeneration` 为 `_sessionKey()`，并在 `onLoad` 订阅、`onUnload` 退订——同会员登出重登立即作废旧列表并释放 `buyingKind`，轮询期间切号或登出无需等待 `onShow` 即刻清零活动定时器；同账号调起微信收银台触发 `onHide` 继续保留确认链。
+- ⑤ 开票跨页预选与严格类型匹配（D5 / D6 / D2 / D3）：`invoice-center.js` 在 `append === true` 分页合并后继续尝试 `_applyPreselect()`（手动选单或关闭表单后清除待预选目标），并删除仅按 `orderId` 回退匹配，严格要求 `orderKind + orderId` 精确匹配。
+- ⑥ 持续回归与验证：新增 `apps/miniapp/scripts/tests/p2m-concurrency-regressions.test.mjs`（392 行，覆盖 D1–D8 与 C4，真跑页面源码与真实 `utils/auth.js`）接入 `verify:page-lifecycle`；跑通 `verify:static` 17/17、M6/M7a/M7b 反向变异红绿复核与 SHA-256 还原、`eslint --quiet`、全仓 `pnpm lint`、`verify:compliance-copy`、`verify:ci-gate-coverage`、`verify:repository-integrity` 及提交后 `generate-project-graph.mjs --check`。未推送，未上线。
+
+## 2026-11-21：微信小程序自助开票与虚拟支付前端接线 P2m（分支 `claude/miniapp-invoice-vpay-p2m`，未推送，未上线）
+
+- 来由：补全线第三十任 P2m，从 `origin/main@15f0b9e6c` 切出；零后端改动，未触碰 `services/api/`、`apps/kiosk/`、`apps/admin/`、`apps/partner/`、`docs/design/`、`apps/miniapp/utils/api.js` 与停放页，全部新增与改动代码/测试文件严格 `< 500` 行。
+- 自助开票中心（一页一分包 `pages/invoice-center/invoice-center`，新增独立模块 `utils/api-invoice.js` 与 `utils/invoice-model.js`）：对接 `GET /api/v1/me/invoice-orders`（游标分页 + 空态诚实提示）、`POST /api/v1/me/invoice-requests`（按服务端 `invoice-title.ts` / `credit-code.ts` 同源 18 位 GB 32100-2015 统一社会信用代码与邮箱校验，个人抬头不传 `taxId`）、`GET /api/v1/me/invoice-requests/:id`（仅消费服务端打码 `taxIdMasked`/`emailMasked`，退回可重新提交）。表单仅驻留内存，提交成功、取消、切后台（`onHide`）、离页（`onUnload`）与切账号时立即清空，零 `wx.setStorageSync` 持久化。`pages/me/me` 与 `pages/orders/orders`（先抽出 `pages/orders/orders-display.js` 保 `orders.js` `< 500` 行）补「自助开票 / 开发票」入口（支持 `orderKind` + `orderId` 预选），`app.json` 登记分包与 `preloadRule`。
+- 一体机服务次数与虚拟支付（一页一分包 `pages/service-credits/service-credits`，新增独立模块 `utils/api-virtual-pay.js` 与 `utils/virtual-pay-model.js`）：进页拉 `GET /api/v1/member/service-credits` 汇总展示 `AI 简历优化`、`AI 模拟面试` 可用次数与记录；仅提供两项单次购买（零硬编码价格/道具 ID/AppKey、零外部付款引导），每次点击前重新 `wx.login` 换码调 `POST /api/v1/member/virtual-pay/orders`，原样逐字节透传 `signData` 字符串并以回调方式调 `wx.requestVirtualPayment`（`mode: 'short_series_goods'`）；`success` 后不伪造本地次数，提示「支付结果确认中」并轮询服务端最多 5 次×2s 核对；开关关闭（`VPAY_DISABLED` / `VPAY_GOODS_UNCONFIGURED` / `VPAY_CONFIG_MISSING` / `VPAY_SANDBOX_FORBIDDEN`）或基础库不支持时均诚实降级；切换账号/退出立即作废在途请求与轮询。`pages/me/me` 增加「一体机服务次数」入口（避开停放页 `membership` 命名）。
+- 错误码、契约与门禁：`utils/user-error.js` 补齐开票与虚拟支付错误码，`scripts/api-contract.json` 由 `contract:update` 同步至 148 个端点（0 缺口）；新增 `invoice-center.test.mjs`（6 条）与 `virtual-pay-credits.test.mjs`（7 条）挂入 `verify:page-lifecycle`。已跑通小程序 `verify:static` 17/17、3 条反向变异 M1–M3 红绿复核与 SHA-256 还原、改动文件 `eslint --quiet`、全仓 `pnpm lint`（0 error）、`verify:compliance-copy`、`verify:ci-gate-coverage`、`verify:repository-integrity` 及 `generate-project-graph.mjs --check`。未推送，未上线。
+
 ## 2026-11-21：一体机打印未确认态补齐收费退回提示条（P2e-6，分支 `claude/kiosk-unconfirmed-pay-p2e6`，未推送，未上线）
 
 - 来由：补全线极小任务包 P2e-6，对照触屏稿 `docs/design/kiosk-touch-2026-10/pay-1113.js:28-30,455-459` 补齐 `/print/done` 未确认态（`PRINT_JOB_UNCONFIRMED`）在收费实付单下的「核查之后才退」提示条。基线 `origin/main@15f0b9e6c`，未推送、未上线。
