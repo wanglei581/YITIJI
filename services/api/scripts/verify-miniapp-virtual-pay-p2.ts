@@ -45,6 +45,7 @@ import { WechatMiniappMessageService } from '../src/virtual-pay/wechat-miniapp-m
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { assertVirtualPayRedeemFlow } from './support/miniapp-virtual-pay-p2-redeem'
 import { assertVirtualPayRefundAndAdmin } from './support/miniapp-virtual-pay-p2-refund'
+import { assertMiniappCreditInterviewReportBridge } from './support/miniapp-virtual-pay-interview-report-bridge'
 
 const API_ROOT = resolve(__dirname, '..')
 
@@ -253,6 +254,13 @@ async function main(): Promise<void> {
       baseUrl,
       adminHeaders: { Authorization: `Bearer ${adminToken}` },
       partnerHeaders: { Authorization: `Bearer ${partnerToken}` },
+    })
+    await assertMiniappCreditInterviewReportBridge({
+      prisma,
+      audit,
+      registry,
+      serviceOrders,
+      rounds: 5,
     })
 
     console.log(`=== ALL PASS verify-miniapp-virtual-pay-p2 (SQLite, port=${port}, redis=${realRedis ? 'real' : 'memory'}) ===`)

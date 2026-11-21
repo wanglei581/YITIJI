@@ -208,7 +208,7 @@ export async function executeServiceOrderRefund(
   if (!existing) return 'skipped'
   if (existing.status === 'refunded') return 'refunded'
   if (existing.provider === MINIAPP_CREDIT_PROVIDER) {
-    return restoreMiniappCreditForServiceOrder(db, audit, existing, reason)
+    return restoreMiniappCreditForServiceOrder(db, audit, existing, reason, opts)
   }
   const manual = opts?.manual === true
   const cap = manual ? SERVICE_REFUND_RETRY_CAP + 1 : SERVICE_REFUND_RETRY_CAP

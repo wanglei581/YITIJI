@@ -12,36 +12,70 @@ export interface MiniappCreditServiceOrderRow {
   serviceKey: string
   amountCents: number
   settledAt?: Date | null
+  reportState?: string | null
+}
+
+export interface RestoreMiniappCreditOptions {
+  /**
+   * 模拟面试已开场（settledAt 非空）后报告失败/过期/离场退回：
+   * 仅当 consumed 单的 reportState 精确匹配时才原子退回权益，与 commitPaidReportAtomic 互斥。
+   */
+  requireConsumedReportState?: 'retry' | null
 }
 
 /**
  * 失败/离场/关单/改免费时，把已关联到该一体机服务单的小程序权益原子退回 available。
- * 绝不调微信 Native 退款接口；重复调用幂等；已完成服务（settledAt !== null）严禁退回。
+ * 绝不调微信 Native 退款接口；重复调用幂等；
+ * 常规路径要求 settledAt === null；模拟面试报告失败路径（显式传入 requireConsumedReportState）
+ * 仅允许 serviceKey='mock_interview' 且 status='consumed' 且 reportState 精确匹配的单原子退回，
+ * reportState='done' 或已完成非面试单严禁退回。
  */
 export async function restoreMiniappCreditForServiceOrder(
   db: PrismaService,
   audit: AuditService,
   order: MiniappCreditServiceOrderRow,
   reason: string,
+  opts?: RestoreMiniappCreditOptions,
 ): Promise<'refunded' | 'skipped'> {
+  const reportMode = opts?.requireConsumedReportState !== undefined
   if (order.provider !== MINIAPP_CREDIT_PROVIDER) return 'skipped'
   if (order.status === 'refunded') return 'refunded'
-  if (order.settledAt) return 'skipped'
-  if (order.status !== 'paid' && order.status !== 'consumed') return 'skipped'
+  if (order.status === 'consumed' && order.reportState === 'done') return 'skipped'
+  if (reportMode) {
+    if (order.serviceKey !== 'mock_interview' || order.status !== 'consumed' || !order.settledAt) {
+      return 'skipped'
+    }
+    if (order.reportState !== opts.requireConsumedReportState) return 'skipped'
+  } else {
+    if (order.settledAt) return 'skipped'
+    if (order.status !== 'paid' && order.status !== 'consumed') return 'skipped'
+  }
 
   const now = new Date()
-  const outcome = await db.$transaction(async (tx) => {
-    const updatedOrder = await tx.serviceOrder.updateMany({
-      where: {
+  const orderWhere = reportMode
+    ? {
+        id: order.id,
+        provider: MINIAPP_CREDIT_PROVIDER,
+        serviceKey: 'mock_interview',
+        status: 'consumed',
+        settledAt: { not: null },
+        reportState: opts.requireConsumedReportState,
+      }
+    : {
         id: order.id,
         provider: MINIAPP_CREDIT_PROVIDER,
         status: { in: ['paid', 'consumed'] },
         settledAt: null,
-      },
+        OR: [{ reportState: null }, { reportState: { not: 'done' } }],
+      }
+  const outcome = await db.$transaction(async (tx) => {
+    const updatedOrder = await tx.serviceOrder.updateMany({
+      where: orderWhere,
       data: {
         status: 'refunded',
         refundReason: reason,
         refundedAt: now,
+        retryUntil: null,
         nextRefundAt: null,
         refundLeaseUntil: null,
         refundChannelState: null,

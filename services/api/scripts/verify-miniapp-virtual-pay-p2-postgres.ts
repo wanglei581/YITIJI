@@ -42,6 +42,7 @@ import {
   assertSameSessionDoubleCreditRedeem,
 } from './support/miniapp-virtual-pay-p2-redeem'
 import { assertRefundVsRedeemRace } from './support/miniapp-virtual-pay-p2-refund'
+import { assertMiniappCreditInterviewReportBridge } from './support/miniapp-virtual-pay-interview-report-bridge'
 
 const API_ROOT = resolve(__dirname, '..')
 
@@ -197,6 +198,13 @@ async function main(): Promise<void> {
       prisma,
       refunds: refundService,
       redeem: redeemService,
+    })
+    await assertMiniappCreditInterviewReportBridge({
+      prisma,
+      audit,
+      registry,
+      serviceOrders,
+      rounds: 10,
     })
 
     console.log(`=== ALL PASS verify-miniapp-virtual-pay-p2:postgres (port=${port}, redis=${realRedis ? 'real' : 'memory'}) ===`)
