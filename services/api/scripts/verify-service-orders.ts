@@ -1008,6 +1008,9 @@ async function main(): Promise<void> {
       where: { consumedRef: uniqRef, status: { in: ['pending', 'paid', 'consumed'] } },
     }), 1, '唯一索引拒绝后只剩一张')
     pass('a 同一任务的第二张没结案单写不进去')
+    const { runServiceOrderP2b9dAbnormalCases } = await import('./support/service-order-p2b9d-abnormal-cases')
+    await runServiceOrderP2b9dAbnormalCases(prisma, randomUUID().slice(0, 8))
+    pass('b 服务单发起/查询/通知三路 ABNORMAL 不当失败，写清中间账户并告警')
   })
   pass('服务单收钱、占用、退款和后台查看')
 }

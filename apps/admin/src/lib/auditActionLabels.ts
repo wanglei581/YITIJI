@@ -375,6 +375,7 @@ const ACTION_LABELS: Record<string, string> = {
   'service_order.channel_close_failed': '服务单关码失败，稍后重试',
   'service_order.layout_only': '排版失败，这一单不退款',
   'service_order.paid': '服务单已付款',
+  'service_order.refund_abnormal': '服务单退款渠道异常，钱停在渠道中间账户',
   'service_order.refund_retry': '再试一次服务单退款',
   'service_order.refunded': '服务单已原路退款',
   'service_order.admin_refund': '管理员发起服务单原路退款',
