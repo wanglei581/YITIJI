@@ -14,7 +14,13 @@ import { useScanDeviceCapability } from './useScanDeviceCapability'
 import { recoverDeviceSession } from './scanDeviceRecovery'
 import { beginDeviceScan, useScanDeviceStartState } from './useScanDeviceStart'
 import { SCAN_PAY_BAR_DESC, scanPayBarTitle, scanPayButtonLabel } from './scanPayModel'
-import { armScanDeviceAutoStartAfterPay, useScanDevicePayResume, useScanPayState } from './useScanPayGate'
+import {
+  armScanDeviceAutoStartAfterPay,
+  clearScanDeviceAutoStartAfterPay,
+  forgetEndedScanTrip,
+  useScanDevicePayResume,
+  useScanPayState,
+} from './useScanPayGate'
 import './styles/scan-device-qx.css'
 import './styles/scan-device-flow.css'
 import './styles/scan-pay.css'
@@ -51,7 +57,7 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
   const chargeCents = !recovery && !pay.loading && pay.needsPayment && pay.chargeCents !== null && pay.chargeCents > 0
     ? pay.chargeCents
     : null
-  const goPay = useCallback((): void => {
+  const openPayScreen = useCallback((armAutoStart: boolean): void => {
     if (!material) return
     patchScanWorkbenchSession({
       stage: 'device-settings',
@@ -61,9 +67,21 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
       live: undefined,
       result: undefined,
     })
-    armScanDeviceAutoStartAfterPay()
+    if (armAutoStart) armScanDeviceAutoStartAfterPay()
+    else clearScanDeviceAutoStartAfterPay()
     navigate(payServicePath('scan', { next: 'device', back: 'how' }))
   }, [choice, material, navigate])
+
+  /** 用户亲手点击「付 X.XX 元开始扫描」：先清掉已终结旧单，再武装一次性自动续接并进付款屏。 */
+  const goPay = useCallback((): void => {
+    forgetEndedScanTrip(pay.trip, pay.order)
+    openPayScreen(true)
+  }, [openPayScreen, pay.order, pay.trip])
+
+  /** 服务端 402 / SERVICE_* 拒单回跳：绝不重新武装自动启动，防止与付款屏形成死循环。 */
+  const returnToPayOnReject = useCallback((): void => {
+    openPayScreen(false)
+  }, [openPayScreen])
 
   const resumeAfterPay = useCallback((): void => {
     if (!material) return
@@ -73,9 +91,9 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
       memberToken: getToken(),
       endUserId,
       onGoStage: onGoStage ?? (() => undefined),
-      onNeedPay: goPay,
+      onNeedPay: returnToPayOnReject,
     })
-  }, [choice, endUserId, getToken, goPay, material, onGoStage])
+  }, [choice, endUserId, getToken, material, onGoStage, returnToPayOnReject])
 
   useScanDevicePayResume({
     enabled: Boolean(material) && !recovery && !cap.loading && cap.allowed
@@ -140,7 +158,7 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
               memberToken: getToken(),
               endUserId,
               onGoStage: onGoStage ?? (() => undefined),
-              onNeedPay: goPay,
+              onNeedPay: returnToPayOnReject,
             })
           },
         },

@@ -42,6 +42,8 @@ const SETTLE_POLL_MAX = 24
  * 正常进入放纸设置页时恒为 null，绝不会在未点击开始时自动建会话。
  */
 let deviceAutoStartGeneration: number | null = null
+/** 同一个服务单号至多自动续接一次（且被 402/SERVICE_* 拒过即封禁），防止付款屏 ok ↔ 设置页 402 循环。 */
+const deviceAutoStartBlockedOrders = new Set<string>()
 
 export function armScanDeviceAutoStartAfterPay(): void {
   deviceAutoStartGeneration = scanLifecycleGeneration()
@@ -51,14 +53,23 @@ export function clearScanDeviceAutoStartAfterPay(): void {
   deviceAutoStartGeneration = null
 }
 
+/** 402 / SERVICE_* 拒单回跳时清空自动启动位，并封禁该单号再次自动续接（需用户显式点击）。 */
+export function markScanDeviceAutoStartBlocked(orderId?: string | null): void {
+  deviceAutoStartGeneration = null
+  if (orderId) deviceAutoStartBlockedOrders.add(orderId)
+}
+
 export function isScanDeviceAutoStartArmed(): boolean {
   return deviceAutoStartGeneration !== null && deviceAutoStartGeneration === scanLifecycleGeneration()
 }
 
-export function consumeScanDeviceAutoStartAfterPay(): boolean {
+export function consumeScanDeviceAutoStartAfterPay(orderId?: string | null): boolean {
   const armed = isScanDeviceAutoStartArmed()
   deviceAutoStartGeneration = null
-  return armed
+  if (!armed) return false
+  if (orderId && deviceAutoStartBlockedOrders.has(orderId)) return false
+  if (orderId) deviceAutoStartBlockedOrders.add(orderId)
+  return true
 }
 
 /** 面板路径上已被 POST /scan/sessions 以 402 明确拒过的“看似已付”旧单号，防止付款屏 ok ↔ 设置页 402 死循环。 */
@@ -74,6 +85,7 @@ export function wasScanPanelOrderRejected(orderId: string | null | undefined): b
 
 function resetScanPayMemory(): void {
   clearScanDeviceAutoStartAfterPay()
+  deviceAutoStartBlockedOrders.clear()
   panelRejectedOrderIds.clear()
 }
 
@@ -313,6 +325,7 @@ export function useScanDevicePayResume(input: {
   onResume: () => void
 }): void {
   const { enabled, pay, onResume } = input
+  const orderId = pay.order?.id ?? pay.trip?.orderId ?? null
   useEffect(() => {
     if (!isScanDeviceAutoStartArmed()) return
     if (pay.loading) return
@@ -321,6 +334,6 @@ export function useScanDevicePayResume(input: {
       return
     }
     if (!enabled || !pay.readyToCreate) return
-    if (consumeScanDeviceAutoStartAfterPay()) onResume()
-  }, [enabled, onResume, pay.loading, pay.needsPayment, pay.readyToCreate])
+    if (consumeScanDeviceAutoStartAfterPay(orderId)) onResume()
+  }, [enabled, onResume, orderId, pay.loading, pay.needsPayment, pay.readyToCreate])
 }

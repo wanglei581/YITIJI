@@ -2,12 +2,12 @@ import { useSyncExternalStore } from 'react'
 import { createScanSession } from '../../services/api/scanTasks'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { getTerminalId } from '../../services/api/screensaver'
-import { errorCodeOf } from '../../services/api/userErrorMessage'
 import { postLocalScanCommand } from '../../services/scan/localScanApi'
 import { panelScanType, type ScanDeviceChoice, type ScanMaterial } from './scanMaterials'
 import {
   SCAN_ORDER_IN_USE_NOTICE,
   isScanOrderInUseError,
+  shouldForgetScanTripOnPayError,
   shouldReturnToScanPay,
 } from './scanPayModel'
 import { type ScanStage } from './scanWorkbenchModel'
@@ -23,7 +23,11 @@ import {
   readScanWorkbenchSession,
   scanLifecycleGeneration,
 } from './scanWorkbenchSession'
-import { forgetScanServiceTrip, readScanServiceHeaders } from './useScanPayGate'
+import {
+  forgetScanServiceTrip,
+  markScanDeviceAutoStartBlocked,
+  readScanServiceHeaders,
+} from './useScanPayGate'
 
 const UNRESOLVED_MS = 60_000
 const UNRESOLVED_NOTICE = '状态未知。这一次没能确认有没有建成扫描，请先返回，过一会儿再试。不要再点开始。'
@@ -130,7 +134,9 @@ async function run(input: DeviceStartRequest): Promise<void> {
       return
     }
     if (shouldReturnToScanPay(error)) {
-      if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') forgetScanServiceTrip(input.endUserId)
+      const sentOrderId = serviceHeaders?.['x-service-order-id'] ?? null
+      markScanDeviceAutoStartBlocked(sentOrderId)
+      if (shouldForgetScanTripOnPayError(error)) forgetScanServiceTrip(input.endUserId)
       publish({ phase: 'starting', notice: '', locked: false })
       input.onNeedPay?.()
       return
