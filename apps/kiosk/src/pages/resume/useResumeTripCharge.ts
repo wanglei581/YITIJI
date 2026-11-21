@@ -26,9 +26,12 @@ import {
 import { errorCodeOf } from '../../services/api/userErrorMessage'
 import {
   forgetServiceTrip,
+  onServiceTripsCleared,
   readServiceTrip,
   serviceTripOwnerFor,
+  serviceTripOwnerMatches,
   type ServiceTrip,
+  type ServiceTripOwner,
 } from '../../services/serviceTrip'
 import { formatYuan, PAY_BACK } from '../pay/payServiceModel'
 
@@ -131,6 +134,15 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
   const { user } = useAuth()
   const endUserId = user?.id ?? null
   const owner = useMemo(() => serviceTripOwnerFor(endUserId), [endUserId])
+  const endUserIdRef = useRef<string | null>(endUserId)
+  const ownerRef = useRef<ServiceTripOwner>(owner)
+  const genRef = useRef(0)
+  const mountedRef = useRef(true)
+  if (endUserIdRef.current !== endUserId) {
+    endUserIdRef.current = endUserId
+    genRef.current += 1
+  }
+  ownerRef.current = owner
   const [terminalId, setTerminalId] = useState<string | null>(() => getTerminalId())
   const [pricing, setPricing] = useState<ResumeChargePricing>(() => initialPricing(getTerminalId()))
   const [trip, setTrip] = useState<ServiceTrip | null>(() => readServiceTrip('resume_optimize', { owner }))
@@ -142,6 +154,21 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
   const nowMs = Date.now()
   const renderedNowRef = useRef<number>(nowMs)
   renderedNowRef.current = nowMs
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      genRef.current += 1
+    }
+  }, [])
+
+  useEffect(() => onServiceTripsCleared(() => {
+    genRef.current += 1
+    setTrip(null)
+    setOrder(null)
+    setCheckingOrder(false)
+  }), [])
 
   useEffect(() => subscribeTerminalIdentity(() => {
     const next = getTerminalId()
@@ -165,8 +192,23 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
     return () => { cancelled = true }
   }, [terminalId])
 
+  const isRequestCurrent = useCallback((gen: number, expectedTrip: ServiceTrip): boolean => {
+    if (!mountedRef.current || gen !== genRef.current) return false
+    const currentOwner = serviceTripOwnerFor(endUserIdRef.current)
+    ownerRef.current = currentOwner
+    if (!serviceTripOwnerMatches(expectedTrip.owner, currentOwner)) return false
+    const latest = readServiceTrip('resume_optimize', { owner: currentOwner })
+    return latest !== null
+      && latest.orderId === expectedTrip.orderId
+      && latest.kioskSessionId === expectedTrip.kioskSessionId
+  }, [])
+
   const refreshOrder = useCallback(async (): Promise<ServiceOrderView | null> => {
-    const current = readServiceTrip('resume_optimize', { owner })
+    if (!mountedRef.current) return null
+    const currentOwner = serviceTripOwnerFor(endUserIdRef.current)
+    ownerRef.current = currentOwner
+    const current = readServiceTrip('resume_optimize', { owner: currentOwner })
+    const gen = ++genRef.current
     setTrip(current)
     if (API_MODE !== 'http' || !terminalId || !current) {
       setOrder(null)
@@ -176,9 +218,11 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
     setCheckingOrder(true)
     try {
       const view = await getServiceOrder(current.orderId, current.kioskSessionId)
+      if (!isRequestCurrent(gen, current)) return null
       setOrder(view)
       return view
     } catch (error) {
+      if (!isRequestCurrent(gen, current)) return null
       if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
         forgetServiceTrip('resume_optimize', current.orderId)
         setTrip(null)
@@ -186,27 +230,30 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
       setOrder(null)
       return null
     } finally {
-      setCheckingOrder(false)
+      if (mountedRef.current && gen === genRef.current) setCheckingOrder(false)
     }
-  }, [owner, terminalId])
+  }, [isRequestCurrent, terminalId])
 
   useEffect(() => {
-    const current = readServiceTrip('resume_optimize', { owner })
+    const currentOwner = serviceTripOwnerFor(endUserId)
+    ownerRef.current = currentOwner
+    const current = readServiceTrip('resume_optimize', { owner: currentOwner })
+    const gen = ++genRef.current
     setTrip(current)
     if (!inspectOrder || API_MODE !== 'http' || !terminalId || !current) {
       setOrder(null)
       setCheckingOrder(false)
-      return
+      return () => { genRef.current += 1 }
     }
     let cancelled = false
     setCheckingOrder(true)
     void getServiceOrder(current.orderId, current.kioskSessionId)
       .then((view) => {
-        if (cancelled) return
+        if (cancelled || !isRequestCurrent(gen, current)) return
         setOrder(view)
       })
       .catch((error) => {
-        if (cancelled) return
+        if (cancelled || !isRequestCurrent(gen, current)) return
         if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
           forgetServiceTrip('resume_optimize', current.orderId)
           setTrip(null)
@@ -214,10 +261,13 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
         setOrder(null)
       })
       .finally(() => {
-        if (!cancelled) setCheckingOrder(false)
+        if (!cancelled && mountedRef.current && gen === genRef.current) setCheckingOrder(false)
       })
-    return () => { cancelled = true }
-  }, [inspectOrder, owner, terminalId])
+    return () => {
+      cancelled = true
+      genRef.current += 1
+    }
+  }, [endUserId, inspectOrder, isRequestCurrent, owner, terminalId])
 
   useEffect(() => {
     if (!order || order.status !== 'paid' || order.attemptsUsed < 1 || !order.retryUntil) return
