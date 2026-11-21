@@ -7,7 +7,7 @@ import type { OrderDetailControls } from './useOrderDetail'
 import { amountText, autoRefundStatusText, orderPaperReleased, payStatusPresentation } from './orderDisplay'
 
 export function PrintReturnHoldActions({ controls }: { controls: OrderDetailControls }) {
-  const { detail, openDetail, refresh } = controls
+  const { detail, reloadDetail, refresh } = controls
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -37,7 +37,7 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
       const result = await adminOrdersReadonlyService.resolvePrintReturnHold(detail.id, action)
       setNote(`已处理。支付状态 ${payStatusPresentation(result.payStatus).label}，退款状态 ${autoRefundStatusText(result.refundStatus)}。金额 ${amountText(result.amountCents, detail.currency)}。`)
       void refresh()
-      await openDetail(detail.id)
+      await reloadDetail(detail.id)
     } catch (err) {
       setError(userMessageOf(err, '这一步没有完成，请看上面的状态后再试'))
     } finally {
@@ -51,7 +51,7 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
       ? `渠道这时已经有了答复，已按渠道答复记账，没有用这次登记。${state}`
       : `已按商户平台核实结果登记。${state}`)
     void refresh()
-    await openDetail(detail.id)
+    await reloadDetail(detail.id)
   }
 
   const queryChannel = async () => {
@@ -62,7 +62,7 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
       const outcome = await adminOrdersReadonlyService.queryPrintReturnChannel(detail.id)
       setNote(outcome.message)
       void refresh()
-      await openDetail(detail.id)
+      await reloadDetail(detail.id)
     } catch (err) {
       setError(userMessageOf(err, '向渠道查询结果没有完成，请稍后重试'))
     } finally {
@@ -80,7 +80,7 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
       setReason('')
       setNote('已按核对后的路径发起退款。请看本页现在的支付状态。')
       void refresh()
-      await openDetail(detail.id)
+      await reloadDetail(detail.id)
     } catch (err) {
       setError(userMessageOf(err, '核对后的退款没有完成，请稍后重试'))
     } finally {

@@ -100,8 +100,7 @@ function freshHoldOrder(mode: HoldDemoMode): AdminOrderReadonlyDetail {
   }
 }
 
-/** 本页第一次读列表时才看本地开关，避免默认订单页带上待人工单。 */
-export function currentHoldDemo(): AdminOrderReadonlyDetail | null {
+function ensureHoldOrder(): AdminOrderReadonlyDetail | null {
   if (!loaded) {
     loaded = true
     const mode = holdDemoMode()
@@ -110,9 +109,15 @@ export function currentHoldDemo(): AdminOrderReadonlyDetail | null {
   return holdOrder
 }
 
+/** 本页第一次读列表时才看本地开关，避免默认订单页带上待人工单；返回独立快照，避免原地改字段跳过 React 刷新。 */
+export function currentHoldDemo(): AdminOrderReadonlyDetail | null {
+  const order = ensureHoldOrder()
+  return order ? { ...order, print: order.print ? { ...order.print } : null } : null
+}
+
 /** 不是这张演示单时返回 null，调用方继续走原来的模拟。 */
 export function resolveHoldDemo(id: string, action: HoldAction): PrintReturnResolutionResult | null {
-  const order = currentHoldDemo()
+  const order = ensureHoldOrder()
   if (!order || order.id !== id) return null
   if (order.printRefundDisposition !== 'manual' && order.printRefundDisposition !== 'auto_failed') {
     throw new ApiHttpError('REFUND_HOLD_ALREADY_RESOLVED', '这张单刚刚已经处理过，请刷新后再看。', 409)
@@ -160,7 +165,7 @@ export function resolveHoldDemo(id: string, action: HoldAction): PrintReturnReso
 
 /** 按商户平台核实结果登记的演示。不是这张演示单时返回 null。 */
 export function registerHoldDemo(id: string, input: ChannelResultRegistrationInput): ChannelResultRegistrationOutcome | null {
-  const order = currentHoldDemo()
+  const order = ensureHoldOrder()
   if (!order || order.id !== id) return null
   if (!order.channelResultRegistration || order.channelResultRegistration.refundNo !== input.refundNo) {
     throw new ApiHttpError('REGISTRATION_NOT_IN_FLIGHT', '这笔退款不在渠道处理中，不用登记。请刷新后再看。', 400)
@@ -227,7 +232,7 @@ export function registerHoldDemo(id: string, input: ChannelResultRegistrationInp
 
 /** 24 小时内在途退款「只查不处置」演示。返回字段与服务端 QueryPrintReturnChannelOutcome 逐一对齐。 */
 export function queryHoldDemo(id: string): QueryPrintReturnChannelOutcome | null {
-  const order = currentHoldDemo()
+  const order = ensureHoldOrder()
   if (!order || order.id !== id) return null
   if (!order.channelInFlight) {
     return {
