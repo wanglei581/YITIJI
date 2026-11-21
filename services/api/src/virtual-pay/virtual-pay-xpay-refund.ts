@@ -41,10 +41,28 @@ export function parseFrozenRefundReasonCode(stored: string | null | undefined): 
   return match ? (match[1] as VirtualPayRefundReasonCode) : null
 }
 
-const RETRYABLE_INDETERMINATE_REASONS = new Set([
+const RETRYABLE_INDETERMINATE_PREFIXES = [
   'refund_in_progress_268490014',
   'refund_request_timeout_unknown',
-])
+] as const
+
+export function extractRetryableRefundPrefix(reason: string | null | undefined): string | null {
+  if (!reason) return null
+  for (const prefix of RETRYABLE_INDETERMINATE_PREFIXES) {
+    if (reason === prefix || reason.startsWith(`${prefix}|`)) return prefix
+  }
+  return null
+}
+
+/** 查单/同步写入诊断时保留既有可重试前缀，绝不因查到旧态 2/3/4 抹掉合法同参重试资格。 */
+export function preserveRetryableDiagnostic(
+  existingReason: string | null | undefined,
+  nextReason: string,
+): string {
+  const prefix = extractRetryableRefundPrefix(existingReason)
+  if (!prefix) return nextReason
+  return `${prefix}|${nextReason}`
+}
 
 export function mapWechatEnvType(envType: number | undefined): 0 | 1 | null {
   if (envType === 1) return 0
@@ -74,7 +92,7 @@ export function isRetryableIndeterminateOrder(order: Omit<RefundPreconditionRow,
     order.status === 'refunding' &&
     Boolean(order.refundOrderId) &&
     !order.wxRefundId &&
-    Boolean(order.lastDiagnosticReason && RETRYABLE_INDETERMINATE_REASONS.has(order.lastDiagnosticReason)) &&
+    Boolean(extractRetryableRefundPrefix(order.lastDiagnosticReason)) &&
     order.credit?.status === 'refunding'
   )
 }

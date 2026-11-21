@@ -377,7 +377,7 @@ export async function assertVirtualPayRefundAndAdmin(deps: {
   assert.equal(res013.status, 'refund_failed')
   assert.equal(res013.credit?.status, 'refunding')
 
-  // 268490014 同单同参重试：首调返 268490014 保持 refunding 且权益锁定，随后对同一单故意传不同 reason/refundReasonCode 重试，body 必须逐字节一致！
+  // 268490014 完整链路：首调返 268490014 → 中间 syncOrder(status=4) 留锁且保留可重试前缀 → 再次 initiateRefund（故意改 reason/code）不被 409 拦且 body 逐字节一致 → 最终 syncOrder(status=8) 收敛双 refunded
   const s014 = await seedOrder(prisma)
   const rawBodies014: string[] = []
   const first014 = await refunds.initiateRefund(
@@ -397,6 +397,18 @@ export async function assertVirtualPayRefundAndAdmin(deps: {
   assert.equal(first014.credit?.status, 'refunding')
   assert.equal(first014.lastDiagnosticReason, 'refund_in_progress_268490014')
 
+  const sync014Mid = await refunds.syncOrder(s014.order.id, 'admin-1', {
+    fetchImpl: makeFakeFetch({
+      queryOrder: () => ({ errcode: 0, order: { status: 4, paid_fee: 200, left_fee: 200, env_type: 2 } }),
+    }),
+  })
+  assert.equal(sync014Mid.order.status, 'refunding', '268490014 后 syncOrder 见旧态 4 必须保持 refunding')
+  assert.equal(sync014Mid.order.credit?.status, 'refunding', '268490014 后 syncOrder 见旧态 4 严禁解锁权益')
+  assert.ok(
+    sync014Mid.order.lastDiagnosticReason?.startsWith('refund_in_progress_268490014|'),
+    `syncOrder 绝不能抹掉可重试前缀，实际 ${sync014Mid.order.lastDiagnosticReason}`,
+  )
+
   const retry014 = await refunds.initiateRefund(
     s014.order.id,
     { confirm: true, reason: '重试时改写原因', refundReasonCode: '1', operatorId: 'admin-1' },
@@ -411,10 +423,18 @@ export async function assertVirtualPayRefundAndAdmin(deps: {
     },
   )
   assert.equal(rawBodies014.length, 2)
-  assert.equal(rawBodies014[0], rawBodies014[1], '同一单 268490014 重试必须逐字节复发完全相同的请求体（冻结 refund_order_id 与 refund_reason）')
+  assert.equal(rawBodies014[0], rawBodies014[1], '同一单 268490014 经 syncOrder 后重试仍必须逐字节复发完全相同的请求体')
   assert.equal(retry014.status, 'refunding')
   assert.equal(retry014.wxRefundId, 'wxr_retry_014')
   assert.equal(retry014.credit?.status, 'refunding')
+
+  const final014 = await refunds.syncOrder(s014.order.id, 'admin-1', {
+    fetchImpl: makeFakeFetch({
+      queryOrder: () => ({ errcode: 0, order: { status: 8, paid_fee: 200, left_fee: 0, env_type: 2, wx_refund_id: 'wxr_retry_014' } }),
+    }),
+  })
+  assert.equal(final014.order.status, 'refunded')
+  assert.equal(final014.order.credit?.status, 'refunded')
 
   // 网络超时后：保持 refunding 且权益持续锁定 → 同步查到旧支付态 4 严禁解锁权益 → 核销被拒 → 晚到 xpay_refund_notify 成功正常收敛为 refunded + 权益 refunded
   const sTimeout = await seedOrder(prisma, { endUserId: member.id, openId: member.wxOpenId, priceCents: 200 })

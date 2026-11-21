@@ -9,6 +9,7 @@ import { VIRTUAL_PAY_DIAGNOSTIC_ACTION } from './virtual-pay-order.service'
 import { notifyWechatProvideGoods, queryWechatVirtualPayOrder } from './virtual-pay-xpay-client'
 import {
   markVirtualPayRefundFailed,
+  preserveRetryableDiagnostic,
   settleVirtualPayRefundSucceeded,
 } from './virtual-pay-xpay-refund'
 import {
@@ -56,15 +57,20 @@ function mapEnvType(envType: number | undefined): 0 | 1 | null {
 async function diagnoseOnce(
   prisma: PrismaService,
   audit: AuditService,
-  order: Pick<RefundingOrderRow, 'id' | 'outTradeNo'>,
+  order: Pick<RefundingOrderRow, 'id' | 'outTradeNo' | 'lastDiagnosticReason'>,
   reason: string,
 ): Promise<void> {
+  const current = await prisma.virtualPayOrder.findUnique({
+    where: { id: order.id },
+    select: { lastDiagnosticReason: true },
+  })
+  const currentReason = current?.lastDiagnosticReason ?? null
+  if (currentReason === 'refund_retry_inflight') return
+  const nextReason = preserveRetryableDiagnostic(currentReason, reason)
+  if (currentReason === nextReason) return
   const claimed = await prisma.virtualPayOrder.updateMany({
-    where: {
-      id: order.id,
-      OR: [{ lastDiagnosticReason: null }, { lastDiagnosticReason: { not: reason } }],
-    },
-    data: { lastDiagnosticReason: reason },
+    where: { id: order.id, lastDiagnosticReason: currentReason },
+    data: { lastDiagnosticReason: nextReason },
   })
   if (claimed.count !== 1) return
   await audit.write({
@@ -73,7 +79,7 @@ async function diagnoseOnce(
     action: VIRTUAL_PAY_DIAGNOSTIC_ACTION,
     targetType: 'virtual_pay_order',
     targetId: order.outTradeNo,
-    payload: { reason },
+    payload: { reason: nextReason },
   })
 }
 

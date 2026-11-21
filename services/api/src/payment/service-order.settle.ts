@@ -36,7 +36,7 @@ export async function markServiceOrderNotMade(
   event: ServiceTripEvent,
 ): Promise<void> {
   const row = await deps.prisma.serviceOrder.findUnique({ where: { id: orderId } })
-  if (!row || !isServiceOrderKey(row.serviceKey) || row.status !== 'consumed') return
+  if (!row || !isServiceOrderKey(row.serviceKey) || row.status !== 'consumed' || row.settledAt) return
   const outcome = classifyServiceOutcome(row.serviceKey, event)
   if (outcome === 'layout_only') return
   if (outcome === 'made') {
@@ -49,7 +49,7 @@ export async function markServiceOrderNotMade(
   })
   if (!session?.endedAt && row.attemptsUsed < 2) {
     const updated = await deps.prisma.serviceOrder.updateMany({
-      where: { id: row.id, status: 'consumed', attemptsUsed: row.attemptsUsed },
+      where: { id: row.id, status: 'consumed', attemptsUsed: row.attemptsUsed, settledAt: null },
       data: {
         status: 'paid',
         failureReason: failureReasonFor(event),
@@ -59,6 +59,11 @@ export async function markServiceOrderNotMade(
       },
     })
     if (updated.count === 1) return
+    const afterCas = await deps.prisma.serviceOrder.findUnique({
+      where: { id: row.id },
+      select: { settledAt: true },
+    })
+    if (afterCas?.settledAt) return
   }
   await executeServiceOrderRefund(
     deps.prisma, deps.registry, deps.audit, deps.redis, row.id, failureReasonFor(event),
@@ -107,6 +112,7 @@ export async function claimServiceConsume(
         kioskSessionId,
         serviceKey,
         status: 'paid',
+        settledAt: null,
         attemptsUsed: { lt: 2 },
         OR: [{ attemptsUsed: 0 }, { retryUntil: { gt: now } }],
       },

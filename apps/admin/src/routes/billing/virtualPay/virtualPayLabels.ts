@@ -101,6 +101,10 @@ const DIAGNOSTIC_LABELS: Record<string, string> = {
 export function vpayDiagnosticLabel(reason: string | null | undefined): string {
   if (!reason) return '—'
   if (DIAGNOSTIC_LABELS[reason]) return DIAGNOSTIC_LABELS[reason]
+  if (reason.includes('|')) {
+    const primary = reason.split('|')[0]
+    if (primary && DIAGNOSTIC_LABELS[primary]) return DIAGNOSTIC_LABELS[primary]
+  }
   if (reason.startsWith('refund_notify_failed_')) return '微信退款结果通知回报失败，请同步查单核实'
   if (reason.startsWith('refund_query_failed_status_')) return '微信查单回报退款失败，请核对后决定是否重发'
   if (reason.startsWith('refund_query_still_paid_')) return '微信查单仍显示已支付，退款结果尚未最终确认，权益保持锁定'

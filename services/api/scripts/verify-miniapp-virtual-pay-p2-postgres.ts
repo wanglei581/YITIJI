@@ -37,6 +37,7 @@ import { VirtualPayRefundService } from '../src/virtual-pay/virtual-pay-refund.s
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import {
   assertConcurrentCreditRedeem20,
+  assertFinishVsLateFailRace,
   assertFinishVsRestoreRace,
   assertSameSessionDoubleCreditRedeem,
 } from './support/miniapp-virtual-pay-p2-redeem'
@@ -190,6 +191,7 @@ async function main(): Promise<void> {
     await assertConcurrentCreditRedeem20(pgCtx)
     await assertSameSessionDoubleCreditRedeem(pgCtx)
     await assertFinishVsRestoreRace({ prisma, audit })
+    await assertFinishVsLateFailRace({ prisma, audit, registry })
 
     await assertRefundVsRedeemRace({
       prisma,

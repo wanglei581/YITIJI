@@ -331,7 +331,7 @@ export async function assertVirtualPayRedeemFlow(ctx: RedeemVerifyContext): Prom
   assert.equal((await prisma.serviceOrder.findUniqueOrThrow({ where: { id: orderId4 } })).status, 'refunded')
   assert.equal((await prisma.memberServiceCredit.findUniqueOrThrow({ where: { id: seeded.creditId } })).status, 'available')
 
-  // 10. 已完成服务（settledAt !== null）严禁被 executeServiceOrderRefund 或迟到 markServiceOrderNotMade 退回权益
+  // 10. 首趟真实成功（attemptsUsed=1, settledAt !== null）严禁被 executeServiceOrderRefund 或迟到 markServiceOrderNotMade 重开或免费二次消费
   await prisma.terminal.update({ where: { id: charging.terminalId }, data: { userChargeMode: 'user_pays' } })
   const ksSettled = `ksess-settled-${randomBytes(4).toString('hex')}`
   await prisma.kioskSession.create({
@@ -344,31 +344,41 @@ export async function assertVirtualPayRedeemFlow(ctx: RedeemVerifyContext): Prom
   )
   assert.equal(redeemed5.status, 200)
   const orderId5 = String((redeemed5.json.data as { id: string }).id)
-  const holdSettled = await serviceOrders.beginTrip(
-    {
-      'x-terminal-id': chgTermHeaders['x-terminal-id']!,
-      'x-terminal-session-token': chgTermHeaders['x-terminal-session-token']!,
-      'x-kiosk-session-id': ksSettled,
-      'x-service-order-id': orderId5,
-    },
-    'resume_optimize',
-  )
+  const settledTripHeaders: Record<string, string> = {
+    'x-terminal-id': chgTermHeaders['x-terminal-id']!,
+    'x-terminal-session-token': chgTermHeaders['x-terminal-session-token']!,
+    'x-kiosk-session-id': ksSettled,
+    'x-service-order-id': orderId5,
+  }
+  const holdSettled = await serviceOrders.beginTrip(settledTripHeaders, 'resume_optimize')
   await holdSettled.consume('resume-task-settled-ok')
-  await finishServiceOrder(prisma, orderId5)
+  await holdSettled.noteMade()
   const settledOrderBefore = await prisma.serviceOrder.findUniqueOrThrow({ where: { id: orderId5 } })
+  assert.equal(settledOrderBefore.status, 'consumed')
+  assert.equal(settledOrderBefore.attemptsUsed, 1)
   assert.ok(settledOrderBefore.settledAt)
   // 直接调 executeServiceOrderRefund → skipped，权益保持 consumed
   const refundSettled = await executeServiceOrderRefund(prisma, registry, audit, null, orderId5, 'late_direct_refund')
   assert.equal(refundSettled, 'skipped', '已完成单（settledAt !== null）绝不能被退回权益')
-  // 经真实 markServiceOrderNotMade 注入迟到失败（即使把 attemptsUsed 推到 2）→ 绝不退回权益
-  await prisma.serviceOrder.update({ where: { id: orderId5 }, data: { attemptsUsed: 2 } })
+  // 真实 attemptsUsed=1 链路下注入迟到失败 markServiceOrderNotMade → 绝不可翻回 paid 重开重试窗口！
   await markServiceOrderNotMade({ prisma, registry, audit, redis: null }, orderId5, 'optimize_failed')
   const settledOrderAfter = await prisma.serviceOrder.findUniqueOrThrow({ where: { id: orderId5 } })
-  assert.equal(settledOrderAfter.status, 'consumed')
+  assert.equal(settledOrderAfter.status, 'consumed', '首趟成功后迟到失败绝不可重开为 paid')
+  assert.equal(settledOrderAfter.attemptsUsed, 1)
+  assert.equal(settledOrderAfter.retryUntil, null)
   assert.ok(settledOrderAfter.settledAt)
   assert.equal((await prisma.memberServiceCredit.findUniqueOrThrow({ where: { id: seeded.creditId } })).status, 'consumed')
+  // 试图拿这张已完成单再次 beginTrip → consume → 必被拒（409/402，无法免费再消费第二次）
+  await assert.rejects(
+    async () => {
+      const holdAgain = await serviceOrders.beginTrip(settledTripHeaders, 'resume_optimize')
+      await holdAgain.consume('resume-task-second-attempt')
+    },
+    (err: { getStatus?: () => number }) => err.getStatus?.() === 409 || err.getStatus?.() === 402,
+    '已完成单绝不可免费再次消费第二次',
+  )
 
-  console.log('PASS P2 核销全链（鉴权/免费机409/过期会话400/原子核销/beginTrip/失败2次退回再核销/关单恢复/离场退回/改免费退回/已完成单禁退）')
+  console.log('PASS P2 核销全链（鉴权/免费机409/过期会话400/原子核销/beginTrip/失败2次退回再核销/关单恢复/离场退回/改免费退回/首趟成功禁重开与禁退）')
 }
 
 /**
@@ -557,4 +567,82 @@ export async function assertFinishVsRestoreRace(deps: {
     )
   }
   console.log('PASS PostgreSQL 10 轮 finishServiceOrder vs 退回权益并发：严格互斥')
+}
+
+/**
+ * PostgreSQL 首趟（attemptsUsed=1）finishServiceOrder vs markServiceOrderNotMade('optimize_failed') 真实并发互斥：
+ * 要么成功结案（consumed + settledAt 非空 + retryUntil 空），要么进入重试（paid + settledAt 空 + retryUntil 非空），
+ * 绝不允许出现「settledAt 非空却被重开为 paid」或「既结案又可免费二次消费」的撕裂态。
+ */
+export async function assertFinishVsLateFailRace(deps: {
+  prisma: PrismaService
+  audit: AuditService
+  registry: PaymentProviderRegistry
+}): Promise<void> {
+  const { prisma, audit, registry } = deps
+  const term = await seedTerminalAndSession(prisma, {
+    id: `term-pg-lf-${randomBytes(4).toString('hex')}`,
+    orgType: 'school',
+    userChargeMode: 'user_pays',
+    resumeCents: 100,
+    interviewCents: 100,
+  })
+  for (let round = 0; round < 10; round += 1) {
+    const member = await prisma.endUser.create({
+      data: {
+        phoneHash: `p2-pg-lf-${round}-${randomBytes(4).toString('hex')}`,
+        phoneEnc: 'enc-lf',
+        wxOpenId: `wx-lf-${round}-${randomBytes(4).toString('hex')}`,
+        status: 'active',
+        enabled: true,
+      },
+    })
+    const seeded = await seedPaidCredit(prisma, member.id, 'resume_optimize', `lf${round}`)
+    const order = await prisma.serviceOrder.create({
+      data: {
+        id: `vpcord_lf_${randomBytes(8).toString('hex')}`,
+        terminalId: term.terminalId,
+        kioskSessionId: term.kioskSessionId,
+        endUserId: member.id,
+        serviceKey: 'resume_optimize',
+        provider: MINIAPP_CREDIT_PROVIDER,
+        providerOrderNo: `vpclf${randomBytes(8).toString('hex')}`,
+        amountCents: 0,
+        status: 'consumed',
+        paidAt: new Date(),
+        consumedAt: new Date(),
+        consumedRef: `ref-lf-${round}`,
+        attemptsUsed: 1,
+        expiresAt: new Date(Date.now() + 300_000),
+      },
+    })
+    await prisma.memberServiceCredit.update({
+      where: { id: seeded.creditId },
+      data: { status: 'consumed', consumedAt: new Date(), consumedServiceOrderId: order.id },
+    })
+
+    await Promise.all([
+      finishServiceOrder(prisma, order.id),
+      markServiceOrderNotMade({ prisma, registry, audit, redis: null }, order.id, 'optimize_failed'),
+    ])
+
+    const finalOrder = await prisma.serviceOrder.findUniqueOrThrow({ where: { id: order.id } })
+    const finalCredit = await prisma.memberServiceCredit.findUniqueOrThrow({ where: { id: seeded.creditId } })
+    const settledWon =
+      finalOrder.status === 'consumed' &&
+      finalOrder.settledAt !== null &&
+      finalOrder.retryUntil === null &&
+      finalCredit.status === 'consumed'
+    const retryWon =
+      finalOrder.status === 'paid' &&
+      finalOrder.settledAt === null &&
+      finalOrder.retryUntil !== null &&
+      finalCredit.status === 'consumed'
+    assert.equal(
+      settledWon !== retryWon,
+      true,
+      `第 ${round + 1} 轮首趟完成与迟到失败必须严格互斥，实际 order=(status=${finalOrder.status}, settled=${Boolean(finalOrder.settledAt)}, retry=${Boolean(finalOrder.retryUntil)}) credit=${finalCredit.status}`,
+    )
+  }
+  console.log('PASS PostgreSQL 10 轮首趟 attemptsUsed=1 finishServiceOrder vs markServiceOrderNotMade 并发：严格互斥')
 }
