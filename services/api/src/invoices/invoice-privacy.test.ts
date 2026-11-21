@@ -21,6 +21,8 @@ interface InvoiceRow {
   email: string | null
   emailClearedAt: Date | null
   returnReason: string | null
+  invoiceNo?: string | null
+  issuedAt?: Date | null
   amountCents: number
   status: string
   updatedAt: Date
@@ -33,8 +35,9 @@ function age(days: number, now: Date): Date {
 function matchesWhere(row: InvoiceRow, where: Record<string, unknown>): boolean {
   if (typeof where['endUserId'] === 'string' && row.endUserId !== where['endUserId']) return false
   if (typeof where['id'] === 'string' && row.id !== where['id']) return false
+  if (typeof where['status'] === 'string' && row.status !== where['status']) return false
   const status = where['status'] as { in?: string[] } | undefined
-  if (status?.in && !status.in.includes(row.status)) return false
+  if (status && typeof status === 'object' && status.in && !status.in.includes(row.status)) return false
   const email = where['email'] as { not?: null } | undefined
   if (email && 'not' in email && email.not === null && row.email == null) return false
   const updatedAt = where['updatedAt'] as { lt?: Date } | undefined
@@ -219,6 +222,47 @@ test('仅开过单位发票的会员注销后，退回原因里的非账号姓�
   const serialized = JSON.stringify(row)
   assert.equal(serialized.includes('王小明'), false)
   assert.equal(serialized.includes('110108123456789'), false)
+})
+
+test('并发窗口里管理员抢先标已开：行级 CAS 绝不覆盖 status / invoiceNo / issuedAt，同时仍清掉个人抬头和邮箱', async () => {
+  const now = new Date(Date.now() - 60_000)
+  const issuedAt = new Date()
+  const { rows, tx } = createStore([
+    {
+      id: 'race-submitted',
+      endUserId: 'member-race',
+      orderKind: 'print',
+      orderId: 'order-race-1',
+      titleType: 'personal',
+      title: '赵明轩',
+      taxId: null,
+      email: 'zhaomx@example.com',
+      emailClearedAt: null,
+      returnReason: null,
+      invoiceNo: null,
+      issuedAt: null,
+      amountCents: 300,
+      status: 'submitted',
+      updatedAt: now,
+    },
+  ])
+  const originalFindMany = tx.invoiceRequest.findMany
+  tx.invoiceRequest.findMany = async (args: { where: Record<string, unknown> }) => {
+    const snapshot = await originalFindMany(args)
+    // 模拟读完 submitted 快照后、注销写库前，管理员抢先提交标已开。
+    rows[0]!.status = 'issued'
+    rows[0]!.invoiceNo = 'REAL-INV-CAS-001'
+    rows[0]!.issuedAt = issuedAt
+    return snapshot
+  }
+  await deidentifyClosedMemberInvoices(tx as never, 'member-race', (text) => text)
+  assert.equal(rows[0]!.status, 'issued')
+  assert.equal(rows[0]!.invoiceNo, 'REAL-INV-CAS-001')
+  assert.equal(rows[0]!.issuedAt, issuedAt)
+  assert.equal(rows[0]!.returnReason, null)
+  assert.equal(rows[0]!.title, '[已去标识]')
+  assert.equal(rows[0]!.email, null)
+  assert.ok(rows[0]!.emailClearedAt instanceof Date)
 })
 
 // 期望值改动（返工包 P2c1b 第 11 条）：邮箱保留天数单独设 INVOICE_EMAIL_RETENTION_DAYS（默认 90），

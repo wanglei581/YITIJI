@@ -313,6 +313,48 @@ async function main(): Promise<void> {
     assert.equal(JSON.stringify(after).includes('110108123456789'), false)
   })
 
+  await check('10 注销行级 CAS：Read Committed 下管理员抢先标已开，注销绝不覆盖 invoiceNo / issuedAt，同时清掉个人抬头与邮箱', async () => {
+    const endUserId = await member()
+    const orderId = await printOrder(endUserId, commercialTerminal)
+    const stored = await submitPersonal(endUserId, 'print', orderId)
+    const usesPostgres = /^postgres(?:ql)?:/.test(process.env['DATABASE_URL'] ?? '')
+    const runWithRace = async (client: typeof prisma) => {
+      let raced = false
+      const racedClient = new Proxy(client, {
+        get(target, prop) {
+          if (prop !== 'invoiceRequest') return Reflect.get(target, prop)
+          return new Proxy(target.invoiceRequest, {
+            get(delegate, method) {
+              if (method !== 'findMany') return Reflect.get(delegate, method)
+              return async (args: Parameters<typeof delegate.findMany>[0]) => {
+                const snapshot = await delegate.findMany(args)
+                if (!raced) {
+                  raced = true
+                  await admin.markIssued(stored.id, { invoiceNo: 'REAL-INV-RC-001', operatorId: OPERATOR })
+                }
+                return snapshot
+              }
+            },
+          })
+        },
+      })
+      await deidentifyClosedMemberInvoices(racedClient as never, endUserId, (text) => text)
+    }
+    if (usesPostgres) {
+      await prisma.$transaction(async (tx) => runWithRace(tx as unknown as typeof prisma), { isolationLevel: 'ReadCommitted' })
+    } else {
+      await runWithRace(prisma)
+    }
+    const after = await prisma.invoiceRequest.findUniqueOrThrow({ where: { id: stored.id } })
+    assert.equal(after.status, 'issued', 'Read Committed 并发标已开后不得被注销改回 returned')
+    assert.equal(after.invoiceNo, 'REAL-INV-RC-001', '已开具发票号不得被抹除')
+    assert.ok(after.issuedAt, '已开具时间不得被清空')
+    assert.equal(after.returnReason, null)
+    assert.equal(after.title, '[已去标识]', '并发已开行的个人抬头仍须去标识')
+    assert.equal(after.email, null, '并发已开行的邮箱仍须清空')
+    assert.ok(after.emailClearedAt)
+  })
+
   console.log(`PASS verify:invoice-real-db（${passed.length} 组）`)
 }
 

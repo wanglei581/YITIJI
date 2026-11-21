@@ -57,19 +57,43 @@ export async function deidentifyClosedMemberInvoices(
   scrub: (text: string) => string,
 ): Promise<number> {
   const rows = await tx.invoiceRequest.findMany({ where: { endUserId } })
+  const now = new Date()
   for (const row of rows) {
-    const open = row.status === 'submitted'
-    await tx.invoiceRequest.update({
-      where: { id: row.id },
+    const deidentify = {
+      title: row.titleType === 'personal' ? '[已去标识]' : scrub(row.title),
+      email: null,
+      ...(row.email != null ? { emailClearedAt: now } : {}),
+    }
+    if (row.status === 'submitted') {
+      const closed = await tx.invoiceRequest.updateMany({
+        where: { id: row.id, status: 'submitted' },
+        data: {
+          ...deidentify,
+          status: 'returned',
+          returnReason: CLOSED_MEMBER_INVOICE_RETURN_REASON,
+          invoiceNo: null,
+          issuedAt: null,
+        },
+      })
+      if (closed.count === 1) continue
+      // 并发窗口里管理员已抢先将申请标已开或退回：绝不覆写 status / invoiceNo / issuedAt，只按实际终态补做去标识。
+      await tx.invoiceRequest.updateMany({
+        where: { id: row.id, status: 'returned' },
+        data: { ...deidentify, returnReason: null },
+      })
+      await tx.invoiceRequest.updateMany({
+        where: { id: row.id, status: 'issued' },
+        data: deidentify,
+      })
+      continue
+    }
+    await tx.invoiceRequest.updateMany({
+      where: { id: row.id, status: row.status },
       data: {
-        title: row.titleType === 'personal' ? '[已去标识]' : scrub(row.title),
-        email: null,
-        ...(row.email != null ? { emailClearedAt: new Date() } : {}),
-        ...(open
-          ? { status: 'returned', returnReason: CLOSED_MEMBER_INVOICE_RETURN_REASON, invoiceNo: null, issuedAt: null }
-          : row.status === 'returned'
-            ? { returnReason: row.returnReason === CLOSED_MEMBER_INVOICE_RETURN_REASON ? CLOSED_MEMBER_INVOICE_RETURN_REASON : null }
-            : {}),
+        ...deidentify,
+        ...(row.status === 'returned' && row.returnReason !== CLOSED_MEMBER_INVOICE_RETURN_REASON
+          ? { returnReason: null }
+          : {}),
       },
     })
   }
