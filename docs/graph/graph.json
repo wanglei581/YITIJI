@@ -21941,6 +21941,9 @@
     "apps/kiosk/scripts/tests/scan-device-state.test.mjs": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
+    "apps/kiosk/scripts/tests/scan-pay-gate.test.mjs": [
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
     "apps/kiosk/scripts/tests/scan-pay-model.test.mjs": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
@@ -37409,6 +37412,7 @@
           "apps/kiosk/scripts/tests/scan-delivery-ack.test.mjs",
           "apps/kiosk/scripts/tests/scan-device-recovery.test.mjs",
           "apps/kiosk/scripts/tests/scan-device-state.test.mjs",
+          "apps/kiosk/scripts/tests/scan-pay-gate.test.mjs",
           "apps/kiosk/scripts/tests/scan-pay-model.test.mjs",
           "apps/kiosk/scripts/tests/scan-rescan-authority.test.mjs",
           "apps/kiosk/scripts/tests/scan-session-revoke.test.mjs",

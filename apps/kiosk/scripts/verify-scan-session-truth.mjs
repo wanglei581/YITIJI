@@ -2230,12 +2230,12 @@ const deviceRecoveryTest = spawnSync(
 )
 assert.equal(deviceRecoveryTest.status, 0, `scan device recovery behaviour failed: ${deviceRecoveryTest.stderr || deviceRecoveryTest.stdout}`)
 
-// P2e-4 扫描按次付款判定与状态文案必须有运行时覆盖。
+// P2e-4 / P2e-4b 扫描按次付款判定、前置闸门、加载禁点、402 防循环与旧已结案单隔离必须有运行时覆盖。
 const scanPayModelTest = spawnSync(
   process.execPath,
-  ['--test', resolve(kioskRoot, 'scripts/tests/scan-pay-model.test.mjs')],
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-pay-model.test.mjs'), resolve(kioskRoot, 'scripts/tests/scan-pay-gate.test.mjs')],
   { encoding: 'utf8' },
 )
-assert.equal(scanPayModelTest.status, 0, `scan pay model unit test failed: ${scanPayModelTest.stderr || scanPayModelTest.stdout}`)
+assert.equal(scanPayModelTest.status, 0, `scan pay unit tests failed: ${scanPayModelTest.stderr || scanPayModelTest.stdout}`)
 
 console.log('ALL PASS scan session truth contract')

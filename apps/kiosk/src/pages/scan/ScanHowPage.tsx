@@ -114,7 +114,6 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
   const readyLabel = scanReadyChipText(screenAllowed && probe.freshReady && cap.allowed)
   const pending = cap.loading || (cap.allowed && probe.phase !== 'done')
   const createsOnNext = showOff || (!pending && !(screenAllowed && way === 'screen'))
-  const panelPayLoading = createsOnNext && pay.loading
   const panelChargeCents = createsOnNext && !pay.loading && pay.needsPayment && pay.chargeCents !== null && pay.chargeCents > 0
     ? pay.chargeCents
     : null
@@ -134,7 +133,6 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
     navigate(payServicePath('scan', { next: 'settings', back: 'how' }))
   }
   const goPanel = (): void => {
-    if (panelPayLoading) return
     if (panelChargeCents !== null) {
       goPanelPay()
       return
@@ -167,23 +165,19 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
   const dock: ScanDock = showOff
     ? {
         left: { label: '返回', leaveTo: '/print-scan' },
-        primary: panelPayLoading
-          ? { label: '正在确认费用', onClick: () => undefined, disabled: true, noArrow: true }
-          : {
-              label: panelChargeCents !== null ? scanPayButtonLabel(panelChargeCents) : '到打印机面板上扫',
-              onClick: goPanel,
-            },
+        primary: {
+          label: panelChargeCents !== null ? scanPayButtonLabel(panelChargeCents) : '到打印机面板上扫',
+          onClick: goPanel,
+        },
       }
     : {
         left: { label: '返回', onClick: goWhat },
         primary: pending
           ? { label: '正在检查扫描仪', onClick: () => undefined, disabled: true, noArrow: true }
-          : panelPayLoading
-            ? { label: '正在确认费用', onClick: () => undefined, disabled: true, noArrow: true }
-            : {
-                label: panelChargeCents !== null ? scanPayButtonLabel(panelChargeCents) : '下一步',
-                onClick: goNext,
-              },
+          : {
+              label: panelChargeCents !== null ? scanPayButtonLabel(panelChargeCents) : '下一步',
+              onClick: goNext,
+            },
       }
 
   return (
@@ -211,7 +205,7 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
             </span>
             <WayTail kind="none" />
           </button>
-          <button type="button" className="cs-way" data-testid="scan-way-panel" disabled={panelPayLoading} onClick={goPanel}>
+          <button type="button" className="cs-way" data-testid="scan-way-panel" onClick={goPanel}>
             <WayArt kind="mfp" />
             <span className="tx">
               <span className="sx-chip">现在可以用</span>

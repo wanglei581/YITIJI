@@ -22,6 +22,7 @@ import {
   SERVICE_ORDERS_PATH,
   apiError,
   ok,
+  recordServiceOrderCalls,
   serviceOrderClosePath,
   serviceOrderPath,
   serviceOrderView,
@@ -717,6 +718,208 @@ test.describe('扫描按次付款接线 @kiosk', () => {
     await spaGo(page, '/scan?stage=result')
     await expect(page.getByTestId('scan-result-paid-copy')).toHaveCount(0)
     await expect(page.getByTestId('scan-device-done')).toContainText('先检查文件和个人信息，再打印')
+    await expect(page.getByTestId('scan-device-done')).not.toContainText('已经付过')
+  })
+
+  test('P2e-4b(1) 面板直达/刷新设置页：未付或仅留旧已结案单绝不发建会话请求，先清旧单直接跳付款屏 @kiosk', async ({ page, api }) => {
+    registerPricing(api, scanOnlyChargedPricing(100))
+    registerScanCapabilities(api, 'off')
+    const freshOrder = { ...ORDER_SCAN, id: 'ord-fresh-panel-001', createdAt: Date.now() }
+    const settledOrder = { ...ORDER_SCAN, id: 'ord-old-settled-panel', amountCents: 137, createdAt: Date.now() - 60_000 }
+    registerScanOrder(api, freshOrder, () => serviceOrderView(freshOrder))
+    api.respond('GET', serviceOrderPath(settledOrder.id), ok(serviceOrderView(settledOrder, {
+      status: 'consumed',
+      paidAt: new Date(Date.now() - 50_000).toISOString(),
+      consumedAt: new Date(Date.now() - 40_000).toISOString(),
+      settledAt: new Date(Date.now() - 10_000).toISOString(),
+      attemptsUsed: 1,
+    })))
+    const creates = recordScanCreates(page)
+    const orderCalls = recordServiceOrderCalls(page)
+
+    // 1. 保留 scanType 无单直达 /scan?stage=settings → 0 次 POST /scan/sessions，直接跳付款屏
+    await page.goto('/scan?stage=start')
+    await writeScanWorkbenchSession(page, { stage: 'settings', scanType: 'document' })
+    await page.goto('/scan?stage=settings')
+    await expect(page).toHaveURL(/\/pay\/scan\?next=settings&back=how/)
+    expect(creates).toHaveLength(0)
+
+    // 2. 留存旧已结案单（consumed+settledAt）直达 /scan?stage=settings → 先忘旧单、0 次建会话、跳付款屏建新单
+    await page.goto('/scan?stage=start')
+    await seedScanTrip(page, settledOrder.id, 'sess-old-settled-panel')
+    await writeScanWorkbenchSession(page, { stage: 'settings', scanType: 'document' })
+    await page.goto('/scan?stage=settings')
+    await expect(page).toHaveURL(/\/pay\/scan\?next=settings&back=how/)
+    await expect.poll(() => orderCalls.filter((c) => c.method === 'POST' && c.path === SERVICE_ORDERS_PATH).length).toBeGreaterThanOrEqual(1)
+    expect(creates).toHaveLength(0)
+  })
+
+  test('P2e-4b(2) 屏上扫描价目/查单加载期间禁用主按钮防抢跑，加载完恢复正确状态 @kiosk', async ({ page, api }) => {
+    registerPricing(api, scanOnlyChargedPricing(100))
+    registerScanCapabilities(api, 'available')
+    await routeLocalScannerReady(page)
+    const creates = recordScanCreates(page)
+
+    let releaseConfig: (() => void) | null = null
+    let holdConfig = false
+    let configPayload: Record<string, unknown> = {
+      smartCampus: { enabled: false, modules: {}, items: [] },
+      toolbox: { enabled: true, items: [] },
+      recruitmentHosting: { enabled: false, deploymentEnabled: false, reason: 'deployment_off' },
+      configVersion: 'p2e4b-hold',
+      refreshIntervalMs: 300_000,
+      serverTime: new Date().toISOString(),
+      pricing: scanOnlyChargedPricing(100),
+    }
+    await page.route(`**${KIOSK_CONFIG_PATH}`, async (route) => {
+      if (holdConfig) {
+        await new Promise<void>((resolve) => { releaseConfig = resolve })
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(configPayload) })
+    })
+
+    // 1. 慢加载价目：加载中主按钮禁用（正在确认费用），不发出建会话
+    await page.goto('/scan?stage=start')
+    await writeScanWorkbenchSession(page, {
+      stage: 'device-settings',
+      material: 'resume',
+      scanType: 'resume',
+      deviceChoice: { source: 'feeder', colorMode: 'gray' },
+    })
+    holdConfig = true
+    await page.goto('/scan?stage=device-settings')
+    await expect(page.locator('[data-scan-stage="device-settings"]')).toBeVisible()
+    await expect(page.getByTestId('scan-device-start')).toBeDisabled()
+    await expect(page.getByTestId('scan-device-start')).toHaveText('正在确认费用')
+    expect(creates).toHaveLength(0)
+
+    // 放行收费价目 → 切「付 1.00 元开始扫描」并恢复可点
+    holdConfig = false
+    releaseConfig?.()
+    await expect(page.getByTestId('scan-device-start')).toBeEnabled()
+    await expect(page.getByTestId('scan-device-start')).toHaveText('付 1.00 元开始扫描')
+    expect(creates).toHaveLength(0)
+
+    // 2. 加载完读不到价（缺 pricing）→ 恢复可点「开始扫描」
+    const { pricing: _drop, ...noPricing } = configPayload
+    void _drop
+    configPayload = noPricing
+    holdConfig = true
+    await page.goto('/scan?stage=device-settings')
+    await expect(page.getByTestId('scan-device-start')).toBeDisabled()
+    holdConfig = false
+    releaseConfig?.()
+    await expect(page.getByTestId('scan-device-start')).toBeEnabled()
+    await expect(page.getByTestId('scan-device-start')).toHaveText('开始扫描')
+  })
+
+  test('P2e-4b(3) 402 持续拒单 + 查单持续 paid：1 次点击仅建 1 次绝不循环自动启动；过期旧单先忘单建新单 @kiosk', async ({ page, api }) => {
+    registerPricing(api, scanOnlyChargedPricing(100))
+    registerScanCapabilities(api, 'available')
+    await routeLocalScannerReady(page)
+    const loopOrder = { ...ORDER_SCAN, id: 'ord-loop-paid-1', createdAt: Date.now() }
+    const freshOrder = { ...ORDER_SCAN, id: 'ord-fresh-after-expired', createdAt: Date.now() }
+    api.respond('GET', serviceOrderPath(loopOrder.id), ok(serviceOrderViewByState(loopOrder, 'paid')))
+    api.respond('POST', SERVICE_ORDERS_PATH, ok(serviceOrderView(freshOrder)))
+    api.respond('GET', serviceOrderPath(freshOrder.id), ok(serviceOrderView(freshOrder)))
+    api.respond('POST', '/api/v1/scan/sessions', apiError(402, 'SERVICE_PAYMENT_REQUIRED', '这一次要先付款'))
+    const creates = recordScanCreates(page)
+    const orderCalls = recordServiceOrderCalls(page)
+
+    await page.goto('/scan?stage=start')
+    await seedScanTrip(page, loopOrder.id, 'sess-loop-1')
+    await writeScanWorkbenchSession(page, {
+      stage: 'device-settings',
+      material: 'resume',
+      scanType: 'resume',
+      deviceChoice: { source: 'feeder', colorMode: 'gray' },
+    })
+    await spaGo(page, '/scan?stage=device-settings')
+    await expect(page.getByTestId('scan-device-start')).toHaveText('开始扫描')
+
+    // 1 次物理点击 → 402 回付款屏 → 付款屏查到 paid 在 1.6s 后跳回放纸设置 → 绝不再自动启动！
+    await page.getByTestId('scan-device-start').click()
+    await expect(page).toHaveURL(/\/pay\/scan\?next=device&back=how/)
+    await expect(page.locator('[data-scan-stage="device-settings"]')).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(2_500)
+    await expect(page.locator('[data-scan-stage="device-settings"]')).toBeVisible()
+    expect(creates).toHaveLength(1)
+
+    // 2. 服务端返回 SERVICE_ORDER_EXPIRED（不可再用旧单）→ 先忘旧单，进付款屏后真实建新单
+    api.respond('POST', '/api/v1/scan/sessions', apiError(402, 'SERVICE_ORDER_EXPIRED', '这张付款单已过期'))
+    await page.getByTestId('scan-device-start').click()
+    await expect(page).toHaveURL(/\/pay\/scan\?next=device&back=how/)
+    await expect.poll(() => orderCalls.filter((c) => c.method === 'POST' && c.path === SERVICE_ORDERS_PATH).length).toBeGreaterThanOrEqual(1)
+  })
+
+  test('P2e-4b(4) 绕过完成页出口留存旧已结案单（consumed+settledAt 137 分）：新一趟清旧单建新单，未付结果页不串旧金额 @kiosk', async ({ page, api }) => {
+    registerPricing(api, scanOnlyChargedPricing(100))
+    registerScanCapabilities(api, 'available')
+    await routeLocalScannerReady(page)
+    await routeVisiblePdf(page)
+    const oldSettled = { ...ORDER_SCAN, id: 'ord-old-settled-137', amountCents: 137, createdAt: Date.now() - 120_000 }
+    const newOrder = { ...ORDER_SCAN, id: 'ord-new-trip-100', amountCents: 100, createdAt: Date.now() }
+    api.respond('GET', serviceOrderPath(oldSettled.id), ok(serviceOrderView(oldSettled, {
+      status: 'consumed',
+      paidAt: new Date(Date.now() - 90_000).toISOString(),
+      consumedAt: new Date(Date.now() - 60_000).toISOString(),
+      settledAt: new Date(Date.now() - 30_000).toISOString(),
+      attemptsUsed: 1,
+    })))
+    api.respond('POST', SERVICE_ORDERS_PATH, ok(serviceOrderView(newOrder)))
+    api.respond('GET', serviceOrderPath(newOrder.id), ok(serviceOrderView(newOrder)))
+    const orderCalls = recordServiceOrderCalls(page)
+
+    // 1. 留存旧已结案单进入新一趟扫描 → 自动清旧单、出「付 1.00 元开始扫描」→ 进付款屏建新单（不判 ok 自动跳回）
+    await page.goto('/scan?stage=start')
+    await seedScanTrip(page, oldSettled.id, 'sess-old-137')
+    await enterHowFromStart(page, 'resume')
+    await page.getByRole('button', { name: '下一步', exact: true }).click()
+    await expect(page.locator('[data-scan-stage="device-settings"]')).toBeVisible()
+    await expect(page.getByTestId('scan-device-start')).toHaveText('付 1.00 元开始扫描')
+
+    await page.getByTestId('scan-device-start').click()
+    await expect(page).toHaveURL(/\/pay\/scan\?next=device&back=how/)
+    await expect.poll(() => orderCalls.filter((c) => c.method === 'POST' && c.path === SERVICE_ORDERS_PATH).length).toBe(1)
+    await expect(page.getByText('请完成这一次支付')).toBeVisible()
+
+    // 2. 留存旧已结案单（137 分）直接落在新一趟未付面板/屏上结果页 → 绝不借用旧单金额 1.37 元
+    await page.goto('/scan?stage=start')
+    await seedScanTrip(page, oldSettled.id, 'sess-old-137')
+    await writeScanWorkbenchSession(page, {
+      stage: 'result',
+      scanType: 'resume',
+      live: {
+        scanTaskId: 'new-unpaid-panel-task',
+        controlToken: 'ctrl-new-panel',
+        instructions: ['步骤一'],
+        expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+      },
+      result: { outcome: 'completed', success: true, file: SCAN_FILE },
+    })
+    await spaGo(page, '/scan?stage=result')
+    await expect(page.getByTestId('scan-result-paid-copy')).toHaveCount(0)
+    await expect(page.getByTestId('scan-workbench-exits')).not.toContainText('1.37')
+    await expect(page.getByTestId('scan-workbench-exits')).not.toContainText('已经付过')
+
+    await page.goto('/scan?stage=start')
+    await seedScanTrip(page, oldSettled.id, 'sess-old-137')
+    await writeScanWorkbenchSession(page, {
+      stage: 'result',
+      material: 'resume',
+      scanType: 'resume',
+      deviceFlow: true,
+      live: {
+        scanTaskId: 'new-unpaid-device-task',
+        controlToken: 'ctrl-new-device',
+        instructions: ['步骤一'],
+        expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+      },
+      result: { outcome: 'completed', success: true, file: SCAN_FILE },
+    })
+    await spaGo(page, '/scan?stage=result')
+    await expect(page.getByTestId('scan-result-paid-copy')).toHaveCount(0)
+    await expect(page.getByTestId('scan-device-done')).not.toContainText('1.37')
     await expect(page.getByTestId('scan-device-done')).not.toContainText('已经付过')
   })
 })

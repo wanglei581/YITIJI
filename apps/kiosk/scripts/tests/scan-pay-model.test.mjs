@@ -183,6 +183,65 @@ test('409 SERVICE_ORDER_IN_USE 不回付款屏；402 与其它 SERVICE_* 回付�
   assert.equal(mod.shouldReturnToScanPay(notFound), true)
   assert.equal(mod.shouldReturnToScanPay(refOcc), true)
   assert.equal(mod.shouldReturnToScanPay(busy), false)
+
+  for (const code of [
+    'SERVICE_ORDER_NOT_FOUND',
+    'SERVICE_ORDER_EXPIRED',
+    'SERVICE_ORDER_REFUNDED',
+    'SERVICE_ORDER_USED',
+    'SERVICE_ORDER_REF_OCCUPIED',
+  ]) {
+    assert.equal(mod.shouldForgetScanTripOnPayError(new ApiHttpError(code, 'err', 402)), true, code)
+  }
+  assert.equal(mod.shouldForgetScanTripOnPayError(payReq), false)
+  assert.equal(mod.shouldForgetScanTripOnPayError(inUse), false)
+})
+
+test('scanOrderIsEndedForNewTrip 识别已结案与不可复用旧单，保留待付/已付/可免费再试单', () => {
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'consumed', attemptsUsed: 1, settledAt: new Date(NOW).toISOString() }), NOW), true)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'consumed', attemptsUsed: 2, settledAt: null }), NOW), true)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'refunded', attemptsUsed: 2 }), NOW), true)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'refunding', attemptsUsed: 2 }), NOW), true)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'refund_failed', attemptsUsed: 2 }), NOW), true)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'closed', closeReason: 'user_cancelled' }), NOW), true)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'closed', closeReason: 'expired' }), NOW), true)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'closed', closeReason: 'price_changed' }), NOW), true)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'paid', attemptsUsed: 1, retryUntil: new Date(NOW - 1000).toISOString() }), NOW), true)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'pending', expiresAt: new Date(NOW - 1000).toISOString() }), NOW), true)
+
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'paid', attemptsUsed: 0 }), NOW), false)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'paid', attemptsUsed: 1, retryUntil: new Date(NOW + 60_000).toISOString() }), NOW), false)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'consumed', attemptsUsed: 1, settledAt: null }), NOW), false)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'pending', expiresAt: new Date(NOW + 60_000).toISOString() }), NOW), false)
+  assert.equal(mod.scanOrderIsEndedForNewTrip(makeOrder({ status: 'pending', checking: true, expiresAt: new Date(NOW - 1000).toISOString() }), NOW), false)
+})
+
+test('scanOrderBelongsToScanTask 与 scanPaidAmountCentsForDone 按任务归属核对，绝不串旧单金额', () => {
+  const settledOld = makeOrder({ id: 'ord-old', status: 'consumed', amountCents: 137, attemptsUsed: 1, settledAt: new Date(NOW).toISOString() })
+  const liveOld = makeOrder({ id: 'ord-old', status: 'consumed', amountCents: 137, attemptsUsed: 1, settledAt: null })
+
+  // 未绑定当前任务/代次的已结案旧单：拒绝展示旧金额
+  assert.equal(mod.scanOrderBelongsToScanTask(settledOld, { taskId: null, boundOrderId: undefined, generationMatched: false }), false)
+  assert.equal(mod.scanPaidAmountCentsForDone(settledOld, { taskId: null, boundOrderId: undefined, generationMatched: false }), null)
+
+  // 当前任务明确未付新建（boundOrderId: null）：无论旧单是否结案都不借用金额
+  assert.equal(mod.scanPaidAmountCentsForDone(liveOld, { taskId: 'task-unpaid-2', boundOrderId: null, generationMatched: false }), null)
+  assert.equal(mod.scanPaidAmountCentsForDone(settledOld, { taskId: 'task-unpaid-2', boundOrderId: null, generationMatched: false }), null)
+
+  // 当前任务绑定了另一张单号：拒绝
+  assert.equal(mod.scanPaidAmountCentsForDone(settledOld, { taskId: 'task-2', boundOrderId: 'ord-new', generationMatched: true }), null)
+
+  // 订单带非空 resourceId 且与当前任务不一致：拒绝；一致：放行
+  const withRef = { ...settledOld, resourceId: 'task-1' }
+  assert.equal(mod.scanPaidAmountCentsForDone(withRef, { taskId: 'task-2' }), null)
+  assert.equal(mod.scanPaidAmountCentsForDone(withRef, { taskId: null }), null)
+  assert.equal(mod.scanPaidAmountCentsForDone(withRef, { taskId: 'task-1' }), 137)
+
+  // 当前任务正是用这张单建出来的：即使服务端已结案（settledAt 非空）仍如实展示实付额
+  assert.equal(mod.scanPaidAmountCentsForDone(settledOld, { taskId: 'task-1', boundOrderId: 'ord-old', generationMatched: true }), 137)
+
+  // 订单在内存里已绑定给别的任务：拒绝借给未知新任务
+  assert.equal(mod.scanPaidAmountCentsForDone(liveOld, { taskId: 'task-other', boundOrderId: undefined, orderBoundToOtherTask: true }), null)
 })
 
 test('文案拼接符合稿 359 行且不含禁止词', () => {
