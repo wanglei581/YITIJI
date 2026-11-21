@@ -1,6 +1,6 @@
 import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
-import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useClearGuestDraftOnFlowExit } from './resumeGenerateDraft'
 import type {
@@ -35,10 +35,16 @@ import { detectGeneratedUnconfirmedAdditions, extractConfirmableFacts, previewUs
 import { loadStampedGeneratedResume } from './components/resume-deliver/generatedEntryIndex'
 import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
+import {
+  buildGeneratePreviewCopy,
+  GENERATE_EXPORT_VIEWS,
+  GENERATE_FORMAT_NAME,
+  holdExportPrint,
+  readDeliverPhase,
+} from './components/resume-deliver/generatePreviewViewModel'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
 import { GeneratePreviewCta, GeneratePreviewEmptyExits } from './GeneratePreviewChrome'
 import { ResumeGenerateAdvisor } from './components/ResumeGenerateQxChrome'
-import { ASKS, type ResumeAsk } from './touch/resumeAsks'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-preview-qx.css'
@@ -49,53 +55,6 @@ interface LocationState {
   taskId?: string
   licenseViewOnly?: boolean
   deliverPhase?: 'preview' | 'export'
-}
-
-const EXPORT_VIEWS = new Set<GeneratePreviewViewState>([
-  'export-chooser',
-  'export-exporting',
-  'export-failed',
-  'export-ready',
-  'export-url-expired',
-  'export-print-unavailable',
-])
-
-const FORMAT_NAME: Record<ResumeExportFormat, string> = {
-  pdf: 'PDF',
-  docx: 'DOCX',
-  txt: 'TXT',
-  md: 'MD',
-}
-
-const NEW_TASK_CTA = new Set([
-  'resume-generate-preview-cta-export',
-  'resume-generate-preview-cta-print',
-  'resume-generate-preview-cta-confirm-export',
-])
-
-/** 底栏里只停用打印、导出。返回、离开、再读一次保持可点。 */
-function holdExportPrint(node: ReactNode): ReactNode {
-  if (Array.isArray(node)) return node.map((child) => holdExportPrint(child))
-  if (!isValidElement(node)) return node
-  const props = node.props as { 'data-testid'?: unknown; children?: ReactNode }
-  const testId = props['data-testid']
-  if (typeof testId === 'string' && NEW_TASK_CTA.has(testId)) {
-    return cloneElement(node, {
-      disabled: true,
-      title: LICENSE_NO_NEW_TASK_REASON,
-      'aria-disabled': undefined,
-      onClick: () => undefined,
-    })
-  }
-  const children = props.children
-  if (children == null || typeof children === 'string' || typeof children === 'number') return node
-  return cloneElement(node, undefined, holdExportPrint(children))
-}
-
-function readPhase(state: unknown): 'preview' | 'export' | null {
-  if (!state || typeof state !== 'object') return null
-  const value = (state as LocationState).deliverPhase
-  return value === 'export' || value === 'preview' ? value : null
 }
 
 export function ResumeGeneratePreviewPage() {
@@ -218,8 +177,8 @@ export function ResumeGeneratePreviewPage() {
   const view = resolved.view
   const fixtureLock = Boolean(query.requested && (query.capture || query.debug))
   const phase: 'preview' | 'export' = fixtureLock
-    ? (query.requested && EXPORT_VIEWS.has(query.requested) ? 'export' : 'preview')
-    : (readPhase(location.state) === 'export' ? 'export' : 'preview')
+    ? (query.requested && GENERATE_EXPORT_VIEWS.has(query.requested) ? 'export' : 'preview')
+    : (readDeliverPhase(location.state) === 'export' ? 'export' : 'preview')
   const exportScreen: GeneratePreviewViewState = view.startsWith('export-') ? view : 'export-chooser'
   // 只追踪生成结果里已有的候选词；预览中后来由本人输入的词不归给 AI。
   const unconfirmed = resume && result?.resume ? detectGeneratedUnconfirmedAdditions(resume, result.resume, input, userAdditions) : []
@@ -278,7 +237,7 @@ export function ResumeGeneratePreviewPage() {
   }
 
   const backToPreview = () => {
-    if (readPhase(location.state) === 'export') {
+    if (readDeliverPhase(location.state) === 'export') {
       navigate(-1)
       return
     }
@@ -305,26 +264,6 @@ export function ResumeGeneratePreviewPage() {
     summaryRef.current?.scrollIntoView({ block: 'center' })
   }
 
-  const emptyCopy = view === 'preview-failed'
-    ? { title: '这条记录没读回来', description: '可能已过留存期、不是本人，或者网络不通。不拿别的结果凑数。' }
-    : view === 'preview-no-result'
-      ? { title: '没有可看的结果', description: '预览要有一次已经完成的生成。这次进来没带结果，不会拿示例冒充你的简历。' }
-      : view === 'illegal'
-        ? { title: '认不出这个页面状态', description: '地址里的状态没有登记。这一页不猜你想去哪一步，也不把原始参数显示出来。' }
-        : view === 'preview-loading'
-          ? { title: '正在读取生成结果…', description: '读回来之前，这一页不显示任何简历内容。' }
-          : { title: '生成结果已清除', description: '公共设备不保留个人信息。刷新、返回或待机之后，这一份要重新填写。' }
-
-  const emptyNext = view === 'preview-failed'
-    ? { ask: '换条路继续', doing: '可以再读一次，或者回去重填一遍。' }
-    : view === 'preview-no-result'
-      ? { ask: '先完成一次生成', doing: '回去填写，生成之后再到这里逐段核对。' }
-      : view === 'illegal'
-        ? { ask: '从简历服务重新进来', doing: '回到简历服务，再点一次「从零生成简历」。' }
-        : view === 'preview-loading'
-          ? { ask: '稍等一下', doing: '结果读回来后，就能逐段核对。' }
-          : { ask: '需要重新生成', doing: '回去重新填写，就能再生成一份预览。' }
-
   const showWorkspace = Boolean(resume && result) && !['session-lost', 'preview-no-result', 'preview-loading', 'preview-failed', 'illegal'].includes(view)
   const canRetry = Boolean(restoreTaskId) && !synthetic
   const go = (to: string) => navigate(to)
@@ -350,7 +289,7 @@ export function ResumeGeneratePreviewPage() {
     exporting,
     canPrint,
     printNavigating,
-    formatName: FORMAT_NAME[exportFormat],
+    formatName: GENERATE_FORMAT_NAME[exportFormat],
     canRetry,
     onHome: () => go('/'),
     onSource: () => go('/resume/source'),
@@ -361,30 +300,12 @@ export function ResumeGeneratePreviewPage() {
     onConfirmExport: () => { if (titleBlocked) { focusTitleIssue(); return } setFactOpen(true) },
     onPrint: handlePrint,
   })
-
-  const statusLabel = onExportScreen
-    ? (exportScreen === 'export-exporting' ? '正在生成文件' : exportScreen === 'export-failed' ? '这次没导出' : exportScreen === 'export-ready' ? '文件已好' : exportScreen === 'export-url-expired' ? '下载链接过期' : exportScreen === 'export-print-unavailable' ? '暂时不能打印' : '选格式')
-    : (view === 'preview-loading' ? '正在读回这次结果' : view === 'preview-failed' ? '这次没读回来' : view === 'illegal' ? '认不出这一页' : showWorkspace ? '核对这一次的结果' : '预览')
-
-  const advisor = onExportScreen
-    ? { eyebrow: '导出', ask: exportScreen === 'export-chooser' ? '要哪种格式？' : exportScreen === 'export-exporting' ? '正在生成文件' : exportScreen === 'export-failed' ? '文件没生成出来' : exportScreen === 'export-ready' ? '文件好了' : exportScreen === 'export-url-expired' ? '扫码取件这条过期了' : '这一份暂时进不了打印', doing: exportScreen === 'export-chooser' ? '四种都能导出。页数、版式和打印目前只有 PDF 有。' : '核对过的内容还在。这一步只出文件，不改描述。' }
-    : showWorkspace
-      ? { eyebrow: '预览', ask: '生成好了，你核一遍', doing: '事实和你填的逐字一致。被润色过的段落会标明供参考。' }
-      : { eyebrow: '预览', ask: emptyNext.ask, doing: emptyNext.doing }
-
-  // 底栏「问小青」：每个状态一句自己的问题（稿 gen-preview 各状态）；稿里 ask 为 false 的「认不出」状态不画。
-  const previewAsk: ResumeAsk | null = onExportScreen
-    ? (exportScreen === 'export-exporting' ? ASKS.exportBusy
-      : exportScreen === 'export-failed' ? ASKS.exportFailed
-        : exportScreen === 'export-ready' ? ASKS.exportReady
-          : exportScreen === 'export-url-expired' ? ASKS.exportExpired
-            : exportScreen === 'export-print-unavailable' ? ASKS.exportNoPrint
-              : ASKS.exportChooser)
-    : view === 'illegal' ? null
-      : view === 'preview-failed' ? ASKS.previewFailed
-        : view === 'preview-no-result' ? ASKS.previewNone
-          : view === 'session-lost' ? ASKS.previewLost
-            : ASKS.previewReady
+  const { emptyCopy, statusLabel, advisor, previewAsk } = buildGeneratePreviewCopy({
+    view,
+    exportScreen,
+    onExportScreen,
+    showWorkspace,
+  })
 
   return (
     <ResumeTouchFrame
