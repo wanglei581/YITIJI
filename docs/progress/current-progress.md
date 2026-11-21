@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-21：小程序虚拟支付二期极小终收收口 P2d2c（分支 `claude/miniapp-vpay-p2d2-1121`，接 `b8cce6809`，0 新增迁移，未推送，未上线）
+
+- 来由：按 Codex 聚焦终收 `b8cce6809` 查出的最后 2 项（1 P1 + 1 P2）及总指挥特别授权仅精准修改 `service-order.settle.ts` 3 处完成最终闭环。
+- ① [P1] 首趟成功后（`attemptsUsed=1, settledAt !== null`）迟到失败禁重开：`services/api/src/payment/service-order.settle.ts` 精准 3 处补 `settledAt: null`——`markServiceOrderNotMade` 入口排除 `row.settledAt`、重试 CAS 补 `settledAt: null`（失配复查已结案即返回不进退款）、`claimServiceConsume` 补 `settledAt: null`。移除测试中人为改 `attemptsUsed=2` 的绕路，补齐真实 `beginTrip → consume → noteMade`（`attemptsUsed=1`）后迟到失败禁重开与二次消费 409 拦拒，以及 PG 16 10 轮 `finishServiceOrder` vs `markServiceOrderNotMade('optimize_failed')` 真实并发互斥回归。
+- ② [P2] 同步/定时查单不抹掉 `268490014`/超时退款重试资格：`virtual-pay-xpay-refund.ts` 新增 `extractRetryableRefundPrefix` / `preserveRetryableDiagnostic` 并按前缀判定 `isRetryableIndeterminateOrder`；`virtual-pay-refund-reconcile.ts` 的 `diagnoseOnce` 读取库内最新诊断并以 CAS 保留既有可重试前缀（如 `refund_in_progress_268490014|refund_query_still_paid_4` 且不覆盖 `refund_retry_inflight`）；`virtualPayLabels.ts` 同步适配前缀中文显示。补齐 `268490014 → syncOrder(status=4) → 改传 reason 再次 initiateRefund（body 逐字节一致）→ syncOrder(status=8) 收敛双 refunded` 全链回归。
+- ③ 验证与收尾：双库（SQLite + PG 16 `5674` + 真 Redis `6674` + 真 HTTP `3374`）全绿（`verify:miniapp-virtual-pay-p2` / `:postgres` / `verify:miniapp-virtual-pay` / `verify:service-orders` / `verify:service-orders-concurrency`），C1–C2 反向变异 0→1→0 SHA-256 逐字节还原复绿，`service-order.settle.ts`（296 行）及全部改动业务源码 `< 500` 行，API/Admin/Kiosk `tsc`、`eslint --quiet`、全仓 `pnpm lint`、`verify:ci-gate-coverage`、`verify:repository-integrity` 与最终 HEAD `node scripts/generate-project-graph.mjs --check` 全部退出 0；隔离 PG/Redis/HTTP 已停，未推送。
+
 ## 2026-11-21：小程序虚拟支付二期财务安全收口返工 P2d2b（分支 `claude/miniapp-vpay-p2d2-1121`，接 `378e6b319`，0 新增迁移，未推送，未上线）
 
 - 来由：按 Codex 独立财务与安全复收发现的 4 项 P1 + 5 项必改 + 2 项协议偏差，一次性全部修净并通过双库真并发、真实浏览器安全断言与 3 条反向变异。
