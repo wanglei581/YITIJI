@@ -691,26 +691,40 @@ async function main(): Promise<void> {
       const iv9b = await createAndAnswerInterview({ terminalId: termCharge, token: chargeToken, kioskSessionId: ks9b, orderId: order9b })
       assert.equal((await endInterview(iv9b.sessionId, iv9b.accessToken)).status, 503)
       assert.equal((await loadOrder(order9b)).reportState, 'retry')
-      // 把窗口拨到已过期，让 sweep 与两路并发 end 同时抢退
+      // 把窗口拨到已过期，让 sweep 与两路并发 end 同时抢退；用 slow-fail 确保两路独立实例都进入 buildReport → onReportFailed
       await prisma.serviceOrder.update({ where: { id: order9b }, data: { retryUntil: new Date(Date.now() - 10_000) } })
+      reportMode = 'slow-fail'
 
       const svcA = makeInterviewService()
       const svcB = makeInterviewService()
       const barrier = createRaceBarrier(3)
       const requester = { endUserId: null, accessToken: iv9b.accessToken }
+      // 在 claimRefund 的 updateMany 前对齐三路（两路并发 end + 一路清扫）：
+      // 三路都已读到 status='consumed' / reportState='retry' 后同时起跑，真正撞向条件 updateMany 门闩。
+      const origUpdateMany = prisma.serviceOrder.updateMany.bind(prisma.serviceOrder)
+      prisma.serviceOrder.updateMany = (async (args: Parameters<typeof origUpdateMany>[0]) => {
+        const w = (args as { where?: { id?: unknown }; data?: { status?: unknown } })?.where
+        const d = (args as { where?: { id?: unknown }; data?: { status?: unknown } })?.data
+        if (w?.id === order9b && d?.status === 'refunding') {
+          await barrier.wait()
+        }
+        return origUpdateMany(args)
+      }) as typeof origUpdateMany
       const runEndFail = async (svc: MockInterviewService) => {
-        await barrier.wait()
         await svc.end(iv9b.sessionId, requester, {
           onReportMade: () => serviceOrders.noteInterviewReportMade(iv9b.sessionId),
           onReportFailed: () => serviceOrders.noteInterviewReportFailed(iv9b.sessionId),
         }).catch(() => undefined)
       }
       const runSweep = async () => {
-        await barrier.wait()
         await serviceOrders.sweep(new Date())
       }
-      await Promise.all([runEndFail(svcA), runEndFail(svcB), runSweep()])
-      assert.equal(barrier.timedOut, false, '三路并发必须真正同时开跑')
+      try {
+        await Promise.all([runEndFail(svcA), runEndFail(svcB), runSweep()])
+      } finally {
+        prisma.serviceOrder.updateMany = origUpdateMany
+      }
+      assert.equal(barrier.timedOut, false, '三路并发必须真正同时撞到 claimRefund')
       assert.equal(refundCalls, 1, `并发两次 end + 清扫必须只调渠道退款 1 次，实际 ${refundCalls}`)
       assert.deepEqual(refundedOrderIds, [order9b])
       assert.equal((await loadOrder(order9b)).status, 'refunded')
