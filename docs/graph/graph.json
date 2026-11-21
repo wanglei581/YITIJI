@@ -15370,7 +15370,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 855,
+      "reachableFileCount": 858,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18392,6 +18392,7 @@
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
             "POST /:param/cancel",
+            "POST /:param/close",
             "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
@@ -18412,6 +18413,7 @@
             "apps/kiosk/src/pages/scan/styles/scan-device-flow.css",
             "apps/kiosk/src/pages/scan/styles/scan-device-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-fs.css",
+            "apps/kiosk/src/pages/scan/styles/scan-pay.css",
             "apps/kiosk/src/pages/scan/styles/scan-result-viewer-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-compact-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
@@ -18562,7 +18564,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1044
+      "sourceFileCount": 1047
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21937,6 +21939,9 @@
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/scripts/tests/scan-device-state.test.mjs": [
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
+    "apps/kiosk/scripts/tests/scan-pay-model.test.mjs": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/scripts/tests/scan-rescan-authority.test.mjs": [
@@ -37404,6 +37409,7 @@
           "apps/kiosk/scripts/tests/scan-delivery-ack.test.mjs",
           "apps/kiosk/scripts/tests/scan-device-recovery.test.mjs",
           "apps/kiosk/scripts/tests/scan-device-state.test.mjs",
+          "apps/kiosk/scripts/tests/scan-pay-model.test.mjs",
           "apps/kiosk/scripts/tests/scan-rescan-authority.test.mjs",
           "apps/kiosk/scripts/tests/scan-session-revoke.test.mjs",
           "apps/kiosk/scripts/tests/scan-workbench-model.test.mjs",

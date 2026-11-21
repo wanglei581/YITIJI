@@ -38,7 +38,7 @@ flowchart LR
   app --> profile["/profile<br/>1 页 · 14 端点"]
   app --> renshi["/renshi<br/>1 页 · 13 端点"]
   app --> resume["/resume<br/>15 页 · 37 端点"]
-  app --> scan["/scan<br/>5 页 · 13 端点"]
+  app --> scan["/scan<br/>5 页 · 14 端点"]
   app --> screensaver["/screensaver<br/>1 页 · 13 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 0 端点"]
   app --> toolbox["/toolbox<br/>1 页 · 0 端点"]
@@ -127,7 +127,7 @@ flowchart LR
 | `/resume/source` | ResumeSourcePage | `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | 36 | 8 |
 | `/resume/templates/*` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/upload` | Navigate | — _(重定向)_ | 0 | — |
-| `/scan` | ScanWorkbenchPage | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | 13 | 16 |
+| `/scan` | ScanWorkbenchPage | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | 14 | 17 |
 | `/scan/progress` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan/result` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan/settings` | Navigate | — _(重定向)_ | 0 | — |
@@ -254,7 +254,7 @@ flowchart LR
 
 **`/resume/source`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
-**`/scan`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
+**`/scan`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/close`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/screensaver`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 

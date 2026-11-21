@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-11-21：一体机扫描这一趟的按次付款接线（P2e-4，分支 `claude/kiosk-pay-scan-p2e4`，未推送）
+
+- 来由：收费清单第 7 项第四包，起点 P2e-1c 过审头 `588e46904`；只复用 P2e-1 地基函数，未改动 P2e-1 付款屏与地基、未改动服务单后端、未碰简历/面试/打印页、小程序、两个后台、终端程序、设计稿与生产配置，未改大文件 `scanWorkbenchSession.ts`（708 行）和 `scan-fs.css`（780 行）。
+- 两条建会话路径前付款：抽出纯模型 `apps/kiosk/src/pages/scan/scanPayModel.ts`（168 行）、Hook `apps/kiosk/src/pages/scan/useScanPayGate.ts`（278 行）与样式 `apps/kiosk/src/pages/scan/styles/scan-pay.css`（50 行）。面板扫描在 `ScanHowPage.tsx` 的「下一步」（`showOff` 态为「到打印机面板上扫」及卡片）替换为「付 X.XX 元开始扫描」+ 稿 359 行说明条，点击进 `/pay/scan?next=settings&back=how`，付成后自动回到 `/scan?stage=settings` 建会话；屏上扫描在 `ScanDeviceSettingsPage.tsx` 的「开始扫描」替换为「付 X.XX 元开始扫描」+ 说明条，保存选纸/颜色并置一次性内存自动启动位后进 `/pay/scan?next=device&back=how`，付成后自动回到 `/scan?stage=device-settings` 经 `useScanDevicePayResume` 调 `beginDeviceScan` 建会话。已付/可免费再试不重出付款按钮；0 元/读不到价/公共点位保持原样。
+- 建会话带头、同单重扫重放与 409/402 分流：`scanTasks.ts` 的 `createScanSession` 增可选第 4 参 `extraHeaders`（禁止覆盖 `X-Scan-Retry-Control`），两条路建会话均带 `x-kiosk-session-id` 与 `x-service-order-id`；`useScanSessionCreate.ts` 将同一份 `serviceHeaders` 闭入单一 `sendCreate` 闭包，配对重扫（`X-Scan-Retry-Control`）与丢失响应重放（`scanCreateReplay.ts`）天然沿用同一订单号。遇 `409 SERVICE_ORDER_IN_USE` 两条路均按「接着这一次」处理（本地有有效会话直接恢复，否则面板显示「这一次扫描已经在进行 / 接着这一次继续」、屏上提示不用再付），绝不回付款屏；402 及其他 `SERVICE_*` 回付款屏（404 `SERVICE_ORDER_NOT_FOUND` 先忘单）。
+- 结果页展示：`ScanResultPage.tsx`、`ScanResultFailedView.tsx`、`ScanResultExitRow.tsx`、`ScanDeviceFailedView.tsx`、`ScanDeviceDonePage.tsx` 接入本趟订单查询与未落定轻轮询（5 秒，上限 24 次）。失败已付可免费再试替换按钮为「免费再试一次」并单起一行 `RETRY` 句；退款中/已退/退款失败严格按服务单状态展示（未 `refunded` 绝不写「已退」）；完成页已付按订单 `amountCents` 换稿 376 行并在显式离场时忘单，没付过的完成页一字不改。
+- 验证：单测 `scan-pay-model.test.mjs`（6/6，已挂入 `verify:scan-session-truth`）；Playwright 新增 `scan-pay.spec.ts`（8/8，已挂入 `test:browser:truth`），全部既有不收费扫描用例原样通过未改期望（`scan-session-truth`+`kiosk-scan-safety`+`scan-pay` 50/50、`human-journey` 9/9、`fusion-w2-scan`+`scan-device-k1b*` 84/84）；1080×1920 照稿并排 7 组图存 `/tmp/p2e4-sbs/` 并逐张核图无非豁免差异；隔离真服务（Redis 6672、API 3372、SQLite `/tmp/p2e4-verify.db`、沙箱通道 + 真实扫描租约/投递链路）跑通面板、屏上、首次失败免费再试同单出文件、两次失败后台真清扫自动退款（`refunded`），截图与查单 JSON 存 `/tmp/p2e4-evidence/` 且进程与端口已清净；4 条反向变异（屏上跳过付款、重扫换单号、409 让再付、未付完成页标价）全部跑红还原；全量图谱关联门禁、kiosk `tsc --noEmit`、`eslint --quiet`、全仓 `pnpm lint`（0 errors）、`generate-project-graph --check` 全过。未推送，未上线。
+
 ## 2026-11-21：一体机付款屏到点核实端到端闭合与统一节流退避（P2e-1c，分支 `claude/kiosk-pay-service-p2e1`，未推送）
 
 - 来由：补全线第三十任依据 Codex 独立复收 `6819fb0c8` 暴露的 2 处精确缺陷派发的极小范围收口返工，从 `6819fb0c8` 继续按 2 项逐项提交，所有改动/新增业务源码保持 `< 500` 行，未新增数据库迁移、未触碰 P2e-2/3/4 业务页与生产配置。
