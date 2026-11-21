@@ -146,6 +146,12 @@ export class ApiRouter {
       status: 200,
       json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
     })
+    // 自助开票二期：我的订单登录后会同时读 AI/扫描服务单列表（GET /me/service-orders）。
+    // 默认空列表，保证既有免费机与打印订单用例不因这条新请求中断；有服务单的用例自行覆盖。
+    this.respond('GET', '/api/v1/me/service-orders', {
+      status: 200,
+      json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+    })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
       status: 200,

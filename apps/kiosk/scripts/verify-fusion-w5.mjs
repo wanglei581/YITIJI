@@ -23,7 +23,7 @@ const W5_ROUTES = [
   // 2026-11-19 开票手机页与短链中转，与上面的手机辅助页同一口径。
   '/invoice/phone', '/k/i/:scene',
   '/screensaver', '/session-timeout', '/error-offline', '/profile',
-  '/me/resumes', '/me/print-orders', '/me/documents', '/me/favorites',
+  '/me/resumes', '/me/print-orders', '/me/orders/invoice', '/me/documents', '/me/favorites',
   '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id',
   '/me/notifications', '/me/feedback', '/me/settings', '/me/privacy-requests', '/help',
   // 2026-11-04 产品负责人定停放：/toolbox 收成跳回首页的 splat。
@@ -493,7 +493,8 @@ const A_BATCH_EYEBROWS = [
   // 证据锚点随稿换字，判据不变：眉题仍是中文、照稿，屏上不出现英文眉题。
   ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="我的 · 消息"']],
   ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的 · 文档"']],
-  ['src/pages/profile/me/MyPrintOrdersPage.tsx', ['eyebrow="我的 · 打印订单"']],
+  ['src/pages/profile/me/MyPrintOrdersPage.tsx', ["'我的 · 打印订单'", "'我的 · 订单'"]],
+  ['src/pages/profile/me/orders/orderInvoiceCopy.ts', ["INVOICE_SCREEN_EYEBROW = '我的 · 订单'"]],
   ['src/pages/profile/me/MyResumesPage.tsx', ['eyebrow="我的 · 简历"']],
   ['src/pages/profile/me/MyFavoritesPage.tsx', ['eyebrow="我的 · 收藏"']],
   ['src/pages/profile/me/MyAiRecordsPage.tsx', ['eyebrow="我的 · AI 服务记录"']],

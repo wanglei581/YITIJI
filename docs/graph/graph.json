@@ -9842,6 +9842,7 @@
         "handler": "MemberPrintOrdersController.list",
         "method": "GET",
         "models": [
+          "InvoiceRequest",
           "PrintTask",
           "Terminal"
         ],
@@ -10004,6 +10005,7 @@
         "method": "GET",
         "models": [
           "FileObject",
+          "InvoiceRequest",
           "Order",
           "PrintTask",
           "Terminal"
@@ -16294,6 +16296,7 @@
         {
           "component": "PhoneInvoicePage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16302,6 +16305,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16966,6 +16972,7 @@
         {
           "component": "InvoiceSceneEntry",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16974,6 +16981,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -17432,6 +17442,20 @@
             "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
+          "wrappers": []
+        },
+        {
+          "component": "MyOrderInvoicePage",
+          "endpoints": [],
+          "file": null,
+          "layout": [
+            "KioskHandoverGate",
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/me/orders/invoice",
+          "styles": [],
           "wrappers": []
         },
         {
@@ -20343,6 +20367,7 @@
           "services/api/src/invoices/invoice-email-retention.ts",
           "services/api/src/invoices/invoice-privacy.test.ts",
           "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
@@ -35582,7 +35607,9 @@
           "apps/kiosk/src/pages/upload/phone-upload-service-desk.css",
           "apps/kiosk/src/routes/index.tsx"
         ],
-        "missing": []
+        "missing": [
+          "src/pages/profile/me/orders/orderInvoiceCopy.ts"
+        ]
       },
       "file": "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "helper": true,
@@ -36916,7 +36943,14 @@
           "apps/kiosk/src/pages/profile/profileEntries.ts",
           "apps/kiosk/src/pages/profile/styles/profile-qx.css"
         ],
-        "missing": []
+        "missing": [
+          "apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx",
+          "apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx",
+          "apps/kiosk/src/pages/profile/me/orders/order-invoice.css",
+          "apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts",
+          "apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts",
+          "apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts"
+        ]
       },
       "file": "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "helper": true,

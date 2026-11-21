@@ -6,6 +6,12 @@ import type {
 } from './member-print-orders.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+import { assessInvoiceEligibility } from '../invoices/invoice-eligibility'
+import {
+  pickLatestInvoiceRequestByOrder,
+  toInvoiceOpenStatus,
+  type MemberInvoiceStatus,
+} from '../invoices/invoice-request-summary'
 import { isPaidUnfulfilledRefundRequired } from '../payment/pending-refund-signal'
 import {
   arrivalViewsForOrders,
@@ -213,6 +219,7 @@ export class MemberPrintOrdersService {
           select: {
             id: true,
             orderNo: true,
+            endUserId: true,
             // 任务上没记终端时用订单上的终端兜底显示网点名。
             terminalId: true,
             amountCents: true,
@@ -234,6 +241,8 @@ export class MemberPrintOrdersService {
             discountCents: true,
             // API-20：只用来派生 refundRequired，不回传内部原因码。
             refundReason: true,
+            // 自助开票二期：仅用于同源调用 assessInvoiceEligibility，不外露退款详情。
+            refunds: { select: { status: true } },
           },
         },
       },
@@ -252,9 +261,43 @@ export class MemberPrintOrdersService {
       this.prisma,
       rows.flatMap((row) => (row.order ? [row.order] : [])),
     )
+    const chargedOrderIds = [...new Set(rows.flatMap((r) => (r.order && r.order.amountCents > 0 ? [r.order.id] : [])))]
+    const invoiceByOrder = chargedOrderIds.length > 0
+      ? pickLatestInvoiceRequestByOrder(
+          await this.prisma.invoiceRequest.findMany({
+            where: { endUserId, orderKind: 'print', orderId: { in: chargedOrderIds } },
+            select: { id: true, orderId: true, status: true, createdAt: true },
+          }),
+        )
+      : new Map()
     return buildMemberPage(rows, page, total, (r) => {
       const terminal = r.terminal ?? (r.order?.terminalId ? fallbackTerminals.get(r.order.terminalId) ?? null : null)
       const params = parseSafeParams(r.paramsJson)
+      const invoiceFields = r.order && r.order.amountCents > 0
+        ? (() => {
+            const picked = invoiceByOrder.get(r.order.id)
+            const decision = assessInvoiceEligibility(
+              {
+                kind: 'print',
+                id: r.order.id,
+                endUserId: r.order.endUserId,
+                payStatus: r.order.payStatus,
+                amountCents: r.order.amountCents,
+                discountCents: r.order.discountCents,
+                refundedAmountCents: r.order.refundedAmountCents,
+                refundStatuses: r.order.refunds.map((refund) => refund.status),
+                openInvoiceStatus: toInvoiceOpenStatus(picked),
+              },
+              endUserId,
+            )
+            const invoiceStatus: MemberInvoiceStatus = picked?.status ?? 'none'
+            return {
+              canInvoice: decision.ok,
+              invoiceStatus,
+              invoiceRequestId: invoiceStatus === 'none' ? null : (picked?.id ?? null),
+            }
+          })()
+        : null
       return {
         id: r.id,
         status: r.status,
@@ -272,6 +315,7 @@ export class MemberPrintOrdersService {
         terminal: terminal ? { id: terminal.id, displayName: terminal.displayName ?? null, locationLabel: terminal.locationLabel ?? null } : null,
         failureCode: r.status === 'failed' && r.errorCode && MEMBER_VISIBLE_FAILURE_CODES.has(r.errorCode) ? r.errorCode : null,
         ...memberOrderPaymentFields(r.order, r.order ? arrivalViews.get(r.order.id) : null),
+        ...(invoiceFields ?? {}),
       }
     })
   }

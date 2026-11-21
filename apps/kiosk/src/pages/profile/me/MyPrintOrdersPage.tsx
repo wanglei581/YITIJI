@@ -2,21 +2,14 @@ import { useKioskLicense } from '../../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../../copy/unattendedCopy'
 import { LicenseLock } from '../../../layouts/LicenseLock'
 // ============================================================
-// 我的打印订单 — /me/print-orders（本人，只读）。视觉真值：稿 38-member-assets（青序流光）。
-// 展示安全元数据（文件名 / 状态 / 份数 / 彩黑 / 幅面 / 时间）
-// + C5-1 订单支付安全字段（金额 / 支付状态 / 支付来源 / 计费页数 / 取件码）
-// + API-20 待退款信号（refundRequired，由服务端派生）。
-// 诚实口径（C5 P0b）：
-// - 支付字段全部来自后端关联 Order；历史订单无 Order（payStatus 为 null）
-//   显示「暂无支付信息」，不显示金额 0、不推断。
-// - 支付来源只可能是 线下收款 / 免费 / 人工确认（无 live 网关）。
-// - 取件码仅后端返回时展示，前端不做可见性推断。
-// - 「再打一份」不从订单侧直连，详单内引导「去我的文档再打印」（新任务新订单）。
+// 我的订单 / 打印订单 — /me/print-orders（本人，只读）。
+// 免费机且无收费/服务单时保持「打印订单」原口径；收费机或存在服务单/实付打印单时升级为
+// 「我的订单」并混排 AI/扫描服务单与「开发票」入口（对照 pay-1113.js:516-537）。
 // ============================================================
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { MemberPrintOrderItem } from '@ai-job-print/shared'
+import type { MemberPrintOrderItem, MemberServiceOrderItem } from '@ai-job-print/shared'
 import { getMyPrintOrders } from '../../../services/api/memberPrintOrders'
 import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
@@ -31,7 +24,6 @@ import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
 import { PendingPickupSection, usePendingPickupOrders } from './printOrders/PendingPickupSection'
 import { mobilePickupBanner, pendingPickupExitCards } from './printOrders/pendingPickupExits'
 import {
-  formatAmountCents,
   isFreeMemberOrder,
   memberPayStatusLabel,
   paymentSourceLabel,
@@ -44,7 +36,23 @@ import {
   mergePrintOrderRefresh,
   nextPrintOrdersPollDelay,
 } from './printOrders/statusRefresh'
+import {
+  PrintOrderInvoiceAction,
+  ServiceOrderRow,
+  ServiceOrdersMoreAction,
+} from './orders/ServiceOrderRow'
+import {
+  canShowPrintOrderInvoiceButton,
+  formatOrderYuan,
+  hasChargedPrintOrder,
+  invoiceDetailPath,
+  matchesServiceOrderFilter,
+  mergeOrdersNewestFirst,
+  printOrderInvoiceHint,
+} from './orders/orderInvoiceCopy'
+import { useMemberServiceOrders } from './orders/useMemberServiceOrders'
 import './styles/member-records-qx.css'
+import './orders/order-invoice.css'
 
 const PAGE_SIZE = 20
 const MAX_REFRESH_PAGE_SIZE = 50
@@ -60,7 +68,7 @@ const STATUS_LABEL: Record<MemberPrintOrderItem['status'], string> = {
   cancelled: '已取消',
 }
 
-/** 任务状态筛选（客户端过滤已加载数据；「进行中」= pending/claimed/printing）。 */
+/** 任务状态筛选（客户端过滤已加载数据；「进行中」= pending/claimed/printing 与退款处理中服务单）。 */
 const STATUS_FILTERS = [
   { key: 'all', label: '全部', match: () => true },
   { key: 'active', label: '进行中', match: (s: MemberPrintOrderItem['status']) => s === 'pending' || s === 'claimed' || s === 'printing' },
@@ -70,23 +78,6 @@ const STATUS_FILTERS = [
 ] as const
 
 type FilterKey = (typeof STATUS_FILTERS)[number]['key']
-
-/** 卡片上的支付概要一行。历史无 Order 显示「暂无支付信息」。
- *  0 元或免费来源不写「已支付」：待退款仍优先，其余只写免费。收费单保持金额 · 支付状态（来源）。
- */
-function paymentLine(item: MemberPrintOrderItem): string {
-  if (item.payStatus == null) return '暂无支付信息'
-  if (item.amountCents === 0 || item.paymentSource === 'free') {
-    if (item.refundRequired === true) return `0 元（免费试运营） · ${PENDING_REFUND_LABEL}`
-    return '0 元（免费试运营） · 免费'
-  }
-  const parts: string[] = []
-  if (typeof item.amountCents === 'number') parts.push(formatAmountCents(item.amountCents))
-  const sourceLabel = item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined
-  const source = sourceLabel ? `（${sourceLabel}）` : ''
-  parts.push(`${memberPayStatusLabel(item).label}${source}`)
-  return parts.join(' · ')
-}
 
 export function MyPrintOrdersPage() {
   const { isLoggedIn, getToken } = useAuth()
@@ -106,6 +97,8 @@ export function MyPrintOrdersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const itemsRef = useRef(items)
   const loadingMoreRef = useRef(loadingMore)
+
+  const svc = useMemberServiceOrders(isLoggedIn, getToken, reloadKey)
 
   const load = useCallback(() => {
     if (!isLoggedIn) {
@@ -139,7 +132,6 @@ export function MyPrintOrdersPage() {
         setTotal(r.total)
       })
       .catch(() => {
-        // 追加失败保持已加载列表不变；显示内联错误提示，用户可再次点击重试。
         setLoadMoreError(true)
       })
       .finally(() => setLoadingMore(false))
@@ -233,25 +225,58 @@ export function MyPrintOrdersPage() {
     [navigate],
   )
 
-  const filtered = useMemo(() => {
-    const f = STATUS_FILTERS.find((x) => x.key === filterKey) ?? STATUS_FILTERS[0]
-    return items.filter((i) => f.match(i.status))
-  }, [items, filterKey])
+  const openServiceInvoice = useCallback((item: MemberServiceOrderItem) => {
+    navigate(invoiceDetailPath('service', item.id), { state: { amountCents: item.amountCents, serviceName: item.serviceName } })
+  }, [navigate])
 
+  const openPrintInvoice = useCallback((item: MemberPrintOrderItem) => {
+    if (!item.orderId) return
+    navigate(invoiceDetailPath('print', item.orderId), { state: { amountCents: item.amountCents ?? undefined, serviceName: item.fileName ?? '打印订单' } })
+  }, [navigate])
+
+  const ordersMode = useMemo(
+    () => isLoggedIn && (svc.hasAnyPositivePrice || svc.serviceOrders.length > 0 || hasChargedPrintOrder(items)),
+    [isLoggedIn, svc.hasAnyPositivePrice, svc.serviceOrders.length, items],
+  )
+
+  /** 卡片上的支付概要一行：历史无 Order 写「暂无支付信息」；收费单用「X.XX 元」，不写免费试运营。 */
+  const paymentLine = useCallback((item: MemberPrintOrderItem): string => {
+    if (item.payStatus == null) return '暂无支付信息'
+    if (item.amountCents === 0 || item.paymentSource === 'free') {
+      if (ordersMode) return item.refundRequired === true ? PENDING_REFUND_LABEL : '免费'
+      if (item.refundRequired === true) return `0 元（免费试运营） · ${PENDING_REFUND_LABEL}`
+      return '0 元（免费试运营） · 免费'
+    }
+    const parts: string[] = []
+    if (typeof item.amountCents === 'number') parts.push(formatOrderYuan(item.amountCents))
+    const sourceLabel = item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined
+    const source = sourceLabel ? `（${sourceLabel}）` : ''
+    parts.push(`${memberPayStatusLabel(item).label}${source}`)
+    return parts.join(' · ')
+  }, [ordersMode])
+
+  const mergedEntries = useMemo(() => {
+    const f = STATUS_FILTERS.find((x) => x.key === filterKey) ?? STATUS_FILTERS[0]
+    const filteredPrint = items.filter((i) => f.match(i.status))
+    const filteredService = svc.serviceOrders.filter((s) => matchesServiceOrderFilter(s.status, filterKey))
+    return mergeOrdersNewestFirst(filteredPrint, filteredService)
+  }, [items, svc.serviceOrders, filterKey])
+
+  const hasAnyOrders = items.length > 0 || svc.serviceOrders.length > 0
   const pendingPickup = usePendingPickupOrders(isLoggedIn ? getToken() : null)
-  const pendingBlocking = isLoggedIn && state === 'ready' && items.length === 0
-    && (pendingPickup.presence === 'loading' || pendingPickup.presence === 'off')
+  const pendingBlocking = isLoggedIn && state === 'ready' && !hasAnyOrders
+    && (svc.serviceLoading || pendingPickup.presence === 'loading' || pendingPickup.presence === 'off')
   const uiState = !isLoggedIn
     ? 'login'
     : state === 'loading' || pendingBlocking
       ? 'loading'
       : state === 'error'
         ? 'error'
-        : state === 'ready' && items.length === 0 && pendingPickup.presence === 'hidden'
+        : state === 'ready' && !hasAnyOrders && pendingPickup.presence === 'hidden'
           ? 'empty'
           : 'ready'
   const miniOn = whenMiniapp(useSupportContact(isLoggedIn), 'on') !== ''
-  const allLoadedFree = items.length > 0 && items.every(isFreeMemberOrder)
+  const allLoadedFree = items.length > 0 && svc.serviceOrders.length === 0 && items.every(isFreeMemberOrder)
   const pickupBanner = mobilePickupBanner(miniOn, pendingPickup.presence)
   const pickupBlock = (
     <>
@@ -264,7 +289,7 @@ export function MyPrintOrdersPage() {
       <PendingPickupSection
         presence={pendingPickup.presence}
         rows={pendingPickup.rows}
-        hasTasks={items.length > 0}
+        hasTasks={hasAnyOrders}
         reloading={pendingPickup.reloading}
         onReload={pendingPickup.reload}
       />
@@ -278,7 +303,7 @@ export function MyPrintOrdersPage() {
     body = <QxMeLoadingBlock title="正在加载打印订单" />
   } else if (state === 'error') {
     body = <QxMeErrorBlock onRetry={() => setReloadKey((k) => k + 1)} />
-  } else if (items.length === 0 && pendingPickup.presence === 'hidden') {
+  } else if (!hasAnyOrders && pendingPickup.presence === 'hidden') {
     body = (
       <div className="me-state" data-testid="qx-me-fallback">
         <MeEmptyPack exitsClassName="me-orders-exits" sentence="还没有打印订单。没登录时在这台机器上打的单不会进这个账号。">
@@ -289,7 +314,7 @@ export function MyPrintOrdersPage() {
         </MeEmptyPack>
       </div>
     )
-  } else if (items.length === 0) {
+  } else if (!hasAnyOrders) {
     const exits = pendingPickupExitCards({
       printTaskCount: items.length,
       presence: pendingPickup.presence,
@@ -320,10 +345,10 @@ export function MyPrintOrdersPage() {
     )
   } else {
     const syncNote = autoRefreshChecking
-        ? '正在同步进行中的订单…'
-        : autoRefreshSyncedAt
-          ? `进行中的订单会自动刷新，上次同步 ${formatTime(autoRefreshSyncedAt)}。没登录时在这台机器上打的单不会进这个账号。`
-          : '进行中的订单会自动刷新。没登录时在这台机器上打的单不会进这个账号。'
+      ? '正在同步进行中的订单…'
+      : autoRefreshSyncedAt
+        ? `进行中的订单会自动刷新，上次同步 ${formatTime(autoRefreshSyncedAt)}。没登录时在这台机器上打的单不会进这个账号。`
+        : '进行中的订单会自动刷新。没登录时在这台机器上打的单不会进这个账号。'
     body = (
       <>
         {pickupBlock}
@@ -336,7 +361,7 @@ export function MyPrintOrdersPage() {
           onPick={(id) => setFilterKey(id as FilterKey)}
         />
 
-        {filtered.length === 0 ? (
+        {mergedEntries.length === 0 ? (
           <div className="me-state">
             <MeP>{filterKey !== 'all' && nextCursor ? '已加载记录中暂无此类，点「加载更多」继续查找。' : '这个筛选下没有订单。'}</MeP>
             <div className="me-stack me-orders-exits">
@@ -345,13 +370,18 @@ export function MyPrintOrdersPage() {
             </div>
           </div>
         ) : (
-          <MeRows few={filtered.length < 7 && expandedId === null} testId="member-assets-list" label="我的打印订单">
-            {filtered.map((item) => {
+          <MeRows few={mergedEntries.length < 7 && expandedId === null} testId="member-assets-list" label={ordersMode ? '我的订单' : '我的打印订单'}>
+            {mergedEntries.map((entry) => {
+              if (entry.kind === 'service') {
+                return <ServiceOrderRow key={`svc-${entry.id}`} item={entry.item} onInvoice={openServiceInvoice} />
+              }
+              const item = entry.item
               const canCreateFeedback = item.status === 'completed' || item.status === 'failed'
               const expanded = expandedId === item.id
               const name = item.fileName ?? '未命名订单'
               const pay = paymentLine(item)
               const refund = item.refundRequired === true && !pay.includes(PENDING_REFUND_LABEL) ? ` · ${PENDING_REFUND_LABEL}` : ''
+              const invoiceHint = printOrderInvoiceHint(item)
               return (
                 <MeRow
                   key={item.id}
@@ -362,7 +392,8 @@ export function MyPrintOrdersPage() {
                   onToggle={() => setExpandedId(expanded ? null : item.id)}
                   toggleLabel={`${expanded ? '收起' : '查看'}订单详单 ${name}`}
                   title={<span className="qx-me-asset-name">{item.fileName ?? '未命名文件'}</span>}
-                  lines={[<>{STATUS_LABEL[item.status]} · {formatTime(item.completedAt ?? item.createdAt)} · {pay}{refund}{item.pickupCode && ' · 到机码'}</>]}
+                  lines={[<>{STATUS_LABEL[item.status]} · {formatTime(item.completedAt ?? item.createdAt)} · {pay}{refund}{invoiceHint ? ` · ${invoiceHint}` : ''}{item.pickupCode && ' · 到机码'}</>]}
+                  aside={canShowPrintOrderInvoiceButton(item) ? <PrintOrderInvoiceAction item={item} name={name} onInvoice={openPrintInvoice} /> : undefined}
                   actions={(
                     <>
                       <OrderPaymentSummary item={item} />
@@ -392,6 +423,12 @@ export function MyPrintOrdersPage() {
           </div>
         )}
 
+        <ServiceOrdersMoreAction
+          hasMore={Boolean(svc.serviceNextCursor)}
+          loading={svc.loadingMoreServices}
+          onMore={svc.loadMoreServices}
+        />
+
         {hasActivePrintOrders(items) ? (
           <QxTouchCallout kind="remind" icon="alert">
             {autoRefreshFailed ? (
@@ -402,7 +439,7 @@ export function MyPrintOrdersPage() {
           </QxTouchCallout>
         ) : null}
 
-        {filtered.length > 0 && filtered.length < 7 && expandedId === null ? (
+        {mergedEntries.length > 0 && mergedEntries.length < 7 && expandedId === null ? (
           <div className="me-stack me-orders-exits">
             <LicenseLock><MeExitCard art="usb" artWidth={110} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} /></LicenseLock>
             <MeExitCard art="stack" artWidth={110} title="去我的文档" desc="从已保存的文件里再选一份" onClick={() => navigate('/me/documents')} />
@@ -413,20 +450,22 @@ export function MyPrintOrdersPage() {
   }
 
   const ctabar = uiState === 'login' || uiState === 'loading' || uiState === 'error' ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/print-orders', '去打印', () => navigate('/print-scan')) : <LicenseLock>{recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/print-orders', '去打印', () => navigate('/print-scan'))}</LicenseLock>
+  const combinedTotal = total + svc.serviceTotal
+  const pageSub = hasAnyOrders
+    ? (ordersMode ? `共 ${combinedTotal} 条` : `共 ${total} 条已产生打印任务的单`)
+    : uiState === 'empty' || (!hasAnyOrders && (pendingPickup.presence === 'rows' || pendingPickup.presence === 'error'))
+      ? '还没有归入账号的打印任务'
+      : undefined
 
   return (
     <QxMePage
-      title="打印订单"
+      title={ordersMode ? '我的订单' : '打印订单'}
       view="orders"
       screen="member-list"
       screenState={`orders-${uiState}`}
-      eyebrow="我的 · 打印订单"
-      sub={items.length > 0
-        ? `共 ${total} 条已产生打印任务的单`
-        : uiState === 'empty' || (items.length === 0 && (pendingPickup.presence === 'rows' || pendingPickup.presence === 'error'))
-          ? '还没有归入账号的打印任务'
-          : undefined}
-      fine={allLoadedFree ? '只显示当前登录账号的打印订单；状态与到机码一律由系统返回。' : undefined}
+      eyebrow={ordersMode ? '我的 · 订单' : '我的 · 打印订单'}
+      sub={pageSub}
+      fine={allLoadedFree && !ordersMode ? '只显示当前登录账号的打印订单；状态与到机码一律由系统返回。' : undefined}
       ctabar={ctabar}
       live={false}
     >

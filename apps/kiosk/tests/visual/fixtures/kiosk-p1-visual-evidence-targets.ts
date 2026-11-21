@@ -343,6 +343,8 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   productionOnly('/pay/resume'),
   productionOnly('/pay/interview'),
   productionOnly('/pay/scan'),
+  // 自助开发票扫码屏：2026-07 原型集里没有，稿在触屏版 pay-1113.js:476-569。
+  productionOnly('/me/orders/invoice'),
   productionOnly('/ai/plan'),
   productionOnly('/session-resume'),
   redirect('/jobs/online-platforms', '/official-channels'),

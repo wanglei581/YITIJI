@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-11-21：自助开票二期 + 一体机「我的订单」与开发票扫码屏 P2c2（分支 `claude/invoice-p2c2-1121`，未推送，未上线）
+
+- 来由：按任务包 `P2c2` 依据 `docs/design/kiosk-touch-2026-10/pay-1113.js`（472–569 行）与 `deliver-1111/r26-1119/p2e/decisions.md` 第 4 条，补齐会员服务单列表与一体机订单页开票入口及自助开发票扫码屏（零新增 Prisma 迁移，业务源码单文件严格 `< 500` 行）。
+- 后端零 PII 列表与开票态统一判据：
+  - 新增 `GET /api/v1/me/service-orders`（`services/api/src/payment/member-service-order.{controller,service}.ts` 与 `services/api/src/invoices/invoice-request-summary.ts`，挂入 `ServiceOrderModule`）：`@UseGuards(EndUserAuthGuard)` + `Cache-Control: no-store`，按 `endUserId` 严格隔离，仅返实付 `> 0`、`paymentFailed = false`、状态属于 `paid/consumed/refunding/refunded/refund_failed` 的服务单，`cursor` + `pageSize`（默认 20 封顶 50，非法游标 400 `VALIDATION_FAILED`），批量联查 `InvoiceRequest`（优先 `submitted`/`issued`，否则最近 `returned`）并统一调用 `assessInvoiceEligibility` 计算 `canInvoice`，响应绝不含 `taxId`/`email`/`title`/`qrCodeContent`/`prepayId`/`channelTxnNo`/`providerOrderNo`/`wxOpenId`。
+  - `GET /api/v1/me/print-orders`（`member-print-orders.service.ts`）：仅对已关联 `Order` 且 `amountCents > 0` 的收费打印单批量补齐只增可选字段 `canInvoice`、`invoiceStatus`、`invoiceRequestId`（复用 `assessInvoiceEligibility`，免费/无 `Order` 行保持零新增键，100% 向后兼容）。
+- 一体机「我的订单」升级与 `/me/orders/invoice` 自助开发票扫码屏：
+  - 先拆后改 `apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx`，拆出 `apps/kiosk/src/pages/profile/me/orders/{orderInvoiceCopy,useMemberServiceOrders,ServiceOrderRow,useOrderInvoiceSession,MyOrderInvoicePage}.ts(x)` 与 `order-invoice.css`（全量业务源码均 `< 500` 行）。
+  - 收费机或会员名下有服务单/实付打印单时标题升级为「我的订单 / 我的 · 订单 / 共 N 条」，按 `createdAt` 新到旧混排服务单与打印单并诚实筛选，可开票单右侧提供「开发票」主按钮，严格对齐 `pay-1113.js:516-537` 文案；无打印单但有服务单时正常渲染不误显空态；纯免费机无收费单时 100% 保持原「打印订单」与既有免费门禁/用例零改动。
+  - 新增 `/me/orders/invoice`（同步登记 `routes/index.tsx`、`KioskRoot.tsx`、`licenseWindDownRoutes.ts` `mine/always` 组、`route-manifest.ts`、W5/W6 门禁及遵循 `468c3a4e0`/`6bd209038` 先例在 `kiosk-proto-2026-07-migration-matrix.md` 追加 1 行路由映射）：支持收费出码态（白底码框、三步路径、「手机上要填的三项」、3s 轮询与可见性暂停及 429 `Retry-After` 退避、轮询变 `已提交` 立停并展示确认句、过期隐藏失效码切「重新生成开票码」）、免费兜底态与 `INVOICE_NOT_ALLOWED` 原因展示；全屏零输入框、`controlToken` 仅存组件内存 `ref` 不落任何 storage/URL，零 `¥`、零「工作人员」、零硬编码价目。
+  - 同步更新 `docs/api/member-invoice-requests.md`，新增 `verify:member-service-orders`（挂入 `ci.yml` SQLite/PG 双 job 与 `verify-ci-gate-coverage.mjs`）及 `tests/visual/my-orders-invoice.spec.ts`（挂入 `test:browser:truth`）。
+- 验证：SQLite 与真实 PostgreSQL 16（端口 5673）+ 隔离 Redis（6673）双库实跑 `verify:member-service-orders`（6 组）、`verify:invoice-real-db`、`verify:invoice-http`、`verify:member-print-orders`、`verify:member-closure`（22 组）全部通过；真实编译 API（3373）+ PG（5673）+ Redis（6673）+ Kiosk Vite（4179）双视口端到端实走「一体机出真码 `/k/i/<scene>` → 手机提交 → 一体机 3s 自动轮询变 `已提交` → 回订单页见 `已提交开票`」通过；`blk.sh` 锁下 `my-orders-invoice.spec.ts`（8/8）及既有打印订单/个人中心/W2/W5/W6 回归 0 改期望全绿；产出 4 张 1080×1920 照稿并排对比图至 `/tmp/p2c2-sbs/`；5 条反向变异（M1/M2/M3a/M3b/M4）均跑红并逐字节还原复绿；全仓 `tsc`/`pnpm lint`/图谱重生 `--check`/CI 门禁覆盖与仓库完整性通过；未推送，未上线。
+
 ## 2026-11-21：小程序微信虚拟支付后端极小收口返工 P2d1b3（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
 
 - 来由：按 Codex 独立复收 `P2d1b2`（`f61d17b23`）复现出的 4 处阻塞/并发缺陷 + 1 处 XML 重复键收紧，接在 `f61d17b23` 之后逐项完成极小收口并提交（零新增数据库迁移）。

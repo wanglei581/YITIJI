@@ -4,7 +4,7 @@ export interface WindDownRoute { path: string; service: string; kind: WindDownRo
 // Explicit route patterns mirror routes/index.tsx, including redirects and mobile entry points.
 const groups: Array<[string, WindDownRouteKind, string[]]> = [
   ['public', 'always', ['/', '/login', '/legal/:doc', '/screensaver', '/session-timeout', '/error-offline', '/help', '/notifications', '/official-channels', '/jobs/online-platforms', '/member/qr-login', '/k/l/:ticketId']],
-  ['mine', 'always', ['/profile', '/me/resumes', '/me/print-orders', '/me/documents', '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings', '/me/privacy-requests']],
+  ['mine', 'always', ['/profile', '/me/resumes', '/me/print-orders', '/me/orders/invoice', '/me/documents', '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings', '/me/privacy-requests']],
   ['information', 'always', ['/renshi', '/print-scan', '/print-scan/feature/:key', '/print/scan-feature', '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/companies', '/companies/:id', '/job-fairs', '/job-fairs/:id', '/job-fairs/:id/companies', '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map', '/job-fairs/:id/stats', '/campus', '/campus/welcome', '/jobs-service', '/fairs-service']],
   // 百宝箱、智慧校园已停放（#1583）：旧链接与全部深链一律回首页，按首页算，收尾期间也照常回首页。
   ['public', 'always', ['/toolbox/*', '/smart-campus/*']],

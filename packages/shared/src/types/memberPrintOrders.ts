@@ -97,7 +97,16 @@ export interface MemberPrintOrderItem {
    * 不给 errorMessage 原文（那是写给一体机现场的）；前端按码配用户说法。
    */
   failureCode?: 'PAPER_EMPTY' | 'PRINTER_ERROR' | 'PRINTER_OFFLINE' | 'PRINT_JOB_UNCONFIRMED' | 'PARTIAL_OUTPUT' | null
+  // ── 自助开票二期（2026-11-21）：只读可选，仅已关联 Order 且 amountCents > 0 时返回；绝不含税号/邮箱/抬头 ──
+  /** 本单当前能否提交开票申请（与后端 assessInvoiceEligibility 同源）。 */
+  canInvoice?: boolean
+  /** 本单开票申请状态：none 无申请 / submitted 已提交 / issued 已开 / returned 已退回。 */
+  invoiceStatus?: MemberInvoiceStatus
+  /** 最新有效（或最近退回）开票申请编号；无申请为 null。 */
+  invoiceRequestId?: string | null
 }
+
+export type MemberInvoiceStatus = 'none' | 'submitted' | 'issued' | 'returned'
 
 // ============================================================
 // 跨端订单时间线：GET /api/v1/me/print-orders/timeline（2026-09-29）

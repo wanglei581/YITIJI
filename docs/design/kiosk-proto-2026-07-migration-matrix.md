@@ -126,6 +126,7 @@
 | `/k/i/:scene` | InvoiceSceneEntry | src/pages/invoice/PhoneInvoicePages.tsx | 2026-11-19：一体机开票码的短链网页中转，兑换场景码后 replace 到 `/invoice/phone`（凭据只放 fragment）；前缀与 `/k/u`、`/k/l` 分开，不进小程序扫码规则；顶级全屏、手机尺寸；无原型屏 |
 | `/invoice/phone` | PhoneInvoicePage | src/pages/invoice/PhoneInvoicePages.tsx | 2026-11-19：手机上填写开票信息（抬头类型、抬头、单位税号、接收邮箱）；文案取触屏稿 `pay-1113.js` 开票屏与合规文档「发票申请流程」；顶级全屏、手机尺寸；无原型屏 |
 | `/pay/resume` `/pay/interview` `/pay/scan` | PayServicePage | src/pages/pay/PayServicePage.tsx | 2026-11-19：AI 简历优化、AI 模拟面试、扫描的按次付款屏，三种服务各一条；视觉取触屏版稿 `pay-1113.js` 的 pay-service；75 屏原型无对应屏 |
+| `/me/orders/invoice` | MyOrderInvoicePage | src/pages/profile/me/orders/MyOrderInvoicePage.tsx | 2026-11-21：一体机自助开发票扫码屏（白底码框、三项说明、状态轮询、免费机兜底）；视觉取触屏版稿 `pay-1113.js`（476–569 行）；75 屏原型无对应屏 |
 
 > 备注:`src/pages/placeholders/` 下另有 `OfflineAgenciesPage.tsx` / `OfflineJobDetailPage.tsx` / `PrintScanConvertPage.tsx` / `PrintScanFeaturePage.tsx` / `PrintScanSignPage.tsx` 等占位文件,**未被 routes/index.tsx 引用**(实际路由指向正式实现版),属历史遗留,不参与迁移。`src/pages/jobs-fairs-prototype.tsx` 亦未被路由引用。
 

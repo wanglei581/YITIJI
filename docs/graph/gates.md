@@ -52,7 +52,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 断言了不存在的路径（8）
+## 断言了不存在的路径（10）
 
 门禁里写着某个仓库路径，但该路径在 git 里不存在。可能是文件被移动/删除后门禁
 没跟着改 —— 这类断言往往已经恒真或恒假，需要人确认。
@@ -60,7 +60,9 @@ _（空）_
 | 门禁脚本 | 找不到的路径 |
 | --- | --- |
 | `apps/kiosk/scripts/verify-data-request-ui.mjs` | `apps/admin/src/routes/member-privacy/index.tsx`<br/>`apps/admin/src/services/api/memberPrivacyAdmin.ts` |
+| `apps/kiosk/scripts/verify-fusion-w5.mjs` | `src/pages/profile/me/orders/orderInvoiceCopy.ts` |
 | `apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs` | `src/pages/resume/ResumeExportPage.tsx` |
+| `apps/kiosk/scripts/verify-lightflow-profile-entry.mjs` | `apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx`<br/>`apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx`<br/>`apps/kiosk/src/pages/profile/me/orders/order-invoice.css`<br/>`apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts`<br/>`apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts`<br/>`apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts` |
 | `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs` | `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs` |
 | `apps/partner/scripts/verify-partner-refresh-safe.mjs` | `services/api/policies.ts` |
 | `services/api/scripts/verify-conversation-memory-forget-logout-switch.ts` | `services/api/aiHttpAdapter.ts`<br/>`services/api/aiSessionForget.ts` |

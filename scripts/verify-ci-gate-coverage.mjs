@@ -92,6 +92,8 @@ const REQUIRED_COMMANDS = [
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters',
   // 服务单沙箱模拟付成：生产必须 404、只认沙箱通道。它一旦从 CI 摘掉，生产判断被删也不会有人发现。
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-sandbox-simulate',
+  // 自助开票二期：会员侧服务单列表、打印单开票态与真 HTTP 跨端开票闭环。
+  'VERIFICATION_DATABASE_TARGET=isolated VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-service-orders',
 ]
 
 const workflowText = readFileSync(workflowPath, 'utf8')

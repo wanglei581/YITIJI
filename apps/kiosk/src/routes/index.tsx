@@ -34,6 +34,7 @@ import { PrintPickupClaimPage } from '../pages/print/PrintPickupClaimPage'
 import { PayServicePage } from '../pages/pay/PayServicePage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { MyPrintOrdersPage } from '../pages/profile/me/MyPrintOrdersPage'
+import { MyOrderInvoicePage } from '../pages/profile/me/orders/MyOrderInvoicePage'
 import { MyResumesPage } from '../pages/profile/me/MyResumesPage'
 import { MyDocumentsPage } from '../pages/profile/me/MyDocumentsPage'
 import { MyFavoritesPage } from '../pages/profile/me/MyFavoritesPage'
@@ -153,6 +154,7 @@ export const kioskRouter = createBrowserRouter([
           // 「我的」明细页（本人 /me/* 真实数据；未登录引导登录，空态诚实，不造假数据）
           { path: 'me/resumes',        element: <MyResumesPage /> },
           { path: 'me/print-orders',   element: <MyPrintOrdersPage /> },
+          { path: 'me/orders/invoice', element: <MyOrderInvoicePage /> },
           { path: 'me/documents',      element: <MyDocumentsPage /> },
           { path: 'me/favorites',      element: <MyFavoritesPage /> },
           { path: 'me/ai-records',     element: <MyAiRecordsPage /> },
