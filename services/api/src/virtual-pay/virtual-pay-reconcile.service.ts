@@ -11,7 +11,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { sendVirtualPayOpsAlert } from './virtual-pay-alert'
 import { confirmPaid } from './virtual-pay-delivery'
 import { VIRTUAL_PAY_DIAGNOSTIC_ACTION } from './virtual-pay-order.service'
-import { calcPaySig } from './virtual-pay-sign'
+import { notifyWechatProvideGoods, queryWechatVirtualPayOrder } from './virtual-pay-xpay-client'
 
 /** 超过 2 分钟仍待支付才查，避免刚下单就打微信。核对表补充规则 8。 */
 export const VIRTUAL_PAY_QUERY_MIN_AGE_MS = 2 * 60 * 1000
@@ -22,13 +22,14 @@ export const VIRTUAL_PAY_QUERY_MAX_FAILS = 3
 /** 待支付单超过 24 小时仍因查询失败无法收敛时直接转待人工。 */
 export const VIRTUAL_PAY_MANUAL_REVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000
 const QUERY_TAKE = 50
-const QUERY_URI = '/xpay/query_order'
 /**
  * 微信官方 query_order Res.order.status 明确表示已支付的状态：
  * 2=订单已经支付，待发货；3=订单发货中；4=订单已发货。
  * 7（退款失败）、9（回收广告金完成）、10（分账回退完成）不得记权益，只写诊断转待人工。
  */
 const PAID_STATUSES = new Set([2, 3, 4])
+/** 查单补记后仍停留在待发货(2)或发货中(3)的现金单，需调 notify_provide_goods 同步微信侧已发货态。 */
+const NEED_NOTIFY_PROVIDE_STATUSES = new Set([2, 3])
 
 interface PendingOrder {
   id: string
@@ -158,22 +159,14 @@ export class VirtualPayReconcileService {
     token: string,
     fetchImpl: typeof fetch,
   ): Promise<QueryOutcome> {
-    const body = JSON.stringify({ openid: order.openId, env: order.env, order_id: order.outTradeNo })
-    const paySig = calcPaySig(QUERY_URI, body, appKey)
-    const url =
-      'https://api.weixin.qq.com/xpay/query_order' +
-      `?access_token=${encodeURIComponent(token)}` +
-      `&pay_sig=${encodeURIComponent(paySig)}`
-    const response = await fetchImpl(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
+    const data = await queryWechatVirtualPayOrder({
+      openId: order.openId,
+      env: order.env,
+      orderId: order.outTradeNo,
+      appKey,
+      token,
+      fetchImpl,
     })
-    if (!response.ok) throw new Error('VPAY_QUERY_HTTP')
-    const data = (await response.json()) as {
-      errcode?: number
-      order?: { status?: number; paid_fee?: number; env_type?: number; wx_order_id?: string; paid_time?: number }
-    }
     if (data.errcode !== 0 || !data.order || typeof data.order.status !== 'number') {
       return { kind: 'error', reason: 'query_failed' }
     }
@@ -205,6 +198,17 @@ export class VirtualPayReconcileService {
     if (!result.ok) {
       await this.diagnoseOrder(order, result.reason)
       return { kind: 'mismatch' }
+    }
+    if (result.granted && NEED_NOTIFY_PROVIDE_STATUSES.has(status)) {
+      const notified = await notifyWechatProvideGoods({
+        orderId: order.outTradeNo,
+        env: order.env,
+        token,
+        fetchImpl,
+      })
+      if (!notified) {
+        await this.diagnoseOrder(order, 'notify_provide_goods_failed')
+      }
     }
     return { kind: 'paid' }
   }

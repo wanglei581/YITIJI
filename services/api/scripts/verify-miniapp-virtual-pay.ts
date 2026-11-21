@@ -47,6 +47,7 @@ import { assertVirtualPayDelivery } from './support/miniapp-virtual-pay-delivery
 import { assertVirtualPayCredits } from './support/miniapp-virtual-pay-credits'
 import { assertVirtualPayReconcile } from './support/miniapp-virtual-pay-reconcile'
 import { assertVirtualPayReconcileEdge } from './support/miniapp-virtual-pay-reconcile-edge'
+import { assertVirtualPayNotifyProvideGoods } from './support/miniapp-virtual-pay-notify-goods'
 import { assertOfficialVirtualPaySignatures, assertVirtualPayOrders } from './support/miniapp-virtual-pay-orders'
 
 const API_ROOT = resolve(__dirname, '..')
@@ -421,6 +422,7 @@ async function main(): Promise<void> {
     await assertVirtualPayDelivery({ prisma, base })
     await assertVirtualPayReconcile({ prisma, redis })
     await assertVirtualPayReconcileEdge({ prisma, redis })
+    await assertVirtualPayNotifyProvideGoods({ prisma, redis })
     await assertVirtualPayCredits({ prisma, call, jwt, redis })
   } finally {
     await app.close()

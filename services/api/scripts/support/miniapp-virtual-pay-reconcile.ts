@@ -44,6 +44,7 @@ export async function assertVirtualPayReconcile(options: {
   await createOrder(prisma, 'vpqueryoldpay', now.getTime() - VIRTUAL_PAY_QUERY_MAX_AGE_MS - 2 * 60_000)
 
   const seen = new Map<string, string>()
+  const notified: string[] = []
   let tokenCalls = 0
   const originalFetch = globalThis.fetch
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -56,6 +57,12 @@ export async function assertVirtualPayReconcile(options: {
       const posted = String(init?.body ?? '')
       assert.equal(posted.includes(' '), false)
       return json({ access_token: TOKEN, expires_in: 7200 })
+    }
+    if (url.includes('/xpay/notify_provide_goods')) {
+      const parsed = JSON.parse(String(init?.body ?? '{}')) as { order_id: string; env: number }
+      assert.equal(parsed.env, 0)
+      notified.push(parsed.order_id)
+      return json({ errcode: 0, errmsg: 'ok' })
     }
     if (!url.includes('/xpay/query_order')) throw new Error(`unexpected wechat url ${url.split('?')[0]}`)
     const body = String(init?.body ?? '')
@@ -99,6 +106,7 @@ export async function assertVirtualPayReconcile(options: {
     await reconcile.reconcileOnce(now, globalThis.fetch)
     assert.equal(await credits(prisma, 'vpquerypaid01'), 1)
     assert.equal(tokenCalls, 1)
+    assert.deepEqual([...notified].sort(), ['vpqueryafter1', 'vpqueryoldpay', 'vpquerypaid01'])
 
     const reasons = (await prisma.auditLog.findMany({ where: { action: VIRTUAL_PAY_DIAGNOSTIC_ACTION } }))
       .map((row) => JSON.parse(row.payloadJson).reason as string)
