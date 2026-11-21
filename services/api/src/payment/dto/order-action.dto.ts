@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator'
 
 /**
  * Admin 线下/人工确认收款请求体（P0a，无 live 网关）。
@@ -32,6 +32,11 @@ export class AdminRegisterChannelResultDto {
   @IsString()
   @MaxLength(64)
   channelRefundNo?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  actualAmountCents?: number
 
   @IsOptional()
   @IsString()

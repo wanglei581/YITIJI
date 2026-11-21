@@ -53,7 +53,7 @@ export async function channelRegistrationEntry(
 export async function registerChannelResult(
   db: PrismaService,
   orderId: string,
-  input: { refundNo: string; result: string; channelRefundNo?: string | null; note?: string | null; confirmOrderNo: string },
+  input: { refundNo: string; result: string; channelRefundNo?: string | null; actualAmountCents?: number | null; note?: string | null; confirmOrderNo: string },
   operatorId: string,
   deps: { supportsQuery: (channel: string) => boolean; channelQuery: PendingRefundChannelQuery },
 ): Promise<{ orderId: string; payStatus: string; refundStatus: string; refundNo: string; amountCents: number; recordedBy: 'registration' | 'channel' }> {
@@ -79,7 +79,18 @@ export async function registerChannelResult(
     if (!channelRefundNo || channelRefundNo.length > 64) {
       throw deny('REGISTRATION_INPUT_REQUIRED', '登记「渠道已退成」要填渠道退款单号（64 字以内）。')
     }
-    registration = { result: 'refunded', channelRefundNo, note: input.note?.trim() || null }
+    const actualAmountCents = input.actualAmountCents === undefined || input.actualAmountCents === null
+      ? refund.amountCents
+      : input.actualAmountCents
+    if (
+      typeof actualAmountCents !== 'number'
+      || !Number.isInteger(actualAmountCents)
+      || actualAmountCents <= 0
+      || actualAmountCents > refund.amountCents
+    ) {
+      throw deny('REGISTRATION_AMOUNT_INVALID', `实退金额必须是大于 0 且不超过本笔申请额（${refund.amountCents} 分）的整数分。`)
+    }
+    registration = { result: 'refunded', channelRefundNo, actualAmountCents, note: input.note?.trim() || null }
   } else if (input.result === 'not_refunded') {
     const note = input.note?.trim() ?? ''
     if (note.length < 4 || note.length > 200) {
@@ -120,7 +131,12 @@ export async function registerChannelResult(
       db,
       orderId,
       [registration.result === 'refunded'
-        ? { refundNo: refund.refundNo, verdict: 'success', amountCents: refund.amountCents, channelRefundNo: registration.channelRefundNo }
+        ? {
+          refundNo: refund.refundNo,
+          verdict: 'success',
+          amountCents: registration.actualAmountCents ?? refund.amountCents,
+          channelRefundNo: registration.channelRefundNo,
+        }
         : { refundNo: refund.refundNo, verdict: 'failed' }],
       operatorId,
       registration,

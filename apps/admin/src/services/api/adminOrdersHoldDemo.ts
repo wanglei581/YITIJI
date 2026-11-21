@@ -167,24 +167,52 @@ export function registerHoldDemo(id: string, input: ChannelResultRegistrationInp
     throw new ApiHttpError('REGISTRATION_ORDER_NO_MISMATCH', '重输的订单号和这张单对不上，没有登记。', 400)
   }
   const at = new Date().toISOString()
+  if (input.result === 'refunded') {
+    const maxCents = order.channelResultRegistration.amountCents
+    const actualCents = input.actualAmountCents ?? maxCents
+    if (!Number.isInteger(actualCents) || actualCents <= 0 || actualCents > maxCents) {
+      throw new ApiHttpError('REGISTRATION_AMOUNT_INVALID', `实退金额必须是大于 0 且不超过本笔申请额（${maxCents} 分）的整数分。`, 400)
+    }
+    order.channelInFlight = false
+    order.channelResultRegistration = null
+    order.updatedAt = at
+    order.refundStatus = 'success'
+    order.refundLedgerCents = actualCents
+    order.refundedAmountCents = actualCents
+    if (actualCents < order.payableCents) {
+      order.payStatus = 'partial_refunded'
+      order.refundRemainderCents = order.payableCents - actualCents
+      order.refundEligible = true
+      order.printRefundDisposition = 'manual'
+      order.printRefundReason = '只退了一部分，纸没有出，待人工核对'
+      order.opsAttention = true
+      order.opsAttentionCode = 'partial_refunded'
+      order.refundRequired = false
+    } else {
+      order.payStatus = 'refunded'
+      order.taskStatus = 'cancelled'
+      order.printRefundDisposition = null
+      order.refundRemainderCents = null
+      order.refundedAt = at
+      order.opsAttention = false
+      order.opsAttentionCode = null
+      order.refundRequired = false
+    }
+    return {
+      orderId: order.id,
+      payStatus: order.payStatus,
+      refundStatus: 'success',
+      refundNo: input.refundNo,
+      amountCents: actualCents,
+      recordedBy: 'registration',
+    }
+  }
   order.channelInFlight = false
   order.channelResultRegistration = null
   order.updatedAt = at
-  if (input.result === 'refunded') {
-    order.payStatus = 'refunded'
-    order.refundStatus = 'success'
-    order.taskStatus = 'cancelled'
-    order.printRefundDisposition = null
-    order.refundedAmountCents = order.refundLedgerCents ?? 0
-    order.refundedAt = at
-    order.opsAttention = false
-    order.opsAttentionCode = null
-    order.refundRequired = false
-  } else {
-    order.payStatus = 'paid'
-    order.refundStatus = 'failed'
-    order.refundFailureReason = '按商户平台核实：没退出去'
-  }
+  order.payStatus = 'paid'
+  order.refundStatus = 'failed'
+  order.refundFailureReason = '按商户平台核实：没退出去'
   return {
     orderId: order.id,
     payStatus: order.payStatus,

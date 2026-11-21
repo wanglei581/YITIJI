@@ -113,4 +113,30 @@ test.describe('待人工三步按钮只看渠道在途', () => {
     await expect(row).toContainText('已退款')
     await settleAdminPage(page, guards)
   })
+
+  test('按商户平台核实结果登记「渠道已退成」：校验实退金额并支持部分退留余款', async ({ page }) => {
+    const { guards, detail } = await openHoldDetail(page, 'channel-stuck', '处理中')
+    await detail.getByRole('button', { name: '按商户平台核实结果登记', exact: true }).click()
+    await detail.getByRole('button', { name: '渠道已退成', exact: true }).click()
+
+    const amountInput = detail.getByLabel('实退金额（元）')
+    await expect(amountInput).toHaveValue('2.00')
+    await detail.getByLabel('渠道退款单号').fill('WX-PART-60')
+    await detail.getByLabel('重输订单号确认').fill(ORDER_NO)
+    const submit = detail.getByRole('button', { name: '确认登记', exact: true })
+    await expect(submit).toBeEnabled()
+
+    await amountInput.fill('3.00')
+    await expect(submit).toBeDisabled()
+    await amountInput.fill('0')
+    await expect(submit).toBeDisabled()
+    await amountInput.fill('0.60')
+    await expect(submit).toBeEnabled()
+    await submit.click()
+
+    await expect(detail.getByText('已退款', { exact: true }).locator('..')).toContainText('¥0.60')
+    await expect(detail.getByRole('button', { name: '退还剩余', exact: true })).toBeVisible()
+    await expect(detail.getByText(/退还剩余 ¥1\.40/)).toBeVisible()
+    await settleAdminPage(page, guards)
+  })
 })

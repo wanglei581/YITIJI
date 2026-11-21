@@ -81,6 +81,8 @@ async function main(): Promise<void> {
     await runServiceOrderP2b9dAbnormalCases(prisma, randomBytes(4).toString('hex'))
     const { runP2b9dQueryChannelCases } = await import('./support/pickup-arrival-p2b9d-query-channel-cases')
     await runP2b9dQueryChannelCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
+    const { runP2b9dRegAmountCases } = await import('./support/pickup-arrival-p2b9d-reg-amount-cases')
+    await runP2b9dRegAmountCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
   } finally {
     await prisma.onModuleDestroy()
     rmSync(dir, { recursive: true, force: true })

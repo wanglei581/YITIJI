@@ -41,6 +41,7 @@ function deny(code: string, message: string): BadRequestException {
 export type ChannelResultRegistration = {
   result: 'refunded' | 'not_refunded'
   channelRefundNo: string | null
+  actualAmountCents?: number | null
   note: string | null
 }
 
@@ -67,6 +68,7 @@ export async function recordChannelAnswers(
             refundNos: answers.map((answer) => answer.refundNo),
             result: registration.result,
             channelRefundNo: registration.channelRefundNo,
+            ...(registration.actualAmountCents != null ? { actualAmountCents: registration.actualAmountCents } : {}),
             note: registration.note,
             operatorId,
             basis: '按商户平台核实结果登记',

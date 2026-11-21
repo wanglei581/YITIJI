@@ -7,6 +7,8 @@ export interface ChannelResultRegistrationInput {
   result: 'refunded' | 'not_refunded'
   /** 登记「渠道已退成」时必填。 */
   channelRefundNo?: string
+  /** 登记「渠道已退成」时的实退金额（整数分），必须满足 0 < actualAmountCents <= 申请额。 */
+  actualAmountCents?: number
   /** 登记「渠道确认没退出去」时必填，4 到 200 字。 */
   note?: string
   /** 重输的订单号，必须和这张单一致。 */
