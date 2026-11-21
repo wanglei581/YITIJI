@@ -438,13 +438,86 @@ test.describe('模拟面试按次付款 P2e-3 @kiosk', () => {
     await expect(alert).not.toContainText('钱在退回')
     await expect(alert).not.toContainText('已退')
 
-    // 轮询进入 refunding → 写「钱在退回」，仍绝不写「已退」
+    // 轮询进入 refunding → 写「钱在退回」，仍绝不写「已退」，且隐藏生成/重试按钮
     await expect(alert).toContainText('钱在退回原付款账户，到账时间以支付渠道为准。', { timeout: 10_000 })
     await expect(alert).not.toContainText('已退')
+    await expect(page.getByTestId('interview-primary')).toHaveText('回到首页')
+    await expect(page.getByRole('button', { name: '结束并生成练习报告' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '免费再试一次' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '结束本场练习' })).toHaveCount(0)
 
-    // 轮询进入 refunded → 才允许写「已退回」
+    // 轮询进入 refunded → 才允许写「已退回」，仍不允许第三次触发 end
     await expect(alert).toContainText('已退回', { timeout: 10_000 })
     await expect(alert).toContainText('钱在退回')
+    await expect(page.getByTestId('interview-primary')).toHaveText('回到首页')
+    expect(endCalls).toBe(2)
+    await expectNoForbiddenCopy(page)
+  })
+
+  test('作答页免费再试过期 409 SERVICE_RETRY_EXPIRED：展示退款并隐藏生成/重试按钮，保留返回与带走问答 @kiosk', async ({ page, api }) => {
+    setupMachine(api, { mock_interview: 100 })
+    const order: FixtureOrder = { ...ORDER_INTERVIEW, createdAt: Date.now() }
+    let orderMode: 'pending' | 'paid' | 'report_retry' | 'refunded' = 'pending'
+    let endCalls = 0
+    api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
+    api.respondWith('GET', serviceOrderPath(order.id), () => {
+      if (orderMode === 'refunded') {
+        return ok(serviceOrderView(order, {
+          status: 'refunded',
+          paidAt: new Date(order.createdAt + 1_000).toISOString(),
+          refundReason: '免费再试已过期',
+          refundedAt: new Date().toISOString(),
+        }))
+      }
+      if (orderMode === 'report_retry') {
+        return ok(serviceOrderView(order, {
+          status: 'consumed',
+          paidAt: new Date(order.createdAt + 1_000).toISOString(),
+          settledAt: new Date(order.createdAt + 2_000).toISOString(),
+          attemptsUsed: 1,
+          failureReason: '报告没生成',
+          retryUntil: new Date(Date.now() + 10 * 60_000).toISOString(),
+        }))
+      }
+      if (orderMode === 'paid') {
+        return ok(serviceOrderView(order, { status: 'paid', paidAt: new Date(order.createdAt + 1_000).toISOString() }))
+      }
+      return ok(serviceOrderView(order))
+    })
+    api.respondWith('POST', INTERVIEW_END_PATH, () => {
+      endCalls += 1
+      if (endCalls === 1) {
+        orderMode = 'report_retry'
+        return apiError(503, 'AI_INTERVIEW_REPORT_FAILED', '报告生成失败')
+      }
+      orderMode = 'refunded'
+      return apiError(409, 'SERVICE_RETRY_EXPIRED', '免费再试时间已过，这一次的费用会自动退回原付款账户')
+    })
+
+    await reachSetupStep3(page)
+    await page.getByTestId('interview-primary').click()
+    await confirmAge14(page)
+    await expect(page.locator('[data-qx-page="pay-service"]')).toHaveAttribute('data-qxt-state', 'wait')
+    orderMode = 'paid'
+    await expect(page.locator('[data-kiosk-screen="interview-session"]')).toBeVisible({ timeout: 15_000 })
+
+    await page.getByRole('textbox', { name: '本题回答' }).fill('我负责每周台账复核和进度同步。')
+    await page.getByTestId('interview-primary').click()
+    await expect(page.locator('.interview-session__history')).toContainText('台账复核')
+
+    await page.getByRole('button', { name: '结束本场练习' }).click()
+    await expect(page.getByTestId('interview-primary')).toHaveText('免费再试一次')
+
+    // 模拟再试时服务端已判定过期 409 并走退款：隐藏生成/重试按钮、保留安全出口
+    await page.getByTestId('interview-primary').click()
+    const alert = page.locator('.interview-session__error')
+    await expect(alert).toContainText('已退回')
+    await expect(page.getByTestId('interview-primary')).toHaveText('回到首页')
+    await expect(page.getByRole('button', { name: '结束并生成练习报告' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '免费再试一次' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '结束本场练习' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /带走本场问答/ })).toBeVisible()
+    expect(endCalls).toBe(2)
     await expectNoForbiddenCopy(page)
   })
 
@@ -487,6 +560,10 @@ test.describe('模拟面试按次付款 P2e-3 @kiosk', () => {
     await expect(alert).toContainText('需要帮助？拨打服务电话')
     await expect(alert).not.toContainText('钱在退回')
     await expect(alert).not.toContainText('已退')
+    await expect(page.getByTestId('interview-primary')).toHaveText('回到首页')
+    await expect(page.getByRole('button', { name: '结束并生成练习报告' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '免费再试一次' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '结束本场练习' })).toHaveCount(0)
     await expectNoForbiddenCopy(page)
   })
 
@@ -505,11 +582,19 @@ test.describe('模拟面试按次付款 P2e-3 @kiosk', () => {
     expect(orderCalls).toHaveLength(0)
   })
 
-  test('402 SERVICE_PAYMENT_REQUIRED 兜底：补确认 14 岁后自动回付款屏 @kiosk', async ({ page, api }) => {
-    // 初始价目表显示 0 元（模拟管理员刚切收费、终端缓存未到期），start 回 402 时必须兜底回付款屏。
+  test('402 SERVICE_PAYMENT_REQUIRED 兜底：补确认 14 岁 → 付款 → 付成自动带头开场无循环 @kiosk', async ({ page, api }) => {
+    // 初始价目表显示 0 元（模拟管理员刚切收费、终端缓存未到期），start 回 402 时兜底回付款屏，付成后自动开场且仅建 1 单不循环。
     setupMachine(api, { mock_interview: 0 })
     const order: FixtureOrder = { ...ORDER_INTERVIEW, createdAt: Date.now() }
     let switchedToPaid = false
+    let orderPaid = false
+    let startCalls = 0
+    const startHeaders: Array<Record<string, string>> = []
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && new URL(req.url()).pathname === INTERVIEW_START_PATH) {
+        startHeaders.push(req.headers())
+      }
+    })
     api.mapJson('GET', KIOSK_CONFIG_PATH, (json) => {
       const base = json && typeof json === 'object' ? (json as Record<string, unknown>) : {}
       const pricing = base.pricing && typeof base.pricing === 'object' ? (base.pricing as Record<string, unknown>) : {}
@@ -522,17 +607,50 @@ test.describe('模拟面试按次付款 P2e-3 @kiosk', () => {
       }
     })
     api.respondWith('POST', INTERVIEW_START_PATH, () => {
-      switchedToPaid = true
-      return apiError(402, 'SERVICE_PAYMENT_REQUIRED', '这一次要先付款')
+      startCalls += 1
+      if (startCalls === 1) {
+        switchedToPaid = true
+        return apiError(402, 'SERVICE_PAYMENT_REQUIRED', '这一次要先付款')
+      }
+      return { status: 200, json: STARTED_INTERVIEW }
     })
     api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
-    api.respondWith('GET', serviceOrderPath(order.id), () => ok(serviceOrderView(order)))
+    api.respondWith('GET', serviceOrderPath(order.id), () => ok(serviceOrderView(
+      order,
+      orderPaid ? { status: 'paid', paidAt: new Date().toISOString() } : {},
+    )))
 
+    const orderCalls = recordServiceOrderCalls(page)
     await reachSetupStep3(page)
     await expect(page.getByTestId('interview-primary')).toHaveText('创建并开始练习')
     await page.getByTestId('interview-primary').click()
     await confirmAge14(page)
     await expect(page).toHaveURL(/\/pay\/interview/)
     await expect(page.locator('[data-qx-page="pay-service"]')).toHaveAttribute('data-qxt-state', 'wait')
+
+    // 付成 → 返回开练页自动带头开场进入作答页，全程仅 1 次建单、绝不来回弹回付款屏
+    orderPaid = true
+    await expect(page.locator('[data-kiosk-screen="interview-session"]')).toBeVisible({ timeout: 15_000 })
+    expect(orderCalls.filter((c) => c.method === 'POST' && c.path === SERVICE_ORDERS_PATH)).toHaveLength(1)
+    expect(startHeaders).toHaveLength(2)
+    expect(startHeaders[1]?.['x-service-order-id']).toBe(order.id)
+    expect(String(startHeaders[1]?.['x-kiosk-session-id'] ?? '').length).toBeGreaterThan(0)
+  })
+
+  test('402 防循环边界：刷新后仍为 0 元时停在开练页提示，不反复跳转付款屏也不建单 @kiosk', async ({ page, api }) => {
+    setupMachine(api, { mock_interview: 0 })
+    api.respondWith('POST', INTERVIEW_START_PATH, () =>
+      apiError(402, 'SERVICE_PAYMENT_REQUIRED', '这一次要先付款'),
+    )
+    const orderCalls = recordServiceOrderCalls(page)
+
+    await reachSetupStep3(page)
+    await expect(page.getByTestId('interview-primary')).toHaveText('创建并开始练习')
+    await page.getByTestId('interview-primary').click()
+
+    await expect(page).toHaveURL(/\/interview/)
+    await expect(page.locator('[data-setup-step="3"]')).toBeVisible()
+    await expect(page.getByTestId('interview-setup-error')).toContainText('要先付款')
+    expect(orderCalls.filter((c) => c.method === 'POST' && c.path === SERVICE_ORDERS_PATH)).toHaveLength(0)
   })
 })
