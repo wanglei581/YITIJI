@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-21：一体机打印未确认态补齐收费退回提示条（P2e-6，分支 `claude/kiosk-unconfirmed-pay-p2e6`，未推送，未上线）
+
+- 来由：补全线极小任务包 P2e-6，对照触屏稿 `docs/design/kiosk-touch-2026-10/pay-1113.js:28-30,455-459` 补齐 `/print/done` 未确认态（`PRINT_JOB_UNCONFIRMED`）在收费实付单下的「核查之后才退」提示条。基线 `origin/main@15f0b9e6c`，未推送、未上线。
+- 先拆后改：将 `apps/kiosk/src/pages/print/PrintDonePage.tsx`（原 732 行）的 `isUnconfirmed` 分支独立抽为 `apps/kiosk/src/pages/print/components/PrintDoneResultUnconfirmed.tsx`（143 行，`PrintDonePage.tsx` 净减至 680 行），既有全部静态门禁零破损。
+- 收费提示条与严格门控：`PrintDoneResultUnconfirmed.tsx` 以 `isPaidUnconfirmedPrint(amountCents)` 结合 `paymentFactOf(amountCents) === 'paid' && amountCents > 0`（有限正数）门控，仅确认收过钱时在正文底部紧邻底栏之前渲染 `data-testid="print-unconfirmed-refund-bar"`（标题「核查之后才退」，正文「核查确认没出纸后，钱自动退回原付款账户，到账时间以支付渠道为准。」）；0 元免费机（`amountCents === 0`）与金额未知单（缺省/`null`）严格不渲染。`apps/kiosk/src/pages/print/styles/print-done-touch.css` 复用触屏稿 `.py-bar.on` 同源样式与语义令牌（零裸 hex），并对带提示条的未确认态对齐 `st3-unc` 竖向留白与行高，1080×1920 实拍并排照稿（`/tmp/p2e6-sbs/st-unconfirmed-paid.png`）与设计稿逐像素吻合、零溢出零遮挡。
+- 回归与门禁：新增 `apps/kiosk/tests/visual/print-unconfirmed-pay.spec.ts` 并登记进 `apps/kiosk/playwright.w2.config.ts`；`blk.sh` 锁下跑通新用例（3/3）、`print-fail-s15c3/s15c4`、`print-walkfix`（合 39/39）与 `print-done-truth`（22/22）0 改期望全绿；完成 2 条反向变异（撤掉收费条渲染 / 放开 `amountCents > 0` 门控）红绿复核并逐字节还原；未改动 `docs/design/`、`services/api/`、`apps/admin/`、`apps/partner/`、`apps/miniapp/`，零 `¥`、零「工作人员」、零硬编码价格，全量静态/API/lint/图谱 `--check` 与仓库完整性门禁全绿。
+
 ## 2026-11-21：小程序微信虚拟支付后端极小收口返工 P2d1b3（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
 
 - 来由：按 Codex 独立复收 `P2d1b2`（`f61d17b23`）复现出的 4 处阻塞/并发缺陷 + 1 处 XML 重复键收紧，接在 `f61d17b23` 之后逐项完成极小收口并提交（零新增数据库迁移）。
