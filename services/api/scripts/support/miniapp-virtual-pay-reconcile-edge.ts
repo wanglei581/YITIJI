@@ -41,6 +41,7 @@ export async function assertVirtualPayReconcileEdge(options: {
   try {
     await assertOrderEnvAppKeySelection(prisma, options.redis as RedisService)
     await assertExpiredErrorExitAndDiagLimit(prisma, options.redis as RedisService)
+    await assertOfficialPaidStatusOnly(prisma, options.redis as RedisService)
     await assertUnconfiguredNoPendingSilent(prisma, options.redis as RedisService)
   } finally {
     restoreEnv(saved)
@@ -226,6 +227,64 @@ async function assertExpiredErrorExitAndDiagLimit(prisma: PrismaService, redis: 
   assert.equal(misDiagCount, 1, '同一单状态未变化时诊断只写 1 条')
   await prisma.virtualPayOrder.update({ where: { outTradeNo: misNo }, data: { status: 'closed' } })
   console.log('PASS 51 张超期单报错出口转待人工且补记第 51 张；诊断按单限频有上限')
+}
+
+async function assertOfficialPaidStatusOnly(prisma: PrismaService, redis: RedisService): Promise<void> {
+  await prisma.virtualPayOrder.updateMany({ where: { status: 'pending' }, data: { status: 'closed' } })
+  const now = new Date()
+  const dueAt = now.getTime() - VIRTUAL_PAY_QUERY_MIN_AGE_MS - 60_000
+  applyEnv({ WECHAT_MINIAPP_VPAY_ENV: '0', ALERT_WEBHOOK_URL: undefined })
+
+  const statusByOrder = new Map<string, number>([
+    ['vpst2paid00001', 2],
+    ['vpst3paid00001', 3],
+    ['vpst4paid00001', 4],
+    ['vpst7fail00001', 7],
+    ['vpst9adfn00001', 9],
+    ['vpst10rev00001', 10],
+  ])
+  for (const no of statusByOrder.keys()) {
+    await createOrder(prisma, no, dueAt, 0)
+  }
+  const fetchStatuses: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('stable_token')) return json({ access_token: TOKEN, expires_in: 7200 })
+    if (url.includes('/xpay/notify_provide_goods')) return json({ errcode: 0, errmsg: 'ok' })
+    const body = JSON.parse(String(init?.body ?? '{}')) as { order_id: string }
+    const wxStatus = statusByOrder.get(body.order_id) ?? 1
+    return json({
+      errcode: 0,
+      errmsg: 'ok',
+      order: {
+        order_id: body.order_id,
+        status: wxStatus,
+        paid_fee: PRICE,
+        env_type: 1,
+        wx_order_id: `WX_${body.order_id}`,
+        paid_time: Math.floor(now.getTime() / 1000),
+      },
+    })
+  }) as typeof fetch
+
+  const svc = new VirtualPayReconcileService(prisma, new AuditService(prisma), new MiniappAccessTokenService(redis), redis)
+  await svc.reconcileOnce(now, fetchStatuses)
+
+  for (const no of ['vpst2paid00001', 'vpst3paid00001', 'vpst4paid00001']) {
+    assert.equal(await statusOf(prisma, no), 'paid', `${no} 是官方已支付状态(2/3/4)，必须记权益`)
+    assert.equal(await creditsOf(prisma, no), 1)
+  }
+  for (const [no, wxStatus] of [['vpst7fail00001', 7], ['vpst9adfn00001', 9], ['vpst10rev00001', 10]] as const) {
+    assert.equal(await creditsOf(prisma, no), 0, `官方状态 ${wxStatus} 不得记权益`)
+    assert.equal(await statusOf(prisma, no), 'manual_review', `官方状态 ${wxStatus} 应转待人工而非 paid`)
+    const diag = await prisma.auditLog.findFirstOrThrow({
+      where: { action: VIRTUAL_PAY_DIAGNOSTIC_ACTION, targetId: no },
+      orderBy: { createdAt: 'desc' },
+    })
+    const payload = JSON.parse(diag.payloadJson) as { reason?: string; wxStatus?: number }
+    assert.equal(payload.reason, 'non_grantable_order_status')
+    assert.equal(payload.wxStatus, wxStatus)
+  }
+  console.log('PASS 查单只认官方 2/3/4 为已支付；7/9/10 只写诊断转待人工、不记权益')
 }
 
 async function assertUnconfiguredNoPendingSilent(prisma: PrismaService, redis: RedisService): Promise<void> {

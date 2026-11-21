@@ -23,7 +23,12 @@ export const VIRTUAL_PAY_QUERY_MAX_FAILS = 3
 export const VIRTUAL_PAY_MANUAL_REVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000
 const QUERY_TAKE = 50
 const QUERY_URI = '/xpay/query_order'
-const PAID_STATUSES = new Set([2, 3, 4, 7, 9, 10])
+/**
+ * 微信官方 query_order Res.order.status 明确表示已支付的状态：
+ * 2=订单已经支付，待发货；3=订单发货中；4=订单已发货。
+ * 7（退款失败）、9（回收广告金完成）、10（分账回退完成）不得记权益，只写诊断转待人工。
+ */
+const PAID_STATUSES = new Set([2, 3, 4])
 
 interface PendingOrder {
   id: string
@@ -38,6 +43,7 @@ interface PendingOrder {
 
 type QueryOutcome =
   | { kind: 'paid' | 'unpaid' | 'close' | 'mismatch' }
+  | { kind: 'manual_review'; wxStatus: number }
   | { kind: 'error'; reason: string }
 
 /**
@@ -132,6 +138,10 @@ export class VirtualPayReconcileService {
       await this.recordQueryFailure(order, now, outcome.reason, fetchImpl)
       return
     }
+    if (outcome.kind === 'manual_review') {
+      await this.moveToManualReview(order, 'non_grantable_order_status', { wxStatus: outcome.wxStatus }, fetchImpl)
+      return
+    }
     if (outcome.kind === 'unpaid' && !expired && (order.queryFailCount > 0 || order.lastDiagnosticReason !== null)) {
       await this.resetQueryState(order.id)
     } else if (outcome.kind === 'mismatch' && !expired && order.queryFailCount > 0) {
@@ -177,7 +187,9 @@ export class VirtualPayReconcileService {
       await this.diagnoseOrder(order, 'order_closed')
       return { kind: 'close' }
     }
-    if (!PAID_STATUSES.has(status)) return { kind: 'unpaid' }
+    if (!PAID_STATUSES.has(status)) {
+      return { kind: 'manual_review', wxStatus: status }
+    }
     const env = data.order.env_type === 1 ? 0 : data.order.env_type === 2 ? 1 : null
     if (env == null || typeof data.order.paid_fee !== 'number') {
       return { kind: 'error', reason: 'query_failed' }
@@ -206,23 +218,13 @@ export class VirtualPayReconcileService {
     const nextFails = (order.queryFailCount ?? 0) + 1
     const ageMs = now.getTime() - order.createdAt.getTime()
     if (nextFails >= VIRTUAL_PAY_QUERY_MAX_FAILS || ageMs >= VIRTUAL_PAY_MANUAL_REVIEW_MAX_AGE_MS) {
-      const moved = await this.prisma.virtualPayOrder.updateMany({
-        where: { id: order.id, status: 'pending' },
-        data: { status: 'manual_review', queryFailCount: nextFails },
-      })
-      if (moved.count === 1) {
-        await this.diagnoseOrder(order, 'query_manual_review', { failCount: nextFails, lastError: failReason })
-        await sendVirtualPayOpsAlert({
-          redis: this.redis,
-          fetchImpl,
-          outTradeNo: order.outTradeNo,
-          episodeToken: 'manual-review',
-          type: 'virtual_pay_manual_review',
-          severity: 'error',
-          title: `小程序虚拟支付订单 ${order.outTradeNo} 查单持续失败已转待人工`,
-          logger: this.logger,
-        })
-      }
+      await this.moveToManualReview(
+        order,
+        'query_manual_review',
+        { failCount: nextFails, lastError: failReason },
+        fetchImpl,
+        nextFails,
+      )
       return
     }
     await this.prisma.virtualPayOrder.updateMany({
@@ -230,6 +232,31 @@ export class VirtualPayReconcileService {
       data: { queryFailCount: nextFails },
     })
     await this.diagnoseOrder(order, failReason)
+  }
+
+  private async moveToManualReview(
+    order: PendingOrder,
+    reason: string,
+    extra: Record<string, unknown>,
+    fetchImpl: typeof fetch,
+    queryFailCount?: number,
+  ): Promise<void> {
+    const moved = await this.prisma.virtualPayOrder.updateMany({
+      where: { id: order.id, status: 'pending' },
+      data: { status: 'manual_review', ...(queryFailCount === undefined ? {} : { queryFailCount }) },
+    })
+    if (moved.count !== 1) return
+    await this.diagnoseOrder(order, reason, extra)
+    await sendVirtualPayOpsAlert({
+      redis: this.redis,
+      fetchImpl,
+      outTradeNo: order.outTradeNo,
+      episodeToken: reason,
+      type: 'virtual_pay_manual_review',
+      severity: 'error',
+      title: `小程序虚拟支付订单 ${order.outTradeNo} 已转待人工（${reason}）`,
+      logger: this.logger,
+    })
   }
 
   private close(id: string): Promise<unknown> {
