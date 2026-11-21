@@ -98,6 +98,10 @@ if (defaultIdx < 0) {
 expectMatches(hookSrc, /tonerKnown:\s*false/, 'hook 声明 tonerKnown=false（Agent 未上报耗材）')
 expectMatches(hookSrc, /网络正常/, 'hook 含「网络正常」文案（仅 API 可达时）')
 expectMatches(hookSrc, /状态未知/, 'hook 含「状态未知」文案')
+expectMatches(hookSrc, /case 'paper_jam':/, '卡纸单独成一档，不并进打印机异常')
+expectMatches(hookSrc, /printerLabel: '打印机卡纸'/, '卡纸状态行写「打印机卡纸」')
+expectMatches(hookSrc, /errorCode: 'paperJam'/, '卡纸错误码是 paperJam')
+expectMatches(hookSrc, /printerLabel: '打印机异常'/, '没有卡纸证据时仍写「打印机异常」')
 
 // 打印闸门合上：两个心跳值各走自己的 case，不掉进 default（default 是「状态未知」，入口不会停）。
 // 说明用无人值守标准句 3（copy/unattendedCopy.ts 的 machineUnusableLine，覆盖「暂停接单」），不写死，也不把人引向现场。
@@ -115,9 +119,11 @@ expectMatches(
   /label:\s*device\.printerLabel,\s*notice:\s*machineCannotPrintLine\(contact\)/,
   'W-117 离线与异常的状态词取自真实设备状态，求助走服务电话（不找现场工作人员）',
 )
-expectMatches(hubPageSrc, /paperOff\s*=\s*hubState === 'device-off' && device\.printer\.errorCode === 'paperEmpty'/, 'W-117 缺纸只在确定缺纸时单独成版面，异常与离线不冒充缺纸')
+expectMatches(hubPageSrc, /paperOff\s*=\s*hubState === 'device-off' && !device\.printerNotice && \(device\.printer\.errorCode === 'paperEmpty' \|\| device\.printer\.errorCode === 'paperJam'\)/, 'W-117 缺纸和确定卡纸才单独成版面，暂停接单、异常与离线不冒充')
 const hubView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
 expectMatches(hubView, /打印机缺纸，这次出不了纸/, 'W-117 缺纸单独说明（稿 st-device-off）')
+expectMatches(hubView, /打印机卡纸，这次出不了纸/, 'W-117 确定卡纸的打印卡沿用缺纸版说明')
+expectMatches(hubView, /卡纸时复印也出不了纸，恢复后再用/, 'W-117 确定卡纸的复印卡写恢复后再用')
 expectMatches(hubView, /transferCaps\.some\(\(item\) => item\.actionable\)/, 'W-117 「先传、稍后打印」只在传文件类入口真可用时才出现')
 const uploadSrc = read('src/pages/print/PrintUploadPage.tsx')
 const homeDomainSrc = read('src/pages/home/homeDomainStatus.ts')
@@ -259,8 +265,13 @@ expectMatches(
 )
 expectMatches(
   homeSrc,
-  /device\.requestFailed\s*\? \{ tone: 'warn' as const, label: '服务暂时连不上' \}/,
-  'HomePage 读状态的请求没回来时页头写「服务暂时连不上」',
+  /homeBandStatus\(\{[\s\S]*requestFailed: device\.requestFailed === true/,
+  'HomePage 把请求失败交给 homeBandStatus，不在页里另写顶栏文案',
+)
+expectMatches(
+  homeDomainSrc,
+  /if \(input\.requestFailed\) return \{ tone: 'warn', label: '服务暂时连不上' \}/,
+  '读状态的请求没回来时页头写「服务暂时连不上」',
 )
 expectMatches(
   homeViewSrc,

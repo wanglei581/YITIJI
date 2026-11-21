@@ -104,9 +104,10 @@ const TESTID_BY_VARIANT: Record<FailureVariant, string> = {
   failed: 'print-fulfill-state-failed',
   'paper-jam': 'print-fulfill-state-paper-jam',
   'out-of-paper': 'print-fulfill-state-out-of-paper',
+  offline: 'print-fulfill-state-offline',
 }
 
-/** 带走链接过期时的一句话（标准求助句由调用方拼进 expiredLine）。 */
+/** 带走链接过期时的一句话。三态不带服务电话；普通失败仍由文案函数接上求助句。 */
 export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: string }) {
   const { variant, copy, rows, free, retry, takeaway, canReportIssue, isLoggedIn } = props
   return (
@@ -119,7 +120,7 @@ export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: str
       title={copy.title}
       subtitle={copy.subtitle}
       status={{ tone: 'bad', label: copy.pill }}
-      statusClassName={variant === 'out-of-paper' ? 'qx-pill' : undefined}
+      statusClassName={variant === 'out-of-paper' ? 'qx-pill pft-fail-status' : 'pft-fail-status'}
       terminalLabel="就业服务大厅"
       back={{ label: '返回首页', onBack: props.onHome }}
       ask={printAsk(ASK_LABEL, ASK_DRAFT)}
@@ -157,9 +158,6 @@ export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: str
               >
                 {retry.busy ? '正在重新提交…' : '重新提交打印'}
               </button>
-              {retry.blockedReason ? (
-                <p id={RETRY_WHY_ID} className="pft-fail-why" data-testid="print-retry-blocked-reason" role="status">{retry.blockedReason}</p>
-              ) : null}
             </>
           ) : null}
           {props.onContact ? (
@@ -168,6 +166,9 @@ export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: str
             </button>
           ) : null}
         </div>
+        {retry.available && retry.blockedReason ? (
+          <p id={RETRY_WHY_ID} className="pft-fail-why" data-testid="print-retry-blocked-reason" role="status">{retry.blockedReason}</p>
+        ) : null}
         <TakeawayCard takeaway={takeaway} expiredLine={props.expiredLine} />
         {isLoggedIn ? <OrdersRowLink onOrders={props.onOrders} /> : null}
         {copy.resumeLine ? (

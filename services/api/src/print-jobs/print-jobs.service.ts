@@ -131,20 +131,20 @@ export interface PrintJobStatusResult {
  */
 const USER_FAILURE_REASONS: Record<string, string> = {
   DOWNLOAD_HASH_MISMATCH: '文件校验未通过，请返回重新上传后再打印',
-  PRINTER_NOT_FOUND:      '未找到打印机，请联系工作人员检查打印机连接',
+  PRINTER_NOT_FOUND:      '未找到打印机。',
   PRINTER_OFFLINE:        '打印机离线，请稍后重试。',
   PAPER_EMPTY:            '打印机缺纸，当前无法打印。',
   PRINTER_ERROR:          '打印机可能卡纸或发生设备故障，当前暂时无法继续使用。',
-  PRINT_JOB_UNCONFIRMED:  '打印作业未确认完成，请工作人员检查出纸状态',
+  PRINT_JOB_UNCONFIRMED:  '打印作业已提交到打印队列，但未确认完成。请先看纸张、卡纸和出纸口。',
   PRINT_TIMEOUT:          '打印超时，请稍后重试',
   PRINT_QUEUE_TIMEOUT:    '这单等了太久没有打印，没有出纸，可以重新提交打印。',
-  PRINT_COMMAND_FAILED:   '打印执行失败，请稍后重试或联系工作人员',
+  PRINT_COMMAND_FAILED:   '打印执行失败，请稍后重试。',
   UNSUPPORTED_FILE_TYPE:  '该文件格式暂不支持打印，请上传 PDF 或图片',
   FILE_NOT_FOUND:         '打印文件已失效，请返回重新上传',
 }
 
 /** 未知错误码 / 仅有原始 errorMessage 时的统一安全兜底文案。 */
-const DEFAULT_USER_FAILURE_REASON = '打印任务失败，请联系工作人员处理或稍后重试'
+const DEFAULT_USER_FAILURE_REASON = '打印任务失败，请稍后重试。'
 
 const printJobFileSelect = {
   id: true,

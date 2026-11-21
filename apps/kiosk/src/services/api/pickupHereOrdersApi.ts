@@ -39,6 +39,16 @@ export interface PickupHereListItem {
   claimableHere: boolean
   createdAt: string | null
   billablePages: number | null
+  terminal: { displayName: string | null; locationLabel: string | null } | null
+}
+
+function asTerminal(value: unknown): PickupHereListItem['terminal'] {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const displayName = typeof row.displayName === 'string' ? row.displayName : null
+  const locationLabel = typeof row.locationLabel === 'string' ? row.locationLabel : null
+  if (!displayName && !locationLabel) return null
+  return { displayName, locationLabel }
 }
 
 function asSource(value: unknown): PickupHereListItem | null {
@@ -52,6 +62,7 @@ function asSource(value: unknown): PickupHereListItem | null {
     claimableHere: row.claimableHere === true,
     createdAt: typeof row.createdAt === 'string' ? row.createdAt : null,
     billablePages: typeof row.billablePages === 'number' ? row.billablePages : null,
+    terminal: asTerminal(row.terminal),
   }
 }
 

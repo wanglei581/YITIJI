@@ -128,6 +128,177 @@ test('点单失败的可恢复说法不叫人输码', () => {
   assert.doesNotMatch(here.PICKUP_HERE_RESUME_NOTE, /到机码/)
 })
 
+test('我的打印订单里的手机待取单：本机可以来取，别的机器写去处，现场单不进', () => {
+  const rows = here.pendingPickupRows([
+    { kind: 'kiosk_task', orderId: 'task-1', title: '现场简历.pdf', itemCount: 1, claimableHere: true },
+    { kind: 'cloud_single', orderId: '', title: '空单号.pdf', itemCount: 1, claimableHere: true },
+    { kind: 'cloud_single', orderId: 'ord-here', title: '简历.pdf', itemCount: 1, claimableHere: true, pickupCode: '28491703' },
+    {
+      kind: 'cloud_single', orderId: 'ord-other', title: '别的机器.pdf', itemCount: 1, claimableHere: false,
+      terminal: { displayName: '2号机', locationLabel: '市人才市场' },
+    },
+    {
+      kind: 'package', orderId: 'pkg-far', title: null, itemCount: 2, claimableHere: false,
+      terminal: { displayName: '大厅', locationLabel: '大厅' },
+    },
+    { kind: 'cloud_single', orderId: 'ord-blank', title: '无名网点.pdf', itemCount: 1, claimableHere: false, terminal: null },
+    {
+      kind: 'cloud_single', orderId: 'ord-ctrl', title: '控制符.pdf', itemCount: 1, claimableHere: false,
+      terminal: { displayName: '3号机\u0000', locationLabel: '  西门  ' },
+    },
+  ])
+  assert.deepEqual(rows.map((row) => ({ orderId: row.orderId, claimableHere: row.claimableHere, elsewhere: row.elsewhere, label: row.label })), [
+    { orderId: 'ord-here', claimableHere: true, elsewhere: null, label: '简***.pdf' },
+    { orderId: 'ord-other', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到市人才市场的2号机领取', label: '别***.pdf' },
+    { orderId: 'pkg-far', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到大厅领取', label: '材料包 · 2 个文件' },
+    { orderId: 'ord-blank', claimableHere: false, elsewhere: here.PICKUP_HERE_OTHER_MACHINE, label: '无***.pdf' },
+    { orderId: 'ord-ctrl', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到西门的3号机领取', label: '控***.pdf' },
+  ])
+  const packed = JSON.stringify(rows)
+  assert.equal(packed.includes('28491703'), false)
+  assert.equal(packed.includes('简历.pdf'), false)
+  assert.equal(packed.includes('工作人员'), false)
+  assert.equal(here.pendingPickupPlace({
+    kind: 'cloud_single', orderId: 'x', title: null, itemCount: 1, claimableHere: false,
+    terminal: { displayName: '   ', locationLabel: '\u0007' },
+  }), null)
+})
+
+test('我的打印订单复用取件时间线，不另造接口', () => {
+  const page = readFileSync(join(kioskRoot, 'src/pages/profile/me/MyPrintOrdersPage.tsx'), 'utf8')
+  const section = readFileSync(join(kioskRoot, 'src/pages/profile/me/printOrders/PendingPickupSection.tsx'), 'utf8')
+  const api = readFileSync(join(kioskRoot, 'src/services/api/pickupHereOrdersApi.ts'), 'utf8')
+  assert.match(page, /usePendingPickupOrders/)
+  assert.match(page, /<PendingPickupSection/)
+  assert.match(section, /listPickupHereOrders/)
+  const exitsSrc = readFileSync(join(kioskRoot, 'src/pages/profile/me/printOrders/pendingPickupExits.ts'), 'utf8')
+  assert.match(exitsSrc, /手机上还没取的单这次没读到/)
+  assert.match(section, /pendingPickupErrorLines\(hasTasks\)/)
+  assert.match(section, /className="me-pk-err"[^>]*data-testid="pending-pickup-error"/)
+  assert.match(section, /到这台取件/)
+  assert.match(section, /去哪台取/)
+  assert.match(api, /\/me\/print-orders\/timeline/)
+  assert.doesNotMatch(`${page}\n${section}`, /\/me\/print-orders\/pending|claim-here/)
+  assert.doesNotMatch(`${page}\n${section}`, /工作人员/)
+})
+
+test('有待取单、没有打印任务时，待取单块下面接去打印和去我的文档', async () => {
+  const exits = await import(transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/pendingPickupExits.ts')))
+  const cards = exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'rows', miniOn: true })
+  assert.deepEqual(cards.map((card) => card.title), ['去打印', '去我的文档'])
+  assert.deepEqual(cards.map((card) => card.to), ['/print-scan', '/me/documents'])
+  assert.equal(cards[1].desc, '从已保存的文件里再选一份')
+  assert.equal(cards[1].locked, false)
+  assert.equal(cards[1].art, 'stack')
+  assert.equal(exits.pendingPickupExitCards({ printTaskCount: 2, presence: 'rows', miniOn: true }).length, 0, '已有打印任务不再接空态出路卡')
+  assert.equal(exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'hidden', miniOn: true }).length, 0)
+  // 定稿第 8 条：读失败且没有打印任务也接这两张卡。改回「error 时 length 0」这里要红。
+  const failedEmpty = exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'error', miniOn: true })
+  assert.deepEqual(failedEmpty.map((card) => card.title), ['去打印', '去我的文档'])
+  assert.equal(exits.pendingPickupExitCards({ printTaskCount: 2, presence: 'error', miniOn: true }).length, 0, '已有打印任务时读失败不另接空态出路卡')
+  assert.deepEqual(exits.pendingPickupErrorLines(false), ['手机上还没取的单这次没读到。'])
+  assert.deepEqual(exits.pendingPickupErrorLines(true), ['手机上还没取的单这次没读到。', '下面已产生打印任务的订单不受影响。'])
+  assert.deepEqual(exits.pendingPickupFileMark('简***.pdf'), { pkg: false, text: 'PDF' })
+  assert.deepEqual(exits.pendingPickupFileMark('材料包 · 3 个文件'), { pkg: true, text: '' })
+  const withoutMini = exits.pendingPickupExitCards({ printTaskCount: 0, presence: 'rows', miniOn: false })
+  assert.deepEqual(withoutMini.map((card) => card.title), ['去打印', '看看我的文档'])
+  assert.equal(JSON.stringify(cards).includes('工作人员'), false)
+  const page = readFileSync(join(kioskRoot, 'src/pages/profile/me/MyPrintOrdersPage.tsx'), 'utf8')
+  const section = readFileSync(join(kioskRoot, 'src/pages/profile/me/printOrders/PendingPickupSection.tsx'), 'utf8')
+  assert.match(page, /pendingPickupExitCards\(/)
+  assert.match(page, /data-testid="pending-pickup-exits"/)
+  assert.match(page, /pendingPickup\.presence === 'rows' \|\| pendingPickup\.presence === 'error'/)
+  assert.match(section, /data-testid="pending-pickup-list"[^>]*className="me-stack me-pin"|className="me-stack me-pin"[^>]*data-testid="pending-pickup-list"/)
+})
+
+test('S15c8 没有打印任务时仍给出到店单横幅和小字', async () => {
+  const exits = await import(transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/pendingPickupExits.ts')))
+  const title = '手机上下的到店单，到机器上输到机码取件'
+  const rows = exits.mobilePickupBanner(true, 'rows')
+  assert.equal(rows.title, title)
+  assert.equal(rows.note, '还没取的手机单列在这一条下面。')
+  const failed = exits.mobilePickupBanner(true, 'error')
+  assert.equal(failed.title, title)
+  assert.equal(failed.note, null)
+  assert.equal(exits.mobilePickupBanner(true, 'hidden').note, '还没核销出打印任务的单，不在下面的列表里')
+  assert.equal(exits.mobilePickupBanner(false, 'rows'), null)
+  const page = readFileSync(join(kioskRoot, 'src/pages/profile/me/MyPrintOrdersPage.tsx'), 'utf8')
+  assert.match(page, /mobilePickupBanner\(miniOn, pendingPickup\.presence\)/)
+  assert.match(page, /\{pickupBanner \?/)
+  assert.doesNotMatch(page, /hideClaimShortcut/)
+})
+
+test('S15c7：待取单是横排小按钮，读失败两句分两行且按钮在右边', async () => {
+  const jsxUrl = import.meta.resolve('react/jsx-runtime')
+  const reactUrl = import.meta.resolve('react')
+  const { createElement } = await import('react')
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const allow = new Set([jsxUrl, reactUrl])
+  function transpileJsx(absolutePath, replacements) {
+    let out = ts.transpileModule(readFileSync(absolutePath, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+      fileName: absolutePath,
+    }).outputText
+    for (const [specifier, url] of Object.entries(replacements)) {
+      out = out.split(`'${specifier}'`).join(`'${url}'`).split(`"${specifier}"`).join(`"${url}"`)
+    }
+    const leftover = [...out.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((match) => match[1])
+      .filter((specifier) => !specifier.startsWith('data:') && !allow.has(specifier))
+    assert.deepEqual(leftover, [], `${absolutePath} 还有没替换的运行时依赖：${leftover.join(', ')}`)
+    return toDataUrl(out)
+  }
+  const exitsUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/pendingPickupExits.ts'))
+  const hereUrl = transpile(join(kioskRoot, 'src/pages/print/pickupHereOrders.ts'), {
+    '../../copy/unattendedCopy': unattendedUrl,
+  })
+  const sectionUrl = transpileJsx(join(kioskRoot, 'src/pages/profile/me/printOrders/PendingPickupSection.tsx'), {
+    react: reactUrl,
+    'react/jsx-runtime': jsxUrl,
+    'react-router-dom': toDataUrl('export function useNavigate() { return () => {} }'),
+    '../../../../services/api/pickupHereOrdersApi': toDataUrl('export async function listPickupHereOrders() { return [] }'),
+    '../../../print/pickupHereOrders': hereUrl,
+    '../../touch/MeKit': toDataUrl(`import { jsx } from '${jsxUrl}'; export function MeBtn({ children, className, ...rest }) { return jsx('button', { ...rest, className, children }) }`),
+    '../../../../components/qingxu/touch/QxTouchIcon': toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchIcon() { return jsx('svg', {}) }`),
+    './pendingPickupExits': exitsUrl,
+  })
+  const { PendingPickupSection } = await import(sectionUrl)
+  const draw = (props) => renderToStaticMarkup(createElement(PendingPickupSection, { onReload: () => {}, reloading: false, ...props }))
+  const emptyFail = draw({ presence: 'error', rows: [], hasTasks: false })
+  assert.match(emptyFail, /me-pk-err/)
+  assert.match(emptyFail, /<p><span>手机上还没取的单这次没读到。<\/span><\/p>/)
+  assert.doesNotMatch(emptyFail, /不受影响/)
+  assert.match(emptyFail, /<button[^>]*class="me-pk-retry"[^>]*>重新读取<\/button>/)
+  assert.doesNotMatch(emptyFail, /me-stack/)
+  const taskFail = draw({ presence: 'error', rows: [], hasTasks: true })
+  assert.match(taskFail, /<span>手机上还没取的单这次没读到。<\/span><span>下面已产生打印任务的订单不受影响。<\/span>/)
+  const busy = draw({ presence: 'error', rows: [], hasTasks: false, reloading: true })
+  assert.match(busy, /正在重新读取…/)
+  assert.match(busy, /disabled/)
+  const hereRow = draw({
+    presence: 'rows',
+    hasTasks: false,
+    rows: [{ orderId: 'ord-here', label: '简***.pdf', detail: '11月18日 20:16 · 1 页', claimableHere: true, elsewhere: null }],
+  })
+  assert.match(hereRow, /me-pk-row/)
+  assert.match(hereRow, /me-pk-ft[^>]*>PDF</)
+  assert.match(hereRow, /class="me-pk-go"/)
+  assert.match(hereRow, /到这台取件/)
+  assert.doesNotMatch(hereRow, /去哪台取/)
+  const farRow = draw({
+    presence: 'rows',
+    hasTasks: true,
+    rows: [{ orderId: 'pkg-far', label: '材料包 · 3 个文件', detail: '11月17日 18:40 · 9 页', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到二楼服务区的 2 号机领取' }],
+  })
+  assert.match(farRow, /me-pk-pkg/)
+  assert.match(farRow, /<div class="me-pk-where">[\s\S]*<b>去哪台取<\/b>/)
+  assert.doesNotMatch(farRow, /<button[^>]*>[\s\S]*去哪台取/)
+  const css = readFileSync(join(kioskRoot, 'src/pages/profile/touch/me-states.css'), 'utf8')
+  assert.match(css, /\.me-pk-err\s*\{[^}]*display:\s*flex/)
+  assert.match(css, /\.me-orders-exits \.me-exit-art\s*\{[^}]*width:\s*240px/)
+  const sectionSrc = readFileSync(join(kioskRoot, 'src/pages/profile/me/printOrders/PendingPickupSection.tsx'), 'utf8')
+  assert.match(sectionSrc, /reloadKey > 0 && presenceRef\.current === 'error'/)
+})
+
 test('点领取时服务端说不在这台机器：用服务端那句，空句或叫人找工作人员时用无人值守替身', () => {
   assert.equal(
     here.pickupHereMismatchMessage('这笔订单不在这台机器取件，请到下单时选的网点领取'),

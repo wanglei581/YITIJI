@@ -25,6 +25,8 @@ export type { SummaryRow }
 type Props = {
   step: 4
   freePricing: boolean
+  /** 提醒条与页内须知的同一句。不传时仍按 freePricing 在免费句和付费句之间选。 */
+  stayLine?: string
   /** 公示价重读失败：费用区整段不画，避免「应付 x 元」或「免费试运营」和失败说明同时出现。 */
   hideQuotedAmount?: boolean
   screen: PrintConfirmScreen
@@ -78,7 +80,7 @@ function pagesCopies(quote: QuoteView, file: PrintFileState, copiesLabel?: strin
 
 export function PrintConfirmView(props: Props) {
   const {
-    freePricing, hideQuotedAmount = false, screen, invalidReason, file, summaryRows, adjustments, paperNote, pricedParamsLabel, quote, costCalcLabel,
+    freePricing, stayLine, hideQuotedAmount = false, screen, invalidReason, file, summaryRows, adjustments, paperNote, pricedParamsLabel, quote, costCalcLabel,
     amountText, benefitView, redactionText, materialDemo, printerBlocked, printerBlockedReason,
     terminalFailed, terminalFailedText, selfAssessment, printNotes, actions,
     submitError, onLogin, preview = null, sheetsLabel = null, settingsLabel = null, copiesLabel = null, docked = false,
@@ -298,7 +300,7 @@ export function PrintConfirmView(props: Props) {
 
           <div className="qxt-remind">
             <PrintIcon name="shield" size={34} />
-            <span>{freePricing ? '提交后请留在机器旁，任务确认后自动开始打印。' : '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。'}</span>
+            <span>{stayLine ?? (freePricing ? '提交后请留在机器旁，任务确认后自动开始打印。' : '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。')}</span>
           </div>
           <p className="pdk-fine">隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</p>
 
