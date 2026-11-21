@@ -49,6 +49,24 @@ type JsonMapperHost = {
   mapJson(method: string, path: string, map: (json: unknown) => unknown): void
 }
 
+/** 扫一趟收费（扫描 1.00 元，其余 0），P2e-4 用例夹具。 */
+export function scanOnlyChargedPricing(scanCents = 100): Record<string, unknown> {
+  return machinePricing(0, 0, { scan: scanCents })
+}
+
+/** 全部 0 元（免费机器），P2e-4 用例夹具。 */
+export function allFreeMachinePricing(): Record<string, unknown> {
+  return machinePricing(0, 0)
+}
+
+/** 公共就业点位：即使后台价格位非 0，页面仍按免费展示。 */
+export function publicSiteMachinePricing(services: MachineServicePrices = {}): Record<string, unknown> {
+  return {
+    ...machinePricing(0, 0, services),
+    isPublicSite: true,
+  }
+}
+
 /** 在已经登记的终端配置上盖上本机价，不改托管、百宝箱等其它字段。 */
 export function attachMachinePricing(api: JsonMapperHost, bw: number, color: number, services: MachineServicePrices = {}): void {
   api.mapJson('GET', KIOSK_CONFIG_PATH, (json) => {

@@ -2230,4 +2230,12 @@ const deviceRecoveryTest = spawnSync(
 )
 assert.equal(deviceRecoveryTest.status, 0, `scan device recovery behaviour failed: ${deviceRecoveryTest.stderr || deviceRecoveryTest.stdout}`)
 
+// P2e-4 扫描按次付款判定与状态文案必须有运行时覆盖。
+const scanPayModelTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-pay-model.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(scanPayModelTest.status, 0, `scan pay model unit test failed: ${scanPayModelTest.stderr || scanPayModelTest.stdout}`)
+
 console.log('ALL PASS scan session truth contract')
