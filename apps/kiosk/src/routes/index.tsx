@@ -31,6 +31,7 @@ import { PrintCashierPage } from '../pages/print/PrintCashierPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
 import { PrintDonePage } from '../pages/print/PrintDonePage'
 import { PrintPickupClaimPage } from '../pages/print/PrintPickupClaimPage'
+import { PayServicePage } from '../pages/pay/PayServicePage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { MyPrintOrdersPage } from '../pages/profile/me/MyPrintOrdersPage'
 import { MyResumesPage } from '../pages/profile/me/MyResumesPage'
@@ -207,6 +208,11 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/progress',    element: <PrintProgressPage /> },
       { path: 'print/done',        element: <PrintDonePage /> },
       { path: 'print/pickup-claim', element: <PrintPickupClaimPage /> },
+      // 按次付款（稿 pay-1113.js 的 pay-service）：三种服务各一条，服务种类由路由定；
+      // 分开登记，授权收尾与使用统计才能各归各的服务（付完接着办同一件事不被拦）。
+      { path: 'pay/resume',        element: <PayServicePage what="resume" /> },
+      { path: 'pay/interview',     element: <PayServicePage what="interview" /> },
+      { path: 'pay/scan',          element: <PayServicePage what="scan" /> },
       // AI简历服务（Phase 3）：服务中心中间页（ResumeHomePage）已移除，首页瓦片直达各功能。
       // /resume 与 /resume/upload 均保留为旧入口兼容，重定向到上传页 /resume/source，不再出现二次选择页。
       { path: 'resume',            element: <Navigate to="/resume/source" replace /> },

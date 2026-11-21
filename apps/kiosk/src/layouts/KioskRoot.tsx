@@ -120,6 +120,10 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/print/preview',
   '/print/progress',
   '/print/done',
+  /* 触屏版稿 pay-1113.js 的付款屏，三种服务各一条（2026-11-19）。 */
+  '/pay/resume',
+  '/pay/interview',
+  '/pay/scan',
   /* 稿 21-resume-triage 同一工作台的两条 route：取件与方向、解析等待与失败。 */
   '/resume/source',
   '/resume/parse',
@@ -315,6 +319,10 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/campus',
   '/campus/welcome',
   '/campus/freshman-insights',
+  // 收费 按次付款（稿 pay-1113.js 的 pay-service）
+  '/pay/resume',
+  '/pay/interview',
+  '/pay/scan',
 ])
 
 const QX_TOUCH_PREFIXES: readonly string[] = [

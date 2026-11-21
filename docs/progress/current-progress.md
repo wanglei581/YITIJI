@@ -1,5 +1,36 @@
 # 当前开发进度
 
+## 2026-11-21：一体机付款屏到点核实端到端闭合与统一节流退避（P2e-1c，分支 `claude/kiosk-pay-service-p2e1`，未推送）
+
+- 来由：补全线第三十任依据 Codex 独立复收 `6819fb0c8` 暴露的 2 处精确缺陷派发的极小范围收口返工，从 `6819fb0c8` 继续按 2 项逐项提交，所有改动/新增业务源码保持 `< 500` 行，未新增数据库迁移、未触碰 P2e-2/3/4 业务页与生产配置。
+- 到点核实端到端闭合（必改 1）：
+  - 后端 `services/api/src/payment/service-order.service.ts`：`getForSession` 在 `refresh && row.status === 'pending'` 时不再被 `row.expiresAt.getTime() > Date.now()` 阻断，有 `provider.queryPayment` 时照常查渠道——`paid`（流水/金额匹配）走 `markServiceOrderPaid` 且 `checking: false`、`failed` 标 `paymentFailed: true` 且 `checking: false`、`closed` 设 `checking: false`、`pending` 仅未过期时保持 `checking: true`（已过期确认未付设 `checking: false`）、`unknown` 或查询抛异常保持 `checking: true`；无 `queryPayment`（`sandbox`）则未过期保持 `checking: true`、已过期设 `checking: false`。`verify-service-order-sandbox-simulate.ts` 补齐已过 `expiresAt` 待付单 `refresh=1` 的真 HTTP 回归（`paid` / 抛错 / `unknown` / `pending` / `closed` / `failed` / 沙箱过期）。
+  - 前端 `apps/kiosk/src/services/api/serviceOrders.ts` + `usePayServiceFlow.ts`：`serviceOrderPhase` 在 `pending` 下调整为 `paymentFailed` → `checking` → `serviceOrderExpiredLocally`，不再把服务端 `200 + pending + checking: true` 抢判成 `timed_out`；`usePayServiceFlow.ts` 增加 `postExpiryChecking` 续查态，到点 `refresh=1` 返回 `checking: true` 后保持轮询激活并每 `>= 10s` 自动续查 `refresh=1`，续查期间普通 GET 返回 `checking: false` 不抢判 `timeout`，仅在 `fromRefresh === true && checking === false` 或 `status !== 'pending'` 时收口；未过期期间普通查单 `checking: false` 仍立即复位回 `wait`。
+- 统一节流、每分钟上限与 429 退避（必改 2）：
+  - 抽出零运行时依赖的 `apps/kiosk/src/pages/pay/payPollGuard.ts`（150 行），让常规轮询、手动刷新、到点自动核实、`lookup`/`close_failed`「再查一次」四条路径（及重载恢复 `enter`）共用同一份 `lastRefreshAt`、`getLog`（60 秒窗口 28 次封顶）、`rateLimitHits`、`backoffUntil`；到点核实若距上次刷新不足 10 秒、处于退避期或满 28 次则通过定时器推迟至允许时刻发送（卸载/换单/离页自动清理）；`lookup`/`close_failed`「再查一次」与到点核实遇 `429 / RATE_LIMITED / RECONCILE_TOO_FREQUENT` 均走 `recordRateLimit` 尊重 `Retry-After` 并置 `rateLimited: true`，`PayServicePage.tsx` 同步在 `lookup`/`close_failed` 渲染限流温和提示。
+  - 新增 `apps/kiosk/scripts/tests/pay-poll-guard.test.mjs`（6 条单测与源码流程回归，挂入 `verify:kiosk-session-reporting`），`apps/kiosk/tests/visual/pay-service.spec.ts` 扩至 26 条（补齐到点 `checking: true` 12 秒后承接晚到 `paid`、到点前 1 秒手动核实推迟到 `>= 10000ms`、`lookup` 429 `Retry-After: 15` 退避期内连点 3 次发 0 次并过期后恢复 3 条精确回归）。
+- 验证：本机跑通 API `verify:service-orders`（38 PASS）、`verify:service-orders-concurrency`（21 PASS）、`verify:service-order-sandbox-simulate`（8 PASS）；`kiosk`/`api` `tsc --noEmit`、改动文件 `eslint --quiet`、`verify:kiosk-session-reporting`（21/21）、`verify:backend-error-copy-coverage`、`verify:fusion-w6`、`verify:kiosk-frontend-debt`、`verify:kiosk-unattended-copy`、`verify:kiosk-ai-declaration`、`blk.sh` 锁下 Playwright `pay-service.spec.ts`（26/26）与 W6 `/pay/`（3/3）、3 条反向变异 M1–M3 红绿复核、`generate-project-graph --check`、`verify-ci-gate-coverage` 与 `verify-repository-integrity`。未推送，未上线。
+
+## 2026-11-21：一体机按次付款屏地基返工（P2e-1b，分支 `claude/kiosk-pay-service-p2e1`，未推送）
+
+- 来由：补全线第三十任依据 Codex 独立收货结论（针对 `a22cbb25d`）派发的 P2e-1b 返工，从 `a22cbb25d` 继续小步提交，手写修改 14 个文件。未碰 `apps/admin/`、`apps/partner/`、`apps/miniapp/`、数据库 schema/迁移与生产配置。
+- 免费直通（阻塞 1）：零价、公共就业点位、总开关关闭、机构承担、无终端身份及 409 `SERVICE_FREE_ON_THIS_TERMINAL` 均自动前往白名单合法站内 `next`（如 `/resume/optimize`），兜底 `free` 态主按钮也指向 `onStart`（`targets.next`）而非退回 `back`；`fusion-w6-route-cases.ts` 同步更新 `/pay/resume`、`/pay/interview`、`/pay/scan` 的预期落地路径与页面标记。
+- 本地到点先核实（阻塞 2）：`usePayServiceFlow.ts` 本地倒计时归零时不再直接切 `timeout` 停轮询，先停常规 3 秒轮询并发一次 `refresh=1` 核实——服务端已 `paid` 直接进 `ok` 并前进下一步；明确未付成才落 `timeout`；核实请求本身网络/5xx 失败则保留单号落 `lookup`（可点「再查一次」发 `refresh=1` 承接晚到已付结果，不误判超时）。
+- 关单失败留单（应改 3）：`retireServiceTripOrder` 改为结构化返回，仅在关单成功、单本就终态或回 404 `SERVICE_ORDER_NOT_FOUND` 时才 `forgetServiceTrip`；返回或换码关单失败时保留 `sessionStorage` 原单号与 `tripRef`，进入 `close_failed` 给出温和提示与「再查一次 / 先返回」恢复路径，不静默丢单再建新单。
+- 重载旧周期收尾与游客转会员边界（应改 4、5）：`serviceTrip.ts`（保持零运行时依赖）新增无 PII 归属标记（游客 `guest` / 会员内存随机 `mark`）、旧周期号读取 `readServiceTripSessionIds` 与清场回调 `onServiceTripsCleared`；`kioskSession.ts`（零运行时依赖）新增 `end(reason, extraSessionIds)` 与 `endSessions`（带 64 条去重、含当前周期时轮换新编号）；`useKioskSessionReporting.ts` 在 `endKioskVisit` 与清场订阅里把重载保留的旧周期号一并通知服务端 `/kiosk/session/end`；`AuthContext.tsx` 游客转会员登录分支调用 `clearServiceTrips('login_handover')`，并由 `readServiceTrip` 归属隔离双保险拦截跨人/重载后继承。
+- 429 退避、`checking` 复位、底栏离开回归与门禁加强（应改 6、7）：`serviceOrders.ts` 解析 `Retry-After` 头（不改动 `httpAdapter.ts`），轮询遇 429 按 `Retry-After` 或 10s→60s 指数退避并显示温和提示（恢复 200 自动清除）；`applyView` 在收到普通响应 `checking: false` 时立即清除 `checking` 态不再粘滞；`pay-service.spec.ts` 扩至 23 条（补齐免费直通、到点核实与压哨付成、核实失败承接晚到已付、返回/换码关单失败留单、游客转会员隔离、429 退避、底栏「问小青」与主导航离开停轮询/恢复/清场、轮询 ≥3s 与 `refresh=1` ≥10s 实际间隔断言）；`verify-service-order-sandbox-simulate.ts` 明确断言非沙箱拒绝错误码为 `SANDBOX_ONLY`。
+- 验证：本机跑通 `kiosk`/`api` `tsc --noEmit`、改动文件 `eslint --quiet`、API `verify-service-order-sandbox-simulate`（7 PASS）与 `verify-service-orders`（38 PASS）与 `verify-service-orders-concurrency`、`blk.sh` 锁下 Playwright `pay-service.spec.ts`（23/23 通过）及 W6 `/pay/{resume,interview,scan}`（3/3 通过）、17 项图谱关联 kiosk 门禁、`kiosk-session-reporting.test.mjs`（15/15）、`generate-project-graph --check`、`verify-ci-gate-coverage`、`verify-repository-integrity` 及 4 条反向变异红绿复核。未推送，未上线。
+
+## 2026-11-19：一体机按次付款的地基与付款屏（P2e-1，分支 `claude/kiosk-pay-service-p2e1`，未推送）
+
+- 来由：补全线第二十七任派的收费第一包，清单第 7 项。起点 `origin/main` `f25d2b65f`。简历、面试、扫描三包（P2e-2/3/4）接在这一包上。
+- 服务单客户端 `apps/kiosk/src/services/api/serviceOrders.ts`：建单、查单（含 `refresh=1`）、关单；`ServiceOrderView` 照后端逐字段；受费用接口要带的 `x-kiosk-session-id`、`x-service-order-id` 由 `serviceOrderHeaders` 构造；状态判定按本地时钟对 `expiresAt` 判超时，管理员改价、改向个人收费总开关、改绑机构关掉的待付单归入没付成，可免费再试是 `status==='paid' && attemptsUsed>=1 && retryUntil>now`。没有扩 `ApiHttpError`。
+- 这一趟的订单号记在 sessionStorage（`apps/kiosk/src/services/serviceTrip.ts`），带着建单时的使用周期编号：整页重载会换编号，查单、关单仍要用建单时那个。键登记进 `auth/kioskSensitiveSession.ts` 清场表，每条清场路径都清。`useKioskSessionReporting.ts` 导出 `currentKioskVisitId`、`kioskVisitReadyForCharge`（建单前补发并等 start 落库）；建单遇 `SERVICE_SESSION_REQUIRED` 稍等 1.5 秒再建一次，再不成出标准句，不循环。
+- 付款屏 `/pay/resume`、`/pay/interview`、`/pay/scan`（`apps/kiosk/src/pages/pay/`），照触屏稿 `pay-1113.js` 的 pay-service：等待、核实中、付好了（停 1.6 秒去下一步）、没付成、超时、免费兜底（本机这一项 0 元时画稿里的免费屏；建单回 409 时刷新本机价目后直接去下一步）。渠道照实写（微信「请用微信扫这张码」、沙箱「测试支付通道 · 非真实收款」），简历 TRIP 句按运行页改，金额用建单返回的 `amountCents`，写「X.XX 元」。不付了返回会关掉待付单，付好了的返回不关。轮询普通查单 3 秒一次，核实间隔不少于 10 秒，每分钟封顶 28 次。「手机上买过」后端没有核销接口，不接。三条路由分开登记，授权收尾与使用统计各归简历、面试、扫描。
+- 后端只加开发与联调用的沙箱模拟付成 `POST /api/v1/payment/sandbox/simulate-service-order`（新文件 `service-order-sandbox.controller.ts`：生产 404、只认沙箱通道、按库内服务单造签名合法的回调、走真回调同一条验签入账路径），用例 `verify:service-order-sandbox-simulate` 进 CI。服务单的建单、查单、关单、结算、退款没有改，`online-payment.service.ts`、`refund.service.ts` 没动。
+- 路由登记：routes、`KioskRoot` 青序与触屏两张表、route-manifest、W6 用例与波次表、视觉证据处置、授权收尾、使用统计、迁移对照表一行。`userErrorMessage` 补服务单 8 个码，`verify-backend-error-copy-coverage` 加服务单一组。浏览器用例 `pay-service.spec.ts` 16 条挂进 `test:browser:truth`；并排截图按需跑（touch-pairs「付款 并排」）。
+- 本机真服务走了四遍（模拟付成、模拟付失败再出一张码、等真 5 分钟超时、中途把价改成 0）。没改简历、面试、扫描、打印的页面与调用，没碰小程序、两个后台和生产配置，价目仍 0。没有推送，没有上线。
+
 ## 2026-11-21：收费第 2 期 b 返工第十轮 `P2b9d`，渠道退成事实保底、防二退、服务单异常与在途查询收口（未推送）
 
 - 分支 `claude/pricing-p2b-1119c`（从第九轮头 `f968e3522` 继续）。默认仍是机构承担、价目 0、个人收费总开关关、公共就业点位永不收费；未新增数据库迁移，未触碰 `apps/kiosk/`、`apps/miniapp/`、`apps/partner/`、`apps/terminal-agent/`、生产配置，未推送。

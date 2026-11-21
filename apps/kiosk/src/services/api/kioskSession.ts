@@ -58,9 +58,9 @@ export function categoryForPath(pathname: string): KioskVisitCategory | null {
   if (under(path, '/resume/career-plan') || under(path, '/resume/self-assessment') || under(path, '/ai/plan')) return 'career'
   if (under(path, '/me/feedback') || under(path, '/help')) return 'help'
   if (under(path, '/print') || under(path, '/print-scan') || under(path, '/upload/phone') || under(path, '/invoice/phone') || under(path, '/k/i')) return 'print'
-  if (under(path, '/scan')) return 'scan'
-  if (under(path, '/resume') || under(path, '/resume-service') || under(path, '/session-resume')) return 'resume'
-  if (under(path, '/interview') || under(path, '/interview-service')) return 'interview'
+  if (under(path, '/scan') || under(path, '/pay/scan')) return 'scan'
+  if (under(path, '/resume') || under(path, '/resume-service') || under(path, '/session-resume') || under(path, '/pay/resume')) return 'resume'
+  if (under(path, '/interview') || under(path, '/interview-service') || under(path, '/pay/interview')) return 'interview'
   if (under(path, '/assistant')) return 'assistant'
   if (under(path, '/policy-service') || under(path, '/renshi')) return 'policy'
   if (under(path, '/official-channels')) return 'official_channel'
@@ -90,8 +90,10 @@ export interface KioskVisitReporter {
   enterPath: (pathname: string) => void
   /** 触摸 / 按键时调用：记下「第一次触摸」作为周期开始，已开始的周期按间隔补 heartbeat。 */
   noteActivity: () => void
-  /** 清场时调用：结束当前周期（开始过才发），并立即换新周期。 */
-  end: (reason: KioskVisitEndReason) => void
+  /** 清场时调用：结束当前周期（开始过才发）及已记服务单关联的旧周期，并立即换新周期。 */
+  end: (reason: KioskVisitEndReason, extraSessionIds?: readonly string[]) => void
+  /** 换人或离线清场时补收尾一组旧周期编号；包含当前周期时同步切新周期。 */
+  endSessions: (sessionIds: readonly string[], reason: KioskVisitEndReason) => void
   /** 等在飞的请求都结束（测试用）。 */
   settle: () => Promise<void>
   snapshot: () => KioskVisitSnapshot
@@ -114,6 +116,18 @@ export function createKioskVisitReporter(deps: KioskVisitDeps, enabled = true): 
   let lastBeatAt = 0
   const categoryBeatAt = new Map<KioskVisitCategory, number>()
   const inflight = new Set<Promise<void>>()
+  /** 已发过 end 的周期编号（去重：endVisit 与随后的 clearLocal 不对同一旧周期连发两次）。 */
+  const endedIds = new Set<string>()
+
+  const markEnded = (id: string): boolean => {
+    if (endedIds.has(id)) return false
+    endedIds.add(id)
+    if (endedIds.size > 64) {
+      const oldest = endedIds.values().next().value
+      if (oldest !== undefined) endedIds.delete(oldest)
+    }
+    return true
+  }
 
   const track = (work: Promise<void>): void => {
     const guarded = work.catch(() => undefined)
@@ -216,14 +230,15 @@ export function createKioskVisitReporter(deps: KioskVisitDeps, enabled = true): 
       heartbeat()
     },
 
-    end(reason) {
+    end(reason, extraSessionIds = []) {
       if (!enabled) return
       const now = deps.now()
-      if (started) {
+      const endedAt = iso(now)
+      if (started && markEnded(clientSessionId)) {
         const id = clientSessionId
         const at = wokeAt
         const category = lastCategory
-        const body = { clientSessionId: id, endedAt: iso(now), endReason: reason }
+        const body = { clientSessionId: id, endedAt, endReason: reason }
         track((async () => {
           const outcome = await deliver('end', body)
           if (outcome !== 'not_found') return
@@ -231,7 +246,30 @@ export function createKioskVisitReporter(deps: KioskVisitDeps, enabled = true): 
           if ((await deliver('start', startBody(id, at, category))) === 'ok') await deliver('end', body)
         })())
       }
+      for (const raw of extraSessionIds) {
+        const extraId = typeof raw === 'string' ? raw.trim() : ''
+        if (!extraId || !markEnded(extraId)) continue
+        // 重载后旧服务单挂在旧周期 A 上：补发旧周期 A 的 end，服务端 onSessionEnded 立刻关单/退款；
+        // 旧周期没在服务端落过库时 404 直接忽略，不伪造 start。
+        track(deliver('end', { clientSessionId: extraId, endedAt, endReason: reason }).then(() => undefined))
+      }
       resetCycle(now)
+    },
+
+    endSessions(sessionIds, reason) {
+      if (!enabled) return
+      const cleaned = sessionIds.map((raw) => (typeof raw === 'string' ? raw.trim() : '')).filter(Boolean)
+      if (cleaned.length === 0) return
+      if (cleaned.includes(clientSessionId)) {
+        // 清掉的旧单就是当前周期建的：同步结束并切新周期，免得下一位沿用已结束的周期号建单被拒。
+        this.end(reason, cleaned)
+        return
+      }
+      const endedAt = iso(deps.now())
+      for (const id of cleaned) {
+        if (!markEnded(id)) continue
+        track(deliver('end', { clientSessionId: id, endedAt, endReason: reason }).then(() => undefined))
+      }
     },
 
     async settle() {

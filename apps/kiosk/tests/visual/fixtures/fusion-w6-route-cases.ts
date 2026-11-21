@@ -150,6 +150,11 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // 青序流光 11-arrival-code.html 把本页从「扫码取件」重定位为「输入你的到机码」；
   // marker / featureText 改指新页身份，强度不变：删掉页头或 data-w2-page 仍然会红。
   { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: w2('pickup-claim'), featureText: '输入你的到机码' },
+  // 按次付款（稿 pay-1113.js 的 pay-service）。夹具终端三项价都是 0：直接打开自动前往对应合法站内下一步，不建单。
+  // 收费机器上的等待、核实、付好了、没付成、超时各态由 pay-service.spec.ts 钉。
+  { pattern: '/pay/resume', url: '/pay/resume', expectedPath: '/resume/optimize', marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
+  { pattern: '/pay/interview', url: '/pay/interview', expectedPath: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
+  { pattern: '/pay/scan', url: '/pay/scan', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("小青的作业面")', featureText: '小青的作业面' },
   { pattern: '/session-resume', url: '/session-resume', marker: '[data-testid="session-resume-state-list"]', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },

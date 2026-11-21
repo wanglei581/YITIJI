@@ -211,6 +211,16 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   // 2026-09-29 P1-3 出站白名单：服务商地址未核准，这次没有发出请求（覆盖门禁 verify:backend-error-copy-coverage）
   AI_ENDPOINT_NOT_ALLOWED: 'AI 服务暂时不可用，本次没有生成结果；打印、扫描照常可用',
   AI_LAYOUT_ADJUST_TOO_LONG: '这份简历一次放不下。请先删短一些内容，再试一次；也可以直接按现在的版式导出。',
+  // 2026-11-19 按次付款（服务单，services/api/src/payment/service-order*.ts）。付款屏和接在它后面的
+  // 简历、面试、扫描都会遇到。出不了码时没有单，钱没有扣；要人接着处理只给服务电话（标准句 1）。
+  SERVICE_SESSION_REQUIRED: () => `这一次暂时出不了付款码。${helpNeededLine()}。`,
+  SERVICE_QR_UNAVAILABLE: () => `这一次暂时出不了付款码。${helpNeededLine()}。`,
+  PRICE_CONFIG_INVALID: () => `这台机器这一项的价目有误，暂时办不了。${helpNeededLine()}。`,
+  SERVICE_FREE_ON_THIS_TERMINAL: '这台机器这项服务免费，不用付款',
+  SERVICE_ORDER_NOT_FOUND: '没有找到这一次的付款单，请返回重新开始',
+  SERVICE_ORDER_IN_USE: '这一次已经开始了，请等它办完',
+  SERVICE_ORDER_REF_OCCUPIED: '这一项已经算在另一张付款单上了，请返回重新开始',
+  SERVICE_PAYMENT_REQUIRED: '这一次要先付款，付好了才会开始',
 }
 
 /**

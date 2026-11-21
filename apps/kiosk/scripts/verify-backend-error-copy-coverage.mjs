@@ -137,6 +137,33 @@ try {
     else pass(`${code} → ${shown}`)
   }
   if (checked === 0) fail('AI 类一个码都没在服务端源码里找到：扫描坏了（AI_PROVIDER_NOT_CONFIGURED 早已存在）')
+
+  // ── C. 按次付款（服务单）类 ────────────────────────────────────────
+  // 一体机会碰到的服务单接口：建单 / 查单 / 关单，以及受费用接口的占用与 402。
+  // 后台退款几个码（service-order.admin.ts）只给管理员后台，回调几个码只给支付渠道，都不在这里。
+  const serviceFiles = [
+    'services/api/src/payment/service-order.service.ts',
+    'services/api/src/payment/service-order.settle.ts',
+    'services/api/src/payment/service-order.ref.ts',
+    'services/api/src/payment/service-order.intercept.ts',
+    'services/api/src/payment/service-order.payment.ts',
+  ]
+  const serviceCodes = new Set()
+  for (const rel of serviceFiles) {
+    if (!existsSync(join(repoRoot, rel))) { fail(`找不到 ${rel}（服务端改名或挪位，先更新本门禁）`); continue }
+    for (const c of exceptionCodes(rel)) if (!c.startsWith('CALLBACK_')) serviceCodes.add(c)
+  }
+  // 阳性对照：抽取器坏了会抽出空集，「全都有登记」就会空转变绿。
+  for (const must of ['SERVICE_FREE_ON_THIS_TERMINAL', 'SERVICE_SESSION_REQUIRED', 'SERVICE_QR_UNAVAILABLE', 'SERVICE_ORDER_NOT_FOUND', 'SERVICE_PAYMENT_REQUIRED', 'PRICE_CONFIG_INVALID']) {
+    if (!serviceCodes.has(must)) fail(`抽取器没从服务端源码抽到 ${must}（抽取器坏了或服务端改名，先查这里）`)
+  }
+  pass(`服务单类从服务端抽到 ${serviceCodes.size} 个码：${[...serviceCodes].sort().join(', ')}`)
+  for (const code of [...serviceCodes].sort()) {
+    const shown = mod.shared.userMessageOf({ code }, SENTINEL)
+    if (shown === SENTINEL || shown === GENERIC_5XX) fail(`一体机 userErrorMessage 没有登记 ${code}：用户只会看到兜底句`)
+    else if (/工作人员|¥|微信或支付宝|免费试运营/.test(shown)) fail(`${code} 的句子用了禁用说法：${shown}`)
+    else pass(`${code} → ${shown}`)
+  }
 } finally {
   await cleanup()
 }
