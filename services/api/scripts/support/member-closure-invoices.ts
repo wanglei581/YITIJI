@@ -220,7 +220,11 @@ export async function verifyClosureRevokesInvoiceSessions(deps: {
           status: 'submitted',
         },
       }),
-      (error: unknown) => String((error as { message?: unknown }).message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN'),
+      (error: unknown) => {
+        const record = error as { message?: unknown; meta?: { driverAdapterError?: { cause?: { originalMessage?: unknown } } } } | null
+        return String(record?.message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+          || String(record?.meta?.driverAdapterError?.cause?.originalMessage ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+      },
     )
     assert.equal(await deps.prisma.invoiceRequest.count({ where: { endUserId: deps.victim.id } }), 0, '注销后开票申请必须保持 0 新行')
   } finally {

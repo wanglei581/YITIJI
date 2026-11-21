@@ -219,7 +219,10 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
         data: { orderKind: 'print', orderId: 'order-closed-1', endUserId: closedMember.id, titleType: 'personal', title: '已注销', amountCents: 100 },
       })
     } catch (error) {
-      if (String((error as { message?: unknown }).message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')) closedWriteRejected = true
+      const record = error as { message?: unknown; meta?: { driverAdapterError?: { cause?: { originalMessage?: unknown } } } } | null
+      const matched = String(record?.message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+        || String(record?.meta?.driverAdapterError?.cause?.originalMessage ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+      if (matched) closedWriteRejected = true
       else throw error
     }
     if (!closedWriteRejected) throw new Error(`${kind}: InvoiceRequest closed-member write trigger must reject inserts for closed members`)

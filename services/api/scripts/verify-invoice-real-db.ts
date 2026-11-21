@@ -278,7 +278,11 @@ async function main(): Promise<void> {
           () => prisma.invoiceRequest.create({
             data: { orderKind: 'print', orderId, endUserId, titleType: 'personal', title: '迟到写入', email: EMAIL, amountCents: 300, status: 'submitted' },
           }),
-          (error: unknown) => String((error as { message?: unknown }).message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN'),
+          (error: unknown) => {
+            const record = error as { message?: unknown; meta?: { driverAdapterError?: { cause?: { originalMessage?: unknown } } } } | null
+            return String(record?.message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+              || String(record?.meta?.driverAdapterError?.cause?.originalMessage ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+          },
           `${label} 会员绕过业务层直写开票表必须被数据库触发器拦截`,
         )
       }

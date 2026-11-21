@@ -103,7 +103,14 @@ function uniqueConflict(error: unknown): boolean {
 }
 
 function closedMemberWriteError(error: unknown): boolean {
-  return String((error as { message?: unknown } | null)?.message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+  const record = error as {
+    message?: unknown
+    meta?: { driverAdapterError?: { cause?: { originalMessage?: unknown } } }
+  } | null
+  return (
+    String(record?.message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+    || String(record?.meta?.driverAdapterError?.cause?.originalMessage ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+  )
 }
 
 @Injectable()
