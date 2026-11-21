@@ -12,7 +12,11 @@ const BLOCKED = '退款还在渠道处理中，结果出来前不能处置。'
  * 两张单的退款状态都是「待人工核对」，按钮能不能点不能靠退款状态猜。
  * 长期查不到渠道结果的单可以按商户平台核实结果登记：重输订单号对上才能登记，登记「没退出去」后三步照常。
  */
-async function openHoldDetail(page: Page, mode: 'channel-manual' | 'window-local' | 'channel-stuck', refundStatus = '待人工核对') {
+async function openHoldDetail(
+  page: Page,
+  mode: 'channel-manual' | 'window-local' | 'channel-stuck' | 'paper-channel-manual',
+  refundStatus = '待人工核对',
+) {
   await page.addInitScript((value) => localStorage.setItem('mock:order-hold', value), mode)
   const guards = await openAuthed(page, '/orders')
   await settleAdminPage(page, guards)
@@ -82,6 +86,14 @@ test.describe('待人工三步按钮只看渠道在途', () => {
     await release.click()
     await expect(detail.getByText('支付状态', { exact: true }).locator('..')).toContainText('已支付')
     await expect(detail.getByText('任务状态', { exact: true }).locator('..')).toContainText('待领取')
+    await settleAdminPage(page, guards)
+  })
+
+  test('纸已出且渠道在途待人工：不亮起「核对后仍退款」，避免二次出款', async ({ page }) => {
+    const { guards, detail } = await openHoldDetail(page, 'paper-channel-manual')
+    await expect(detail.getByRole('button', { name: '核对后仍退款', exact: true })).toHaveCount(0)
+    await expect(detail.getByText(BLOCKED, { exact: true })).toBeVisible()
+    await expect(detail.getByText('退款还在渠道处理中，结果出来前不能处置，也不能重复退款。', { exact: true })).toBeVisible()
     await settleAdminPage(page, guards)
   })
 })

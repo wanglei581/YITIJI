@@ -43,8 +43,15 @@ export async function stageNewRefund(
         verifiedAfterPaper: input.verifiedAfterPaper,
       })
       if (input.verifiedAfterPaper) {
+        // 绝不把已提交渠道的 manual_review 撤成 withdrawn，避免新开单号二次出款。
         await tx.refund.updateMany({
-          where: { orderId: input.orderId, status: { in: ['failed', 'manual_review'] } },
+          where: {
+            orderId: input.orderId,
+            OR: [
+              { status: 'failed' },
+              { status: 'manual_review', channelSubmittedAt: null },
+            ],
+          },
           data: { status: 'withdrawn' },
         })
       }

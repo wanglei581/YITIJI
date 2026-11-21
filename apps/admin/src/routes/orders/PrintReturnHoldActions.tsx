@@ -16,16 +16,18 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
   if (!detail || detail.recordKind === 'service') return null
 
   const remainderOnly = detail.payStatus === 'partial_refunded' && detail.refundStatus === 'success'
+    && (detail.refundRemainderCents === undefined || detail.refundRemainderCents === null || detail.refundRemainderCents > 0)
   const hold = (detail.printRefundDisposition === 'manual' || detail.printRefundDisposition === 'auto_failed')
     && Boolean(detail.refundLedgerNo)
     && !remainderOnly
   const paperOut = orderPaperReleased(detail)
-  // 只看服务端给的判断：渠道受理过、还没落定的退款（不论记成处理中还是待人工）都不能处置。
+  // 只看服务端给的判断：渠道受理过、还没落定的退款（不论记成处理中还是待人工）都不能处置，也不能再发起核对后仍退款。
   const channelPending = detail.channelInFlight === true
   const verified = detail.payStatus === 'paid'
     && paperOut
-    && detail.refundStatus !== 'pending'
+    && !channelPending
     && detail.refundStatus !== 'success'
+  const refundedConflict = detail.refundStatus === 'success' && !remainderOnly
 
   const run = async (action: 'confirm-refunded' | 'release-paper' | 'close') => {
     setPending(action)
@@ -90,8 +92,14 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
             三选一：确认已经退成、改为出纸，或关闭这张单。做完只剩一种状态。
           </p>
           <div className="flex flex-wrap gap-2">
-            {paperOut ? (
-              <p className="text-xs text-neutral-600">纸已经出去，不能关单。确认退成也不能用，请走核对后仍退款。</p>
+            {refundedConflict ? (
+              <p className="text-xs font-semibold text-neutral-700">渠道已经退成并已记账，但与当前订单状态存在冲突，请人工核对，勿重复退款。</p>
+            ) : paperOut ? (
+              <p className="text-xs text-neutral-600">
+                {channelPending
+                  ? '退款还在渠道处理中，结果出来前不能处置，也不能重复退款。'
+                  : '纸已经出去，不能关单。确认退成也不能用，请走核对后仍退款。'}
+              </p>
             ) : (
               <>
                 <button type="button" disabled={pending !== null || channelPending} onClick={() => void run('confirm-refunded')} className="inline-flex h-9 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white disabled:opacity-40">
@@ -106,9 +114,11 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
               </>
             )}
           </div>
-          {paperOut ? null : (
+          {refundedConflict ? null : (
             <>
-              <p className="text-xs text-neutral-500">改为出纸和关单都不会把这笔钱记成已退回。关单后纸也不会再出。</p>
+              {paperOut ? null : (
+                <p className="text-xs text-neutral-500">改为出纸和关单都不会把这笔钱记成已退回。关单后纸也不会再出。</p>
+              )}
               {channelPending ? <p className="text-xs font-semibold text-neutral-700">退款还在渠道处理中，结果出来前不能处置。</p> : null}
               {channelPending ? <ChannelResultRegistration detail={detail} onDone={registered} /> : null}
             </>

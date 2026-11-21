@@ -16,8 +16,8 @@ const LEDGER_NO = 'RFD-HOLD-MANUAL'
 const LEDGER_CENTS = 200
 
 type HoldAction = 'confirm-refunded' | 'release-paper' | 'close'
-type HoldDemoMode = 'manual' | 'pending' | 'channel-manual' | 'window-local' | 'channel-stuck'
-const HOLD_DEMO_MODES: readonly HoldDemoMode[] = ['manual', 'pending', 'channel-manual', 'window-local', 'channel-stuck']
+type HoldDemoMode = 'manual' | 'pending' | 'channel-manual' | 'window-local' | 'channel-stuck' | 'paper-channel-manual'
+const HOLD_DEMO_MODES: readonly HoldDemoMode[] = ['manual', 'pending', 'channel-manual', 'window-local', 'channel-stuck', 'paper-channel-manual']
 
 let loaded = false
 let holdOrder: AdminOrderReadonlyDetail | null = null
@@ -47,14 +47,14 @@ function freshHoldOrder(mode: HoldDemoMode): AdminOrderReadonlyDetail {
     amountCents: LEDGER_CENTS,
     currency: 'CNY',
     payStatus: 'paid',
-    taskStatus: 'failed',
+    taskStatus: mode === 'paper-channel-manual' ? 'completed' : 'failed',
     billablePages: 1,
     printFileName: '待人工退款.pdf',
     copies: 1,
     colorMode: 'black_white',
     paperSize: 'A4',
     errorCode: null,
-    printOutcome: 'not_printed',
+    printOutcome: mode === 'paper-channel-manual' ? 'printed' : 'not_printed',
     aftercareStatus: null,
     refundEligible: false,
     retryForbidden: false,
@@ -75,23 +75,23 @@ function freshHoldOrder(mode: HoldDemoMode): AdminOrderReadonlyDetail {
       duplex: 'simplex',
       paperSize: 'A4',
       pageRange: null,
-      status: 'failed',
+      status: mode === 'paper-channel-manual' ? 'completed' : 'failed',
       createdAt,
-      completedAt: null,
+      completedAt: mode === 'paper-channel-manual' ? createdAt : null,
       errorCode: null,
     },
-    statusLogs: [{ fromStatus: 'pending', toStatus: 'failed', errorCode: null, createdAt }],
+    statusLogs: [{ fromStatus: 'pending', toStatus: mode === 'paper-channel-manual' ? 'completed' : 'failed', errorCode: null, createdAt }],
     autoRefund: false,
     refundStatus: mode === 'pending' || mode === 'channel-stuck' ? 'pending' : mode === 'manual' ? 'failed' : 'manual_review',
     refundFailureReason: mode === 'manual' ? '渠道退款失败' : null,
     printRefundDisposition: 'manual',
     printRefundReason: mode === 'window-local'
       ? '取件窗口已经关了，纸没出，待人工原路退回'
-      : mode === 'channel-manual' ? '渠道通知退款金额对不上，待人工核对' : '渠道未确认',
+      : mode === 'channel-manual' || mode === 'paper-channel-manual' ? '渠道通知退款金额对不上，待人工核对' : '渠道未确认',
     refundLedgerNo: LEDGER_NO,
     refundLedgerCents: LEDGER_CENTS,
     refundRemainderCents: null,
-    channelInFlight: mode === 'pending' || mode === 'channel-manual' || mode === 'channel-stuck',
+    channelInFlight: mode === 'pending' || mode === 'channel-manual' || mode === 'channel-stuck' || mode === 'paper-channel-manual',
     channelResultRegistration: mode === 'channel-stuck'
       ? { refundNo: LEDGER_NO, amountCents: LEDGER_CENTS, submittedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString() }
       : null,

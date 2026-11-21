@@ -77,8 +77,15 @@ export function refundBlocksPaper(input: {
   amountCents: number
   payStatus: string
   payableCents: number
+  channelSubmittedAt?: Date | string | null
 }, opts?: { allowFailedHold?: boolean }): boolean {
-  if (opts?.allowFailedHold && (input.status === 'failed' || input.status === 'manual_review')) return false
+  const channelInFlight = refundMayStillBeAtChannel({
+    status: input.status,
+    channelSubmittedAt: input.channelSubmittedAt ?? null,
+  })
+  if (opts?.allowFailedHold && (input.status === 'failed' || (input.status === 'manual_review' && !channelInFlight))) {
+    return false
+  }
   if (input.reason === STALE_ATTEMPT_REFUND_REASON) return false
   if ((OPEN_REFUND_ROW_STATUSES as readonly string[]).includes(input.status)) return true
   if (input.status !== 'success') return false
@@ -123,7 +130,7 @@ async function blockingRefund(
       orderId,
       ...(exceptRefundNo ? { refundNo: { not: exceptRefundNo } } : {}),
     },
-    select: { id: true, status: true, reason: true, amountCents: true },
+    select: { id: true, status: true, reason: true, amountCents: true, channelSubmittedAt: true },
   })
   if (rows.some((row) => refundBlocksPaper({
     status: row.status,
@@ -131,6 +138,7 @@ async function blockingRefund(
     amountCents: row.amountCents,
     payStatus: order.payStatus,
     payableCents,
+    channelSubmittedAt: row.channelSubmittedAt,
   }, opts))) return true
   return summedSuccessBlock(rows, payableCents) !== null
 }
@@ -145,7 +153,7 @@ export async function findBlockingRefund(db: HoldDb, orderId: string): Promise<{
   const payableCents = wholeOrderPayableCents(order)
   const rows = await db.refund.findMany({
     where: { orderId },
-    select: { id: true, status: true, reason: true, amountCents: true },
+    select: { id: true, status: true, reason: true, amountCents: true, channelSubmittedAt: true },
   })
   const hit = rows.find((row) => refundBlocksPaper({
     status: row.status,
@@ -153,6 +161,7 @@ export async function findBlockingRefund(db: HoldDb, orderId: string): Promise<{
     amountCents: row.amountCents,
     payStatus: order.payStatus,
     payableCents,
+    channelSubmittedAt: row.channelSubmittedAt,
   }))
   if (hit) return { id: hit.id }
   return summedSuccessBlock(rows, payableCents)
