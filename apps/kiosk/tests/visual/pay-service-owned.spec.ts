@@ -43,6 +43,10 @@ function chargingMachine(api: ApiRouter, services: MachineServicePrices = { resu
     status: 200,
     json: { success: true, data: [{ scope: 'resume_ai', granted: true }] },
   })
+  api.respond('GET', '/api/v1/me/print-orders', {
+    status: 200,
+    json: { success: true, data: { items: [], total: 0 } },
+  })
 }
 
 async function loginMemberAndGoto(page: Page, targetPath: string): Promise<void> {
@@ -239,5 +243,180 @@ test.describe('付款屏「手机上买过」owned 态 @kiosk', () => {
     await expectState(page, 'refund')
     await expect(page.getByTestId('pay-service-line')).toHaveText('这次权益已自动退回你的账号，下次还能继续用。')
     await expect(payScreen(page)).not.toContainText('钱已经退回原付款账户')
+  })
+
+  test('同一拍连续双击「用这一次」：同步防重入锁严格只发 1 次 redeem-credit @kiosk', async ({ page, api }) => {
+    chargingMachine(api)
+    api.respond('GET', CREDITS_PATH, {
+      status: 200,
+      json: {
+        items: [
+          { serviceKind: 'resume_optimize', createdAt: new Date().toISOString() },
+          { serviceKind: 'resume_optimize', createdAt: new Date().toISOString() },
+        ],
+      },
+    })
+    const creditOrder = {
+      ...ORDER_A,
+      id: 'vpcord_dblclick_1',
+      serviceKey: 'resume_optimize' as const,
+      amountCents: 0,
+      provider: 'wechat' as const,
+      createdAt: Date.now(),
+    }
+    const redeemedView = serviceOrderView(creditOrder, {
+      provider: 'miniapp_credit',
+      amountCents: 0,
+      status: 'paid',
+      paidAt: new Date().toISOString(),
+      qrCodeContent: null,
+    })
+    let redeemCalls = 0
+    let releaseRedeem!: () => void
+    const gate = new Promise<void>((resolve) => { releaseRedeem = resolve })
+    let firstArrived!: () => void
+    const arrived = new Promise<void>((resolve) => { firstArrived = resolve })
+    await page.route((url) => url.pathname === REDEEM_PATH, async (route) => {
+      redeemCalls += 1
+      if (redeemCalls === 1) firstArrived()
+      await gate
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(ok(redeemedView).json),
+      })
+    })
+
+    await loginMemberAndGoto(page, '/pay/resume?next=optimize&back=report')
+    await expectState(page, 'owned')
+
+    // 模拟同一拍连续两次同步触发点击（在 React 尚未重绘 busy 之前）
+    await page.evaluate(() => {
+      const btn = document.querySelector('[data-testid="pay-service-primary"]') as HTMLButtonElement | null
+      if (!btn) throw new Error('missing primary button')
+      btn.click()
+      btn.click()
+    })
+    await arrived
+    await page.waitForTimeout(100)
+    releaseRedeem()
+
+    await expect(page).toHaveURL(/\/resume\/optimize$/, { timeout: 15_000 })
+    expect(redeemCalls).toBe(1)
+  })
+
+  test('核销延迟期间点底栏离开付款页：晚到核销单自动调 /close 退回权益且不留 sessionStorage @kiosk', async ({ page, api }) => {
+    chargingMachine(api)
+    api.respond('GET', CREDITS_PATH, {
+      status: 200,
+      json: { items: [{ serviceKind: 'resume_optimize', createdAt: new Date().toISOString() }] },
+    })
+    const lateOrder = {
+      ...ORDER_A,
+      id: 'vpcord_late_leave_1',
+      serviceKey: 'resume_optimize' as const,
+      amountCents: 0,
+      provider: 'wechat' as const,
+      createdAt: Date.now(),
+    }
+    const redeemedView = serviceOrderView(lateOrder, {
+      provider: 'miniapp_credit',
+      amountCents: 0,
+      status: 'paid',
+      paidAt: new Date().toISOString(),
+      qrCodeContent: null,
+    })
+    let releaseRedeem!: () => void
+    const redeemGate = new Promise<void>((resolve) => { releaseRedeem = resolve })
+    let redeemArrived!: () => void
+    const arrived = new Promise<void>((resolve) => { redeemArrived = resolve })
+    await page.route((url) => url.pathname === REDEEM_PATH, async (route) => {
+      redeemArrived()
+      await redeemGate
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(ok(redeemedView).json),
+      })
+    })
+    let closeCalls = 0
+    await page.route((url) => url.pathname === serviceOrderClosePath(lateOrder.id), async (route) => {
+      closeCalls += 1
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(ok(serviceOrderView(lateOrder, {
+          provider: 'miniapp_credit',
+          amountCents: 0,
+          status: 'refunded',
+          refundReason: '用户离开付款页',
+          refundedAt: new Date().toISOString(),
+          qrCodeContent: null,
+        })).json),
+      })
+    })
+
+    await loginMemberAndGoto(page, '/pay/resume?next=optimize&back=report')
+    await expectState(page, 'owned')
+
+    await primary(page).click()
+    await arrived
+    // 点击底栏「首页」离开付款页
+    await page.locator('nav').getByRole('button', { name: '首页' }).click()
+    await expect(page).toHaveURL(/\/$/, { timeout: 15_000 })
+
+    // 此时晚到的核销响应返回：绝不跳转 /resume/optimize，必须自动发 1 次 /close 并保持 sessionStorage 干净
+    releaseRedeem()
+    await expect.poll(() => closeCalls, { timeout: 10_000 }).toBe(1)
+    await expect(page).toHaveURL(/\/$/)
+    expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toBeNull()
+  })
+
+  test('切用户场景：前一位会员延迟返回的权益绝不把后一位无权益会员的页面改成 owned @kiosk', async ({ page, api }) => {
+    chargingMachine(api)
+    let releaseFirstCredits!: () => void
+    const firstCreditsGate = new Promise<void>((resolve) => { releaseFirstCredits = resolve })
+    let creditsReqCount = 0
+    let firstCreditsArrived!: () => void
+    const firstArrived = new Promise<void>((resolve) => { firstCreditsArrived = resolve })
+    await page.route((url) => url.pathname === CREDITS_PATH, async (route) => {
+      creditsReqCount += 1
+      const idx = creditsReqCount
+      if (idx === 1) {
+        firstCreditsArrived()
+        await firstCreditsGate
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ items: [{ serviceKind: 'resume_optimize', createdAt: new Date().toISOString() }] }),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: [] }),
+      })
+    })
+    const cashOrder = { ...ORDER_A, id: 'svc_user_b_cash_1', createdAt: Date.now() }
+    api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(cashOrder)))
+    api.respondWith('GET', serviceOrderPath(cashOrder.id), () => ok(serviceOrderView(cashOrder)))
+
+    // 用户 A 登录进入付款页，其查权益请求被延迟
+    await loginMemberAndGoto(page, '/pay/resume?next=optimize&back=report')
+    await firstArrived
+    // 切换为无权益的游客/另一位用户重新进入付款页
+    await page.evaluate(() => {
+      window.sessionStorage.clear()
+      window.localStorage.clear()
+    })
+    await page.goto('/pay/resume?next=optimize&back=report')
+    await expectState(page, 'wait')
+
+    // 放行用户 A 的延迟权益响应：当前用户绝不能被翻成 owned
+    releaseFirstCredits()
+    await page.waitForTimeout(300)
+    await expectState(page, 'wait')
+    await expect(page.getByTestId('pay-service-qr')).toBeVisible()
   })
 })
