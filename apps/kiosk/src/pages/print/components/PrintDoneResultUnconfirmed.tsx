@@ -21,7 +21,7 @@ const PAID_REFUND_TITLE = '核查之后才退'
 const PAID_REFUND_DESC = '核查确认没出纸后，钱自动退回原付款账户，到账时间以支付渠道为准。'
 
 /** 仅确认收过钱（amountCents > 0）才展示核查后退回提示；0 元免费机与金额未知严格不展示。 */
-export function isPaidUnconfirmedPrint(amountCents: number | null | undefined): boolean {
+function isPaidUnconfirmedPrint(amountCents: number | null | undefined): boolean {
   if (typeof amountCents !== 'number' || !Number.isFinite(amountCents) || amountCents <= 0) return false
   return paymentFactOf(amountCents) === 'paid'
 }
