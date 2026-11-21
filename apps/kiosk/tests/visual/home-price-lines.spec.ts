@@ -331,7 +331,7 @@ test('首页短价：已登录但没有可继续的办理，照未登录排、�
   expect(await card(home, 'resume-hub').locator('.qxt-mini').evaluate((el) => getComputedStyle(el).transform)).toBe('none')
 })
 
-test('首页短价：未登录收费态，页脚与备案号也在底部导航之上 @w1-kiosk', async ({ page, api }) => {
+test('首页短价：未登录收费态，页脚与备案号也在底部导航之上且标准 2 磁贴不压低 @w1-kiosk', async ({ page, api }) => {
   registerHome(api, machinePricingWith(MIXED))
   const home = await openHome(page)
   await expect(card(home, 'interview-hub').locator(PRICE)).toHaveText('每次 1.50 元')
@@ -339,6 +339,8 @@ test('首页短价：未登录收费态，页脚与备案号也在底部导航�
   expect(box.overflow).toBe(0)
   expect(box.footBottom).toBeLessThanOrEqual(box.navTop)
   expect(box.icpBottom).toBeLessThanOrEqual(box.navTop)
+  expect(await card(home, 'resume-hub').locator('h3').evaluate((el) => getComputedStyle(el).fontSize)).toBe('36px')
+  expect(await card(home, 'resume-hub').locator('.qxt-mini').evaluate((el) => getComputedStyle(el).transform)).toBe('none')
   await shot(page, 'run-fee-mixed.png')
 })
 

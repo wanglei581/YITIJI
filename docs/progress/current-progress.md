@@ -5,7 +5,7 @@
 - 来由：收费第 7 项第五包（P2e-5），起点提交 `f25d2b65fed330923242d91f8ab95df9d083030b`（当时 `origin/main`），只改 `apps/kiosk/`，不碰后端、管理员后台、机构后台与小程序。
 - 数据透出：`kioskHomeFreeBadgeReader.ts` 与 `useKioskHomeFreeBadge.ts` 在原有 `{badge, charged}` 同轮配置读取中透出五个生效价（分，非负整数）；缺键、非法值、读失败、超时或换终端均记为 `null`（未知），绝不默认成 0，且「免费使用」角标语义一字未改。价格只取 `GET /terminals/:id/config` 的 `pricing.effective`，无硬编码价格、无「¥」、无「工作人员」。
 - 卡片与页脚：`QxTouchTask.tsx` 新增可选 `priceLines` 槽位；`homeTouchCopy.ts` 的 `homePriceLines` 仅在五个生效价全部读到且至少一项 > 0 时渲染三张收费入口卡短价（改简历「每次 X.XX 元 · 诊断免费」或「免费」、练面试「每次 X.XX 元」或「免费」、打印 · 扫描两行「打印 黑白每页 X.XX 元 / 免费」与「扫描 每次 X.XX 元 / 免费」，彩色单价不上首页，查政策与到机取件不标价）。页脚「收费以现场公示为准」沿用既有出现条件并接在自动退出登录之后，加 `.qxt-home-keep`（`white-space: nowrap`）确保整句不折行。
-- 样式与压低态：`home-touch.css` 按设计稿 `pay-1113.js` 补价格行样式，并仅在「已登录且有继续办理」或「四磁贴压紧版式」且标价时压低四张入口卡（标题 32px、图标 52px、正文与短价 20px、继续办理条最小高 72px、右下角小样图按右下角缩到 0.78），确保字号不小于 20px、可点区不小于 48px、页脚三行与备案号位于底部导航之上；未登录与不收费态样式保持原样。
+- 样式与压低态：`home-touch.css` 按设计稿 `pay-1113.js` 补价格行样式，并仅在「已登录且有继续办理」或「私有化四磁贴压紧版式（不压低会溢出 76px）」且标价时压低四张入口卡（标题 32px、图标 52px、正文与短价 20px、继续办理条最小高 72px、右下角小样图按右下角缩到 0.78），确保字号不小于 20px、可点区不小于 48px、页脚三行与备案号位于底部导航之上；标准 2 磁贴未登录态与所有不收费态样式保持原样。
 - 验证：新增/扩展 `scripts/tests/home-free-badge.test.mjs`（29/29 PASS）、`tests/fixtures/machine-pricing.ts` 与 `tests/visual/home-price-lines.spec.ts`（挂入 `playwright.w1.config.ts`）；连同 `qingxu-home.spec.ts`（共 51/51 PASS）、`home-continue-handover.spec.ts` 与 `home-fill-when-empty.spec.ts`（19/19 PASS）、全部关联静态/单元/API 门禁、`tsc --noEmit`、全仓 `pnpm lint`（0 errors）及 3 条反向变异均验证通过。本地独立 Redis 6666 + API 3366 + 隔离库 `/tmp/p2e5-verify.db` 真服务三态走通，4 张 1080×1920 照稿并排图逐张目视核对无版式/折行/越界/遮挡差异。未推送，未并主线，未上线。
 
 ## 2026-11-19：合并车 D（政策两路）、打印状态补稿入冻结清单、第四次发布（分支 `claude/train-1119d`，未上线）
