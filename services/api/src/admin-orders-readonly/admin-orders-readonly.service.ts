@@ -15,6 +15,7 @@ import { explainPrintRefund } from '../payment/print-return-disposition'
 import { staleSuccessUnprintedAttentionWhere } from '../payment/stale-success-unprinted-attention'
 import { remainderAmountCents } from '../payment/refund-remainder'
 import { orderHasRefundAtChannel } from '../payment/refund-channel-acceptance'
+import { CHANNEL_SUCCESS_CONFLICT_AUDIT } from '../payment/refund-channel-answer'
 import { channelRegistrationEntry } from '../payment/refund-channel-registration'
 import type {
   AdminOrderReadonlyDetail,
@@ -63,7 +64,10 @@ export class AdminOrdersReadonlyService {
     if (params.pickupStatus) where['pickupStatus'] = params.pickupStatus
     if (params.search && params.search.trim()) where['orderNo'] = { contains: params.search.trim() }
     if (params.opsAttention === true) {
-      const unconfirmedIds = await this.unconfirmedAttemptOrderIds()
+      const [unconfirmedIds, conflictIds] = await Promise.all([
+        this.unconfirmedAttemptOrderIds(),
+        this.successConflictOrderIds(),
+      ])
       where['OR'] = [
         {
           payStatus: 'paid',
@@ -87,6 +91,7 @@ export class AdminOrdersReadonlyService {
         staleSuccessUnprintedAttentionWhere(),
         { type: 'copy', copyJob: { is: { state: 'unconfirmed' } } },
         ...(unconfirmedIds.length > 0 ? [{ id: { in: unconfirmedIds } }] : []),
+        ...(conflictIds.length > 0 ? [{ id: { in: conflictIds }, payStatus: { notIn: ['refunded', 'closed'] } }] : []),
       ]
     } else if (params.refundRequired === true) {
       const collected = {
@@ -176,7 +181,9 @@ export class AdminOrdersReadonlyService {
         })
       : []
 
-    const successCoversOrder = printRefund.refundStatus === 'success' && row.payStatus !== 'partial_refunded'
+    const remainder = await remainderAmountCents(this.prisma, row)
+    const successCoversOrder = printRefund.refundStatus === 'success'
+      && (row.payStatus !== 'partial_refunded' || (remainder !== null && remainder <= 0))
     const blocksAnotherRefund = printRefund.refundStatus === 'pending'
       || printRefund.refundStatus === 'failed'
       || printRefund.refundStatus === 'manual_review'
@@ -212,7 +219,7 @@ export class AdminOrdersReadonlyService {
       printRefundReason: printRefund.reason,
       refundLedgerNo: printRefund.refundNo,
       refundLedgerCents: printRefund.amountCents,
-      refundRemainderCents: await remainderAmountCents(this.prisma, row),
+      refundRemainderCents: remainder,
       channelInFlight: await orderHasRefundAtChannel(this.prisma, row.id),
       channelResultRegistration: await channelRegistrationEntry(this.prisma, row.id),
     }
@@ -270,11 +277,31 @@ export class AdminOrdersReadonlyService {
   private async manualReviewIds(rows: OrderRow[]): Promise<Set<string>> {
     const candidates = rows.filter((row) => row.payStatus === 'paid').map((row) => row.id)
     if (candidates.length === 0) return new Set()
-    const refunds = await this.prisma.refund.findMany({
-      where: { orderId: { in: candidates }, status: 'manual_review' },
-      select: { orderId: true },
+    const [refunds, conflicts] = await Promise.all([
+      this.prisma.refund.findMany({
+        where: { orderId: { in: candidates }, status: 'manual_review' },
+        select: { orderId: true },
+      }),
+      this.prisma.auditLog.findMany({
+        where: {
+          targetId: { in: candidates },
+          action: { in: [CHANNEL_SUCCESS_CONFLICT_AUDIT, 'refund.notify_paper_already_released'] },
+        },
+        select: { targetId: true },
+      }),
+    ])
+    return new Set([
+      ...refunds.map((refund) => refund.orderId),
+      ...conflicts.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
+    ])
+  }
+
+  private async successConflictOrderIds(): Promise<string[]> {
+    const rows = await this.prisma.auditLog.findMany({
+      where: { action: { in: [CHANNEL_SUCCESS_CONFLICT_AUDIT, 'refund.notify_paper_already_released'] } },
+      select: { targetId: true },
     })
-    return new Set(refunds.map((refund) => refund.orderId))
+    return [...new Set(rows.map((row) => row.targetId).filter((id): id is string => Boolean(id)))]
   }
 
   private async unconfirmedAttemptOrderIds(): Promise<string[]> {

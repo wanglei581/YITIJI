@@ -1,8 +1,9 @@
 /**
  * 渠道退款成功通知的收敛。
  *
- * 同一单不许既出纸又退款。任务已领取、打印中、已完成，或订单已标成领取中、打印中，
- * 或已经核对为出纸，都算已经放行。这时无论退款原先是待确认还是失败，都不能记成退款成功。
+ * 同一单不许既出纸又默默记成正常已退。任务已领取、打印中、已完成，或订单已标成领取中、打印中，
+ * 或已经核对为出纸，都算已经放行。此时渠道退成仍是事实：先把退款行落成 success（绝不掩盖/回滚），
+ * 不把订单静默改成已退，记下冲突审计并返回 blocked 触发人工核对告警。
  * 任务还是待打印、纸也没出去：迟到的成功通知记成退款成功。打印任务状态不在这里改。
  */
 import { BadRequestException, NotFoundException } from '@nestjs/common'
@@ -43,20 +44,20 @@ export async function convergeNotifiedRefundSuccess(
     orderTaskStatus: order.taskStatus,
     printOutcome: task?.printOutcome ?? null,
   })
-  const canBlock = input.priorStatus === 'failed' || input.priorStatus === 'pending' || input.priorStatus === 'withdrawn'
+  const canBlock = input.priorStatus === 'failed'
+    || input.priorStatus === 'pending'
+    || input.priorStatus === 'withdrawn'
+    || input.priorStatus === 'manual_review'
   if (canBlock && released) {
-    const held = await tx.refund.updateMany({
-      where: { id: input.refundId, status: { in: ['pending', 'failed', 'withdrawn'] } },
+    const recorded = await tx.refund.updateMany({
+      where: { id: input.refundId, status: { in: ['pending', 'failed', 'withdrawn', 'manual_review'] } },
       data: {
-        status: REFUND_STATUS_MANUAL_REVIEW,
+        status: 'success',
+        amountCents: input.amountCents,
         ...(input.channelRefundNo ? { channelRefundNo: input.channelRefundNo } : {}),
       },
     })
-    if (held.count === 0) return 'idempotent'
-    await tx.order.updateMany({
-      where: { id: input.orderId, payStatus: 'refunding' },
-      data: { payStatus: 'paid' },
-    })
+    if (recorded.count === 0) return 'idempotent'
     await tx.auditLog.create({
       data: {
         actorId: null,
@@ -68,7 +69,7 @@ export async function convergeNotifiedRefundSuccess(
           refundNo: input.refundId,
           amountCents: input.amountCents,
           reason: input.reason,
-          detail: '已经放行出纸，这笔退款不能再记成成功',
+          detail: '已经放行出纸，但渠道已退成并已记账，存在冲突，待人工核对，请勿重复退款',
         }),
       },
     })

@@ -22,11 +22,13 @@ export async function notifyPrintReturnHold(db: PrismaService, orderId: string):
   try {
     const { default: Redis } = await import('ioredis')
     const client = new Redis(redisUrl, {
+      lazyConnect: true,
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
       connectTimeout: 1000,
     })
     try {
+      await client.connect()
       const { deliverOpsAlert } = await import('../admin-ops/admin-alert-push.service')
       await deliverOpsAlert({
         redis: {

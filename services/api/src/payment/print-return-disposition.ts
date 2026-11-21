@@ -16,6 +16,7 @@ import {
 } from './print-no-paper-refund.constants'
 import type { PrismaService } from '../prisma/prisma.service'
 import { CHANNEL_ABNORMAL_AUDIT, CHANNEL_ABNORMAL_DETAIL } from './refund-abnormal'
+import { CHANNEL_SUCCESS_CONFLICT_AUDIT } from './refund-channel-answer'
 
 export const PRINT_NO_PAPER_MANUAL_AUDIT = 'print_order.no_paper_manual'
 export const PRINT_NO_PAPER_AUTO_FAILED_AUDIT = 'print_order.auto_return_failed'
@@ -121,6 +122,7 @@ const REASON_ACTIONS = [
   'refund.notify_amount_mismatch',
   'refund.notify_paper_already_released',
   CHANNEL_ABNORMAL_AUDIT,
+  CHANNEL_SUCCESS_CONFLICT_AUDIT,
 ] as const
 
 const AUTO_REASONS = new Set<string>([PAID_NO_PAPER_AUTO_REASON, STALE_ATTEMPT_REFUND_REASON])
@@ -165,6 +167,15 @@ function mismatchReason(audits: AuditFact[]): string | null {
 function paperReleasedReason(audits: AuditFact[]): string | null {
   for (const audit of audits) {
     if (audit.action !== 'refund.notify_paper_already_released') continue
+    const detail = readPayload(audit.payloadJson).detail
+    if (typeof detail === 'string' && detail.trim()) return detail.trim()
+  }
+  return null
+}
+
+function successConflictReason(audits: AuditFact[]): string | null {
+  for (const audit of audits) {
+    if (audit.action !== CHANNEL_SUCCESS_CONFLICT_AUDIT && audit.action !== 'refund.notify_paper_already_released') continue
     const detail = readPayload(audit.payloadJson).detail
     if (typeof detail === 'string' && detail.trim()) return detail.trim()
   }
@@ -242,6 +253,13 @@ export async function explainPrintRefund(db: PrismaService, orderId: string): Pr
   if (failedOther) return viewOf('manual', failedOther, '退款没有成功，待人工处理')
   const pendingOther = refunds.find((refund) => refund.status === 'pending')
   if (pendingOther) return viewOf('manual', pendingOther, '退款还在处理，待人工核对')
+  // 渠道退成事实已落库，但与出纸或实付合计冲突：留在待人工核对与告警，不得伪装成自动退成功。
+  const conflictDetail = successConflictReason(audits)
+  if (conflictDetail && order.payStatus !== 'refunded' && order.payStatus !== 'closed') {
+    const conflictRow = thisPaymentRefunds.find((refund) => refund.status === 'success')
+      ?? refunds.find((refund) => refund.status === 'success')
+    if (conflictRow) return viewOf('manual', conflictRow, conflictDetail)
+  }
   const autoSuccess = thisPaymentRefunds.find((refund) => refund.status === 'success' && refund.reason != null && AUTO_REASONS.has(refund.reason))
   if (autoSuccess || (order.payStatus === 'refunded' && order.refundReason === PAID_NO_PAPER_AUTO_REASON)) {
     const stale = autoSuccess?.reason === STALE_ATTEMPT_REFUND_REASON
@@ -299,6 +317,7 @@ const HOLD_AUDIT_ACTIONS = [
   PRINT_NO_PAPER_AUTO_FAILED_AUDIT,
   'refund.notify_amount_mismatch',
   'refund.notify_paper_already_released',
+  CHANNEL_SUCCESS_CONFLICT_AUDIT,
 ] as const
 
 export async function listPrintReturnHolds(db: PrismaService): Promise<PrintReturnHold[]> {

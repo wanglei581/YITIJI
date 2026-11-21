@@ -178,12 +178,12 @@ export async function runRefundPaperGuardCases(db: PrismaService, tag: string): 
     }, apiV3Key, platformKeys.privateKey, serial)
     const heldResult = await refunds.processWechatRefundNotify(heldNotify.rawBody, heldNotify.headers)
     assert.equal(heldResult.ok, true)
-    assert.equal((await db.refund.findUnique({ where: { refundNo: held.refundNo } }))?.status, 'manual_review')
+    assert.equal((await db.refund.findUnique({ where: { refundNo: held.refundNo } }))?.status, 'success', 'P2b9d 18:22 裁定：渠道退成事实先落库不回滚')
     assert.equal((await db.order.findUnique({ where: { id: held.orderId } }))?.payStatus, 'paid')
     assert.equal((await db.printTask.findUnique({ where: { id: `pt_${held.orderId}` } }))?.status, 'claimed')
     const heldView = await explainPrintRefund(db, held.orderId)
     assert.equal(heldView.disposition, 'manual')
-    assert.equal(heldView.refundStatus, 'manual_review')
+    assert.equal(heldView.refundStatus, 'success')
     assert.match(heldView.reason ?? '', /已经放行出纸/)
     assert.equal((await collectPrintReturnAlerts(db)).some((alert) => alert.subjectId === held.orderId), true)
 
@@ -252,10 +252,12 @@ export async function runRefundPaperGuardCases(db: PrismaService, tag: string): 
       amount: { refund: 137, total: 137 },
     }, apiV3Key, platformKeys.privateKey, serial)
     await refunds.processWechatRefundNotify(lateNotify.rawBody, lateNotify.headers)
-    assert.equal((await db.refund.findUnique({ where: { refundNo: latePaper.refundNo } }))?.status, 'manual_review')
-    assert.equal((await db.order.findUnique({ where: { id: latePaper.orderId } }))?.payStatus, 'paid')
+    assert.equal((await db.refund.findUnique({ where: { refundNo: latePaper.refundNo } }))?.status, 'success', 'P2b9d 18:22 裁定：渠道退成事实先落库不回滚')
+    assert.equal((await db.order.findUnique({ where: { id: latePaper.orderId } }))?.payStatus, 'refunding')
     assert.notEqual((await db.order.findUnique({ where: { id: latePaper.orderId } }))?.payStatus, 'refunded')
     assert.equal((await db.printTask.findUnique({ where: { id: `pt_${latePaper.orderId}` } }))?.status, 'claimed')
+    assert.equal((await explainPrintRefund(db, latePaper.orderId)).disposition, 'manual')
+    assert.equal((await collectPrintReturnAlerts(db)).some((alert) => alert.subjectId === latePaper.orderId), true)
 
     const shut = await seed('shut', 'cancelled', 'closed', 'closed')
     const shutNotify = buildRefundNotify({

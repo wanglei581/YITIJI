@@ -3,9 +3,10 @@
  * - 失败：这一笔记失败，订单离开「退款中」（和退款明确失败的回滚同一口径：有更早成功退款回部分退款，
  *   迟到回调待退回关闭，其余回已付），之后按点的那一步往下做。只记退款行、订单留在退款中会让关单
  *   绕过「只退了一部分不能关单」，处置被拒后订单也会卡在退款中。
- * - 成功：按渠道回报的退款金额把这一笔记成成功。订单按非过期成功退款的合计记账：
- *   合计等于应付记已退，小于应付记部分退；大于应付不记，整笔回滚并拒绝。
- *   纸已经放行就不记账（同一条订单更新里判定），整笔回滚。
+ * - 成功：按渠道回报的退款金额把这一笔记成成功并落库审计。渠道退成是事实，绝不因纸已出或
+ *   非过期成功退款合计超应付而回滚该笔退款成功事实；遇冲突时保留 Refund.status = 'success'，
+ *   写入冲突审计并触发告警，让订单进入/停留在冲突待人工核对态，不再引导二次退款。
+ *   未冲突时订单按非过期成功退款的合计记账：合计等于应付记已退，小于应付记部分退。
  * 渠道已经退成时，改为出纸、关单照实拒绝，不改写成整单「确认退成」；确认退成直接给出记账后的结果。
  * 重复点击重新读库；每一笔都按「状态还没落定」做条件更新，已经记过的不再记。
  */
@@ -13,6 +14,7 @@ import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 import { isOnlineCollectedRefundLock, ONLINE_PAID_PENDING_REFUND_REASON, payableCents } from './pending-refund-signal'
 import { STALE_ATTEMPT_REFUND_REASON } from './print-no-paper-refund.constants'
+import { notifyPrintReturnHold } from './print-return-alert'
 import { markOrderIfPaperUnreleased } from './refund-paper-exclusion'
 import { nonStaleSuccessCents, payStatusAfterRefundFailure } from './refund-remainder'
 import type { PrintReturnResolution } from './resolve-print-return-hold'
@@ -25,6 +27,10 @@ const OPEN_STATUSES = ['pending', 'manual_review']
 const ORDER_KEPT_PAY_STATUSES = new Set(['unpaid', 'paying', 'closed'])
 const ALREADY_RESOLVED = '这笔待人工退款刚刚已经被处理，请刷新后再看。'
 export const CHANNEL_REFUNDED_CODE = 'REFUND_CHANNEL_REFUNDED'
+export const CHANNEL_SUCCESS_CONFLICT_AUDIT = 'refund.channel_success_conflict'
+export const CHANNEL_SUCCESS_PAPER_CONFLICT_CODE = 'REFUND_CHANNEL_SUCCESS_PAPER_CONFLICT'
+const AMOUNT_EXCEEDS_CONFLICT_MESSAGE = '渠道退款已成功并已记账，但成功退款合计超过订单实付，已转待人工核对，请勿重复退款。'
+const PAPER_RELEASED_CONFLICT_MESSAGE = '渠道退款已成功并已记账，但纸已经放行或已出纸，已转待人工核对，请勿重复退款。'
 
 function deny(code: string, message: string): BadRequestException {
   return new BadRequestException({ error: { code, message } })
@@ -45,7 +51,10 @@ export async function recordChannelAnswers(
   operatorId: string,
   registration?: ChannelResultRegistration,
 ): Promise<boolean> {
-  return db.$transaction(async (tx) => {
+  const outcome = await db.$transaction(async (tx): Promise<{
+    paidBack: boolean
+    conflict: { code: string; message: string } | null
+  }> => {
     if (registration) {
       await tx.auditLog.create({
         data: {
@@ -67,6 +76,7 @@ export async function recordChannelAnswers(
     }
     let paidBack = false
     let refundReason: string | null = null
+    const successRefundNos: string[] = []
     for (const answer of answers) {
       const row = await tx.refund.findUnique({
         where: { refundNo: answer.refundNo },
@@ -106,6 +116,7 @@ export async function recordChannelAnswers(
       if (answer.verdict === 'success' && row.reason !== STALE_ATTEMPT_REFUND_REASON) {
         paidBack = true
         refundReason = row.reason
+        successRefundNos.push(answer.refundNo)
       }
     }
     if (!paidBack) {
@@ -121,7 +132,7 @@ export async function recordChannelAnswers(
           : await payStatusAfterRefundFailure(tx, orderId)
         await tx.order.updateMany({ where: { id: orderId, payStatus: 'refunding' }, data: restored })
       }
-      return false
+      return { paidBack: false, conflict: null }
     }
     const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
@@ -130,10 +141,32 @@ export async function recordChannelAnswers(
     const payable = payableCents(order)
     const total = await nonStaleSuccessCents(tx, orderId)
     if (payable > 0 && total > payable) {
-      throw deny('REFUND_CHANNEL_AMOUNT_EXCEEDS', '渠道回报的退款合计超过这单实付，核对前不能处置。')
+      // 渠道退成事实绝不回滚：保留 Refund.status = 'success'，冲突写审计并走人工核对告警。
+      await tx.auditLog.create({
+        data: {
+          actorId: null,
+          actorRole: 'admin',
+          action: CHANNEL_SUCCESS_CONFLICT_AUDIT,
+          targetType: 'order',
+          targetId: orderId,
+          payloadJson: JSON.stringify({
+            code: 'REFUND_CHANNEL_AMOUNT_EXCEEDS',
+            refundNos: successRefundNos,
+            totalSuccessCents: total,
+            payableCents: payable,
+            operatorId,
+            source: registration ? 'registration' : 'channel',
+            detail: AMOUNT_EXCEEDS_CONFLICT_MESSAGE,
+          }),
+        },
+      })
+      return {
+        paidBack: true,
+        conflict: { code: 'REFUND_CHANNEL_AMOUNT_EXCEEDS', message: AMOUNT_EXCEEDS_CONFLICT_MESSAGE },
+      }
     }
     // 未付、支付中、已关闭的单只记退款行，不改订单支付状态（和确认退成同一口径）。
-    if (ORDER_KEPT_PAY_STATUSES.has(order.payStatus)) return true
+    if (ORDER_KEPT_PAY_STATUSES.has(order.payStatus)) return { paidBack: true, conflict: null }
     const fully = payable <= 0 || total >= payable
     const written = await markOrderIfPaperUnreleased(tx, db.dbKind, orderId, {
       payStatus: fully ? 'refunded' : 'partial_refunded',
@@ -141,7 +174,31 @@ export async function recordChannelAnswers(
       refundReason,
       refundedAt: fully ? new Date() : null,
     })
-    if (!written) throw deny('PAPER_ALREADY_RELEASED', '纸已经放行或已经出去，渠道退成的结果先不记账，请走核对后仍退款。')
+    if (!written) {
+      // 纸已经放行或已出纸，渠道退成事实仍保留不回滚；冲突另写审计并告警，不再引导二次退款。
+      await tx.auditLog.create({
+        data: {
+          actorId: null,
+          actorRole: 'admin',
+          action: CHANNEL_SUCCESS_CONFLICT_AUDIT,
+          targetType: 'order',
+          targetId: orderId,
+          payloadJson: JSON.stringify({
+            code: CHANNEL_SUCCESS_PAPER_CONFLICT_CODE,
+            refundNos: successRefundNos,
+            totalSuccessCents: total,
+            payableCents: payable,
+            operatorId,
+            source: registration ? 'registration' : 'channel',
+            detail: PAPER_RELEASED_CONFLICT_MESSAGE,
+          }),
+        },
+      })
+      return {
+        paidBack: true,
+        conflict: { code: CHANNEL_SUCCESS_PAPER_CONFLICT_CODE, message: PAPER_RELEASED_CONFLICT_MESSAGE },
+      }
+    }
     if (fully && order.printTaskId) {
       const cancelled = await tx.printTask.updateMany({
         where: { id: order.printTaskId, status: 'pending', OR: [{ printOutcome: null }, { printOutcome: { not: 'printed' } }] },
@@ -151,8 +208,13 @@ export async function recordChannelAnswers(
         await tx.order.updateMany({ where: { id: orderId, taskStatus: 'pending' }, data: { taskStatus: 'cancelled' } })
       }
     }
-    return true
+    return { paidBack: true, conflict: null }
   })
+  if (outcome.conflict) {
+    await notifyPrintReturnHold(db, orderId)
+    throw deny(outcome.conflict.code, outcome.conflict.message)
+  }
+  return outcome.paidBack
 }
 
 /** 渠道已经退成之后这一步的结果：确认退成给出记账结果；改为出纸、关单照实拒绝。 */

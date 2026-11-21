@@ -217,15 +217,21 @@ export async function runP2b9ChannelAmountCases(
       assert.equal((await db.order.findUniqueOrThrow({ where: { id: unknown.id } })).payStatus, 'refunding')
     }
 
-    // 7. 合计超过实付（已有成功 50，渠道又说这一笔退了 100）：拒绝，哪儿都不改。
+    // 7. 合计超过实付（已有成功 50，渠道又说这一笔退了 100）：P2b9d 18:22 裁定——渠道退成事实绝不回滚，
+    // 保留 Refund.status='success' 与审计，写入冲突审计并转待人工核对告警，订单不静默写成已退。
     const over = await seed('over', [
       { suffix: 'a', amountCents: 50, status: 'success', reason: '先退一部分', submitted: true },
       { suffix: 'b', amountCents: 100, status: 'pending', reason: '再退一笔', submitted: true },
     ])
     const overRun = await run(over.id, 'confirm_refunded', viaChannel(registryAnswering({ status: 'success', channelRefundNo: 'WX-OVER', refundAmountCents: 100 })))
     assert.equal(overRun.code, 'REFUND_CHANNEL_AMOUNT_EXCEEDS')
-    assert.equal((await db.refund.findUniqueOrThrow({ where: { refundNo: over.refundNos[1] } })).status, 'pending')
+    const overRefund = await db.refund.findUniqueOrThrow({ where: { refundNo: over.refundNos[1] } })
+    assert.equal(overRefund.status, 'success', '渠道退成事实绝不因超应付冲突而回滚')
+    assert.equal(overRefund.amountCents, 100)
+    assert.equal(overRefund.channelRefundNo, 'WX-OVER')
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: over.id } })).payStatus, 'refunding')
+    assert.equal(await db.auditLog.count({ where: { targetId: over.id, action: 'refund.channel_answer' } }), 1)
+    assert.equal(await db.auditLog.count({ where: { targetId: over.id, action: 'refund.channel_success_conflict' } }), 1)
 
     // 8. 已关的单（关单后渠道又通知退成）：只记退款行，订单保持关闭。
     const shut = await seed('shut', [{ suffix: 'a', amountCents: 100, status: 'manual_review', reason: '退款失败', submitted: true }], { payStatus: 'closed', taskStatus: 'cancelled' })

@@ -8,7 +8,7 @@
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 import { CHANNEL_ABNORMAL_DETAIL, parkAbnormalChannelRefund } from './refund-abnormal'
-import { recordChannelAnswers, type DefinitiveChannelAnswer } from './refund-channel-answer'
+import { CHANNEL_SUCCESS_PAPER_CONFLICT_CODE, recordChannelAnswers, type DefinitiveChannelAnswer } from './refund-channel-answer'
 import { refundMayStillBeAtChannel } from './refund-channel-acceptance'
 import { parkChannelQueryFault } from './refund-channel-query'
 import type { PendingRefundChannelQuery, PrintReturnResolution, RefundChannelVerdict } from './resolve-print-return-hold'
@@ -149,8 +149,10 @@ export async function resolveChannelBeforeHold(
     return paidBack ? 'channel_refunded' : action
   } catch (error) {
     const code = exceptionCode(error)
-    if (code === 'REFUND_CHANNEL_AMOUNT_EXCEEDS' || code === 'PAPER_ALREADY_RELEASED') {
-      const detail = code === 'PAPER_ALREADY_RELEASED' ? '纸已经出去，渠道退成的结果先不记账' : '渠道回报的退款合计超过这单实付'
+    if (code === 'REFUND_CHANNEL_AMOUNT_EXCEEDS' || code === CHANNEL_SUCCESS_PAPER_CONFLICT_CODE) {
+      const detail = code === CHANNEL_SUCCESS_PAPER_CONFLICT_CODE
+        ? '纸已经放行或已出纸，渠道退款成功事实已记账，冲突已转待人工核对'
+        : '渠道回报的退款合计超过这单实付，渠道退款成功事实已记账，冲突已转待人工核对'
       await auditRejected(db, orderId, action, operatorId, { code, refundNo: null, verdict: 'success', detail })
     }
     throw error

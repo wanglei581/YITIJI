@@ -312,10 +312,12 @@ export async function runP2b4Cases(
     amountCents: 200,
     reason: printedRefund.reason,
   }))
-  assert.equal(printedOutcome, 'blocked', '退款还在处理时纸已经出去，不能再记成退款成功')
-  assert.equal((await db.refund.findUnique({ where: { id: printedRefund.id } }))?.status, 'manual_review')
-  assert.equal((await db.order.findUnique({ where: { id: printedPending.orderId } }))?.payStatus, 'paid')
+  assert.equal(printedOutcome, 'blocked', '退款还在处理时纸已经出去，不能静默把订单记成已退')
+  assert.equal((await db.refund.findUnique({ where: { id: printedRefund.id } }))?.status, 'success', 'P2b9d 18:22 裁定：渠道退成事实绝不回滚或掩盖')
+  assert.equal((await db.refund.findUnique({ where: { id: printedRefund.id } }))?.channelRefundNo, 'ch-printed-pending')
+  assert.equal((await db.order.findUnique({ where: { id: printedPending.orderId } }))?.payStatus, 'refunding')
   assert.equal((await db.printTask.findUnique({ where: { id: printedPending.taskId } }))?.printOutcome, 'printed')
+  assert.equal(await db.auditLog.count({ where: { targetId: printedPending.orderId, action: 'refund.notify_paper_already_released' } }), 1)
 
   const pendingClear = await seed('pendingclear', {
     payStatus: 'refunding',
