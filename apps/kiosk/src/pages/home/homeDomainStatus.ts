@@ -56,7 +56,10 @@ export function printDomainStatus(input: {
 
 export type HomeBandTone = 'ok' | 'warn' | 'bad' | 'unknown'
 
-/** 首页顶栏胶囊。公开打印机状态已经是卡纸时，本机探针连不上也不把文案盖成「状态未知」。 */
+/**
+ * 首页顶栏胶囊。公开打印机状态已经是卡纸时，本机探针连不上也不把文案盖成「状态未知」。
+ * 卡纸用 warn（琥珀色，--qxt-warn-*）：和打印失败页同一句「打印机卡纸」的胶囊同一档，稿也是这一档。
+ */
 export function homeBandStatus(input: {
   loading: boolean
   requestFailed: boolean
@@ -68,7 +71,7 @@ export function homeBandStatus(input: {
 }): { tone: HomeBandTone; label: string } {
   if (input.loading) return { tone: 'unknown', label: '设备检查中' }
   if (input.requestFailed) return { tone: 'warn', label: '服务暂时连不上' }
-  if (input.errorCode === 'paperJam') return { tone: 'bad', label: input.printerLabel }
+  if (input.errorCode === 'paperJam') return { tone: 'warn', label: input.printerLabel }
   if (input.localAgentUnreachable) return { tone: 'unknown', label: '状态未知' }
   if (input.printerReady) return { tone: 'ok', label: input.printerLabel }
   if (input.kind === 'error') return { tone: 'bad', label: input.printerLabel }

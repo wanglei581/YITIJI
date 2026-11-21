@@ -147,13 +147,24 @@ test('我的打印订单里的手机待取单：本机可以来取，别的机�
       terminal: { displayName: '3号机\u0000', locationLabel: '  西门  ' },
     },
   ])
+  // 拼接处汉字挨着半角数字时空一格（「的 2」），机器名自己的写法（「2号机」）不动。
   assert.deepEqual(rows.map((row) => ({ orderId: row.orderId, claimableHere: row.claimableHere, elsewhere: row.elsewhere, label: row.label })), [
     { orderId: 'ord-here', claimableHere: true, elsewhere: null, label: '简***.pdf' },
-    { orderId: 'ord-other', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到市人才市场的2号机领取', label: '别***.pdf' },
+    { orderId: 'ord-other', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到市人才市场的 2号机领取', label: '别***.pdf' },
     { orderId: 'pkg-far', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到大厅领取', label: '材料包 · 2 个文件' },
     { orderId: 'ord-blank', claimableHere: false, elsewhere: here.PICKUP_HERE_OTHER_MACHINE, label: '无***.pdf' },
-    { orderId: 'ord-ctrl', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到西门的3号机领取', label: '控***.pdf' },
+    { orderId: 'ord-ctrl', claimableHere: false, elsewhere: '这笔订单不在这台机器取件，请到西门的 3号机领取', label: '控***.pdf' },
   ])
+  // 稿上的写法：网点「二楼服务区」、机器「2 号机」→「二楼服务区的 2 号机」；纯编号的机器名两边都空一格。
+  const place = (displayName, locationLabel) => here.pendingPickupPlace({
+    kind: 'package', orderId: 'p', title: null, itemCount: 3, claimableHere: false, terminal: { displayName, locationLabel },
+  })
+  assert.equal(place('2 号机', '二楼服务区'), '二楼服务区的 2 号机')
+  assert.equal(here.pendingPickupElsewhere(place('2 号机', '二楼服务区')), '这笔订单不在这台机器取件，请到二楼服务区的 2 号机领取')
+  assert.equal(place('KSK-014', '就业服务大厅'), '就业服务大厅的 KSK-014')
+  assert.equal(here.pendingPickupElsewhere('KSK-014'), '这笔订单不在这台机器取件，请到 KSK-014 领取')
+  assert.equal(place('东门服务台', 'A 座 3F'), 'A 座 3F 的东门服务台')
+  assert.equal(place('东门服务台', '二楼服务区'), '二楼服务区的东门服务台')
   const packed = JSON.stringify(rows)
   assert.equal(packed.includes('28491703'), false)
   assert.equal(packed.includes('简历.pdf'), false)

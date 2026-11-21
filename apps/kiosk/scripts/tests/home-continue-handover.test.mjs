@@ -61,7 +61,8 @@ test('公开打印机状态是卡纸时，本机探针连不上也写打印机�
     printerLabel: '打印机卡纸',
     errorCode: 'paperJam',
   }
-  assert.deepEqual(m.homeBandStatus(jam), { tone: 'bad', label: '打印机卡纸' })
+  // 卡纸是琥珀色一档（warn），和打印失败页同一句「打印机卡纸」的胶囊同一个色值来源（S15c9 第 2 条，照稿）。
+  assert.deepEqual(m.homeBandStatus(jam), { tone: 'warn', label: '打印机卡纸' })
   assert.equal(m.homeBandStatus({ ...jam, localAgentUnreachable: false }).label, '打印机卡纸')
   assert.equal(
     m.homeBandStatus({ ...jam, errorCode: 'paperEmpty', printerLabel: '打印机缺纸' }).label,

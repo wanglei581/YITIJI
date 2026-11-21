@@ -17,7 +17,8 @@ export default defineConfig({
   // print-handoff：商用收口 P0-5 第二、三批的打印交接回归（H1–H7），同属打印链，归 W2。
   // print-walkfix：触屏版本机全链路走查（2026-10-29）打印链路问题的修复用例（I-08 起），同属打印链，归 W2。
   // fusion-w2-scan-saved-note：面板扫描完成页「核对到才说已存」。同属扫描结果，归 W2。
-  testMatch: /(?:fusion-w2-(?:print|scan|tools)|fusion-w2-scan-saved-note|print-hub-qx|print-fulfill-qx|print-fail-s15c3|print-fail-s15c4|cashier-qx|pickup-claim-receipt|print-handoff|print-walkfix|scan-device-k1b(?:2|3a)?|copy-c3a|copy-c3b1|copy-c3b2)\.spec\.ts$/,
+  // home-printer-jam：首页顶栏在打印机卡纸时的接线（S15c9）。要本机网桥令牌才走得到「探针连不上」那一支，W1 构建没有，归 W2。
+  testMatch: /(?:fusion-w2-(?:print|scan|tools)|fusion-w2-scan-saved-note|print-hub-qx|print-fulfill-qx|print-fail-s15c3|print-fail-s15c4|cashier-qx|pickup-claim-receipt|print-handoff|print-walkfix|home-printer-jam|scan-device-k1b(?:2|3a)?|copy-c3a|copy-c3b1|copy-c3b2)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-fusion-w2',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
