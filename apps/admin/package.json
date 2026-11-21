@@ -42,6 +42,7 @@
     "verify:admin-alert-auto-refresh": "pnpm --filter @ai-job-print/api exec node --import tsx --test ../../apps/admin/src/routes/alerts/useAutoRefresh.test.ts",
     "verify:admin-alerts-refresh-e2e": "node scripts/run-e2e.mjs --config=playwright.alerts-refresh.config.ts",
     "verify:admin-files-actions-e2e": "node scripts/run-e2e.mjs --config=playwright.files-actions.config.ts",
+    "verify:admin-invoice-e2e": "node scripts/run-e2e.mjs --config=playwright.invoice.config.ts",
     "verify:partner-account-action-state": "pnpm --filter @ai-job-print/api exec node --import tsx --experimental-test-coverage --test-coverage-lines=97 --test-coverage-functions=100 --test-coverage-branches=80 --test ../../apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
     "verify:admin-device-fleet-overview-ui": "node scripts/verify-admin-device-fleet-overview-ui.mjs",
     "verify:admin-terminal-network-diagnostics-ui": "node scripts/verify-admin-terminal-network-diagnostics-ui.mjs",

@@ -2,14 +2,14 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`124` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`125` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 124 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 125 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
 flowchart TD
-  EndUser["EndUser<br/><small>34 字段</small>"]
+  EndUser["EndUser<br/><small>35 字段</small>"]
   Organization["Organization<br/><small>35 字段</small>"]
   Terminal["Terminal<br/><small>37 字段</small>"]
   FileObject["FileObject<br/><small>50 字段</small>"]
@@ -87,7 +87,7 @@ flowchart TD
 | **ContractReviewTask** | 30 | EndUser | 8 个文件<br/>`contract-review/__tests__/contract-review-orchestrator.test.ts`<br/>`contract-review/contract-review-lifecycle.service.ts`<br/>`contract-review/contract-review-orchestrator.service.ts`<br/>… |
 | **CopyJob** | 21 | Order | 7 个文件<br/>`admin-print-scan/admin-fulfillment-lists.ts`<br/>`copy-jobs/copy-agent.service.ts`<br/>`copy-jobs/copy-authorization.ts`<br/>… |
 | **DocumentProcessTask** | 19 | EndUser、FileObject、PiiFinding | 6 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`materials/materials-manual-confirmation.service.ts`<br/>`materials/materials.service.ts`<br/>… |
-| **EndUser** | 34 | AiResumeResult、AiServiceLog、AiUsageRecord、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、PrintTask、ScanTask、UserAiConsent、UserDataRequest | 15 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
+| **EndUser** | 35 | AiResumeResult、AiServiceLog、AiUsageRecord、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、InvoiceRequest、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、PrintTask、ScanTask、UserAiConsent、UserDataRequest | 16 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
 | **ExternalJumpLog** | 13 | EndUser | 6 个文件<br/>`activity/activity.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/resume/fair-visit-plan.service.ts`<br/>… |
 | **FairCompany** | 22 | FairCompanyPosition、FairVenueHallCompany、JobFair | 8 个文件<br/>`activity/activity.service.ts`<br/>`companies/companies.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **FairCompanyBooth** | 9 | — | **无代码读写** |
@@ -107,6 +107,7 @@ flowchart TD
 | **HelpItem** | 8 | — | **无代码读写** |
 | **ImportBatch** | 17 | ImportRecord、JobSource | 2 个文件<br/>`jobs/jobs-admin.service.ts`<br/>`jobs/jobs-excel.service.ts` |
 | **ImportRecord** | 10 | ImportBatch | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
+| **InvoiceRequest** | 18 | EndUser | 6 个文件<br/>`invoices/admin-invoice.service.ts`<br/>`invoices/invoice-email-retention.ts`<br/>`invoices/invoice-privacy.test.ts`<br/>… |
 | **Job** | 47 | CompanyProfile、JobAiRecommendation、JobApplication、JobDataQualitySnapshot、JobSource、OfflineAgencyBranch、OfflineJob、Organization | 21 个文件<br/>`activity/activity.service.ts`<br/>`ai/resume/job-fit.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **JobAiRecommendation** | 12 | Job、JobAiSession | 3 个文件<br/>`job-ai/governed-job-fit.service.ts`<br/>`job-ai/job-ai.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **JobAiSession** | 14 | EndUser、JobAiRecommendation | 5 个文件<br/>`ai/ai-result.cleanup.task.ts`<br/>`job-ai/governed-job-fit.service.ts`<br/>`job-ai/job-ai.service.ts`<br/>… |
@@ -130,7 +131,7 @@ flowchart TD
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineJob** | 22 | Job、OfflineAgency | 1 个文件<br/>`offline-agencies/offline-agencies.service.ts` |
 | **OnlinePlatformDirectory** | 34 | FileObject、Organization | 3 个文件<br/>`official-channels/official-channels.service.ts`<br/>`recruitment-content/recruitment-content-read.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
-| **Order** | 43 | CopyJob、OrderItem、PaymentAttempt、PrintTask、Refund | 36 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-fulfillment-lists.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
+| **Order** | 43 | CopyJob、OrderItem、PaymentAttempt、PrintTask、Refund | 37 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-fulfillment-lists.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
 | **OrderItem** | 15 | Order | 11 个文件<br/>`console-screen/console-screen.printed-pages.ts`<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **OrderSubmissionLedger** | 11 | — | 2 个文件<br/>`member-print-orders/order-submission-ledger.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **Organization** | 35 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、License、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、ServiceProject、Terminal、User | 31 个文件<br/>`admin-ops/org-device-alert-webhook.service.ts`<br/>`ai/usage/ai-usage-summary.ts`<br/>`auth/auth.service.ts`<br/>… |
@@ -156,7 +157,7 @@ flowchart TD
 | **ServiceDeployment** | 12 | ServiceIncident、ServiceProject、Terminal | 4 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>… |
 | **ServiceIncident** | 19 | ServiceDeployment、ServiceIncidentEvent、ServiceProject | 2 个文件<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-report-builder.ts` |
 | **ServiceIncidentEvent** | 7 | ServiceIncident | 1 个文件<br/>`first-order/first-order-incidents.service.ts` |
-| **ServiceOrder** | 37 | Terminal | 10 个文件<br/>`admin-ops/derived-service-return-alerts.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/service-order.admin.ts`<br/>… |
+| **ServiceOrder** | 37 | Terminal | 11 个文件<br/>`admin-ops/derived-service-return-alerts.ts`<br/>`invoices/invoice-requests.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **ServiceProject** | 15 | Organization、ServiceDeployment、ServiceIncident、ServiceReport | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
 | **ServiceReport** | 9 | ServiceProject | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
 | **StorageDeletion** | 6 | — | 2 个文件<br/>`files/closure-file-deletion.ts`<br/>`member-privacy/member-closure-redis.service.ts` |

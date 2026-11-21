@@ -1,5 +1,37 @@
 # 当前开发进度
 
+## 2026-11-21：用户自助开票第一包最终收口返工（分支 `claude/invoice-p2c-1119b`，接在 P2c1b `6be42a9cb` 后面，未推送）
+
+- 来由：补全线第三十任返工包 P2c1c，按独立收货报告 `agy-recv-p2c1b-reply.md` 实测复现的两项阻塞隐私问题与三项收口项返工。
+- 封堵注销后扫码开票会话迟到写入明文 PII（三层防线）：`MemberClosureRedisService.revoke` 扫描并吊销该会员的 `invoice_session:*`、`invoice_session_scene:*` 及 `invoice_session_lock:*`；`InvoiceRequestsService.submit` 写库前核验 `EndUser.status === 'active' && enabled === true`（否则 409 `ACCOUNT_UNAVAILABLE`，不落行），并识别库级触发器错误；SQLite 与 PostgreSQL 迁移 `20261119120000_add_invoice_request/migration.sql` 补挂同口径闭户写入触发器（PG 挂 `reject_closed_member_write()`，SQLite 挂 `InvoiceRequest_closed_member_insert` / `bind`）。`verify-member-closure`（真 Redis）、`verify-invoice-real-db` 与 `verify-first-order-migrations`（SQLite + PG）均补真库验证用例。
+- 封堵退回原因脱敏逃逸与仅单位发票注销残留：`invoice-masking.ts` 将 `CREDIT_CODE_IN_TEXT` 改为大小写不敏感匹配 18 位统一社会信用代码并覆盖 15/17/20 位旧税号（要求含数字、排除带连字符订单号、日期与普通短数字），单测与 `verify-invoice-http` 逐一验过；`deidentifyClosedMemberInvoices` 对已退回申请在注销时直接将 `returnReason` 清空为 `null`（已提交转已退回仍写「会员已注销」），根除管理员手写非账号姓名与旧税号残留。
+- 注销开票去标识补行级 CAS：`deidentifyClosedMemberInvoices` 将 `submitted -> returned` 改为行级条件更新 `updateMany({ where: { id, status: 'submitted' } })`，并发窗口里管理员抢先标已开或退回时绝不覆写 `status`/`invoiceNo`/`issuedAt`，只补做个人抬头与邮箱去标识；`verify-invoice-real-db` 补真库 `Read Committed` 探针验证。
+- 修掉 `verify-invoice-http.ts` 新增 1 处 `eslint --quiet` error（`Reply.json.data` 去掉 `any`），全分支改动文件直接运行 `eslint --quiet` 零新增 error；手机开票页 `phoneInvoiceCopy.ts` 无服务电话降级句改为「需要专用发票请在一体机上查看《隐私政策》里的联系方式」，同步补单测与 w5 浏览器用例。
+- 本机隔离 PostgreSQL 16.15（5675，UTC）+ SQLite + Redis 6675 + 共用锁 `blk.sh` 下全部正向门禁、两套 Playwright 浏览器套与 5 条反向变异均已跑通；图谱按本轮代码重生，未推送、未并主线、未上线。
+
+## 2026-11-19：用户自助开票第一包返工（分支 `claude/invoice-p2c-1119b`，接在第一包 5b29d7a53 后面，未推送）
+
+- 来由：补全线第二十七任 P2c1b，按收货报告第 5 节和 agy 核对表返工。下面几条改的是同日第一包（下一条）的行为。
+- 两条会红的门禁修好：模型总数 124→125（多了 `InvoiceRequest`）；迁移对照表补 `/k/i/:scene`、`/invoice/phone` 两行（总指挥裁定只许加这两行，`docs/design/**` 别的不动）。
+- 注销：本人在任何一份申请里填过的个人抬头和邮箱，连同退回原因里出现的这些姓名、邮箱和其余邮箱串，一并擦掉；已提交、还没处理的申请转「已退回」，原因只写「会员已注销」。退回的审计只记原因长度和「原因见申请」，不写原文。审计按现有口径不改写；把原文写进审计的只有第一包分支，没合并、没上线，线上没有这类存量。
+- 后台标已开前用提交时同一套判断复核订单：申请后订单已退款或退款在途，回 409，提示改去「退回」。标已开、退回没成（含 409）时重读申请按最新状态画；只在成功后收起表单，刚填的发票号码留着。
+- 能不能开只看订单自己的事实（付款状态、实付、退款记录），不看终端现在绑的机构：终端改绑到就业服务站后，原先付过钱的单照样能开；公共点位永不收费，那里的单实付是 0，按「没有实付」开不了。一体机建会话被挡时与会员口一样回 409。
+- 会员接口（小程序以后用，一体机带会员令牌也能调）：单条查询和会员数据导出里，税号、邮箱只给打码后的 `taxIdMasked`、`emailMasked`，退回原因里抄到的也打码；可开票订单列表改成分页（`limit` 1–50、`cursor`，返回 `{ items, nextCursor }`），每页只批量读几次库；抬头、税号、邮箱填错时，`INVOICE_TITLE_INVALID` 等专用码和中文句子经 HTTP 真能拿到。接口说明 `docs/api/member-invoice-requests.md` 已对齐，并补了登录错误 `ACCOUNT_UNAVAILABLE` 和导出一节。
+- 手机填写页：去掉一体机屏才用的「这台屏幕不保存税号」；六个没有动作的按钮去掉（下一步本来就写在状态句里）；专用发票一句接上公开的服务电话（读不到号码时用标准句「查看《隐私政策》里的联系方式」）。
+- 已开或已退回的邮箱保留天数单独设 `INVOICE_EMAIL_RETENTION_DAYS`（默认 90），不再借用 AI 服务日志的天数；`.env.example`、数据清单、影响评估同步。
+- 新门禁 `verify:invoice-real-db`（真库）与 `verify:invoice-http`（只挂开票两个控制器的真 HTTP），SQLite 与 PostgreSQL 两个作业都跑；手机页浏览器用例补了提交时过期、抬头报错留在表单；后台浏览器用例补了三种 409。
+- 没改小程序、一体机「我的」和打印页、退款文件、生产配置；`docs/design/**` 只动了上面两行。没有推送，没有上线。
+
+## 2026-11-19：用户自助开票第一包，手机上填抬头（分支 `claude/invoice-p2c-1119`，未推送）
+
+- 来由：补全线第二十五任 P2c1，清单第 5 项。开票信息在手机上填，一体机扫我们自己的网页；小程序以后共用会员接口，本包不改 `apps/miniapp/**`。
+- 已有开票申请表、能不能开的判断、一体机扫码会话（十分钟，Redis 只存哈希，轮询不回税号和邮箱）。
+- 手机中转 `/k/i/:scene` 兑换后进入 `/invoice/phone`。这两页挂在一体机运行时根外面。个人不出现税号框。提交成功写「已提交。开好后，电子发票发到你填的邮箱。」过期、已提交、开不了各有一句和下一步。专用发票这句是「需要专用发票请拨打服务电话」。一体机上的开票屏和「我的订单」入口下一包再做。
+- 会员接口给小程序用，页面没改：`GET /api/v1/me/invoice-orders` 只列本人能开的订单和已经有申请的订单，不带税号和邮箱；`POST /api/v1/me/invoice-requests` 提交，判断与一体机相同；`GET /api/v1/me/invoice-requests/:id` 只查本人的一份。说明在 `docs/api/member-invoice-requests.md`。
+- 后台订单详情抽屉只多挂一块开票申请。已提交时可以「标已开」（发票号码选填）或「退回」（原因必填）。两个人同时点，只成功一次。审计动作是 `invoice.mark_issued`（标已开）和 `invoice.return`（退回开票申请）。演示数据下没有申请，不出现这两颗按钮。
+- 开票申请里的个人抬头和邮箱进入注销：个人抬头改成去标识，邮箱清空，申请行、金额、单位名称和统一社会信用代码留下。已开或已退回满 90 天再清一次邮箱，天数与 AI 服务日志同一函数 `readAiServiceLogRetentionDays`（`AI_SERVICE_LOG_RETENTION_DAYS`）。已提交的不按这 90 天清。数据清单第 40 行、个人信息影响评估第 9 节各补了「发票信息（抬头、税号、邮箱）」。
+- 没改小程序、打印页、我的页、设计稿和生产配置。没有推送，没有上线。图谱按本包代码重生（路由、端点、`InvoiceRequest`、开票门禁），没有手改 `docs/graph/`。
+
 ## 2026-11-19：S15c9 打印状态照稿第三轮（分支 `claude/print-status-s15c9-1119`，起点 `4ada86eac`，未推送，未上线）
 
 - 失败四态照稿收紧竖向间距（只管打印失败页，不动「无法确认」）：标题区下空 46→16，三步卡不设最小高（约 104）、卡间距 16→10，信息表行 72→62，带走卡 226→202（内边距 14/24，二维码 188→172，仍不小于 168）。登录后「查看打印订单」行和下面「订单记录保留着…」一屏装下。没登录时不画这一行，小字下面多留一份同宽空当，十张失败页最长空带都不比稿长出 30px 以上（最大是带走链接没取到，103 对 81）。

@@ -42,6 +42,64 @@ export function closureTextScrubber(identity: ClosureIdentity): (text: string) =
   }
 }
 
+export const CLOSED_MEMBER_INVOICE_RETURN_REASON = '会员已注销'
+
+/**
+ * 开票申请是收款凭证，行留下。个人抬头整段换成去标识（姓名不一定等于账号昵称）。
+ * 单位名称只擦掉已知身份，统一社会信用代码不动。邮箱一律清空。
+ * 已退回申请不是法定已开发票存根，管理员手写的退回原因可能含非账号姓名、旧税号或邮箱，注销时直接清空为 null，
+ * 根除仅开过单位发票时退回原因里的个人身份残留。
+ * 已提交、还没处理的申请转「已退回」，原因只写「会员已注销」：注销后没有人能收发票，也不该再标已开。
+ */
+export async function deidentifyClosedMemberInvoices(
+  tx: PrismaTransactionClient,
+  endUserId: string,
+  scrub: (text: string) => string,
+): Promise<number> {
+  const rows = await tx.invoiceRequest.findMany({ where: { endUserId } })
+  const now = new Date()
+  for (const row of rows) {
+    const deidentify = {
+      title: row.titleType === 'personal' ? '[已去标识]' : scrub(row.title),
+      email: null,
+      ...(row.email != null ? { emailClearedAt: now } : {}),
+    }
+    if (row.status === 'submitted') {
+      const closed = await tx.invoiceRequest.updateMany({
+        where: { id: row.id, status: 'submitted' },
+        data: {
+          ...deidentify,
+          status: 'returned',
+          returnReason: CLOSED_MEMBER_INVOICE_RETURN_REASON,
+          invoiceNo: null,
+          issuedAt: null,
+        },
+      })
+      if (closed.count === 1) continue
+      // 并发窗口里管理员已抢先将申请标已开或退回：绝不覆写 status / invoiceNo / issuedAt，只按实际终态补做去标识。
+      await tx.invoiceRequest.updateMany({
+        where: { id: row.id, status: 'returned' },
+        data: { ...deidentify, returnReason: null },
+      })
+      await tx.invoiceRequest.updateMany({
+        where: { id: row.id, status: 'issued' },
+        data: deidentify,
+      })
+      continue
+    }
+    await tx.invoiceRequest.updateMany({
+      where: { id: row.id, status: row.status },
+      data: {
+        ...deidentify,
+        ...(row.status === 'returned' && row.returnReason !== CLOSED_MEMBER_INVOICE_RETURN_REASON
+          ? { returnReason: null }
+          : {}),
+      },
+    })
+  }
+  return rows.length
+}
+
 /** 逐行处理自由文本，避免清掉财务状态、金额与条款版本。 */
 export async function retainClosureRecords(tx: PrismaTransactionClient, endUserId: string, scrub: (text: string) => string) {
   const counts: Record<string, number> = {}
@@ -152,5 +210,6 @@ export async function retainClosureRecords(tx: PrismaTransactionClient, endUserI
   counts.KioskSession = (await tx.kioskSession.updateMany({ where: { memberId: endUserId }, data: {
     memberId: null, clientSessionId: null, categoriesJson: '[]',
   } })).count
+  counts.InvoiceRequest = await deidentifyClosedMemberInvoices(tx, endUserId, scrub)
   return counts
 }

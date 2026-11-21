@@ -292,6 +292,8 @@ test('R10 白名单与服务端源码一致；路径归类抽样', () => {
     '/print-scan': 'print',
     '/print/pickup-claim': 'print',
     '/upload/phone': 'print',
+    '/invoice/phone': 'print',
+    '/k/i/scene-token': 'print',
     '/scan': 'scan',
     '/resume/source': 'resume',
     '/resume/career-plan': 'career',

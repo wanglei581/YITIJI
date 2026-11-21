@@ -20,6 +20,8 @@ const W5_ROUTES = [
   '/member/qr-login', '/upload/phone', '/login', '/legal/:doc',
   // 2026-10-29 一体机手机码短链的网页中转（兑换或校验后 replace 到上面两个手机页）。
   '/k/u/:scene', '/k/l/:ticketId',
+  // 2026-11-19 开票手机页与短链中转，与上面的手机辅助页同一口径。
+  '/invoice/phone', '/k/i/:scene',
   '/screensaver', '/session-timeout', '/error-offline', '/profile',
   '/me/resumes', '/me/print-orders', '/me/documents', '/me/favorites',
   '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id',

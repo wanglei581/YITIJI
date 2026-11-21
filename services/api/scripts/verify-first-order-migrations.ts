@@ -1,4 +1,4 @@
-import { closeSync, existsSync, mkdtempSync, openSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -37,6 +37,17 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     // 只填没有库内默认值的必填列；读回时也只取 id。
     const stamp = kind === 'sqlite' ? `'2026-10-28T00:00:00.000+00:00'` : `TIMESTAMP '2026-10-28 00:00:00'`
     await client.$executeRawUnsafe(`INSERT INTO "Organization" ("id", "name", "type", "updatedAt") VALUES ('first-order-migration-sentinel', 'Migration sentinel', 'public_employment_service', ${stamp})`)
+    if (kind === 'postgres') {
+      // 基线 07f9046c2 的历史迁移里已含 20261003090000 创建的 reject_closed_member_write()；
+      // prisma db push 不执行迁移 SQL，这里先按原迁移补建该函数，让后续挂触发器的迁移与生产 migrate deploy 同口径。
+      const closureSql = readFileSync(
+        join(api, 'prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql'),
+        'utf8',
+      )
+      const fnMatch = closureSql.match(/CREATE FUNCTION reject_closed_member_write\(\)[\s\S]*?END; \$\$;/u)
+      if (!fnMatch) throw new Error('postgres: reject_closed_member_write function definition missing')
+      await client.$executeRawUnsafe(fnMatch[0])
+    }
     // 基线之后的每条迁移都要在这里按顺序补一行；漏一条，下面用当前客户端写库就会报缺列。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', migration)])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261028120000_ai_service_fact/migration.sql')])
@@ -57,6 +68,8 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261115120000_add_terminal_org_binding_generation/migration.sql')])
     // 批量预建批次号（20261117120000）。当前客户端读 Terminal.provisionBatchId，必须在第一次 terminal.create 之前执行。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261117120000_add_terminal_provision_batch/migration.sql')])
+    // 开票申请（20261119120000）。当前客户端写 InvoiceRequest 之前表必须已存在，且未退回申请的条件唯一索引已建上。
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261119120000_add_invoice_request/migration.sql')])
     // 屏上扫描会话字段（20261102230000，排在上一条之后）。升级前已有的扫描任务升级后要取默认值：此时库里的 ScanTask 还是旧结构，
     // 而当前客户端的模型已含新列，所以旧行只能用原生 SQL 写，且必须在执行这条迁移之前写；扫描任务要挂在终端下，先建一个专用终端。
     const legacyScanId = 'legacy-scan-before-device-fields'
@@ -173,6 +186,58 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     const nullable = kind === 'sqlite' ? Number(deadline.notnull) === 0 : deadline.notnull === 'YES'
     if (!nullable) throw new Error(`${kind}: PolicyPost.validThrough must stay nullable`)
     console.log(`PASS ${kind}: PolicyPost.validThrough exists and is nullable after upgrade`)
+
+    const invoiceMember = await client.endUser.create({ data: { phoneHash: `invoice-migration-${kind}`, phoneEnc: 'enc' } })
+    const openInvoice = await client.invoiceRequest.create({
+      data: { orderKind: 'print', orderId: 'order-open-1', endUserId: invoiceMember.id, titleType: 'personal', title: '测试', amountCents: 100 },
+    })
+    if (openInvoice.status !== 'submitted' || openInvoice.amountCents !== 100) throw new Error(`${kind}: invoice request defaults must round-trip`)
+    let duplicateOpenRejected = false
+    try {
+      await client.invoiceRequest.create({
+        data: { orderKind: 'print', orderId: 'order-open-1', endUserId: invoiceMember.id, titleType: 'personal', title: '再来一次', amountCents: 100 },
+      })
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') duplicateOpenRejected = true
+      else throw error
+    }
+    if (!duplicateOpenRejected) throw new Error(`${kind}: a second non-returned invoice request on the same order must be rejected`)
+    await client.invoiceRequest.update({ where: { id: openInvoice.id }, data: { status: 'returned', returnReason: '资料不全' } })
+    const afterReturn = await client.invoiceRequest.create({
+      data: { orderKind: 'print', orderId: 'order-open-1', endUserId: invoiceMember.id, titleType: 'company', title: '某单位', taxId: '91310000MA1FL2XW30', email: 'a@example.com', amountCents: 100 },
+    })
+    if (afterReturn.status !== 'submitted') throw new Error(`${kind}: a returned invoice request must free the order for a new one`)
+    const otherKind = await client.invoiceRequest.create({
+      data: { orderKind: 'service', orderId: 'order-open-1', endUserId: invoiceMember.id, titleType: 'personal', title: '测试', amountCents: 200, status: 'issued', issuedAt: new Date() },
+    })
+    if (!otherKind.issuedAt) throw new Error(`${kind}: issued invoice columns must round-trip`)
+    let issuedSlotHeld = false
+    try {
+      await client.invoiceRequest.create({
+        data: { orderKind: 'service', orderId: 'order-open-1', endUserId: invoiceMember.id, titleType: 'personal', title: '占位', amountCents: 200 },
+      })
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') issuedSlotHeld = true
+      else throw error
+    }
+    if (!issuedSlotHeld) throw new Error(`${kind}: an issued invoice request must keep the order slot`)
+    const closedMember = await client.endUser.create({
+      data: { phoneHash: `invoice-migration-closed-${kind}`, phoneEnc: 'enc', status: 'anonymized', enabled: false },
+    })
+    let closedWriteRejected = false
+    try {
+      await client.invoiceRequest.create({
+        data: { orderKind: 'print', orderId: 'order-closed-1', endUserId: closedMember.id, titleType: 'personal', title: '已注销', amountCents: 100 },
+      })
+    } catch (error) {
+      const record = error as { message?: unknown; meta?: { driverAdapterError?: { cause?: { originalMessage?: unknown } } } } | null
+      const matched = String(record?.message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+        || String(record?.meta?.driverAdapterError?.cause?.originalMessage ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
+      if (matched) closedWriteRejected = true
+      else throw error
+    }
+    if (!closedWriteRejected) throw new Error(`${kind}: InvoiceRequest closed-member write trigger must reject inserts for closed members`)
+    console.log(`PASS ${kind}: invoice request table rejects a second open application, frees the slot after return, and rejects closed-member writes`)
   } finally { await client.$disconnect() }
 }
 

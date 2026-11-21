@@ -368,6 +368,7 @@ for (const code of ['PRINTER_ERROR', 'PAPER_EMPTY', 'printer_jam']) {
 const drawer = runFile('apps/admin/src/routes/orders/OrderDetailDrawer.tsx', {
   '@ai-job-print/ui': ui, './orderDisplay': display, './orderHonestyCopy': honesty, '../../lib/printErrorText': errors,
   './OrderAftercare': { OrderAftercare: () => null }, './OrderPaymentActions': { OrderPaymentActions: () => null },
+  './OrderInvoiceSection': { OrderInvoiceSection: () => null },
 })
 const scanOrder = { type: 'scan', ownerType: 'anonymous', userLabel: '游客', amountCents: 0, currency: 'CNY', payStatus: 'paid', taskStatus: 'failed', errorCode: 'UNKNOWN_SCAN_CODE', statusLogs: [{ errorCode: 'UNKNOWN_SCAN_CODE' }], print: null }
 const scanListText = textOf(cols.map((column) => column.cell(scanOrder)))

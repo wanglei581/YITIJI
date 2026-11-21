@@ -18,6 +18,8 @@ const PARAM_SAMPLES = {
   // 一体机手机码短链中转：/k/u 夹具兑换回 503，停在本页「网络失败 + 重试」；/k/l 用格式不对的票据，停在本页说明句。
   '/k/u/:scene': '/k/u/sweepSceneToken_0123456',
   '/k/l/:ticketId': '/k/l/sweep-not-a-kiosk-ticket',
+  // 开票短链：夹具兑换回 503，停在本页「网络失败 + 重试」。
+  '/k/i/:scene': '/k/i/sweepInvoiceScene_012345',
   '/me/activity/:id': '/me/activity/sweep-record',
   '/print-scan/feature/:key': '/print-scan/feature/id-photo',
   '/jobs/:id': '/jobs/job-001',

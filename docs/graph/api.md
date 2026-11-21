@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`675` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`685` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -91,7 +91,7 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/users` | AdminUsersController.list | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | GET | `/api/v1/admin/users/:endUserId` | AdminUsersController.getDetail | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
-| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>CopyJob<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>ServiceOrder<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
+| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>CopyJob<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>InvoiceRequest<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>ServiceOrder<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
 | POST | `/api/v1/admin/users/:endUserId/disable` | AdminUsersController.disable | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | POST | `/api/v1/admin/users/:endUserId/restore` | AdminUsersController.restore | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 
@@ -520,6 +520,31 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/kiosk/help` | HelpController.findAll | — | — | — |
+
+## `services/api/src/invoices/admin-invoice.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/admin/invoice-requests/:id/issue` | AdminInvoiceController.issue | admin | AdminInvoiceService | AuditLog<br/>EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/admin/invoice-requests/:id/return` | AdminInvoiceController.returnRequest | admin | AdminInvoiceService | AuditLog<br/>EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| GET | `/api/v1/admin/orders/:id/invoice` | AdminInvoiceController.getByOrder | admin | AdminInvoiceService | AuditLog<br/>EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+
+## `services/api/src/invoices/kiosk-invoice-sessions.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/kiosk/invoice-sessions` | KioskInvoiceSessionsController.create | — | InvoiceSessionsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| GET | `/api/v1/kiosk/invoice-sessions/:sessionId` | KioskInvoiceSessionsController.poll | — | InvoiceSessionsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/kiosk/invoice-sessions/:sessionId/submit` | KioskInvoiceSessionsController.submit | — | InvoiceSessionsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/kiosk/invoice-sessions/scene/resolve` | KioskInvoiceSessionsController.resolve | — | InvoiceSessionsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+
+## `services/api/src/invoices/member-invoice.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/me/invoice-orders` | MemberInvoiceController.list | — | InvoiceRequestsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/me/invoice-requests` | MemberInvoiceController.create | — | InvoiceRequestsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| GET | `/api/v1/me/invoice-requests/:id` | MemberInvoiceController.getOne | — | InvoiceRequestsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
 
 ## `services/api/src/job-ai/job-ai.controller.ts`
 

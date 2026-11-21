@@ -1104,8 +1104,42 @@ model EndUser {
   scanTasks       ScanTask[]
   contractReviewTasks ContractReviewTask[]
   jobApplications JobApplication[]
+  invoiceRequests InvoiceRequest[]
 
   @@index([status])
+}
+
+/// 开票申请。打印订单（Order）与服务单（ServiceOrder）都用 orderKind + orderId 关联。
+/// 同一订单至多一条未退回的申请。Prisma @@unique 表达不了
+/// WHERE status <> 'returned'，条件唯一索引 InvoiceRequest_open_order_key 只写在迁移里。
+model InvoiceRequest {
+  id             String    @id @default(cuid())
+  /// print | service
+  orderKind      String
+  orderId        String
+  endUserId      String
+  endUser        EndUser   @relation(fields: [endUserId], references: [id], onDelete: Restrict)
+  /// personal | company
+  titleType      String
+  title          String
+  /// 单位才有：统一社会信用代码
+  taxId          String?
+  email          String?
+  /// 提交时的实付金额快照，单位分
+  amountCents    Int
+  /// submitted | issued | returned
+  status         String    @default("submitted")
+  issuedAt       DateTime?
+  invoiceNo      String?
+  returnReason   String?
+  operatorId     String?
+  emailClearedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([endUserId, createdAt])
+  @@index([orderKind, orderId])
+  @@index([status, updatedAt])
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────

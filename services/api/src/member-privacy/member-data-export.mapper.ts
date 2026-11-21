@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { UPLOAD_SESSION_ORDER_ONLY_REASON } from '../files/retention-policy'
+import { maskEmail, maskInvoiceText, maskTaxId } from '../invoices/invoice-masking'
 import { PrismaService } from '../prisma/prisma.service'
 
 export const MEMBER_EXPORT_SCHEMA_VERSION = 'member-data-export-v1'
@@ -34,6 +35,12 @@ export interface MemberDataExportEnvelope {
     /** 本人 AI 用量：功能、时间、状态、金额。不含终端、机构、型号和别人的行。 */
     aiUsage: JsonRecord[]
     printOrders: JsonRecord[]
+    /**
+     * 本人的开票申请：编号、订单种类与订单号、抬头类型、抬头、打码后的税号（taxIdMasked）与邮箱（emailMasked）、
+     * 实付金额快照（分）、状态、开出时间、发票号码、退回原因（其中的邮箱与信用代码已打码）、提交时间。
+     * 税号与邮箱和会员接口同口径只给打码后的样子（一体机永远拿不到完整值）；不导操作人。
+     */
+    invoiceRequests: JsonRecord[]
     favorites: JsonRecord[]
     /** 本人自填的求职进度（§4.4A）。可导出、可删除，随账号注销一并清理。 */
     jobApplications: JsonRecord[]
@@ -84,6 +91,7 @@ export class MemberDataExportMapper {
       consents,
       requests,
       aiUsage,
+      invoiceRequests,
     ] = await Promise.all([
       this.prisma.endUser.findUnique({
         where: { id: input.endUserId },
@@ -319,6 +327,26 @@ export class MemberDataExportMapper {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take,
       }),
+      this.prisma.invoiceRequest.findMany({
+        where: { endUserId: input.endUserId },
+        select: {
+          id: true,
+          orderKind: true,
+          orderId: true,
+          titleType: true,
+          title: true,
+          taxId: true,
+          email: true,
+          amountCents: true,
+          status: true,
+          issuedAt: true,
+          invoiceNo: true,
+          returnReason: true,
+          createdAt: true,
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take,
+      }),
     ])
 
     for (const rows of [
@@ -337,6 +365,7 @@ export class MemberDataExportMapper {
       consents,
       requests,
       aiUsage,
+      invoiceRequests,
     ]) {
       this.assertWithinLimit(rows)
     }
@@ -355,6 +384,12 @@ export class MemberDataExportMapper {
         },
         aiUsage: this.toJsonRecords(aiUsage),
         printOrders: this.toJsonRecords(printOrders),
+        invoiceRequests: this.toJsonRecords(invoiceRequests.map(({ taxId, email, returnReason, ...row }) => ({
+          ...row,
+          taxIdMasked: maskTaxId(taxId),
+          emailMasked: maskEmail(email),
+          returnReason: maskInvoiceText(returnReason),
+        }))),
         favorites: this.toJsonRecords(favorites),
         jobApplications: this.toJsonRecords(jobApplications),
         benefits: this.toJsonRecords(benefits),

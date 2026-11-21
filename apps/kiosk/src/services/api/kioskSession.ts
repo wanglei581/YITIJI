@@ -57,7 +57,7 @@ export function categoryForPath(pathname: string): KioskVisitCategory | null {
   if (IDLE_PATHS.has(path) || under(path, '/legal')) return null
   if (under(path, '/resume/career-plan') || under(path, '/resume/self-assessment') || under(path, '/ai/plan')) return 'career'
   if (under(path, '/me/feedback') || under(path, '/help')) return 'help'
-  if (under(path, '/print') || under(path, '/print-scan') || under(path, '/upload/phone')) return 'print'
+  if (under(path, '/print') || under(path, '/print-scan') || under(path, '/upload/phone') || under(path, '/invoice/phone') || under(path, '/k/i')) return 'print'
   if (under(path, '/scan')) return 'scan'
   if (under(path, '/resume') || under(path, '/resume-service') || under(path, '/session-resume')) return 'resume'
   if (under(path, '/interview') || under(path, '/interview-service')) return 'interview'

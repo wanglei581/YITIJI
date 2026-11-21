@@ -50,6 +50,7 @@ import { PrismaModule } from './prisma/prisma.module'
 import { SmartCampusModule } from './smart-campus/smart-campus.module'
 import { MiniappCodeModule } from './miniapp-code/miniapp-code.module'
 import { UploadSessionsModule } from './upload-sessions/upload-sessions.module'
+import { InvoicesModule } from './invoices/invoices.module'
 import { ScanTasksModule } from './scan-tasks/scan-tasks.module'
 import { PrintConversionModule } from './print-conversion/print-conversion.module'
 import { PrintSignModule } from './print-sign/print-sign.module'
@@ -166,6 +167,7 @@ const redisUrl = process.env['REDIS_URL']
     SmartCampusModule,
     MiniappCodeModule,
     UploadSessionsModule,
+    InvoicesModule,
     ScanTasksModule,
     PrintConversionModule,
     PrintSignModule,
