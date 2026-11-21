@@ -441,4 +441,100 @@ test.describe('简历按次付款接线（P2e-2） @kiosk', () => {
     await page.getByRole('button', { name: '关闭文件预览' }).click()
     await expect(page.locator('.qxt-out')).toContainText('免费试运营，本单 0 元')
   })
+
+  test('诊断页免费再试窗口到点实时过期：无需刷新即恢复「付 1.00 元并开始」与价格说明 @kiosk', async ({ page, api }) => {
+    const start = Date.now()
+    await page.clock.install({ time: start })
+    registerResumeShell(api, resumeOnlyMachinePricing(100))
+    const order: FixtureOrder = { ...ORDER_A, createdAt: start - 20_000 }
+    api.respond(
+      'GET',
+      serviceOrderPath(order.id),
+      ok(serviceOrderView(order, {
+        status: 'paid',
+        paidAt: new Date(start - 15_000).toISOString(),
+        attemptsUsed: 1,
+        failureReason: 'optimize_failed',
+        retryUntil: new Date(start + 10_000).toISOString(),
+      })),
+    )
+
+    await seedStorage(page, { resume: true, tripOrderId: order.id })
+    await spaNavigate(page, '/resume/report')
+
+    await expect(page.getByTestId('resume-report-primary')).toHaveText('查看优化建议（4 条）')
+    await expect(page.getByTestId('resume-report-charge-note')).toHaveCount(0)
+
+    // 9 秒时仍在免费再试窗口内
+    await page.clock.runFor(9_000)
+    await expect(page.getByTestId('resume-report-primary')).toHaveText('查看优化建议（4 条）')
+    await expect(page.getByTestId('resume-report-charge-note')).toHaveCount(0)
+
+    // 跨过 retryUntil：无需刷新或重新查单，精准定时器立即恢复付款入口与价格说明
+    await page.clock.runFor(1_500)
+    await expect(page.getByTestId('resume-report-primary')).toHaveText('付 1.00 元并开始')
+    await expect(page.getByTestId('resume-report-charge-note')).toHaveText(DIAGNOSIS_PRICE_NOTE)
+    await expectNoChargingForbiddenCopy(page)
+  })
+
+  test('旧用户查单在途切新会员：晚到已付响应不得污染新用户诊断页状态 @kiosk', async ({ page, api }) => {
+    registerResumeShell(api, resumeOnlyMachinePricing(100))
+    const order: FixtureOrder = { ...ORDER_A, createdAt: Date.now() }
+    let releaseStaleOrder!: () => void
+    let staleOrderStarted!: () => void
+    const staleStarted = new Promise<void>((resolve) => { staleOrderStarted = resolve })
+    const staleGate = new Promise<void>((resolve) => { releaseStaleOrder = resolve })
+
+    await page.route(`**${serviceOrderPath(order.id)}*`, async (route) => {
+      staleOrderStarted()
+      await staleGate
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(ok(paidServiceOrderView(order)).json),
+      })
+    })
+
+    // 1) 游客进诊断页发起旧单查单，请求挂在在途
+    await seedStorage(page, { resume: true, tripOrderId: order.id })
+    await spaNavigate(page, '/resume/report')
+    await staleStarted
+
+    // 2) 另一位用户走可见登录界面切为会员（触发 login_handover 清掉游客单号）
+    await spaNavigate(page, '/login?from=%2Fresume%2Freport')
+    await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+    await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+    for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+    await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+    for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    await page.getByRole('button', { name: '确认登录', exact: true }).click()
+
+    // 3) 此时放回旧游客的晚到已付响应
+    releaseStaleOrder()
+
+    await page.waitForURL((url) => url.pathname === '/resume/report', { timeout: 15_000 })
+    await expect(page.getByTestId('resume-report-primary')).toHaveText('付 1.00 元并开始')
+    await expect(page.getByTestId('resume-report-charge-note')).toHaveText(DIAGNOSIS_PRICE_NOTE)
+    const storedRaw = await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)
+    expect(storedRaw ?? '').not.toContain(order.id)
+  })
+
+  test('HTTP 返回 providerName=mock 演示报告在收费机器上不出付款入口与收费说明 @kiosk', async ({ page, api }) => {
+    registerResumeShell(api, resumeOnlyMachinePricing(100))
+    api.respond('GET', `/api/v1/resume/records/${TASK_ID}`, {
+      status: 200,
+      json: { ...REPORT_WITH_FOUR_ISSUES, providerName: 'mock' },
+    })
+
+    await seedStorage(page, { resume: true })
+    await spaNavigate(page, '/resume/report')
+
+    await expect(page.locator('.rrp-ai-label')).toContainText('演示')
+    await expect(page.getByTestId('resume-report-primary')).toHaveText('查看优化建议（4 条）')
+    await expect(page.getByTestId('resume-report-charge-note')).toHaveCount(0)
+    await expect(page.locator('body')).not.toContainText('付 1.00 元')
+  })
 })
