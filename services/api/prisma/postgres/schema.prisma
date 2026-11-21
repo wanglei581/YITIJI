@@ -1115,13 +1115,15 @@ model VirtualPayOrder {
   productId   String
   priceCents  Int
   /// 0 现网 / 1 沙箱。下单时冻住，推送和查单必须对上。
-  env         Int
-  status      String    @default("pending")
-  outTradeNo  String    @unique
-  wxOrderId   String?
-  paidAt      DateTime?
-  createdAt   DateTime  @default(now())
-  credit      MemberServiceCredit?
+  env                  Int
+  status               String    @default("pending")
+  outTradeNo           String    @unique
+  wxOrderId            String?
+  paidAt               DateTime?
+  queryFailCount       Int       @default(0)
+  lastDiagnosticReason String?
+  createdAt            DateTime  @default(now())
+  credit               MemberServiceCredit?
 
   @@index([status, createdAt])
 }

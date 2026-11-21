@@ -192,6 +192,12 @@ async function main(): Promise<void> {
   const redis = {
     async get(key: string) { return store.get(key) ?? null },
     async setEx(key: string, _ttl: number, value: string) { store.set(key, value) },
+    async setIfAbsent(key: string, value: string, _ttlSeconds: number) {
+      if (store.has(key)) return false
+      store.set(key, value)
+      return true
+    },
+    async del(key: string) { return store.delete(key) ? 1 : 0 },
     async getDel(key: string) {
       const value = store.get(key) ?? null
       store.delete(key)
