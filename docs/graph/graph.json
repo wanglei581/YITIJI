@@ -21026,7 +21026,7 @@
         ]
       },
       {
-        "fieldCount": 14,
+        "fieldCount": 16,
         "name": "VirtualPayOrder",
         "relations": [
           "EndUser",
@@ -27233,7 +27233,13 @@
       "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
       "services/api/scripts/verify-miniapp-virtual-pay.ts"
     ],
+    "services/api/scripts/support/miniapp-virtual-pay-notify-goods.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
     "services/api/scripts/support/miniapp-virtual-pay-orders.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-reconcile-edge.ts": [
       "services/api/scripts/verify-miniapp-virtual-pay.ts"
     ],
     "services/api/scripts/support/miniapp-virtual-pay-reconcile.ts": [
@@ -46595,7 +46601,9 @@
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/miniapp-virtual-pay-credits.ts",
           "services/api/scripts/support/miniapp-virtual-pay-delivery.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-notify-goods.ts",
           "services/api/scripts/support/miniapp-virtual-pay-orders.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-reconcile-edge.ts",
           "services/api/scripts/support/miniapp-virtual-pay-reconcile.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",

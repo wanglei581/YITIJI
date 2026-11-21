@@ -1,5 +1,17 @@
 # 当前开发进度
 
+## 2026-11-21：小程序微信虚拟支付后端第一包返工 P2d1b2（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
+
+- 来由：补全线返工包 P2d1b2（原返工包 P2d1b 第 1–7 条，清单第 6 项），接在 P2d1 交货头 `8164ccea2` 之后逐条完成并提交。
+- ① 运行门禁只要求所选 `env` 对应的 AppKey：`env=0` 只要求现网键 `WECHAT_MINIAPP_VPAY_APP_KEY`，`env=1` 只要求沙箱键 `WECHAT_MINIAPP_VPAY_SANDBOX_APP_KEY`，生产仍禁止 `env=1`；`.env.example` 同步注明（只放占位说明）。
+- ② 查单按订单自己的 `order.env` 选对应环境的 AppKey 签名，缺少对应环境的键时不拿另一环境的键代签，记录 `app_key_missing` 诊断。
+- ③ 查单持续报错出口与诊断限频：给 `VirtualPayOrder` 新增只增列 `queryFailCount` 与 `lastDiagnosticReason`（SQLite 与 PostgreSQL 同步迁移 `20261121120000_virtual_pay_reconcile_state`）。同一单连续查询失败达 3 次或超过 24 小时仍因查询失败无法收敛时转 `manual_review`（待人工），写诊断并复用运维告警出口 `deliverOpsAlert` 告警，不再进自动批次；按单诊断改为状态变化才写；功能未配置且没有在途待支付单时定时查单静默跳过，不再每 5 分钟写诊断。
+- ④ 查单已支付状态严格收窄为官方 `query_order` 的 `2`（已支付待发货）、`3`（发货中）、`4`（已发货）；`7`（退款失败）、`9`（回收广告金完成）、`10`（分账回退完成）只写诊断 `non_grantable_order_status` 并转 `manual_review`，绝不记权益。
+- ⑤ 关单后到账不丢：本地已关闭的订单（`closed`）若收到验签通过且 openid、env、道具、数量、金额全部核对一致的已付推送，仍幂等补记一次权益（同一单至多一条，唯一约束兜底），写入 `virtual_pay.closed_order_paid_recovered`（「关单后到账补记」）审计并告警；字段不符仍拒绝。
+- ⑥ XML 推送解析容忍空白：外层 `<Encrypt>` 信封、内层 XML 叶子值、标签与 CDATA 之间及 CDATA 内首尾空白全部做 `trim` 容错。
+- ⑦ 查单补记后通知发货：依官方接口总表与 `notify_provide_goods` 原文（核对表 3.8、3.9），对经查单补记成功且微信侧状态为 `2`（待发货）或 `3`（发货中）的现金单，幂等调用 `POST /xpay/notify_provide_goods?access_token=...`（官方原文不带 `pay_sig`）；状态为 `4`（已发货）或已由推送标 `paid` 的单不重复调；通知失败不回滚已记权益，写 `notify_provide_goods_failed` 诊断。
+- 没改 `apps/miniapp/**`、`apps/kiosk/**`、`apps/admin/**`、`docs/design/**`、生产配置，仓库不含任何真实价格或道具 ID；图谱由生成器重生并通过 `--check`；未推送，未上线。
+
 ## 2026-11-19：小程序微信虚拟支付后端第一段（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
 
 - 来由：补全线第二十五任 P2d1，清单第 6 项。从 `origin/main` `47e3a99af` 开出。只做后端第一段：开关默认关、下单并签名、接收发货推送并记一次权益、每 5 分钟查单兜底、会员查看自己的可用权益。小程序、一体机、管理员页面和设计稿都没改。用掉权益、失败退款、后台查看与退款留到第二包。

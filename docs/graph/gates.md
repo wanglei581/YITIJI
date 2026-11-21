@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2280 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2282 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2382,7 +2382,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 164 个文件</summary>
+<summary><code>services/api/scripts/</code> — 166 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2449,7 +2449,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/member-closure-verification.ts` | `verify-member-closure.ts` |
 | `services/api/scripts/support/miniapp-virtual-pay-credits.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/scripts/support/miniapp-virtual-pay-delivery.ts` | `verify-miniapp-virtual-pay-postgres.ts`<br/>`verify-miniapp-virtual-pay.ts` |
+| `services/api/scripts/support/miniapp-virtual-pay-notify-goods.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/scripts/support/miniapp-virtual-pay-orders.ts` | `verify-miniapp-virtual-pay.ts` |
+| `services/api/scripts/support/miniapp-virtual-pay-reconcile-edge.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/scripts/support/miniapp-virtual-pay-reconcile.ts` | `verify-miniapp-virtual-pay.ts` |
 | `services/api/scripts/support/minimal-pdf.ts` | `verify-derivation-kind.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-upload-sessions-member-file.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/scripts/support/partner-account-action-static-contract.ts` | `verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts` |

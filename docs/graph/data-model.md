@@ -182,7 +182,7 @@ flowchart TD
 | **UserAiConsent** | 8 | EndUser | 5 个文件<br/>`ai-access/ai-access.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserDataRequest** | 22 | EndUser | 10 个文件<br/>`admin-users/admin-user-closure-read.ts`<br/>`member-privacy/member-closure-requests.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **UserNotification** | 10 | — | 1 个文件<br/>`member-privacy/member-closure.service.ts` |
-| **VirtualPayOrder** | 14 | EndUser、MemberServiceCredit | 4 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`virtual-pay/virtual-pay-delivery.ts`<br/>`virtual-pay/virtual-pay-order.service.ts`<br/>… |
+| **VirtualPayOrder** | 16 | EndUser、MemberServiceCredit | 4 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`virtual-pay/virtual-pay-delivery.ts`<br/>`virtual-pay/virtual-pay-order.service.ts`<br/>… |
 
 ## 没有任何代码读写的模型（8）
 
