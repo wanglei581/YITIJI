@@ -168,3 +168,17 @@ test('抬头填错时服务端的中文句子留在表单上，可以改了再�
   await expect(root).toHaveAttribute('data-phone-invoice-state', 'form')
   await expect(root.getByRole('button', { name: '提交', exact: true })).toBeEnabled()
 })
+
+test('读不到服务电话时，专用发票提示明确指引到一体机查看《隐私政策》 @w5-mobile', async ({ page, api }) => {
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: { servicePhone: null, serviceHours: null, otherOnlineTerminalNearby: false, miniappPublished: false },
+    },
+  })
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto(`/invoice/phone#sessionId=${SESSION}&submitToken=${TOKEN}`)
+  const root = page.locator('main[data-kiosk-screen="phone-invoice"]')
+  await expect(root.getByTestId('invoice-special-line')).toHaveText('需要专用发票请在一体机上查看《隐私政策》里的联系方式')
+})

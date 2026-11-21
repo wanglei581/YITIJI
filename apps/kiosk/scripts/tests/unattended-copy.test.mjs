@@ -25,7 +25,11 @@ function transpile(absolutePath, replacements = {}) {
   return toDataUrl(out)
 }
 
-const copy = await import(transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts')))
+const copyUrl = transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts'))
+const copy = await import(copyUrl)
+const phoneInvoiceCopy = await import(transpile(join(kioskRoot, 'src/pages/invoice/phoneInvoiceCopy.ts'), {
+  '../../copy/unattendedCopy': copyUrl,
+}))
 
 const none = {
   servicePhone: null,
@@ -48,6 +52,22 @@ test('电话片段：有号码带时间、只有号码、没有号码', () => {
 
 test('空白号码与服务时间当成没有', () => {
   assert.equal(copy.servicePhoneLine({ ...phoneHours, servicePhone: '  ', serviceHours: '  ' }), '查看《隐私政策》里的联系方式')
+})
+
+test('手机开票页专用发票句：有号码带出服务电话，读不到号码时明确指引到一体机查看《隐私政策》', () => {
+  assert.equal(
+    phoneInvoiceCopy.invoiceSpecialLine(phoneHours),
+    '需要专用发票请拨打服务电话 18369161921（工作日 9:00–18:00）',
+  )
+  assert.equal(phoneInvoiceCopy.invoiceSpecialLine(phoneOnly), '需要专用发票请拨打服务电话 18369161921')
+  assert.equal(
+    phoneInvoiceCopy.invoiceSpecialLine(none),
+    '需要专用发票请在一体机上查看《隐私政策》里的联系方式',
+  )
+  assert.equal(
+    phoneInvoiceCopy.invoiceSpecialLine({ ...phoneHours, servicePhone: '   ' }),
+    '需要专用发票请在一体机上查看《隐私政策》里的联系方式',
+  )
 })
 
 test('故障句：附近没有别的终端不写换机，小程序未发布不写手机上能看到', () => {

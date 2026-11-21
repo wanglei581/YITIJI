@@ -6,7 +6,7 @@
  * 稿里「这台屏幕不保存税号」属于一体机屏，手机上不用（税号存在服务端，手机上说这句会被读成「这一页不保存」）。
  * 下一步（回一体机重新扫码、回一体机查看）都写在状态句里，这几屏不放没有动作的按钮。
  */
-import { servicePhoneLine, type PublicSupportContact } from '../../copy/unattendedCopy'
+import { resolveSupportContact, servicePhoneLine, type PublicSupportContact } from '../../copy/unattendedCopy'
 
 export const INVOICE_PAGE_TITLE = '用手机扫码填写开票信息'
 export const INVOICE_STEPS = ['手机扫码', '填写开票信息', '发票发到邮箱'] as const
@@ -18,9 +18,14 @@ export const INVOICE_FINE = '在手机上填写并提交。没付成或已退款
 export const INVOICE_KIND = '电子发票（普通发票）'
 export const INVOICE_NO_ID = '个人不需要提供身份证号。'
 export const INVOICE_COMPANY_HINT = '单位请填写名称和统一社会信用代码。'
-/** 合规句「需要专用发票请拨打服务电话」接上公开的服务电话配置；读不到号码时用标准句「查看《隐私政策》里的联系方式」。 */
+/**
+ * 合规句「需要专用发票请拨打服务电话」接上公开的服务电话配置。
+ * 手机开票页是独立网页、页内没有《隐私政策》入口，读不到号码时明确指引到一体机查看。
+ */
 export function invoiceSpecialLine(contact: PublicSupportContact): string {
-  return `需要专用发票请${servicePhoneLine(contact)}`
+  const ctx = resolveSupportContact(contact)
+  if (!ctx.servicePhone) return '需要专用发票请在一体机上查看《隐私政策》里的联系方式'
+  return `需要专用发票请${servicePhoneLine(ctx)}`
 }
 export const INVOICE_SUBMITTED = '已提交。开好后，电子发票发到你填的邮箱。'
 export const INVOICE_EXPIRED = '这个二维码已经过期。请回到一体机，重新扫码。'
