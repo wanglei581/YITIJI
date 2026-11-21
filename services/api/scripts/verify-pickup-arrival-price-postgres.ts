@@ -77,6 +77,8 @@ async function main(): Promise<void> {
     await runP2b9dRegAmountCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
     const { runP2b9dAbnormal24hCases } = await import('./support/pickup-arrival-p2b9d-abnormal-24h-cases')
     await runP2b9dAbnormal24hCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
+    const { runP2b9dStaleAtomicCases } = await import('./support/pickup-arrival-p2b9d-stale-atomic-cases')
+    await runP2b9dStaleAtomicCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
   } finally {
     await prisma.onModuleDestroy()
   }

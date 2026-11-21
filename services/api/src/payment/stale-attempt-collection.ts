@@ -117,31 +117,49 @@ export async function refundExpiredAttemptCollection(
   }
 
   await rememberAudit(db, input, refundNo)
-  const refund = existing ?? await db.refund.create({
-    data: {
-      orderId: input.orderId,
-      refundNo,
-      amountCents: input.attemptAmountCents,
-      status: 'pending',
-      reason: STALE_ATTEMPT_REFUND_REASON,
-      channel: input.channel,
-    },
-  })
   const provider = registry.get(input.channel)
   if (!provider) {
-    await db.refund.update({
-      where: { id: refund.id },
-      data: { status: 'failed' },
-    })
+    if (existing) {
+      await db.refund.update({
+        where: { id: existing.id },
+        data: { status: 'failed' },
+      })
+    } else {
+      await db.refund.create({
+        data: {
+          orderId: input.orderId,
+          refundNo,
+          amountCents: input.attemptAmountCents,
+          status: 'failed',
+          reason: STALE_ATTEMPT_REFUND_REASON,
+          channel: input.channel,
+        },
+      })
+    }
     await notifyPrintReturnHold(db, input.orderId)
     return
   }
-  try {
-    // 先落「已提交渠道」再调渠道：过期付款已发到渠道的退款，之后要按显式记录挡住核验与三步。
-    await db.refund.update({
-      where: { id: refund.id },
-      data: { channelSubmittedAt: new Date() },
+  // 先查到渠道后在 create 中原子写入 channelSubmittedAt，消除「先写 null 再 update」的并发缝隙。
+  const submittedAt = new Date()
+  const refund = existing
+    ? (existing.channelSubmittedAt
+      ? existing
+      : await db.refund.update({
+        where: { id: existing.id },
+        data: { channelSubmittedAt: submittedAt },
+      }))
+    : await db.refund.create({
+      data: {
+        orderId: input.orderId,
+        refundNo,
+        amountCents: input.attemptAmountCents,
+        status: 'pending',
+        reason: STALE_ATTEMPT_REFUND_REASON,
+        channel: input.channel,
+        channelSubmittedAt: submittedAt,
+      },
     })
+  try {
     const executed = await provider.refund({
       orderId: input.orderId,
       orderNo: input.orderNo,
