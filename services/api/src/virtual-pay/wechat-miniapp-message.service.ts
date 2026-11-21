@@ -168,7 +168,7 @@ function readQuery(query: Record<string, unknown>, key: string): string | null {
 function extractEncrypt(raw: string, contentType: string): string | null {
   const trimmed = raw.trim()
   if (contentType.includes('xml') || trimmed.startsWith('<')) {
-    const match = trimmed.match(/<Encrypt>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([^<]*))<\/Encrypt>/)
+    const match = trimmed.match(/<Encrypt>\s*(?:<!\[CDATA\[([\s\S]*?)\]\]>|([^<]*))\s*<\/Encrypt>/)
     const value = match?.[1] ?? match?.[2]
     return value ? value.trim() : null
   }
@@ -204,12 +204,17 @@ function parseXmlChildren(input: string): Record<string, unknown> | string {
   const text = input.trim()
   if (!text.startsWith('<')) return text
   const out: Record<string, unknown> = {}
-  const pattern = /<([A-Za-z_][A-Za-z0-9_]*)>(<!\[CDATA\[([\s\S]*?)\]\]>|([\s\S]*?))<\/\1>/g
+  const pattern = /<([A-Za-z_][A-Za-z0-9_]*)>([\s\S]*?)<\/\1>/g
   let saw = false
   for (const match of text.matchAll(pattern)) {
     saw = true
-    const inner = match[3] !== undefined ? match[3] : (match[4] ?? '')
-    out[match[1]] = inner.includes('<') ? parseXmlChildren(inner) : inner
+    const rawInner = (match[2] ?? '').trim()
+    const cdata = rawInner.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/)
+    if (cdata) {
+      out[match[1]] = cdata[1].trim()
+    } else {
+      out[match[1]] = rawInner.includes('<') ? parseXmlChildren(rawInner) : rawInner
+    }
   }
   return saw ? out : text
 }
@@ -255,13 +260,19 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function readString(value: unknown): string | null {
-  if (typeof value === 'string' && value.length > 0) return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
   if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   return null
 }
 
 function readNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isInteger(value)) return value
-  if (typeof value === 'string' && /^-?\d+$/.test(value)) return Number(value)
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (/^-?\d+$/.test(trimmed)) return Number(trimmed)
+  }
   return null
 }

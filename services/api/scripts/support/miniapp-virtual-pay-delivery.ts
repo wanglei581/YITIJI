@@ -203,7 +203,53 @@ export async function assertVirtualPayDelivery(options: { prisma: PrismaService;
     if (prevWebhook === undefined) delete process.env['ALERT_WEBHOOK_URL']
     else process.env['ALERT_WEBHOOK_URL'] = prevWebhook
   }
-  console.log('PASS 发货推送验签解密；重复推送只有一条权益；金额或道具不对不记权益；关单后到账补记并告警')
+
+  // 第 6 条：XML 叶子值带空白、以及标签与 CDATA 之间带空白的推送都能正常记权益
+  const padXmlOrder = await createPending(prisma, 'vpxmlpad00001')
+  const paidTime = Math.floor(Date.now() / 1000)
+  const paddedLeafXml = [
+    '<xml>',
+    '<Event><![CDATA[ xpay_goods_deliver_notify ]]></Event>',
+    `<OpenId><![CDATA[ ${OPEN_ID} ]]></OpenId>`,
+    `<OutTradeNo><![CDATA[ ${padXmlOrder.outTradeNo} ]]></OutTradeNo>`,
+    '<Env>\n  0\n</Env>',
+    `<WeChatPayInfo><MchOrderNo><![CDATA[ WXPAD1 ]]></MchOrderNo><PaidTime> ${paidTime} </PaidTime></WeChatPayInfo>`,
+    `<GoodsInfo><ProductId><![CDATA[ ${PRODUCT_ID} ]]></ProductId><Quantity>\t1\n</Quantity><ActualPrice> ${PRICE_CENTS} </ActualPrice></GoodsInfo>`,
+    '</xml>',
+  ].join('\n')
+  const padRes = await post(base, seal(paddedLeafXml), undefined, 'text/xml')
+  assert.equal(padRes.status, 200)
+  assert.equal(await padRes.text(), '')
+  assert.equal(await creditCount(prisma, padXmlOrder.id), 1, 'XML 叶子带空白的推送必须正常记权益')
+  assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: padXmlOrder.id } })).status, 'paid')
+
+  const cdataGapOrder = await createPending(prisma, 'vpxmlcdata001')
+  const cdataGapXml = [
+    '<xml>',
+    '  <Event>\n    <![CDATA[xpay_goods_deliver_notify]]>\n  </Event>',
+    `  <OpenId>\n    <![CDATA[${OPEN_ID}]]>\n  </OpenId>`,
+    `  <OutTradeNo>\n    <![CDATA[${cdataGapOrder.outTradeNo}]]>\n  </OutTradeNo>`,
+    '  <Env>0</Env>',
+    `  <WeChatPayInfo>\n    <MchOrderNo>\n      <![CDATA[WXCDATA1]]>\n    </MchOrderNo>\n    <PaidTime>${paidTime}</PaidTime>\n  </WeChatPayInfo>`,
+    `  <GoodsInfo>\n    <ProductId>\n      <![CDATA[${PRODUCT_ID}]]>\n    </ProductId>\n    <Quantity>1</Quantity>\n    <ActualPrice>${PRICE_CENTS}</ActualPrice>\n  </GoodsInfo>`,
+    '</xml>',
+  ].join('\n')
+  const gapEncrypt = seal(cdataGapXml)
+  const gapTs = String(Math.floor(Date.now() / 1000))
+  const gapNonce = 'nonce-gap'
+  const gapSig = sha1([TOKEN, gapTs, gapNonce, gapEncrypt])
+  const gapEnvelope = `<xml>\n  <Encrypt>\n    <![CDATA[${gapEncrypt}]]>\n  </Encrypt>\n</xml>`
+  const gapRes = await fetch(url(base, { msg_signature: gapSig, timestamp: gapTs, nonce: gapNonce }), {
+    method: 'POST',
+    headers: { 'content-type': 'text/xml' },
+    body: gapEnvelope,
+  })
+  assert.equal(gapRes.status, 200)
+  assert.equal(await gapRes.text(), '')
+  assert.equal(await creditCount(prisma, cdataGapOrder.id), 1, '标签与 CDATA 之间带空白的 XML 推送必须正常记权益')
+  assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: cdataGapOrder.id } })).status, 'paid')
+
+  console.log('PASS 发货推送验签解密；重复推送只有一条权益；金额或道具不对不记权益；关单后到账补记并告警；XML 空白容错')
 }
 
 export async function assertConcurrentDelivery(options: { prisma: PrismaService; base: string }): Promise<void> {
