@@ -45,6 +45,7 @@ import {
   replayOpenScanOrder,
 } from './service-order.scan'
 import {
+  assertInterviewReportAdmitted,
   closeExpiredServiceOrders,
   consumePaidServiceOrder,
   finishServiceOrder,
@@ -368,6 +369,10 @@ export class ServiceOrderService {
         // 一张退款抛错不能挡住同一会话里其余待退的单。
       }
     }
+  }
+
+  async assertInterviewReportAdmitted(sessionId: string): Promise<void> {
+    await assertInterviewReportAdmitted(this.settleDeps(), sessionId)
   }
 
   async noteInterviewReportMade(sessionId: string): Promise<void> {

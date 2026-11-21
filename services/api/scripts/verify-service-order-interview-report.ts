@@ -67,9 +67,11 @@ import {
   SERVICE_REFUND_REASON_RETRY_EXPIRED,
   SERVICE_RETRY_WINDOW_MS,
   classifyServiceOutcome,
+  decideInterviewReportAdmission,
   decideInterviewReportFailure,
   failureReasonFor,
 } from '../src/payment/service-order.policy'
+import { interviewReportHooks } from '../src/payment/service-order.intercept'
 import { executeServiceOrderRefund } from '../src/payment/service-order.payment'
 import { ServiceOrderService } from '../src/payment/service-order.service'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -136,6 +138,15 @@ async function main(): Promise<void> {
   assert.equal(decideInterviewReportFailure({ serviceKey: 'mock_interview', status: 'consumed', settledAt: new Date(), reportState: 'retry', sessionEnded: false }), 'refund_failed')
   assert.equal(decideInterviewReportFailure({ serviceKey: 'mock_interview', status: 'consumed', settledAt: new Date(), reportState: 'done', sessionEnded: false }), 'ignore')
   assert.equal(decideInterviewReportFailure({ serviceKey: 'mock_interview', status: 'refunded', settledAt: new Date(), reportState: 'retry', sessionEnded: false }), 'ignore')
+  const policyNow = new Date('2026-11-21T10:00:00.000Z')
+  assert.equal(decideInterviewReportAdmission({ serviceKey: 'mock_interview', status: 'consumed', reportState: null, retryUntil: null, now: policyNow }), 'allow')
+  assert.equal(decideInterviewReportAdmission({ serviceKey: 'mock_interview', status: 'consumed', reportState: 'retry', retryUntil: new Date(policyNow.getTime() + 1_000), now: policyNow }), 'allow')
+  assert.equal(decideInterviewReportAdmission({ serviceKey: 'mock_interview', status: 'consumed', reportState: 'retry', retryUntil: policyNow, now: policyNow }), 'retry_expired')
+  assert.equal(decideInterviewReportAdmission({ serviceKey: 'mock_interview', status: 'consumed', reportState: 'retry', retryUntil: null, now: policyNow }), 'retry_expired')
+  assert.equal(decideInterviewReportAdmission({ serviceKey: 'mock_interview', status: 'consumed', reportState: 'done', retryUntil: null, now: policyNow }), 'allow')
+  for (const st of ['refunding', 'refunded', 'refund_failed'] as const) {
+    assert.equal(decideInterviewReportAdmission({ serviceKey: 'mock_interview', status: st, reportState: 'retry', retryUntil: null, now: policyNow }), 'refunded')
+  }
   pass('判据集中落在 service-order.policy.ts')
 
   // ── 1. 隔离库准备（兼容 SQLite 与真 PostgreSQL）────────────────────────
@@ -404,6 +415,10 @@ async function main(): Promise<void> {
       const iv = await createAndAnswerInterview({ terminalId: termCharge, token: chargeToken, kioskSessionId: ks, orderId })
       const ended = await endInterview(iv.sessionId, iv.accessToken)
       assert.equal(ended.status, 201)
+      const callsAfterFirst = reportCalls
+      const reread = await endInterview(iv.sessionId, iv.accessToken)
+      assert.equal(reread.status, 201, 'reportState=done 幂等重读已生成报告必须照原样放行')
+      assert.equal(reportCalls, callsAfterFirst, '幂等重读不得再次调模型')
       const row = await loadOrder(orderId)
       assert.equal(row.status, 'consumed')
       assert.equal(row.reportState, 'done')
@@ -504,7 +519,7 @@ async function main(): Promise<void> {
       pass('Case 2 & 3: 首次失败进免费再试且不可开新场/不可顶替，再试成功做成不退')
     }
 
-    // ── Case 4: 再试仍失败 → 退一次且只一次；退后再出报告不倒回做成 ─────────
+    // ── Case 4: 再试仍失败 → 退一次且只一次；退款终态/退款中再次 end 必须 409 且 0 次调模型
     {
       refundCalls = 0
       reportMode = 'fail'
@@ -524,17 +539,34 @@ async function main(): Promise<void> {
       const auditRow = await prisma.auditLog.findFirst({ where: { targetId: orderId, action: 'service_order.refunded' } })
       assert.ok(auditRow, '自动退款必须落审计')
 
-      // 退完后再调用 end 成功，绝不能把 refunded 改回 consumed / done
+      // 退完后第三次调用 end：必须在调模型前 409 SERVICE_ORDER_REFUNDED 拒绝，0 次调 LLM、不落报告、不改单
       reportMode = 'ok'
-      assert.equal((await endInterview(iv.sessionId, iv.accessToken)).status, 201)
+      const callsBefore3rd = reportCalls
+      const third = await endInterview(iv.sessionId, iv.accessToken)
+      assert.equal(third.status, 409, '退款后第三次 end 必须返回 409 拒绝')
+      assert.equal(third.json.error?.code, 'SERVICE_ORDER_REFUNDED')
+      assert.equal(reportCalls, callsBefore3rd, '退款后第三次 end 必须 0 次调用大模型')
+      assert.equal(await prisma.mockInterviewReport.findUnique({ where: { sessionId: iv.sessionId } }), null, '退款后不得落库报告')
       const afterLateReport = await loadOrder(orderId)
       assert.equal(afterLateReport.status, 'refunded', '已退款的单绝不因后续出报告倒回做成')
       assert.notEqual(afterLateReport.reportState, 'done')
       assert.equal(refundCalls, 1)
-      pass('Case 4: 再试仍失败退一次且只一次，退后再出报告不倒回做成')
+
+      // refunding / refund_failed 同口径：调模型前 409 SERVICE_ORDER_REFUNDED 且 0 次调模型、不改状态
+      for (const blockedStatus of ['refunding', 'refund_failed'] as const) {
+        await prisma.serviceOrder.update({ where: { id: orderId }, data: { status: blockedStatus } })
+        const before = reportCalls
+        const blocked = await endInterview(iv.sessionId, iv.accessToken)
+        assert.equal(blocked.status, 409, `${blockedStatus} 状态下 end 必须返回 409 拒绝`)
+        assert.equal(blocked.json.error?.code, 'SERVICE_ORDER_REFUNDED')
+        assert.equal(reportCalls, before, `${blockedStatus} 状态下 end 必须 0 次调模型`)
+        assert.equal((await loadOrder(orderId)).status, blockedStatus, `${blockedStatus} 拒绝不得改写服务单状态`)
+      }
+      await prisma.serviceOrder.update({ where: { id: orderId }, data: { status: 'refunded' } })
+      pass('Case 4: 再试仍失败退一次且只一次；refunding/refunded/refund_failed 再次 end 均 409 拒绝且 0 次调模型')
     }
 
-    // ── Case 5: 窗口过期清扫 → 退 ──────────────────────────────────────────
+    // ── Case 5: 窗口过期清扫 → 退；窗口过期未清扫直接 end → 409 拒绝且立即原子退一次、不翻 done
     {
       refundCalls = 0
       reportMode = 'fail'
@@ -553,7 +585,41 @@ async function main(): Promise<void> {
       assert.equal(swept.status, 'refunded')
       assert.equal(swept.refundReason, SERVICE_REFUND_REASON_RETRY_EXPIRED)
       assert.equal(refundCalls, 1)
-      pass('Case 5: 再试窗口过期清扫自动退')
+
+      // 5b: 窗口已过期但清扫尚未跑时直接调 end → 禁止翻 done、0 次调模型、不落报告、触发自动退款仅 1 次
+      refundCalls = 0
+      const ksExp = await openKiosk(termCharge, chargeToken)
+      const orderExp = await paidOrder(ksExp)
+      const ivExp = await createAndAnswerInterview({ terminalId: termCharge, token: chargeToken, kioskSessionId: ksExp, orderId: orderExp })
+      assert.equal((await endInterview(ivExp.sessionId, ivExp.accessToken)).status, 503)
+      assert.equal((await loadOrder(orderExp)).reportState, 'retry')
+      await prisma.serviceOrder.update({ where: { id: orderExp }, data: { retryUntil: new Date(Date.now() - 5_000) } })
+
+      // 独立核验 markInterviewReportMade：窗口已过期绝不能把 reportState='retry' 翻成 'done'
+      await serviceOrders.noteInterviewReportMade(ivExp.sessionId)
+      assert.equal((await loadOrder(orderExp)).reportState, 'retry', 'markInterviewReportMade 不得将已过期的 retry 翻为 done')
+
+      reportMode = 'ok'
+      const callsBeforeExp = reportCalls
+      const expEnd = await endInterview(ivExp.sessionId, ivExp.accessToken)
+      assert.equal(expEnd.status, 409, '过期未清扫调 end 必须返回 409 拒绝')
+      assert.equal(expEnd.json.error?.code, 'SERVICE_RETRY_EXPIRED')
+      assert.equal(reportCalls, callsBeforeExp, '过期未清扫调 end 必须 0 次调用大模型')
+      assert.equal(await prisma.mockInterviewReport.findUnique({ where: { sessionId: ivExp.sessionId } }), null, '过期未清扫调 end 不得落库报告')
+      const expOrder = await loadOrder(orderExp)
+      assert.equal(expOrder.status, 'refunded', '过期未清扫调 end 必须走原路退款收口')
+      assert.equal(expOrder.refundReason, SERVICE_REFUND_REASON_RETRY_EXPIRED)
+      assert.notEqual(expOrder.reportState, 'done')
+      assert.equal(refundCalls, 1, '过期未清扫调 end 应触发退款且仅 1 次')
+
+      // 随后清扫与再次 end 均不得重复退款或调模型
+      await serviceOrders.sweep(new Date())
+      assert.equal(refundCalls, 1, '已由过期 end 退完的单，后续清扫绝不重复退')
+      const afterExpEnd = await endInterview(ivExp.sessionId, ivExp.accessToken)
+      assert.equal(afterExpEnd.status, 409)
+      assert.equal(afterExpEnd.json.error?.code, 'SERVICE_ORDER_REFUNDED')
+      assert.equal(reportCalls, callsBeforeExp)
+      pass('Case 5: 再试窗口过期清扫自动退；未清扫前调 end 必 409 拒、0 次调模型、原路退仅 1 次且不翻 done')
     }
 
     // ── Case 6: 会话结束（onSessionEnded）→ 退 ──────────────────────────────
@@ -681,7 +747,7 @@ async function main(): Promise<void> {
       assert.equal((await endInterview(iv9a.sessionId, iv9a.accessToken)).status, 201)
       assert.equal((await loadOrder(order9a)).reportState, 'done')
 
-      // 9b: 已在 retry + 窗口到期，两个独立服务实例的 end 失败 + sweep 同时撞同一单 → 只退一次
+      // 9b: 已在 retry + 窗口到期，两个独立服务实例的过期 end + sweep 同时撞同一单 → 只退一次且 0 次调模型
       refundCalls = 0
       refundedOrderIds = []
       refundDelayMs = 40
@@ -691,15 +757,16 @@ async function main(): Promise<void> {
       const iv9b = await createAndAnswerInterview({ terminalId: termCharge, token: chargeToken, kioskSessionId: ks9b, orderId: order9b })
       assert.equal((await endInterview(iv9b.sessionId, iv9b.accessToken)).status, 503)
       assert.equal((await loadOrder(order9b)).reportState, 'retry')
-      // 把窗口拨到已过期，让 sweep 与两路并发 end 同时抢退；用 slow-fail 确保两路独立实例都进入 buildReport → onReportFailed
+      // 把窗口拨到已过期，让 sweep 与两路并发 end 同时在前置准入的退款门闩撞车
       await prisma.serviceOrder.update({ where: { id: order9b }, data: { retryUntil: new Date(Date.now() - 10_000) } })
-      reportMode = 'slow-fail'
+      reportMode = 'ok'
+      const callsBefore9b = reportCalls
 
       const svcA = makeInterviewService()
       const svcB = makeInterviewService()
       const barrier = createRaceBarrier(3)
       const requester = { endUserId: null, accessToken: iv9b.accessToken }
-      // 在 claimRefund 的 updateMany 前对齐三路（两路并发 end + 一路清扫）：
+      // 在 claimRefund 的 updateMany 前对齐三路（两路并发过期 end + 一路清扫）：
       // 三路都已读到 status='consumed' / reportState='retry' 后同时起跑，真正撞向条件 updateMany 门闩。
       const origUpdateMany = prisma.serviceOrder.updateMany.bind(prisma.serviceOrder)
       prisma.serviceOrder.updateMany = (async (args: Parameters<typeof origUpdateMany>[0]) => {
@@ -710,21 +777,29 @@ async function main(): Promise<void> {
         }
         return origUpdateMany(args)
       }) as typeof origUpdateMany
-      const runEndFail = async (svc: MockInterviewService) => {
-        await svc.end(iv9b.sessionId, requester, {
-          onReportMade: () => serviceOrders.noteInterviewReportMade(iv9b.sessionId),
-          onReportFailed: () => serviceOrders.noteInterviewReportFailed(iv9b.sessionId),
-        }).catch(() => undefined)
+      const endStatuses: number[] = []
+      const runEndExpired = async (svc: MockInterviewService) => {
+        try {
+          await svc.end(iv9b.sessionId, requester, interviewReportHooks(serviceOrders, iv9b.sessionId))
+          endStatuses.push(201)
+        } catch (err) {
+          const st = err && typeof err === 'object' && 'getStatus' in err && typeof (err as { getStatus?: () => number }).getStatus === 'function'
+            ? (err as { getStatus: () => number }).getStatus()
+            : 0
+          endStatuses.push(st)
+        }
       }
       const runSweep = async () => {
         await serviceOrders.sweep(new Date())
       }
       try {
-        await Promise.all([runEndFail(svcA), runEndFail(svcB), runSweep()])
+        await Promise.all([runEndExpired(svcA), runEndExpired(svcB), runSweep()])
       } finally {
         prisma.serviceOrder.updateMany = origUpdateMany
       }
       assert.equal(barrier.timedOut, false, '三路并发必须真正同时撞到 claimRefund')
+      assert.deepEqual(endStatuses, [409, 409], '两路过期并发 end 必须均返回 409')
+      assert.equal(reportCalls, callsBefore9b, '两路过期并发 end 必须 0 次调用大模型')
       assert.equal(refundCalls, 1, `并发两次 end + 清扫必须只调渠道退款 1 次，实际 ${refundCalls}`)
       assert.deepEqual(refundedOrderIds, [order9b])
       assert.equal((await loadOrder(order9b)).status, 'refunded')

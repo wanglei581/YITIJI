@@ -7,12 +7,8 @@ import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { ResumeExtractionService } from '../ai/resume/resume-extraction.service'
-import { MockInterviewLlmService, type InterviewReportPayload } from './mock-interview-llm.service'
-import {
-  buildQaExcerpts,
-  parseStoredInterviewReport,
-  serializeInterviewReport,
-} from './interview-qa-excerpt'
+import { MockInterviewLlmService } from './mock-interview-llm.service'
+import { buildQaExcerpts, parseStoredInterviewReport } from './interview-qa-excerpt'
 import { InterviewReportPdfService } from './interview-report-pdf.service'
 import { InterviewPracticeSheetPdfService } from './interview-practice-sheet-pdf.service'
 import {
@@ -21,7 +17,7 @@ import {
   pickPracticeQuestions,
 } from './interview-practice-sheet'
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
-import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
+import { AiLogService, type AiUsageAccumulator } from '../ai/ai-log.service'
 import { AiQuotaService } from '../ai/quota/ai-quota.service'
 import { assertMemberInterviewRemaining, runWithAiQuota } from '../ai/quota/ai-quota-run'
 import { InflightCoalescer } from '../ai/ai-inflight'
@@ -47,6 +43,7 @@ import {
   type InterviewChargeSession,
   type InterviewOpenedQuestion,
 } from './mock-interview-charge'
+import { executeInterviewReportEnd, type InterviewReportChargeHooks } from './interview-report-charge'
 
 /** 练习报告和通用题单印在纸上的日期。北京时间自然日。 */
 export function interviewReportDisplayDate(at: Date): string {
@@ -96,10 +93,6 @@ function verifyToken(token: string | null, expectedHash: string | null): boolean
 }
 
 type SessionRow = NonNullable<Awaited<ReturnType<PrismaService['mockInterviewSession']['findUnique']>>>
-
-function isUniqueConflict(error: unknown): boolean {
-  return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'P2002')
-}
 
 @Injectable()
 export class MockInterviewService {
@@ -340,135 +333,26 @@ export class MockInterviewService {
   async end(
     sessionId: string,
     requester: InterviewRequester,
-    opts?: {
-      includeAnswersInPrint?: boolean
-      onReportMade?: () => Promise<void>
-      onReportFailed?: () => Promise<void>
-    },
+    opts?: { includeAnswersInPrint?: boolean } & InterviewReportChargeHooks,
   ) {
     await this.loadAuthorized(sessionId, requester)
     const includeAnswersInPrint = opts?.includeAnswersInPrint !== false
     return this.endLock.run(
       `ai:mock-interview:end:${this.coalesceKey(sessionId, requester)}`,
       120_000,
-      () => this.endOnce(sessionId, requester, includeAnswersInPrint, opts?.onReportMade, opts?.onReportFailed),
-    )
-  }
-
-  private async endOnce(
-    sessionId: string,
-    requester: InterviewRequester,
-    includeAnswersInPrint: boolean,
-    onReportMade?: () => Promise<void>,
-    onReportFailed?: () => Promise<void>,
-  ) {
-    const session = await this.loadAuthorized(sessionId, requester)
-    const existing = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
-    if (existing) {
-      await onReportMade?.()
-      return await this.reportDto(session, existing.payloadJson)
-    }
-    if (session.status === 'configured') {
-      throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_STARTED', message: '尚未开始面试，无法生成报告' } })
-    }
-    const claimed = await this.prisma.mockInterviewSession.updateMany({
-      where: { id: session.id, status: 'in_progress' },
-      data: { status: 'completed', endedAt: new Date() },
-    })
-    if (claimed.count === 0) {
-      const raced = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
-      if (raced) {
-        await onReportMade?.()
-        const latest = await this.loadAuthorized(sessionId, requester)
-        return await this.reportDto(latest, raced.payloadJson)
-      }
-      // CAS 已把状态写成 completed，但进程在写报告前崩溃 → 无报告。
-      // 不引入 completing（shared InterviewSessionStatus 无此值）；允许 completed 且无报告时重试生成。
-      const latest = await this.prisma.mockInterviewSession.findUnique({ where: { id: session.id } })
-      if (!latest || latest.status !== 'completed') {
-        throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_ACTIVE', message: '本场练习未在进行中' } })
-      }
-    }
-    const turns = await this.prisma.mockInterviewTurn.findMany({ where: { sessionId: session.id }, orderBy: { idx: 'asc' } })
-    const answered = turns.filter((t) => t.role === 'candidate' && !t.skipped).length
-    if (answered === 0) {
-      await this.prisma.mockInterviewSession.updateMany({
-        where: { id: session.id, status: 'completed' },
-        data: { status: 'in_progress', endedAt: null },
-      })
-      throw new BadRequestException({ error: { code: 'INTERVIEW_NO_ANSWERS', message: '本场练习还没有任何回答，请至少回答一个问题后再生成报告' } })
-    }
-    // 简历 AI 授权校验在调用模型前独立处理：未授权是用户前置条件，不算系统出报告失败。
-    try {
-      await this.requireResumeConsent(session)
-    } catch (error) {
-      await this.prisma.mockInterviewSession.updateMany({
-        where: { id: session.id, status: 'completed' },
-        data: { status: 'in_progress', endedAt: null },
-      })
-      throw error
-    }
-    const rUsage = new AiUsageAccumulator()
-    const rStartedAt = Date.now()
-    let payload: InterviewReportPayload
-    try {
-      payload = await this.llm.buildReport({
-        ...this.llmCtx(session),
-        transcript: turns.map((t) => ({
-          role: t.role as 'interviewer' | 'candidate',
-          content: t.content,
-          skipped: t.skipped,
-          ...(t.role === 'candidate' && t.answerDurationSec != null ? { durationSec: t.answerDurationSec } : {}),
-          ...(t.role === 'candidate' ? { inputMode: t.inputMode } : {}),
-        })),
-      }, rUsage.add)
-    } catch (error) {
-      this.recordAiLog(session.id, 'interviewReport', rUsage, rStartedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_REPORT_FAILED'))
-      await this.prisma.mockInterviewSession.updateMany({
-        where: { id: session.id, status: 'completed' },
-        data: { status: 'in_progress', endedAt: null },
-      })
-      await onReportFailed?.()
-      throw error
-    }
-    this.recordAiLog(session.id, 'interviewReport', rUsage, rStartedAt, 'success', session.endUserId)
-    const ttl = session.endUserId ? MEMBER_TTL_MS : ANON_TTL_MS
-    try {
-      await this.prisma.mockInterviewReport.create({
-        data: {
-          sessionId: session.id,
-          payloadJson: serializeInterviewReport(payload, includeAnswersInPrint),
-          expiresAt: new Date(Date.now() + ttl),
-        },
-      })
-    } catch (error) {
-      if (isUniqueConflict(error)) {
-        const raced = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
-        if (raced) {
-          await onReportMade?.()
-          return await this.reportDto(session, raced.payloadJson)
-        }
-      }
-      await this.prisma.mockInterviewSession.updateMany({
-        where: { id: session.id, status: 'completed' },
-        data: { status: 'in_progress', endedAt: null },
-      })
-      await onReportFailed?.()
-      throw error
-    }
-    await onReportMade?.()
-    await this.audit.write({
-      actorId: null,
-      actorRole: session.endUserId ? 'enduser' : 'kiosk',
-      action: 'mock_interview.report_generated',
-      targetType: 'mock_interview_session',
-      targetId: session.id,
-      payload: { answered, level: payload.overall.level },
-      ipAddress: null, userAgent: null, requestId: null,
-    })
-    return await this.reportDto(
-      { ...session, status: 'completed', endedAt: new Date() },
-      serializeInterviewReport(payload, includeAnswersInPrint),
+      () => executeInterviewReportEnd({
+        prisma: this.prisma,
+        llm: this.llm,
+        audit: this.audit,
+        anonTtlMs: ANON_TTL_MS,
+        memberTtlMs: MEMBER_TTL_MS,
+        loadAuthorized: (id, req) => this.loadAuthorized(id, req),
+        llmCtx: (session) => this.llmCtx(session),
+        requireResumeConsent: (session) => this.requireResumeConsent(session),
+        recordAiLog: (id, operation, usage, startedAt, status, endUserId, errorCode) =>
+          this.recordAiLog(id, operation, usage, startedAt, status, endUserId, errorCode),
+        reportDto: (session, payloadJson) => this.reportDto(session, payloadJson),
+      }, { sessionId, requester, includeAnswersInPrint, hooks: opts }),
     )
   }
 

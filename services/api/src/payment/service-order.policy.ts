@@ -136,6 +136,36 @@ export function decideInterviewReportFailure(input: {
   return 'enter_retry'
 }
 
+export type InterviewReportAdmission = 'allow' | 'retry_expired' | 'refunded'
+
+/**
+ * 收费面试场次调模型出报告前的准入判定：
+ * - 服务单已进退款中/已退款/退款失败 → 拒绝，不再调模型或落报告；
+ * - 服务单在免费再试中但窗口已过期（清扫尚未跑）→ 按过期走退款收口并拒绝，绝不翻回做成；
+ * - 其余（首次出报告、窗口内再试、已做成幂等重读）→ 放行。
+ */
+export function decideInterviewReportAdmission(input: {
+  serviceKey: string
+  status: string
+  reportState: string | null
+  retryUntil: Date | null
+  now: Date
+}): InterviewReportAdmission {
+  if (input.serviceKey !== 'mock_interview') return 'allow'
+  if (input.status === 'refunding' || input.status === 'refunded' || input.status === 'refund_failed') {
+    return 'refunded'
+  }
+  if (input.status === 'consumed' && input.reportState === 'retry') {
+    if (!input.retryUntil || input.retryUntil.getTime() <= input.now.getTime()) {
+      return 'retry_expired'
+    }
+  }
+  return 'allow'
+}
+
+export const SERVICE_ERROR_RETRY_EXPIRED_MESSAGE = '免费再试时间已过，这一次的费用会自动退回原付款账户'
+export const SERVICE_ERROR_ORDER_REFUNDED_MESSAGE = '这一次已进入退款流程，不再继续生成练习报告'
+
 export const SERVICE_REFUND_REASON_LEFT = '人已离开，这一次还没用'
 export const SERVICE_REFUND_REASON_RETRY_EXPIRED = '免费再试已过期'
 export const SERVICE_REFUND_REASON_REPORT_FAILED = '报告没生成'

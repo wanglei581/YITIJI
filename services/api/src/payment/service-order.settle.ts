@@ -10,6 +10,8 @@ import {
 } from './service-order.ref'
 import { releaseInterviewSession } from './service-order.sweep'
 import {
+  SERVICE_ERROR_ORDER_REFUNDED_MESSAGE,
+  SERVICE_ERROR_RETRY_EXPIRED_MESSAGE,
   SERVICE_ORDER_NAMES,
   SERVICE_REFUND_REASON_REPORT_FAILED,
   SERVICE_REFUND_REASON_REPORT_LEFT,
@@ -17,6 +19,7 @@ import {
   SERVICE_RETRY_WINDOW_MS,
   SERVICE_SWEEP_BATCH,
   classifyServiceOutcome,
+  decideInterviewReportAdmission,
   decideInterviewReportFailure,
   failureReasonFor,
   isServiceOrderKey,
@@ -76,22 +79,90 @@ export async function finishServiceOrder(prisma: PrismaService, orderId: string)
 }
 
 /**
- * 模拟面试报告已落库：把挂在这场上的 mock_interview 服务单锁成 reportState='done'，
- * 清掉失败原因与再试窗口。带 status='consumed' 条件，已进退款的单绝不倒回做成。
+ * 调大模型生成练习报告前的服务单准入校验：
+ * - 当前挂在场上的 consumed 单处于 retry 且窗口已过期（清扫尚未跑）→ 立即按过期原子退款并 409 拒绝；
+ * - 无活跃 consumed 单但已有进入退款中/已退款/退款失败的单 → 409 拒绝，绝不调模型也不落报告；
+ * - 免费机器、无服务单场次、首次出报告或窗口内再试 → 放行。
  */
-export async function markInterviewReportMade(prisma: PrismaService, sessionId: string): Promise<void> {
+export async function assertInterviewReportAdmitted(
+  deps: ServiceOrderSettleDeps,
+  sessionId: string,
+  now = new Date(),
+): Promise<void> {
+  const active = await deps.prisma.serviceOrder.findFirst({
+    where: { serviceKey: 'mock_interview', consumedRef: sessionId, status: 'consumed' },
+    select: { id: true, serviceKey: true, status: true, reportState: true, retryUntil: true },
+  })
+  if (active) {
+    const decision = decideInterviewReportAdmission({
+      serviceKey: active.serviceKey,
+      status: active.status,
+      reportState: active.reportState,
+      retryUntil: active.retryUntil,
+      now,
+    })
+    if (decision === 'retry_expired') {
+      await executeServiceOrderRefund(
+        deps.prisma, deps.registry, deps.audit, deps.redis, active.id,
+        SERVICE_REFUND_REASON_RETRY_EXPIRED,
+        { requireConsumedReportState: 'retry' },
+      )
+      throw new ConflictException({
+        error: { code: 'SERVICE_RETRY_EXPIRED', message: SERVICE_ERROR_RETRY_EXPIRED_MESSAGE },
+      })
+    }
+    return
+  }
+  const refunded = await deps.prisma.serviceOrder.findFirst({
+    where: {
+      serviceKey: 'mock_interview',
+      consumedRef: sessionId,
+      status: { in: ['refunding', 'refunded', 'refund_failed'] },
+    },
+    select: { id: true, serviceKey: true, status: true, reportState: true, retryUntil: true },
+    orderBy: { updatedAt: 'desc' },
+  })
+  if (!refunded) return
+  const decision = decideInterviewReportAdmission({
+    serviceKey: refunded.serviceKey,
+    status: refunded.status,
+    reportState: refunded.reportState,
+    retryUntil: refunded.retryUntil,
+    now,
+  })
+  if (decision === 'refunded') {
+    throw new ConflictException({
+      error: { code: 'SERVICE_ORDER_REFUNDED', message: SERVICE_ERROR_ORDER_REFUNDED_MESSAGE },
+    })
+  }
+}
+
+/**
+ * 模拟面试报告已落库：把挂在这场上的 mock_interview 服务单锁成 reportState='done'，
+ * 清掉失败原因与再试窗口。仅首次（reportState=null）或窗口内再试（retryUntil>now）允许转 done，
+ * 已过期或已进退款的单绝不倒回做成。
+ */
+export async function markInterviewReportMade(
+  prisma: PrismaService,
+  sessionId: string,
+  now = new Date(),
+): Promise<void> {
   if (classifyServiceOutcome('mock_interview', 'interview_report_completed') !== 'made') return
   const row = await prisma.serviceOrder.findFirst({
     where: { serviceKey: 'mock_interview', consumedRef: sessionId, status: 'consumed' },
-    select: { id: true, settledAt: true, reportState: true },
+    select: { id: true, settledAt: true, reportState: true, retryUntil: true },
   })
   if (!row || !row.settledAt || row.reportState === 'done') return
+  if (row.reportState === 'retry' && (!row.retryUntil || row.retryUntil.getTime() <= now.getTime())) return
   await prisma.serviceOrder.updateMany({
     where: {
       id: row.id,
       status: 'consumed',
       settledAt: { not: null },
-      OR: [{ reportState: null }, { reportState: 'retry' }],
+      OR: [
+        { reportState: null },
+        { reportState: 'retry', retryUntil: { gt: now } },
+      ],
     },
     data: { reportState: 'done', failureReason: null, retryUntil: null },
   })
