@@ -173,6 +173,8 @@
   min-height: 120px;
   padding: 8px 12px;
 }
+[data-qx-page='diagnosis'] .rrp-export-panel[data-exported='0'][data-charge-note='1'] { min-height: 0; }
+[data-qx-page='diagnosis'] .rrp-charge-note { flex: 1 0 100%; margin: 0; font-size: 20px; line-height: 1.35; color: var(--qxt-ink-3); }
 [data-qx-page='diagnosis'] .rrp-export-panel[data-exported='0'] .rrp-export { display: flex; flex-wrap: wrap; gap: 10px; }
 [data-qx-page='diagnosis'] .rrp-export-panel[data-exported='0'] .rrp-export button { padding: 0 14px; }
 [data-qx-page='diagnosis'] .rrp-export-panel[data-exported='0'] :is(.rrp-export-reason, .rrp-export-error) { flex-basis: 100%; }

@@ -17,7 +17,9 @@ import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import './touch/report.css'
 import { ResumeDiagnosisFailExits } from './components/ResumeDiagnosisFailExits'
-import { readAiResumeSession } from './aiResumeSession'
+import { readAiResumeSession, saveAiResumeSession } from './aiResumeSession'
+import { payServicePath } from '../pay/payServiceModel'
+import { diagnosisPayButtonLabel, diagnosisPriceNote, useResumeTripCharge } from './useResumeTripCharge'
 import {
   deriveViewState,
   isExportCaptureState,
@@ -255,7 +257,14 @@ export function ResumeReportPage() {
     setReloadKey((n) => n + 1)
     if (parsed.tech) setSearch({ state: 'loading' })
   }
+  const tripCharge = useResumeTripCharge({ inspectOrder: true })
+  const needsPay = !isFixture && !viewOnly && canOptimize
+    && tripCharge.resumePriceCents > 0 && !tripCharge.alreadyPaidForOptimize && !tripCharge.checkingOrder
   const openOptimize = () => navigate('/resume/optimize', { state: { ...state, taskId, accessToken, targetContext: state.targetContext ?? targetContext } })
+  const openPay = () => {
+    if (taskId) saveAiResumeSession({ taskId, accessToken })
+    navigate(payServicePath('resume', { next: 'optimize', back: 'report' }))
+  }
   const dockPrimary = useReportDockPrimary({
     viewState,
     canOptimize,
@@ -263,6 +272,8 @@ export function ResumeReportPage() {
     onRetry: retryLoad,
     onOptimize: openOptimize,
     issueCount: displayIssues.length,
+    payLabel: needsPay ? diagnosisPayButtonLabel(tripCharge.resumePriceCents) : null,
+    onPay: openPay,
   })
   const [exportedNow, setExportedNow] = useState(false)
 
@@ -380,7 +391,15 @@ export function ResumeReportPage() {
               accessToken={accessToken}
               capture={isExportCaptureState(viewState) ? viewState : null}
               onExportedChange={setExportedNow}
-            /></LicenseLock> : <ResumeReportTakeaway key={`${viewState}:${taskId ?? ''}`} show taskId={taskId} accessToken={accessToken} capture={isExportCaptureState(viewState) ? viewState : null} onExportedChange={setExportedNow} />}
+            /></LicenseLock> : <ResumeReportTakeaway
+              key={`${viewState}:${taskId ?? ''}`}
+              show
+              taskId={taskId}
+              accessToken={accessToken}
+              capture={isExportCaptureState(viewState) ? viewState : null}
+              onExportedChange={setExportedNow}
+              optimizePriceNote={needsPay ? diagnosisPriceNote(tripCharge.resumePriceCents) : null}
+            />}
             <p className="qxt-fine" id="resume-report-why">{why}</p>
           </>
         ) : viewState === 'report-empty' ? (
