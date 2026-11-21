@@ -12,7 +12,10 @@ import assert from 'node:assert/strict'
 import type { AuditService } from '../../src/audit/audit.service'
 import { AdminInvoiceService } from '../../src/invoices/admin-invoice.service'
 import { InvoiceRequestsService } from '../../src/invoices/invoice-requests.service'
+import { invoiceSceneIndexKey, invoiceSessionKey, type InvoiceRedis } from '../../src/invoices/invoice-scene'
+import { InvoiceSessionsService } from '../../src/invoices/invoice-sessions.service'
 import { CLOSED_MEMBER_INVOICE_RETURN_REASON } from '../../src/member-privacy/member-closure-retention'
+import type { MemberClosureInput, MemberClosureService } from '../../src/member-privacy/member-closure.service'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 
 export const CLOSURE_INVOICE_NAME = '王小明'
@@ -86,5 +89,142 @@ export async function assertClosureInvoices(
   for (const row of audits) {
     assert.equal(row.payloadJson.includes(CLOSURE_INVOICE_NAME), false, `审计 ${row.action} 里还留着姓名抬头`)
     assert.equal(row.payloadJson.includes(CLOSURE_INVOICE_EMAIL), false, `审计 ${row.action} 里还留着发票邮箱`)
+  }
+}
+
+function errorCodeOf(error: unknown): string | undefined {
+  return (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()?.error?.code
+}
+
+/**
+ * 覆盖注销前已创建扫码开票会话的三层防线（Redis 吊销 + submit 活跃校验 + 数据库触发器）：
+ * 1. 注销前为目标会员和对照会员各建一个开票码，目标会员提前扫码兑换好 submitToken；
+ * 2. 目标会员完成注销变为 anonymized；
+ * 3. 目标会员的 invoice_session:* 与 invoice_session_scene:* 必须已被清空（对照会员的不受影响）；
+ * 4. 持旧 scene / 旧 submitToken、直接调用 InvoiceRequestsService.submit、以及绕过业务层直写 Prisma 都必须失败且库里 0 新行。
+ */
+export async function verifyClosureRevokesInvoiceSessions(deps: {
+  prisma: PrismaService
+  redis: InvoiceRedis
+  closure: MemberClosureService
+  admin: { userId: string; role: string }
+  baseInput: MemberClosureInput
+  victim: { id: string; phoneLast4: string }
+  otherId: string
+  terminalId: string
+  put: Put
+  orderNo: () => string
+}): Promise<void> {
+  const victimOrder = await deps.put('order', {
+    orderNo: deps.orderNo(),
+    endUserId: deps.victim.id,
+    terminalId: deps.terminalId,
+    payStatus: 'paid',
+    taskStatus: 'completed',
+    pickupStatus: 'used',
+    amountCents: 300,
+  })
+  const controlOrder = await deps.put('order', {
+    orderNo: deps.orderNo(),
+    endUserId: deps.otherId,
+    terminalId: deps.terminalId,
+    payStatus: 'paid',
+    taskStatus: 'completed',
+    pickupStatus: 'used',
+    amountCents: 300,
+  })
+  const invoiceRequests = new InvoiceRequestsService(deps.prisma)
+  const invoiceSessions = new InvoiceSessionsService(deps.redis, invoiceRequests)
+  const victimSession = await invoiceSessions.create({
+    terminalId: deps.terminalId,
+    endUserId: deps.victim.id,
+    orderKind: 'print',
+    orderId: victimOrder.id,
+    origin: 'https://kiosk.example',
+  })
+  const victimResolved = await invoiceSessions.resolveScene(victimSession.sceneToken)
+  const controlSession = await invoiceSessions.create({
+    terminalId: deps.terminalId,
+    endUserId: deps.otherId,
+    orderKind: 'print',
+    orderId: controlOrder.id,
+    origin: 'https://kiosk.example',
+  })
+  const victimSessionRedisKey = invoiceSessionKey(victimSession.sessionId)
+  const victimSceneRedisKey = invoiceSceneIndexKey(victimSession.sceneToken)
+  const controlSessionRedisKey = invoiceSessionKey(controlSession.sessionId)
+  const controlSceneRedisKey = invoiceSceneIndexKey(controlSession.sceneToken)
+  try {
+    const rawVictimBefore = await deps.redis.get(victimSessionRedisKey)
+    assert.ok(rawVictimBefore, '阳性对照：注销前开票会话应写在 Redis 里')
+    assert.equal(await deps.redis.get(victimSceneRedisKey), victimSession.sessionId, '阳性对照：注销前场景码索引应写在 Redis 里')
+
+    const closed = await deps.closure.execute(
+      deps.victim.id,
+      { ...deps.baseInput, phoneLast4: deps.victim.phoneLast4 },
+      deps.admin,
+    )
+    assert.equal(closed.status, 'anonymized')
+    assert.equal(await deps.redis.get(victimSessionRedisKey), null, '注销后 invoice_session:* 必须被吊销')
+    assert.equal(await deps.redis.get(victimSceneRedisKey), null, '注销后 invoice_session_scene:* 必须被吊销')
+    assert.ok(await deps.redis.get(controlSessionRedisKey), '注销不得误删另一会员的开票会话')
+    assert.equal(await deps.redis.get(controlSceneRedisKey), controlSession.sessionId, '注销不得误删另一会员的场景码')
+
+    await assert.rejects(
+      () => invoiceSessions.resolveScene(victimSession.sceneToken),
+      (error: unknown) => errorCodeOf(error) === 'INVOICE_SCENE_UNUSABLE',
+    )
+    await assert.rejects(
+      () => invoiceSessions.submit(victimSession.sessionId, {
+        submitToken: victimResolved.submitToken,
+        titleType: 'personal',
+        title: '周明哲',
+        email: 'zhoumz@example.com',
+      }),
+      (error: unknown) => errorCodeOf(error) === 'INVOICE_SCENE_UNUSABLE',
+    )
+    // 即使旧会话键因异常重放或并发未清，业务层活跃会员校验仍须拒绝写入。
+    await deps.redis.setEx(victimSessionRedisKey, 60, rawVictimBefore)
+    await assert.rejects(
+      () => invoiceSessions.submit(victimSession.sessionId, {
+        submitToken: victimResolved.submitToken,
+        titleType: 'personal',
+        title: '周明哲',
+        email: 'zhoumz@example.com',
+      }),
+      (error: unknown) => errorCodeOf(error) === 'ACCOUNT_UNAVAILABLE',
+    )
+    await assert.rejects(
+      () => invoiceRequests.submit(deps.victim.id, {
+        orderKind: 'print',
+        orderId: victimOrder.id,
+        titleType: 'personal',
+        title: '周明哲',
+        email: 'zhoumz@example.com',
+      }),
+      (error: unknown) => errorCodeOf(error) === 'ACCOUNT_UNAVAILABLE',
+    )
+    // 绕过业务层直写数据库也必须被关闭会员写入触发器拦截。
+    await assert.rejects(
+      () => deps.prisma.invoiceRequest.create({
+        data: {
+          orderKind: 'print',
+          orderId: victimOrder.id,
+          endUserId: deps.victim.id,
+          titleType: 'personal',
+          title: '周明哲',
+          email: 'zhoumz@example.com',
+          amountCents: 300,
+          status: 'submitted',
+        },
+      }),
+      (error: unknown) => String((error as { message?: unknown }).message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN'),
+    )
+    assert.equal(await deps.prisma.invoiceRequest.count({ where: { endUserId: deps.victim.id } }), 0, '注销后开票申请必须保持 0 新行')
+  } finally {
+    await deps.redis.del(victimSessionRedisKey)
+    await deps.redis.del(victimSceneRedisKey)
+    await deps.redis.del(controlSessionRedisKey)
+    await deps.redis.del(controlSceneRedisKey)
   }
 }

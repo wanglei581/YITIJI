@@ -96,9 +96,14 @@ function memberOrderView(candidate: ListCandidate, request: { id: string; status
 }
 
 const INVOICE_REQUEST_NOT_FOUND = '没有找到这份开票申请。'
+const INVOICE_ACCOUNT_UNAVAILABLE = '账号当前不可用，开不了发票。'
 
 function uniqueConflict(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002'
+}
+
+function closedMemberWriteError(error: unknown): boolean {
+  return String((error as { message?: unknown } | null)?.message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')
 }
 
 @Injectable()
@@ -161,6 +166,15 @@ export class InvoiceRequestsService {
   }
 
   async submit(endUserId: string, input: SubmitInvoiceInput): Promise<StoredInvoiceRequest> {
+    const member = await this.prisma.endUser.findUnique({
+      where: { id: endUserId },
+      select: { status: true, enabled: true },
+    })
+    if (!member || member.status !== 'active' || !member.enabled) {
+      throw new ConflictException({
+        error: { code: 'ACCOUNT_UNAVAILABLE', message: INVOICE_ACCOUNT_UNAVAILABLE },
+      })
+    }
     const title = normalizeInvoiceTitle(input)
     const facts = await this.loadFacts(input.orderKind, input.orderId)
     if (!facts) {
@@ -191,6 +205,11 @@ export class InvoiceRequestsService {
       })
       return row
     } catch (error) {
+      if (closedMemberWriteError(error)) {
+        throw new ConflictException({
+          error: { code: 'ACCOUNT_UNAVAILABLE', message: INVOICE_ACCOUNT_UNAVAILABLE },
+        })
+      }
       if (!uniqueConflict(error)) throw error
       throw new ConflictException({
         error: { code: 'INVOICE_ALREADY_REQUESTED', message: INVOICE_BLOCK_MESSAGES.already_requested },

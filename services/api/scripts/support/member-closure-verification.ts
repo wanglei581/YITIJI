@@ -12,6 +12,7 @@ export class ClosureMemoryRedis {
   }
   async setEx(key: string, _ttl: number, value: string) { await this.set(key, value) }
   async setNxEx(key: string, value: string, ttl: number) { return await this.set(key, value, 'EX', ttl, 'NX') === 'OK' }
+  async setIfAbsent(key: string, value: string, ttl: number) { return this.setNxEx(key, value, ttl) }
   async del(...keys: string[]) { return keys.reduce((n, key) => n + Number(this.values.delete(key)), 0) }
   async type(key: string) { return this.values.has(key) ? 'string' : 'none' }
   async scan(_cursor: string, _match: string, pattern: string) {

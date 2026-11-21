@@ -36,7 +36,7 @@ import { createPrismaClient } from '../src/prisma/create-client'
 import { StorageService } from '../src/storage/storage.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { ClosureMemoryRedis, scanClosureDatabase, scanClosureRedis, type ClosureScanIdentity } from './support/member-closure-verification'
-import { assertClosureInvoices, closureInvoiceAuditTargets, seedClosureInvoices } from './support/member-closure-invoices'
+import { assertClosureInvoices, closureInvoiceAuditTargets, seedClosureInvoices, verifyClosureRevokesInvoiceSessions } from './support/member-closure-invoices'
 
 // 不允许把外部未标记的库偷偷替换成临时库来绕过保护。
 assertIsolatedVerificationDatabase()
@@ -53,6 +53,7 @@ if (!usesPostgres) {
   } catch (error) { rmSync(temporary, { recursive: true, force: true }); throw error }
 }
 process.env['SECRET_ENCRYPTION_KEY'] ??= 'verify-member-closure-secret-01234567890123456789'
+process.env['FILE_SIGNING_SECRET'] ??= 'verify-member-closure-signing-secret-0123456789'
 process.env['FILE_STORAGE_DRIVER'] = 'local'
 process.env['FILE_STORAGE_DIR'] = join(temporary, 'objects')
 const realRedis = process.env['MEMBER_CLOSURE_REAL_REDIS'] === '1'
@@ -677,7 +678,23 @@ async function main() {
   })
   await check('已注销账号禁止迟到的个人数据写入与身份换绑', async () => {
     await assert.rejects(() => prisma.aiResumeResult.create({ data: { taskId: randomUUID(), kind: 'generate', status: 'completed', provider: 'fallback', endUserId: owned.id, payloadJson: '{}' } }))
+    await assert.rejects(() => prisma.invoiceRequest.create({ data: { orderKind: 'print', orderId: `closed-${closureFixtureToken()}`, endUserId: owned.id, titleType: 'personal', title: '迟到开票', email: 'late@example.com', amountCents: 200, status: 'submitted' } }))
     await assert.rejects(() => prisma.endUser.update({ where: { id: owned.id }, data: { phoneHash: owned.identity.phoneHash, phoneEnc: owned.identity.phoneEnc } }))
+  })
+  await check('注销吊销扫码开票会话且迟到提交与直写均被拒绝，库里 0 新行', async () => {
+    const invoiceUser = await member('周明哲')
+    await verifyClosureRevokesInvoiceSessions({
+      prisma,
+      redis,
+      closure,
+      admin,
+      baseInput: input,
+      victim: { id: invoiceUser.id, phoneLast4: invoiceUser.identity.phone.slice(-4) },
+      otherId: other.id,
+      terminalId: otherFixture.terminalId,
+      put,
+      orderNo: () => `M${randomInt(10000000, 99999999)}${randomInt(10000000, 99999999)}`,
+    })
   })
   await check('12 新账号与旧壳不在同一行共现，创建/审计不含旧壳 id', async () => {
     const scan = await scanClosureDatabase(scanClient, owned.identity, [newId, owned.id])

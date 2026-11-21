@@ -262,6 +262,29 @@ async function main(): Promise<void> {
     await assert.rejects(() => requests.listForMember(endUserId, { cursor: 'bm90LWEtY3Vyc29y' }), (error: unknown) => errorOf(error).code === 'VALIDATION_FAILED')
   })
 
+  await check('8 停用/注销中/已注销会员不得提交开票；数据库触发器同步拦住绕过业务层的迟到写入', async () => {
+    for (const [label, patch] of [
+      ['停用', { status: 'disabled', enabled: false }],
+      ['注销中', { status: 'closing', enabled: false }],
+      ['已注销', { status: 'anonymized', enabled: false }],
+    ] as Array<[string, { status: string; enabled: boolean }]>) {
+      const endUserId = await member()
+      const orderId = await printOrder(endUserId, commercialTerminal)
+      await prisma.endUser.update({ where: { id: endUserId }, data: patch })
+      await expectConflict(() => submitPersonal(endUserId, 'print', orderId), 'ACCOUNT_UNAVAILABLE', '账号当前不可用，开不了发票。')
+      if (patch.status === 'closing' || patch.status === 'anonymized') {
+        await assert.rejects(
+          () => prisma.invoiceRequest.create({
+            data: { orderKind: 'print', orderId, endUserId, titleType: 'personal', title: '迟到写入', email: EMAIL, amountCents: 300, status: 'submitted' },
+          }),
+          (error: unknown) => String((error as { message?: unknown }).message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN'),
+          `${label} 会员绕过业务层直写开票表必须被数据库触发器拦截`,
+        )
+      }
+      assert.equal(await prisma.invoiceRequest.count({ where: { endUserId } }), 0, `${label} 会员不应落行`)
+    }
+  })
+
   console.log(`PASS verify:invoice-real-db（${passed.length} 组）`)
 }
 

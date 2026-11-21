@@ -1,4 +1,4 @@
-import { closeSync, existsSync, mkdtempSync, openSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -37,6 +37,17 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     // 只填没有库内默认值的必填列；读回时也只取 id。
     const stamp = kind === 'sqlite' ? `'2026-10-28T00:00:00.000+00:00'` : `TIMESTAMP '2026-10-28 00:00:00'`
     await client.$executeRawUnsafe(`INSERT INTO "Organization" ("id", "name", "type", "updatedAt") VALUES ('first-order-migration-sentinel', 'Migration sentinel', 'public_employment_service', ${stamp})`)
+    if (kind === 'postgres') {
+      // 基线 07f9046c2 的历史迁移里已含 20261003090000 创建的 reject_closed_member_write()；
+      // prisma db push 不执行迁移 SQL，这里先按原迁移补建该函数，让后续挂触发器的迁移与生产 migrate deploy 同口径。
+      const closureSql = readFileSync(
+        join(api, 'prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql'),
+        'utf8',
+      )
+      const fnMatch = closureSql.match(/CREATE FUNCTION reject_closed_member_write\(\)[\s\S]*?END; \$\$;/u)
+      if (!fnMatch) throw new Error('postgres: reject_closed_member_write function definition missing')
+      await client.$executeRawUnsafe(fnMatch[0])
+    }
     // 基线之后的每条迁移都要在这里按顺序补一行；漏一条，下面用当前客户端写库就会报缺列。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', migration)])
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261028120000_ai_service_fact/migration.sql')])
@@ -199,7 +210,20 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
       else throw error
     }
     if (!issuedSlotHeld) throw new Error(`${kind}: an issued invoice request must keep the order slot`)
-    console.log(`PASS ${kind}: invoice request table rejects a second open application and frees the slot after return`)
+    const closedMember = await client.endUser.create({
+      data: { phoneHash: `invoice-migration-closed-${kind}`, phoneEnc: 'enc', status: 'anonymized', enabled: false },
+    })
+    let closedWriteRejected = false
+    try {
+      await client.invoiceRequest.create({
+        data: { orderKind: 'print', orderId: 'order-closed-1', endUserId: closedMember.id, titleType: 'personal', title: '已注销', amountCents: 100 },
+      })
+    } catch (error) {
+      if (String((error as { message?: unknown }).message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')) closedWriteRejected = true
+      else throw error
+    }
+    if (!closedWriteRejected) throw new Error(`${kind}: InvoiceRequest closed-member write trigger must reject inserts for closed members`)
+    console.log(`PASS ${kind}: invoice request table rejects a second open application, frees the slot after return, and rejects closed-member writes`)
   } finally { await client.$disconnect() }
 }
 

@@ -84,8 +84,9 @@ function matches(row: Record<string, unknown>, where: Record<string, unknown>): 
   return true
 }
 
-function createHarness(options?: { hideOpen?: boolean }) {
+function createHarness(options?: { hideOpen?: boolean; memberState?: { status: string; enabled: boolean } | null }) {
   const now = Date.now()
+  const memberState = options && 'memberState' in options ? options.memberState : { status: 'active', enabled: true }
   const prints: PrintRow[] = [
     {
       id: 'order-ok',
@@ -160,6 +161,9 @@ function createHarness(options?: { hideOpen?: boolean }) {
     terminalId === PUBLIC_TERMINAL ? 'public_employment_service' : 'licensed_hr_agency'
   )
   const prisma = {
+    endUser: {
+      findUnique: async ({ where }: { where: { id: string } }) => (where.id === MEMBER ? memberState : null),
+    },
     order: {
       findUnique: async ({ where }: { where: { id: string } }) => {
         calls.findUnique += 1
@@ -422,4 +426,31 @@ test('会员列表批量读三次库，不对每张单逐个查；一页默认�
   const small = await requests.listForMember(MEMBER, { limit: 5 })
   assert.equal(small.items.length, 5)
   assert.deepEqual(small.items.map((row) => row.orderId), page.items.slice(0, 5).map((row) => row.orderId))
+})
+
+test('非活跃或已停用/注销中/已注销会员提交开票一律拒绝，不落库', async () => {
+  for (const state of [
+    null,
+    { status: 'active', enabled: false },
+    { status: 'disabled', enabled: false },
+    { status: 'closing', enabled: false },
+    { status: 'anonymized', enabled: false },
+  ]) {
+    const { requests, invoices } = createHarness({ memberState: state })
+    await assert.rejects(
+      () => requests.submit(MEMBER, {
+        orderKind: 'print',
+        orderId: 'order-ok',
+        titleType: 'personal',
+        title: '张三',
+        email: EMAIL,
+      }),
+      (error: unknown) => {
+        assert.equal((error as { getStatus?: () => number }).getStatus?.(), 409)
+        assert.equal(errorBody(error).code, 'ACCOUNT_UNAVAILABLE')
+        return true
+      },
+    )
+    assert.equal(invoices.length, 0)
+  }
 })

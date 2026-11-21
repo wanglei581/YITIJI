@@ -31,3 +31,6 @@ CREATE UNIQUE INDEX "InvoiceRequest_open_order_key"
   WHERE "status" <> 'returned';
 
 ALTER TABLE "InvoiceRequest" ADD CONSTRAINT "InvoiceRequest_endUserId_fkey" FOREIGN KEY ("endUserId") REFERENCES "EndUser"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- 防止注销中或已注销会员被迟到的开票提交写入明文抬头和邮箱（与其余会员表同口径）。
+CREATE TRIGGER "InvoiceRequest_closed_member_write" BEFORE INSERT OR UPDATE OF "endUserId" ON "InvoiceRequest" FOR EACH ROW EXECUTE FUNCTION reject_closed_member_write();

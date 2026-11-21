@@ -28,3 +28,11 @@ CREATE INDEX "InvoiceRequest_status_updatedAt_idx" ON "InvoiceRequest"("status",
 CREATE UNIQUE INDEX "InvoiceRequest_open_order_key"
   ON "InvoiceRequest" ("orderKind", "orderId")
   WHERE "status" <> 'returned';
+
+-- 防止注销中或已注销会员被迟到的开票提交写入明文抬头和邮箱（与其余会员表同口径）。
+CREATE TRIGGER "InvoiceRequest_closed_member_insert" BEFORE INSERT ON "InvoiceRequest"
+WHEN NEW."endUserId" IS NOT NULL AND EXISTS (SELECT 1 FROM "EndUser" WHERE "id"=NEW."endUserId" AND "status" IN ('closing','anonymized'))
+BEGIN SELECT RAISE(ABORT, 'MEMBER_CLOSED_WRITE_FORBIDDEN'); END;
+CREATE TRIGGER "InvoiceRequest_closed_member_bind" BEFORE UPDATE OF "endUserId" ON "InvoiceRequest"
+WHEN NEW."endUserId" IS NOT NULL AND NEW."endUserId" IS NOT OLD."endUserId" AND EXISTS (SELECT 1 FROM "EndUser" WHERE "id"=NEW."endUserId" AND "status" IN ('closing','anonymized'))
+BEGIN SELECT RAISE(ABORT, 'MEMBER_CLOSED_WRITE_FORBIDDEN'); END;
