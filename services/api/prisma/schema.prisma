@@ -1103,7 +1103,9 @@ model EndUser {
   scanTasks       ScanTask[]
   contractReviewTasks ContractReviewTask[]
   jobApplications JobApplication[]
-  invoiceRequests InvoiceRequest[]
+  invoiceRequests  InvoiceRequest[]
+  virtualPayOrders VirtualPayOrder[]
+  serviceCredits   MemberServiceCredit[]
 
   @@index([status])
 }
@@ -1139,6 +1141,47 @@ model InvoiceRequest {
   @@index([endUserId, createdAt])
   @@index([orderKind, orderId])
   @@index([status, updatedAt])
+}
+
+// 小程序微信虚拟支付订单。openid 注销时清空。价格是下单时冻住的分，不写进仓库。
+// 用掉和退款留给第二包：本表没有消耗字段。
+model VirtualPayOrder {
+  id          String    @id @default(cuid())
+  endUserId   String?
+  endUser     EndUser?  @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  openId      String?
+  serviceKind String
+  productId   String
+  priceCents  Int
+  /// 0 现网 / 1 沙箱。下单时冻住，推送和查单必须对上。
+  env                  Int
+  status               String    @default("pending")
+  outTradeNo           String    @unique
+  wxOrderId            String?
+  paidAt               DateTime?
+  queryFailCount       Int       @default(0)
+  lastDiagnosticReason String?
+  createdAt            DateTime  @default(now())
+  credit               MemberServiceCredit?
+
+  @@index([status, createdAt])
+}
+
+// 付款后得到的一次服务权益。一单至多一条，sourceOrderId 唯一。
+// consumedAt / refundedAt 留给第二包，本包只写入 available。
+model MemberServiceCredit {
+  id            String          @id @default(cuid())
+  endUserId     String?
+  endUser       EndUser?        @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  serviceKind   String
+  sourceOrderId String          @unique
+  sourceOrder   VirtualPayOrder @relation(fields: [sourceOrderId], references: [id], onDelete: Restrict)
+  status        String          @default("available")
+  consumedAt    DateTime?
+  refundedAt    DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([endUserId, status])
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────

@@ -1,5 +1,39 @@
 # 当前开发进度
 
+## 2026-11-21：小程序微信虚拟支付后端极小收口返工 P2d1b3（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
+
+- 来由：按 Codex 独立复收 `P2d1b2`（`f61d17b23`）复现出的 4 处阻塞/并发缺陷 + 1 处 XML 重复键收紧，接在 `f61d17b23` 之后逐项完成极小收口并提交（零新增数据库迁移）。
+- ① 闭户写保护（`closing`/`closed` 窗口）：`virtual-pay-delivery.ts`（`grantPaid` 事务内与 `confirmPaid` 唯一冲突兜底）在更新订单为 `paid` 与 `ensureCredit` 之前核对 `EndUser.status === 'active'`；非 `active` 会员一律拒转 `paid` 与建权益，返回 `member_not_active`，推送仍返回 HTTP 200 空串、查单不影响同批正常单，诊断审计不记录 openid/PII；`verify:member-closure` 在隔离 SQLite 与真实 PostgreSQL 16 + 真 Redis（21 groups）均零退化。
+- ② 待人工单锁定：`virtual-pay-delivery.ts` 将 `allowClosedRecovery` 严格收窄为仅放行 `order.status === 'closed'`，彻底移除 `manual_review` 放行；查单因官方状态 `7`/`9`/`10` 或连续失败转入 `manual_review` 后，再收到验签且字段全对的迟到推送一律拒转 `paid`、权益数严格为 `0`，返回 `order_manual_review` 并记诊断。
+- ③ 并发失败计数与诊断去重原子化：`virtual-pay-reconcile.service.ts` 将 `recordQueryFailure` 改为事务内 `{ increment: 1 }` 原子自增并在达阈值或超 24h 时原子转 `manual_review`（不再以旧内存快照覆写 `queryFailCount`）；`diagnoseOrder` 改为数据库原子 CAS（抢占成功 `count === 1` 才写审计，并按 `pending`/`manual_review` 约束避免迟到工作线程覆写状态）。已同时在 SQLite 与真实 PostgreSQL 16 补齐 2/3 并发实例失败回归（`verify:miniapp-virtual-pay` 与 `verify:miniapp-virtual-pay:postgres`）。
+- ④ 查单与通知发货 HTTP 超时控制：`virtual-pay-xpay-client.ts` 新增 `VIRTUAL_PAY_HTTP_TIMEOUT_MS = 10_000`，为 `queryWechatVirtualPayOrder` 与 `notifyWechatProvideGoods` 统一挂 `AbortSignal.timeout(timeoutMs)`；首单 `notify_provide_goods` 挂起超时返回 `false`、保留首单已记权益并写 `notify_provide_goods_failed` 诊断，立即继续处理同批第二单（补短超时与防卡死保护回归）。
+- ⑤ XML 重复冲突标签拒绝：`wechat-miniapp-message.service.ts` 在 `parseXmlChildren`（及外层 `<Encrypt>` 提取）中拒绝同层级值不同的重复标签（如两个不同 `<OpenId>` 或 `<ActualPrice>`），不再静默取末值，补齐推送回归用例。
+- 未新增数据库迁移，没改 `apps/miniapp/**`、`apps/kiosk/**`、`apps/admin/**`、`apps/partner/**`、`docs/design/**` 与生产配置；改动业务源码全部 `< 500` 行；已完成 SQLite + 真实 PostgreSQL 16 + 真 Redis 全套门禁、M1–M3 反向变异跑红并还原复绿、`tsc`/`eslint`/`pnpm lint`、图谱重生与 `--check`、CI 门禁覆盖与仓库完整性校验；未推送，未上线。
+
+## 2026-11-21：小程序微信虚拟支付后端第一包返工 P2d1b2（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
+
+- 来由：补全线返工包 P2d1b2（原返工包 P2d1b 第 1–7 条，清单第 6 项），接在 P2d1 交货头 `8164ccea2` 之后逐条完成并提交。
+- ① 运行门禁只要求所选 `env` 对应的 AppKey：`env=0` 只要求现网键 `WECHAT_MINIAPP_VPAY_APP_KEY`，`env=1` 只要求沙箱键 `WECHAT_MINIAPP_VPAY_SANDBOX_APP_KEY`，生产仍禁止 `env=1`；`.env.example` 同步注明（只放占位说明）。
+- ② 查单按订单自己的 `order.env` 选对应环境的 AppKey 签名，缺少对应环境的键时不拿另一环境的键代签，记录 `app_key_missing` 诊断。
+- ③ 查单持续报错出口与诊断限频：给 `VirtualPayOrder` 新增只增列 `queryFailCount` 与 `lastDiagnosticReason`（SQLite 与 PostgreSQL 同步迁移 `20261121120000_virtual_pay_reconcile_state`）。同一单连续查询失败达 3 次或超过 24 小时仍因查询失败无法收敛时转 `manual_review`（待人工），写诊断并复用运维告警出口 `deliverOpsAlert` 告警，不再进自动批次；按单诊断改为状态变化才写；功能未配置且没有在途待支付单时定时查单静默跳过，不再每 5 分钟写诊断。
+- ④ 查单已支付状态严格收窄为官方 `query_order` 的 `2`（已支付待发货）、`3`（发货中）、`4`（已发货）；`7`（退款失败）、`9`（回收广告金完成）、`10`（分账回退完成）只写诊断 `non_grantable_order_status` 并转 `manual_review`，绝不记权益。
+- ⑤ 关单后到账不丢：本地已关闭的订单（`closed`）若收到验签通过且 openid、env、道具、数量、金额全部核对一致的已付推送，仍幂等补记一次权益（同一单至多一条，唯一约束兜底），写入 `virtual_pay.closed_order_paid_recovered`（「关单后到账补记」）审计并告警；字段不符仍拒绝。
+- ⑥ XML 推送解析容忍空白：外层 `<Encrypt>` 信封、内层 XML 叶子值、标签与 CDATA 之间及 CDATA 内首尾空白全部做 `trim` 容错。
+- ⑦ 查单补记后通知发货：依官方接口总表与 `notify_provide_goods` 原文（核对表 3.8、3.9），对经查单补记成功且微信侧状态为 `2`（待发货）或 `3`（发货中）的现金单，幂等调用 `POST /xpay/notify_provide_goods?access_token=...`（官方原文不带 `pay_sig`）；状态为 `4`（已发货）或已由推送标 `paid` 的单不重复调；通知失败不回滚已记权益，写 `notify_provide_goods_failed` 诊断。
+- 没改 `apps/miniapp/**`、`apps/kiosk/**`、`apps/admin/**`、`docs/design/**`、生产配置，仓库不含任何真实价格或道具 ID；图谱由生成器重生并通过 `--check`；未推送，未上线。
+
+## 2026-11-19：小程序微信虚拟支付后端第一段（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
+
+- 来由：补全线第二十五任 P2d1，清单第 6 项。从 `origin/main` `47e3a99af` 开出。只做后端第一段：开关默认关、下单并签名、接收发货推送并记一次权益、每 5 分钟查单兜底、会员查看自己的可用权益。小程序、一体机、管理员页面和设计稿都没改。用掉权益、失败退款、后台查看与退款留到第二包。
+- 平台开关 `charge.miniappVirtualPay.enabled` 只认字符串 `true`，没有这一行就是关。打开必须带 confirm，并写审计。能卖的前提是它和个人收费总开关都开。每个服务的道具 ID 和价格只经后台接口写入，仓库里不放真实价格或道具 ID。环境变量缺了，或生产环境用了沙箱，下单会被拒绝并写诊断，进程照常启动。
+- `POST /api/v1/member/virtual-pay/orders` 用这一次 `wx.login` 的 code 换 session_key 和 openid。openid 必须等于当前会员的 `wxOpenId`，否则拒绝并且不建单。session_key 只在这一次请求的内存里用完，不落库、不进日志、不进审计。用户态签名用 session_key 字符串本身的 UTF-8 字节当 HMAC 密钥，不先做 base64 解码。服务端 `pay_sig` 签实际发出的 body。官方示例的两段签名都复算对得上。
+- `GET/POST /api/v1/wechat/miniapp/message`：GET 按 token 验签后原样回 echostr；POST 安全模式验 `msg_signature`、解密并核 AppID。发货事件 `xpay_goods_deliver_notify` 核对 openid、道具、金额和 env，幂等地标成已支付并记一条权益。同一单重复推送、以及 PostgreSQL 上并发 20 次，都只有一条。验签或 AppID 不对返回 401。金额或道具对不上只写诊断，不记权益。
+- 新表 `VirtualPayOrder` 和 `MemberServiceCredit`，SQLite 与 PostgreSQL 都加了只增迁移。会员注销时断开账号和 openid，账务行留下。`consumedAt` 和 `refundedAt` 本包不写。
+- 每 5 分钟对仍待支付、且落在时窗里的订单调 `query_order`。查到已支付走发货同一条幂等路径。超时未付关单。access_token 只留 `MiniappAccessTokenService` 一处（稳定版凭证接口加 Redis 缓存），会员登录和小程序码都改用它。
+- `GET /api/v1/member/service-credits` 只回本人仍可用的权益：服务种类和记入时间。开关关着也照常回，不让已经记下的消失。用掉的、退款的和别人的不出现。
+- 虚拟支付模块导入共享的 `JwtVerifierModule`，管理员登录守卫才能在全应用里拿到验签服务。否则应用起不来。
+- 没有改打印、服务单和退款。没有推送，没有上线。图谱由生成器重生，没有手改 `docs/graph/`。会员权益接口 `GET /api/v1/member/service-credits` 补进图谱后是 682 个端点。
+
 ## 2026-11-21：一体机付款屏到点核实端到端闭合与统一节流退避（P2e-1c，分支 `claude/kiosk-pay-service-p2e1`，未推送）
 
 - 来由：补全线第三十任依据 Codex 独立复收 `6819fb0c8` 暴露的 2 处精确缺陷派发的极小范围收口返工，从 `6819fb0c8` 继续按 2 项逐项提交，所有改动/新增业务源码保持 `< 500` 行，未新增数据库迁移、未触碰 P2e-2/3/4 业务页与生产配置。

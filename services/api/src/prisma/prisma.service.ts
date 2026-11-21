@@ -213,6 +213,14 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.endUser
   }
 
+  get virtualPayOrder() {
+    return this.client.virtualPayOrder
+  }
+
+  get memberServiceCredit() {
+    return this.client.memberServiceCredit
+  }
+
   get jobSource() {
     return this.client.jobSource
   }

@@ -680,6 +680,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-home-free-badge
           # 每台机器谁付钱、五个价、公共点位锁 0、向个人收费总开关。默认配置下报价仍是 0。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-settings
+          # 小程序虚拟支付开关与道具配置：默认关，价格不进仓库，缺变量或生产沙箱不拒启动。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:miniapp-virtual-pay
           # 保存收费设置撞上改绑：绑定版本过期回 409，不把旧价写进新机构，也不关改绑之后才出现的待付单。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-binding-race
           # 机构改成公共就业点位：名下终端价目清空、版本加一；改回非公共不复活旧价。
@@ -1203,6 +1205,18 @@ jobs:
           createdb -h localhost -U ci p1d_charge_verify
           pnpm verify:terminal-charge-binding-race:postgres
           pnpm verify:terminal-charge-public-reset:postgres
+      - name: Miniapp virtual pay delivery concurrency on isolated PostgreSQL
+        # 同一发货推送并发 20 次，权益表唯一约束只能留下一条。
+        # 门禁自己 db push，库名含 verify，不碰 ai_job_print_ci。
+        working-directory: services/api
+        env:
+          PGPASSWORD: ci
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/vpay_verify
+          POSTGRES_URL: postgresql://ci:ci@localhost:5432/vpay_verify
+          VERIFICATION_DATABASE_TARGET: isolated
+        run: |
+          createdb -h localhost -U ci vpay_verify
+          pnpm verify:miniapp-virtual-pay:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy

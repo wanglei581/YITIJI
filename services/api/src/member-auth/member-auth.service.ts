@@ -18,6 +18,8 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { enforceMemberSmsHourlyLimit } from './sms/sms-egress-limits'
 import { SMS_SENDER, type SmsSender } from './sms/sms-sender'
+import { MiniappAccessTokenService } from '../miniapp-access-token/miniapp-access-token.service'
+import { exchangeMiniappJsCode } from './wx-jscode'
 
 export type LegalConsentSource = 'sms_login' | 'qr_login' | 'wx_login'
 
@@ -63,6 +65,8 @@ export interface MemberLoginResult {
  */
 @Injectable()
 export class MemberAuthService {
+  private readonly tokens: MiniappAccessTokenService
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -70,7 +74,11 @@ export class MemberAuthService {
     @Inject(SMS_SENDER) private readonly sms: SmsSender,
     @Optional() @Inject(AdvisorQaMemory) private readonly qaMemory?: AdvisorQaMemory,
     @Optional() @Inject(ConversationMemoryBridge) private readonly memoryBridge?: ConversationMemoryBridge,
-  ) {}
+    @Optional() @Inject(MiniappAccessTokenService) accessTokens?: MiniappAccessTokenService,
+  ) {
+    // 手动 new 的旧调用点不传这一参。凭证仍然只有这一份实现，缓存落在同一个 Redis。
+    this.tokens = accessTokens ?? new MiniappAccessTokenService(redis)
+  }
 
   /** 发送短信验证码:冷却 + 多维频控 + 写 Redis(TTL 5min)+ 下发。 */
   /** `terminalId`：控制器验签过的一体机终端编号（P1-5 单终端短信额度用），不是一体机发起时为空。 */
@@ -533,36 +541,9 @@ export class MemberAuthService {
   }
 
   private async fetchWxOpenId(code: string): Promise<string> {
-    const appid = process.env['WECHAT_MINIAPP_APPID']
-    const secret = process.env['WECHAT_MINIAPP_APPSECRET']
-    if (!appid || !secret) {
-      throw new HttpException(
-        { error: { code: 'WX_CONFIG_MISSING', message: '微信小程序登录暂不可用，请使用短信验证码登录' } },
-        HttpStatus.SERVICE_UNAVAILABLE,
-      )
-    }
-    const url =
-      `https://api.weixin.qq.com/sns/jscode2session` +
-      `?appid=${encodeURIComponent(appid)}` +
-      `&secret=${encodeURIComponent(secret)}` +
-      `&js_code=${encodeURIComponent(code)}` +
-      `&grant_type=authorization_code`
-    const res = await fetch(url)
-    if (!res.ok) {
-      throw new HttpException(
-        { error: { code: 'WX_CODE2SESSION_FAILED', message: '微信登录服务异常，请稍后再试' } },
-        HttpStatus.BAD_GATEWAY,
-      )
-    }
-    const data = (await res.json()) as { openid?: string; errcode?: number; errmsg?: string }
-    // sessionKey 故意丢弃，不存储
-    if (!data.openid) {
-      throw new HttpException(
-        { error: { code: 'WX_CODE_INVALID', message: '微信登录凭证无效或已过期，请重试' } },
-        HttpStatus.UNAUTHORIZED,
-      )
-    }
-    return data.openid
+    // sessionKey 故意丢弃，不存储。虚拟支付另走 exchangeMiniappJsCode，用完即丢。
+    const { openid } = await exchangeMiniappJsCode(code)
+    return openid
   }
 
   private async fetchWxPhone(phoneCode: string): Promise<string> {
@@ -574,30 +555,7 @@ export class MemberAuthService {
         HttpStatus.SERVICE_UNAVAILABLE,
       )
     }
-    const cacheKey = `wx:miniapp:access_token:${appid}`
-    let accessToken = await this.redis.get(cacheKey)
-    if (!accessToken) {
-      const tokenRes = await fetch('https://api.weixin.qq.com/cgi-bin/stable_token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grant_type: 'client_credential', appid, secret }),
-      })
-      if (!tokenRes.ok) {
-        throw new HttpException(
-          { error: { code: 'WX_TOKEN_FAILED', message: '微信服务暂不可用，请稍后再试' } },
-          HttpStatus.BAD_GATEWAY,
-        )
-      }
-      const tokenData = (await tokenRes.json()) as { access_token?: string; errcode?: number }
-      if (!tokenData.access_token) {
-        throw new HttpException(
-          { error: { code: 'WX_TOKEN_FAILED', message: '微信服务暂不可用，请稍后再试' } },
-          HttpStatus.BAD_GATEWAY,
-        )
-      }
-      accessToken = tokenData.access_token
-      await this.redis.setEx(cacheKey, 7100, accessToken)
-    }
+    const accessToken = await this.tokens.getAccessToken()
     const phoneRes = await fetch(
       `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${encodeURIComponent(accessToken)}`,
       {
