@@ -501,33 +501,63 @@ test.describe('付款屏 @kiosk', () => {
     expect(storedRaw).not.toContain('member-w6')
   })
 
-  test('轮询限额：一分钟里连点刷新，查单总数也不超过 30 次，核实间隔不少于 10 秒 @kiosk', async ({ page, api }) => {
-    await page.clock.install({ time: new Date('2026-11-19T14:40:00+08:00').getTime() })
+  test('轮询限额与间隔：常规轮询 ≥3 秒、核实间隔 ≥10 秒、一分钟总数 ≤30 次 @kiosk', async ({ page, api }) => {
+    const start = new Date('2026-11-19T14:40:00+08:00').getTime()
+    await page.clock.install({ time: start })
     chargingMachine(api)
-    const now = await page.evaluate(() => Date.now())
-    const order = { ...ORDER_A, createdAt: now }
+    const order = { ...ORDER_A, createdAt: start }
     api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
     respondOrder(api, order)
-    const calls = recordServiceOrderCalls(page)
+    let virtualNow = start
+    const calls = recordServiceOrderCalls(page, () => virtualNow)
 
     await page.goto('/pay/resume')
     await expectState(page, 'wait')
-    // 停住页面时钟：页面时间只随 runFor 走，下面 29 步正好 58 秒，全落在同一分钟里。
-    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 500)
+    const createdAt = await page.evaluate(() => Date.now())
+    virtualNow = createdAt
+    await page.clock.pauseAt(createdAt)
     const mark = calls.length
-    for (let step = 0; step < 29; step += 1) {
-      for (let tap = 0; tap < 3; tap += 1) {
-        await primary(page).click()
-        await page.waitForTimeout(25)
-      }
-      await page.clock.runFor(2_000)
-      await page.waitForTimeout(40)
+
+    // 1) 前 12 秒不点按钮：验证自动轮询实际间隔（3 秒一拍，不自动带 refresh=1）。
+    for (let sec = 0; sec < 12; sec += 1) {
+      virtualNow += 1_000
+      await page.clock.runFor(1_000)
+      await page.waitForTimeout(15)
     }
+    const autoReads = calls.slice(mark).filter((call) => call.method === 'GET')
+    expect(autoReads.length).toBeGreaterThanOrEqual(3)
+    expect(autoReads.length).toBeLessThanOrEqual(4)
+    expect(autoReads.every((call) => !call.refresh)).toBe(true)
+    for (let i = 1; i < autoReads.length; i += 1) {
+      const gap = autoReads[i]!.at - autoReads[i - 1]!.at
+      expect(gap, `自动轮询第 ${i} 拍间隔应 ≥3000ms，实际 ${gap}ms`).toBeGreaterThanOrEqual(3_000)
+      expect(gap, `自动轮询第 ${i} 拍间隔应 ≤4000ms，实际 ${gap}ms`).toBeLessThanOrEqual(4_000)
+    }
+
+    // 2) 后续 44 秒每 2 秒点一次刷新（跨过 5 次 10 秒核实窗口），再连点 10 次撞 1 分钟封顶。
+    for (let step = 0; step < 22; step += 1) {
+      await primary(page).click()
+      await page.waitForTimeout(20)
+      virtualNow += 2_000
+      await page.clock.runFor(2_000)
+      await page.waitForTimeout(20)
+    }
+    for (let tap = 0; tap < 10; tap += 1) {
+      await primary(page).click()
+      await page.waitForTimeout(20)
+    }
+
     const reads = calls.slice(mark).filter((call) => call.method === 'GET')
     expect(reads.length).toBeGreaterThan(10)
     expect(reads.length).toBeLessThanOrEqual(30)
-    // 核实（refresh=1）间隔不少于 10 秒：58 秒里最多 6 次。
-    expect(reads.filter((call) => call.refresh).length).toBeLessThanOrEqual(6)
+    const refreshes = reads.filter((call) => call.refresh)
+    expect(refreshes.length).toBeGreaterThanOrEqual(4)
+    expect(refreshes.length).toBeLessThanOrEqual(6)
+    expect(refreshes[0]!.at - createdAt).toBeGreaterThanOrEqual(10_000)
+    for (let i = 1; i < refreshes.length; i += 1) {
+      const gap = refreshes[i]!.at - refreshes[i - 1]!.at
+      expect(gap, `第 ${i} 次 refresh=1 间隔应 ≥10000ms，实际 ${gap}ms`).toBeGreaterThanOrEqual(10_000)
+    }
   })
 
   test('会话还没落库：稍等再建一次，再不成给标准句，不循环 @kiosk', async ({ page, api }) => {

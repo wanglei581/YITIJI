@@ -80,6 +80,11 @@ async function cases(fx: ServiceOrderFixture): Promise<void> {
   })
   const wechat = await fx.call('POST', SIMULATE, { serviceOrderId: wechatRow.id, result: 'success' })
   fx.expectStatus(wechat, 400, '微信单不能模拟付成')
+  assert.equal(
+    wechat.json.error?.code,
+    'SANDBOX_ONLY',
+    '微信单必须由上游 provider 校验明确返回 SANDBOX_ONLY，不能靠下游回调字段校验掩盖',
+  )
   assert.equal((await fx.loadOrder(wechatRow.id)).status, 'pending', '被拒的微信单仍是待付')
   assert.equal((await fx.loadOrder(wechatRow.id)).channelTxnNo, null, '被拒的微信单没有记流水号')
 
@@ -92,14 +97,17 @@ async function cases(fx: ServiceOrderFixture): Promise<void> {
     fx.registry.get = realGet
   }
   fx.expectStatus(noSandbox, 400, '注册表里没有沙箱通道')
+  assert.equal(noSandbox.json.error?.code, 'SANDBOX_ONLY', '注册表没有沙箱时必须返回 SANDBOX_ONLY')
   assert.equal((await fx.loadOrder(prodOrder)).status, 'pending', '没有沙箱通道时不能改单')
-  pass('非沙箱通道一律拒绝：微信单 400、注册表没有沙箱 400，单都不动')
+  pass('非沙箱通道一律拒绝：微信单 400 SANDBOX_ONLY、注册表没有沙箱 400 SANDBOX_ONLY，单都不动')
 
   // ── 参数与找不到 ──────────────────────────────────────────────────
   fx.expectStatus(await fx.call('POST', SIMULATE, { serviceOrderId: prodOrder, result: 'maybe' }), 400, 'result 只认 success/failed')
   fx.expectStatus(await fx.call('POST', SIMULATE, { serviceOrderId: prodOrder, result: 'success', amountCents: 1 }), 400, '请求体不收金额')
-  fx.expectStatus(await fx.call('POST', SIMULATE, { serviceOrderId: 'svc-order-not-here', result: 'success' }), 404, '没有这张单')
-  pass('参数校验：result 白名单、不收金额；单不存在 404')
+  const missing = await fx.call('POST', SIMULATE, { serviceOrderId: 'svc-order-not-here', result: 'success' })
+  fx.expectStatus(missing, 404, '没有这张单')
+  assert.equal(missing.json.error?.code, 'SERVICE_ORDER_NOT_FOUND', '单不存在必须返回 SERVICE_ORDER_NOT_FOUND')
+  pass('参数校验：result 白名单、不收金额；单不存在 404 SERVICE_ORDER_NOT_FOUND')
 
   // ── 付成：单变 paid，按库内金额入账 ───────────────────────────────
   const auditBefore = await fx.prisma.auditLog.count({ where: { action: 'service_order.paid', targetId: prodOrder } })
