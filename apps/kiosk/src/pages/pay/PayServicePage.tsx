@@ -76,13 +76,11 @@ export function PayServicePage({ what }: { what: PayWhat }) {
     }
     flow.onLeave(chrome.left.close)
   }
-  const primary = flow.view === 'ok'
+  const primary = flow.view === 'ok' || flow.view === 'free'
     ? flow.onStart
     : flow.view === 'wait' || flow.view === 'check' || flow.view === 'loading'
       ? flow.onRefresh
-      : flow.view === 'free'
-        ? leave
-        : flow.onRetry
+      : flow.onRetry
   const sum = flow.order ? <PaySum name={name} amount={amount} /> : null
 
   let body

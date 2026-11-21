@@ -97,7 +97,15 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     })
   }, [])
 
-  const showFree = useCallback(() => setState({ ...INITIAL, screen: 'free' }), [])
+  const goNext = useCallback(() => {
+    leavingRef.current = true
+    navigate(targets.next, { replace: true })
+  }, [navigate, targets.next])
+
+  const passFree = useCallback(() => {
+    setState({ ...INITIAL, screen: 'free' })
+    goNext()
+  }, [goNext])
 
   const create = useCallback(async (gen: number) => {
     setState({ ...INITIAL, screen: 'loading' })
@@ -119,21 +127,21 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         const terminalId = getTerminalId()
         if (terminalId) await refreshKioskTerminalConfig(terminalId).catch(() => undefined)
         if (!current(gen)) return
-        navigate(targets.next, { replace: true })
+        passFree()
         return
       }
       setState({ ...INITIAL, screen: 'error', error })
     }
-  }, [applyView, current, endUserId, navigate, pathname, serviceKey, targets.next])
+  }, [applyView, current, endUserId, passFree, pathname, serviceKey])
 
   const enter = useCallback(async (gen: number) => {
     const terminalId = getTerminalId()
-    // 演示模式与没有终端身份（手机、桌面）不收费：服务端不认终端头就按免费放行。
-    if (API_MODE !== 'http' || !terminalId) return showFree()
+    // 演示模式与没有终端身份（手机、桌面）不收费：直接前往合法站内下一步。
+    if (API_MODE !== 'http' || !terminalId) return passFree()
     try {
       const config = await refreshKioskTerminalConfig(terminalId)
       if (!current(gen)) return
-      if (pricingSaysFree(config, serviceKey)) return showFree()
+      if (pricingSaysFree(config, serviceKey)) return passFree()
     } catch {
       // 读不到本机价目就照常建单，由服务端按生效价判；免费时它会回 409。
     }
@@ -164,7 +172,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       }
     }
     await create(gen)
-  }, [applyView, create, current, serviceKey, showFree])
+  }, [applyView, create, current, passFree, serviceKey])
 
   // 进屏即出码。挂上之后隔一拍再开始：开发模式下组件会挂两次，第一次在这一拍之前就被撤掉，不会多建一张单。
   useEffect(() => {
@@ -229,11 +237,6 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       window.clearInterval(clock)
     }
   }, [polling, pollOnce])
-
-  const goNext = useCallback(() => {
-    leavingRef.current = true
-    navigate(targets.next, { replace: true })
-  }, [navigate, targets.next])
 
   useEffect(() => {
     if (view !== 'ok') return undefined

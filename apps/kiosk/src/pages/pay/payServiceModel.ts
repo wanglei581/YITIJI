@@ -174,7 +174,7 @@ export function payChrome(screen: PayScreen, name: string, refundPhase: ServiceO
       return { eyebrow, title: '这一次没有开始', sub, status: { text: sub, tone: 'warn' }, left: leave, ask: true, primary: '再出一张码' }
     }
     case 'free':
-      return { eyebrow: '这一次', title: '这台机器这项服务免费，不用付款', status: { text: '不收费', tone: 'ok' }, left: null, ask: false, primary: '返回' }
+      return { eyebrow: '这一次', title: '这台机器这项服务免费，不用付款', status: { text: '不收费', tone: 'ok' }, left: null, ask: false, primary: '马上开始' }
     case 'lookup':
       return { eyebrow, title: '暂时查不到这一次的付款结果', sub: '先别重复付款', status: { text: '先别重复付款', tone: 'warn' }, left: leave, ask: true, primary: '再查一次' }
     case 'error':
@@ -211,13 +211,21 @@ export function screenForPhase(phase: ServiceOrderPhase): PayScreen | 'renew' {
   }
 }
 
-/** 本机价目里这一项是不是 0 元（公共就业点位一律算）。读不到、读不准都不算免费，照常建单。 */
+/** 本机价目里这一项是不是 0 元（公共就业点位、总开关关闭、机构付均算免费）。读不到、读不准都不算免费，照常建单。 */
 export function pricingSaysFree(config: unknown, serviceKey: ServiceOrderKey): boolean {
   if (!config || typeof config !== 'object') return false
   const pricing = (config as { pricing?: unknown }).pricing
   if (!pricing || typeof pricing !== 'object') return false
-  if ((pricing as { isPublicSite?: unknown }).isPublicSite === true) return true
-  const effective = (pricing as { effective?: unknown }).effective
+  const record = pricing as {
+    isPublicSite?: unknown
+    personalChargeEnabled?: unknown
+    userChargeMode?: unknown
+    effective?: unknown
+  }
+  if (record.isPublicSite === true) return true
+  if (record.personalChargeEnabled === false) return true
+  if (record.userChargeMode === 'org_pays') return true
+  const effective = record.effective
   if (!effective || typeof effective !== 'object') return false
   const value = (effective as Record<string, unknown>)[serviceKey]
   return typeof value === 'number' && Number.isInteger(value) && value === 0

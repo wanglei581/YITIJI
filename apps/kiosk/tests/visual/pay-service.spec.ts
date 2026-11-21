@@ -213,19 +213,23 @@ test.describe('付款屏 @kiosk', () => {
     await expectNoForbiddenCopy(page)
   })
 
-  test('免费兜底：本机这一项 0 元时不建单，只写不用付款、一颗返回 @kiosk', async ({ page, api }) => {
+  test('免费直通：本机这一项 0 元时不建单，直接去合法站内下一步而不是退回 report @kiosk', async ({ page, api }) => {
     chargingMachine(api, { resume_optimize: 0, mock_interview: 200 })
     const calls = recordServiceOrderCalls(page)
 
-    await page.goto('/pay/resume?back=report')
-    await expectState(page, 'free')
-    await expect(payScreen(page)).toContainText('这台机器这项服务免费，不用付款')
-    await expect(payScreen(page)).toContainText('不收费')
-    await expect(primary(page)).toHaveText('返回')
-    await expect(page.getByRole('button', { name: '不付了，返回' })).toHaveCount(0)
+    await page.goto('/pay/resume?next=optimize&back=report')
+    await expect(page).toHaveURL(/\/resume\/optimize$/, { timeout: 15_000 })
     expect(calls).toHaveLength(0)
-    await primary(page).click()
-    await expect(page).toHaveURL(/\/resume\/report$/)
+
+    // 公共就业点位即使价目表非 0 也直接去合法站内下一步；非法 next 回落到白名单默认下一步。
+    api.mapJson('GET', KIOSK_CONFIG_PATH, (json) => {
+      const base = json && typeof json === 'object' ? (json as Record<string, unknown>) : {}
+      const pricing = base.pricing && typeof base.pricing === 'object' ? (base.pricing as Record<string, unknown>) : {}
+      return { ...base, pricing: { ...pricing, isPublicSite: true, effective: { resume_optimize: 100 } } }
+    })
+    await page.goto('/pay/resume?next=https://evil.test&back=report')
+    await expect(page).toHaveURL(/\/resume\/optimize$/, { timeout: 15_000 })
+    expect(calls).toHaveLength(0)
   })
 
   test('免费兜底：建单回 409 这项现在免费，刷新本机价目后直接去下一步 @kiosk', async ({ page, api }) => {
