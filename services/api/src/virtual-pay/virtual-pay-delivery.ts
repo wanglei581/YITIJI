@@ -17,6 +17,7 @@ export interface ConfirmPaidInput {
 export type ConfirmPaidFailure =
   | 'order_missing'
   | 'order_closed'
+  | 'member_not_active'
   | 'openid_mismatch'
   | 'env_mismatch'
   | 'product_mismatch'
@@ -51,6 +52,11 @@ export async function confirmPaid(prisma: PrismaService, input: ConfirmPaidInput
     if (!order) return { ok: false, reason: 'order_missing' }
     const credit = await prisma.memberServiceCredit.findUnique({ where: { sourceOrderId: order.id } })
     if (!credit) throw error
+    const reason = mismatch(order, input)
+    if (reason) return { ok: false, reason }
+    if (!(await isOrderMemberActive(prisma, order.endUserId))) {
+      return { ok: false, reason: 'member_not_active' }
+    }
     if (order.status === 'pending' || (input.allowClosedRecovery === true && (order.status === 'closed' || order.status === 'manual_review'))) {
       await prisma.virtualPayOrder.updateMany({
         where: { id: order.id, status: order.status },
@@ -73,6 +79,9 @@ async function grantPaid(prisma: PrismaService, input: ConfirmPaidInput): Promis
     if (!order) return { ok: false, reason: 'order_missing' }
     const reason = mismatch(order, input)
     if (reason) return { ok: false, reason }
+    if (!(await isOrderMemberActive(tx, order.endUserId))) {
+      return { ok: false, reason: 'member_not_active' }
+    }
     if (order.status === 'paid') {
       await ensureCredit(tx, order)
       return { ok: true, granted: false, recoveredFromClosed: false }
@@ -93,6 +102,9 @@ async function grantPaid(prisma: PrismaService, input: ConfirmPaidInput): Promis
     if (updated.count !== 1) {
       const again = await tx.virtualPayOrder.findUnique({ where: { id: order.id } })
       if (again?.status !== 'paid') return { ok: false, reason: 'order_closed' }
+      if (!(await isOrderMemberActive(tx, again.endUserId))) {
+        return { ok: false, reason: 'member_not_active' }
+      }
       await ensureCredit(tx, again)
       return { ok: true, granted: false, recoveredFromClosed: false }
     }
@@ -108,6 +120,15 @@ function mismatch(order: CreditOrder, input: ConfirmPaidInput): ConfirmPaidFailu
   if (input.quantity != null && input.quantity !== 1) return 'quantity_mismatch'
   if (order.priceCents !== input.priceCents) return 'amount_mismatch'
   return null
+}
+
+async function isOrderMemberActive(
+  tx: Pick<PrismaService, 'endUser'>,
+  endUserId: string | null,
+): Promise<boolean> {
+  if (!endUserId) return false
+  const member = await tx.endUser.findUnique({ where: { id: endUserId }, select: { status: true } })
+  return member?.status === 'active'
 }
 
 async function ensureCredit(
