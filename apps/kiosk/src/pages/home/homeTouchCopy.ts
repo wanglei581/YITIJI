@@ -1,6 +1,35 @@
+import type { KioskHomeEffectivePrices } from '../../hooks/kioskHomeFreeBadgeReader'
 import type { OfficialChannelsState } from '../../hooks/useOfficialChannels'
 import type { HomeJobFairHighlightState } from './hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from './hooks/useHomeJobHighlight'
+
+/** 首页三张收费入口卡的短价（打印 · 扫描卡两行）。查政策永远免费，不标价。 */
+export interface HomePriceLines {
+  resume: readonly string[]
+  interview: readonly string[]
+  print: readonly string[]
+}
+
+function yuan(cents: number): string {
+  return `${(cents / 100).toFixed(2)} 元`
+}
+
+/**
+ * 稿 pay-1113.js「首页短价」。本机五个生效价都读到、并且至少一个大于 0（这台机器在收费）才标价，
+ * 其余一律返回 null、一行不画：mock 没有 pricing、读失败、超时、缺键或不是非负整数都算读不齐，不把未知写成免费。
+ * 公共就业点位、个人收费总开关关、机构承担时服务端下发的都是 0，自然不画。
+ * 某一项是 0 元写「免费」。彩色单价首页不出（稿上没有）。金额写「X.XX 元」，不写货币符号。
+ */
+export function homePriceLines(prices: KioskHomeEffectivePrices): HomePriceLines | null {
+  const { resume_optimize: resume, mock_interview: interview, print_bw_page: bw, print_color_page: color, scan } = prices
+  if (resume === null || interview === null || bw === null || color === null || scan === null) return null
+  if (Math.max(resume, interview, bw, color, scan) <= 0) return null
+  return {
+    resume: [resume > 0 ? `每次 ${yuan(resume)} · 诊断免费` : '免费'],
+    interview: [interview > 0 ? `每次 ${yuan(interview)}` : '免费'],
+    print: [bw > 0 ? `打印 黑白每页 ${yuan(bw)}` : '打印 免费', scan > 0 ? `扫描 每次 ${yuan(scan)}` : '扫描 免费'],
+  }
+}
 
 /** 读不到点位名时的中性说法：只说这是一台自助终端，不写任何地点。 */
 export const NEUTRAL_PLACE_LABEL = '自助服务终端'
