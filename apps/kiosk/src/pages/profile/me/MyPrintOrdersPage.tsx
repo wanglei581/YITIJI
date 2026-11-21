@@ -43,6 +43,7 @@ import {
 } from './orders/ServiceOrderRow'
 import {
   canShowPrintOrderInvoiceButton,
+  effectivePrintPayableCents,
   formatOrderYuan,
   hasChargedPrintOrder,
   invoiceDetailPath,
@@ -80,7 +81,8 @@ const STATUS_FILTERS = [
 type FilterKey = (typeof STATUS_FILTERS)[number]['key']
 
 export function MyPrintOrdersPage() {
-  const { isLoggedIn, getToken } = useAuth()
+  const { isLoggedIn, user, getToken } = useAuth()
+  const endUserId = user?.id ?? null
   const navigate = useNavigate()
   const winding = useKioskLicense().mode === 'winding-down'
   const [items, setItems] = useState<MemberPrintOrderItem[]>([])
@@ -98,7 +100,7 @@ export function MyPrintOrdersPage() {
   const itemsRef = useRef(items)
   const loadingMoreRef = useRef(loadingMore)
 
-  const svc = useMemberServiceOrders(isLoggedIn, getToken, reloadKey)
+  const svc = useMemberServiceOrders(isLoggedIn, getToken, reloadKey, endUserId)
 
   const load = useCallback(() => {
     if (!isLoggedIn) {
@@ -231,7 +233,10 @@ export function MyPrintOrdersPage() {
 
   const openPrintInvoice = useCallback((item: MemberPrintOrderItem) => {
     if (!item.orderId) return
-    navigate(invoiceDetailPath('print', item.orderId), { state: { amountCents: item.amountCents ?? undefined, serviceName: item.fileName ?? '打印订单' } })
+    const payable = effectivePrintPayableCents(item)
+    navigate(invoiceDetailPath('print', item.orderId), {
+      state: { amountCents: payable ?? undefined, serviceName: item.fileName ?? '打印订单' },
+    })
   }, [navigate])
 
   const ordersMode = useMemo(
@@ -239,7 +244,7 @@ export function MyPrintOrdersPage() {
     [isLoggedIn, svc.hasAnyPositivePrice, svc.serviceOrders.length, items],
   )
 
-  /** 卡片上的支付概要一行：历史无 Order 写「暂无支付信息」；收费单用「X.XX 元」，不写免费试运营。 */
+  /** 卡片上的支付概要一行：历史无 Order 写「暂无支付信息」；收费单按抵扣后实付「X.XX 元」展示，不写免费试运营。 */
   const paymentLine = useCallback((item: MemberPrintOrderItem): string => {
     if (item.payStatus == null) return '暂无支付信息'
     if (item.amountCents === 0 || item.paymentSource === 'free') {
@@ -248,7 +253,8 @@ export function MyPrintOrdersPage() {
       return '0 元（免费试运营） · 免费'
     }
     const parts: string[] = []
-    if (typeof item.amountCents === 'number') parts.push(formatOrderYuan(item.amountCents))
+    const payable = effectivePrintPayableCents(item)
+    if (payable !== null) parts.push(formatOrderYuan(payable))
     const sourceLabel = item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined
     const source = sourceLabel ? `（${sourceLabel}）` : ''
     parts.push(`${memberPayStatusLabel(item).label}${source}`)

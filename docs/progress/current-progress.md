@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-11-21：自助开票二期返工收口 P2c2b（分支 `claude/invoice-p2c2-1121`，未推送，未上线）
+
+- 来由：按 Codex 独立审查 `cdaab9ba6` 查出的 3 项 P1 + 2 项 P2 一次性收口，接在 `cdaab9ba6` 之后提交（0 新增 Prisma 迁移，全部改动/新增业务源码 `< 500` 行）。
+- ① `useMemberServiceOrders.ts` 跨用户与登出分页竞态（P1）：绑定显式会话身份（`endUserId = user?.id ?? null` + 当前 `token`）与单调递增代次 `genRef`，换人（即使 `getToken` 引用恒定）、登出或卸载时同步失效并清空列表/游标/分页态；首页与 `loadMoreServices` 写状态前一律核验 `gen` 与 `activeSessionRef`；新增 `apps/kiosk/scripts/tests/member-service-orders-race.test.mjs`（接入 `verify:kiosk-session-reporting`）与浏览器同 SPA 堆跨用户竞态回归。
+- ② `member-print-orders.service.ts` 材料包非当前任务遗漏收费与开票字段（P1）：提取共享安全列白名单 `PRINT_ORDER_LIST_SELECT`，对 `r.order == null && r.orderId != null` 按 `endUserId` 归属过滤批量补查 `Order`，统一用 `resolvedOrder` 计算支付、到机续打与 `assessInvoiceEligibility` 开票态，真正免费/无 `Order` 行保持零新增键；`verify:member-service-orders` 扩至 7 组，在 SQLite + PG 16 双库覆盖 1 单 3 任务在 `paid`（含提交开票前后）/`partial_refunded`/`refunding`/`refunded` 四态一致性及跨用户 `orderId` 归属隔离。
+- ③ 打印单抵扣后实付展示与开票传参统一（P1）：在 `orderInvoiceCopy.ts` 新增与后端 `invoice-eligibility.ts` 同口径的 `effectivePrintPayableCents(item) = Math.max(0, amountCents - discountCents)`，统一驱动 `MyPrintOrdersPage.tsx` 订单摘要行、可开票按钮判定与 `/me/orders/invoice` 传参；`my-orders-invoice.spec.ts` 补齐部分抵扣（`200 - 100` → 订单行与开票屏均为 `1.00 元`）和全额抵扣（`200 - 200` → 无「开发票」按钮）浏览器断言。
+- ④ `useOrderInvoiceSession.ts` 长 `Retry-After` 不再截短（P2）：仅对客户端指数退避封顶 60s，绝不截短有效服务端 `Retry-After`；`my-orders-invoice.spec.ts` 补齐 `429 + Retry-After: 120` 实测等待 `>= 120s` 时钟断言。
+- ⑤ 项目图谱在全部新增文件暂存落盘后重新生成，独立执行 `node scripts/generate-project-graph.mjs --check` 退出码 0（kiosk 92 路由、1060 源文件、api 701 端点、716 门禁脚本，完整包含 `GET /api/v1/me/service-orders` 与 `verify-member-service-orders.ts`）。
+- 验证：SQLite + PG 16（5673）+ 真 Redis（6673）双库跑通 `verify:member-service-orders`（7 组）、`verify:invoice-eligibility/sessions/member/admin/privacy/real-db/http`、`verify:member-print-orders`、`verify:member-closure`（22 组，真 Redis）；`blk.sh` 下 Playwright `my-orders-invoice.spec.ts`（11/11）、`account-assets-journey`（1/1）、`profile-qx`+`fusion-w5`（20/20）0 改既有期望全绿；新增 3 条反向变异 R-M1/R-M2/R-M3 全部跑红并逐字节还原复绿；全仓 `tsc`、`pnpm lint`（0 error）、`eslint --quiet`、全部静态门禁与图谱 `--check` 全绿；隔离端口已全停；未推送，未上线。
+
 ## 2026-11-21：自助开票二期 + 一体机「我的订单」与开发票扫码屏 P2c2（分支 `claude/invoice-p2c2-1121`，未推送，未上线）
 
 - 来由：按任务包 `P2c2` 依据 `docs/design/kiosk-touch-2026-10/pay-1113.js`（472–569 行）与 `deliver-1111/r26-1119/p2e/decisions.md` 第 4 条，补齐会员服务单列表与一体机订单页开票入口及自助开发票扫码屏（零新增 Prisma 迁移，业务源码单文件严格 `< 500` 行）。

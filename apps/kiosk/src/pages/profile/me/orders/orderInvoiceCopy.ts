@@ -40,9 +40,23 @@ export function isTerminalConfigCharged(config: unknown): boolean {
   return kioskEffectivePricesCharged(config)
 }
 
-/** 会员名下是否存在实付 > 0 的打印单。 */
+/** 与后端 invoice-eligibility.ts 统一：打印单抵扣后实付 = max(0, amountCents - discountCents)。 */
+export function effectivePrintPayableCents(
+  item: Pick<MemberPrintOrderItem, 'amountCents' | 'discountCents'>,
+): number | null {
+  if (typeof item.amountCents !== 'number' || !Number.isInteger(item.amountCents)) return null
+  const discount = typeof item.discountCents === 'number' && Number.isInteger(item.discountCents) && item.discountCents > 0
+    ? item.discountCents
+    : 0
+  return Math.max(0, item.amountCents - discount)
+}
+
+/** 会员名下是否存在抵扣后实付 > 0 的打印单。 */
 export function hasChargedPrintOrder(items: readonly MemberPrintOrderItem[]): boolean {
-  return items.some((item) => typeof item.amountCents === 'number' && item.amountCents > 0)
+  return items.some((item) => {
+    const payable = effectivePrintPayableCents(item)
+    return payable !== null && payable > 0
+  })
 }
 
 /** 服务单行副文案，逐态对齐 pay-1113.js:525-529 与 P2c2 任务规范。 */
@@ -72,20 +86,22 @@ export function serviceOrderSubtitle(
 
 /** 实付 > 0 打印单的开票态补充提示（仅已提交/已开/退回时给出，不喧宾夺主）。 */
 export function printOrderInvoiceHint(item: MemberPrintOrderItem): string | null {
-  if (!(typeof item.amountCents === 'number' && item.amountCents > 0)) return null
+  const payable = effectivePrintPayableCents(item)
+  if (!(payable !== null && payable > 0)) return null
   if (item.invoiceStatus === 'issued') return '发票已开 · 电子发票已发到邮箱'
   if (item.invoiceStatus === 'submitted') return '已提交开票'
   if (item.canInvoice && item.invoiceStatus === 'returned') return '开票申请被退回'
   return null
 }
 
-/** 打印单是否可直接展示「开发票」主按钮。 */
+/** 打印单是否可直接展示「开发票」主按钮（抵扣后实付必须 > 0 且后端允许开票）。 */
 export function canShowPrintOrderInvoiceButton(item: MemberPrintOrderItem): boolean {
+  const payable = effectivePrintPayableCents(item)
   return Boolean(
     item.canInvoice === true
     && item.orderId
-    && typeof item.amountCents === 'number'
-    && item.amountCents > 0,
+    && payable !== null
+    && payable > 0,
   )
 }
 

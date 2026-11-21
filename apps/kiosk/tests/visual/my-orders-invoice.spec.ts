@@ -577,4 +577,304 @@ test.describe('我的订单与自助开票扫码屏 @kiosk', () => {
     expect(pollCalls, '离开开票屏后不得继续轮询').toBe(afterLeave)
     await assertNoInvoiceSecretsInStorage(page, [CTRL_TOKEN_1])
   })
+
+  test('部分抵扣打印单订单行与开票屏统一展示抵扣后实付，全额抵扣不显示开发票按钮 @kiosk', async ({ page, api }) => {
+    setupMachine(api, 100, 200, { resume_optimize: 100 })
+    api.respond('GET', SERVICE_ORDERS_PATH, ok({ items: [], nextCursor: null, total: 0 }))
+    api.respond('GET', PRINT_ORDERS_PATH, ok({
+      items: [
+        printOrder({
+          id: 'pt-partial-disc',
+          orderId: 'ord-partial-disc',
+          fileName: '部分抵扣打印单.pdf',
+          amountCents: 200,
+          discountCents: 100,
+          payStatus: 'paid',
+          paymentSource: 'offline',
+          canInvoice: true,
+          invoiceStatus: 'none',
+          createdAt: '2026-11-21T05:30:00.000Z',
+        }),
+        printOrder({
+          id: 'pt-full-disc',
+          orderId: 'ord-full-disc',
+          fileName: '全额抵扣打印单.pdf',
+          amountCents: 200,
+          discountCents: 200,
+          payStatus: 'paid',
+          paymentSource: 'offline',
+          canInvoice: false,
+          invoiceStatus: 'none',
+          createdAt: '2026-11-21T05:20:00.000Z',
+        }),
+      ],
+      nextCursor: null,
+      total: 2,
+    }))
+
+    await page.route(/\/api\/v1\/kiosk\/invoice-sessions(?:\/[^/?#]+)?$/, async (route) => {
+      const req = route.request()
+      if (req.method() === 'POST') {
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: {
+              sessionId: 'inv-disc-1',
+              sceneToken: 'sceneDisc0123456789abcde',
+              codeUrl: 'http://127.0.0.1:4177/k/i/sceneDisc0123456789abcde',
+              controlToken: CTRL_TOKEN_1,
+              expiresAt: new Date(Date.now() + 600_000).toISOString(),
+              status: '等手机填写',
+            },
+          }),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { status: '等手机填写' } }),
+      })
+    })
+
+    await loginTo(page, '/me/print-orders')
+    const partialCard = page.getByTestId('member-assets-order').filter({ hasText: '部分抵扣打印单.pdf' })
+    await expect(partialCard).toContainText('1.00 元 · 已支付（线下收款）')
+    await expect(partialCard).not.toContainText('2.00 元')
+    await expect(page.getByTestId('print-order-invoice-pt-partial-disc')).toBeVisible()
+
+    const fullCard = page.getByTestId('member-assets-order').filter({ hasText: '全额抵扣打印单.pdf' })
+    await expect(fullCard).toContainText('0.00 元 · 已支付（线下收款）')
+    await expect(page.getByTestId('print-order-invoice-pt-full-disc')).toHaveCount(0)
+
+    await page.getByTestId('print-order-invoice-pt-partial-disc').click()
+    await page.waitForURL((url) => url.pathname === '/me/orders/invoice')
+    const screen = page.locator('[data-qx-page="my-orders-invoice"]')
+    await expect(screen).toHaveAttribute('data-qxt-state', 'waiting')
+    await expect(screen.locator('.qxt-band')).toContainText('这一单 1.00 元。开好后，电子发票发到你填的邮箱。')
+    await expect(screen.locator('.qxt-band')).not.toContainText('2.00 元')
+    await assertNoForbiddenCopy(page)
+  })
+
+  test('轮询遇 429 返回 120 秒 Retry-After 时绝不截短至 60 秒，满 120 秒后恢复收敛 @kiosk', async ({ page, api }) => {
+    await page.clock.install()
+    setupMachine(api, 100, 200, { resume_optimize: 100 })
+    api.respond('GET', PRINT_ORDERS_PATH, ok({ items: [], nextCursor: null, total: 0 }))
+    api.respond('GET', SERVICE_ORDERS_PATH, ok({ items: [svcOrder({ id: 'svc-429-120' })], nextCursor: null, total: 1 }))
+
+    let polls = 0
+    await page.route(/\/api\/v1\/kiosk\/invoice-sessions(?:\/[^/?#]+)?$/, async (route) => {
+      const req = route.request()
+      if (req.method() === 'POST') {
+        const nowMs = await page.evaluate(() => Date.now())
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: {
+              sessionId: 'inv-429-120',
+              sceneToken: 'scene4291200123456789abc',
+              codeUrl: 'http://127.0.0.1:4177/k/i/scene4291200123456789abc',
+              controlToken: CTRL_TOKEN_1,
+              expiresAt: new Date(nowMs + 600_000).toISOString(),
+              status: '等手机填写',
+            },
+          }),
+        })
+        return
+      }
+      polls += 1
+      if (polls === 1) {
+        await route.fulfill({
+          status: 429,
+          headers: { 'Retry-After': '120' },
+          contentType: 'application/json',
+          body: JSON.stringify({ success: false, error: { code: 'RATE_LIMITED', message: '请求太频繁' } }),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { status: '已提交' } }),
+      })
+    })
+
+    await loginTo(page, '/me/print-orders')
+    await page.getByTestId('service-order-invoice-svc-429-120').click()
+    const screen = page.locator('[data-qx-page="my-orders-invoice"]')
+    await expect(screen).toHaveAttribute('data-qxt-state', 'waiting')
+
+    await page.clock.runFor(3_500)
+    expect(polls).toBe(1)
+    await expect(page.getByTestId('invoice-rate-limit')).toBeVisible()
+
+    // 过 65 秒（超过旧 60 秒上限）与 115 秒内都不得提前重发
+    await page.clock.runFor(65_000)
+    expect(polls, '120 秒 Retry-After 不得被截短到 60 秒').toBe(1)
+    await page.clock.runFor(50_000)
+    expect(polls, '115 秒内仍应遵守服务端 120 秒退避').toBe(1)
+
+    // 满 120 秒后自动恢复并收口为已提交
+    await page.clock.runFor(10_000)
+    expect(polls).toBe(2)
+    await expect(screen).toHaveAttribute('data-qxt-state', 'submitted')
+  })
+
+  test('跨用户切换与挂起分页竞态：A 发起加载更多后会话失效换 B 登录，同 SPA 堆释放 A 旧分页绝不混入 B 列表 @kiosk', async ({ page, api }) => {
+    setupMachine(api, 100, 200, { resume_optimize: 100 })
+    api.respond('POST', '/api/v1/member/auth/logout', ok({ loggedOut: true }))
+
+    // A 有一条进行中的打印单，便于 5 秒自动刷新返回 401 触发同 SPA 内存态登出（不整页重载，A 的挂起 Promise 真实留在同一堆里）
+    let printCallsA = 0
+    await page.route(/\/api\/v1\/me\/print-orders(?:\?.*)?$/, async (route) => {
+      const auth = route.request().headers()['authorization'] ?? ''
+      if (auth === 'Bearer token-user-A') {
+        printCallsA += 1
+        if (printCallsA === 1) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              data: {
+                items: [printOrder({ id: 'pt-A-active', status: 'printing', amountCents: 0, paymentSource: 'free', canInvoice: undefined, invoiceStatus: undefined })],
+                nextCursor: null,
+                total: 1,
+              },
+            }),
+          })
+          return
+        }
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: false, error: { code: 'UNAUTHORIZED', message: '登录已失效' } }),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { items: [], nextCursor: null, total: 0 } }),
+      })
+    })
+
+    let releaseAPage2: (() => void) | null = null
+    const aPage2Started = new Promise<void>((resolveStarted) => {
+      void page.route(/\/api\/v1\/me\/service-orders(?:\?.*)?$/, async (route) => {
+        const req = route.request()
+        const auth = req.headers()['authorization'] ?? ''
+        const url = new URL(req.url())
+        const cursor = url.searchParams.get('cursor')
+        if (auth === 'Bearer token-user-A' && !cursor) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              data: {
+                items: [svcOrder({ id: 'svc-A-1', serviceName: 'AI 简历优化', amountCents: 100 })],
+                nextCursor: 'cursor-A-1',
+                total: 2,
+              },
+            }),
+          })
+          return
+        }
+        if (auth === 'Bearer token-user-A' && cursor === 'cursor-A-1') {
+          resolveStarted()
+          await new Promise<void>((resolveHold) => { releaseAPage2 = resolveHold })
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              data: {
+                items: [svcOrder({ id: 'svc-A-2-PRIVATE', serviceName: 'AI 模拟面试', amountCents: 300 })],
+                nextCursor: null,
+                total: 99,
+              },
+            }),
+          })
+          return
+        }
+        if (auth === 'Bearer token-user-B' && !cursor) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              data: {
+                items: [svcOrder({ id: 'svc-B-1', serviceName: '扫描', amountCents: 200 })],
+                nextCursor: null,
+                total: 1,
+              },
+            }),
+          })
+          return
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: { items: [], nextCursor: null, total: 0 } }),
+        })
+      })
+    })
+
+    // 首次登录返回用户 A，二次登录返回用户 B
+    let loginSeq = 0
+    await page.route('**/api/v1/member/auth/login', async (route) => {
+      loginSeq += 1
+      const isA = loginSeq === 1
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            token: isA ? 'token-user-A' : 'token-user-B',
+            user: isA
+              ? { id: 'enduser-A', phoneMasked: '138****0001', nickname: '用户A' }
+              : { id: 'enduser-B', phoneMasked: '139****0002', nickname: '用户B' },
+          },
+        }),
+      })
+    })
+
+    await loginTo(page, '/me/print-orders')
+    await expect(page.getByTestId('service-order-invoice-svc-A-1')).toBeVisible()
+    await page.getByRole('button', { name: '加载更多服务单', exact: true }).click()
+    await aPage2Started
+
+    // 等待自动刷新收到 401 → AuthProvider 同页清会话并 SPA 跳回 /login（A 的挂起 Promise 仍在同一 JS 堆）
+    await page.waitForURL((url) => url.pathname === '/login', { timeout: 12_000 })
+
+    // 换 B 登录，SPA 返回 /me/print-orders
+    await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+    await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+    for (const d of '13900139002') await page.getByRole('button', { name: d, exact: true }).click()
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+    await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+    for (const d of '123456') await page.getByRole('button', { name: d, exact: true }).click()
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    await page.getByRole('button', { name: '确认登录', exact: true }).click()
+    await page.waitForURL((url) => url.pathname === '/me/print-orders', { timeout: 10_000 })
+
+    // B 首页先返回
+    await expect(page.getByTestId('service-order-invoice-svc-B-1')).toBeVisible()
+    await expect(page.locator('.qxt-band')).toContainText('共 1 条')
+
+    // 释放 A 仍在同一 JS 堆中的晚到分页响应，断言绝不混入 B 列表也不覆盖 total
+    releaseAPage2?.()
+    await page.waitForTimeout(300)
+    await expect(page.getByTestId('member-service-order')).toHaveCount(1)
+    await expect(page.getByTestId('service-order-invoice-svc-B-1')).toBeVisible()
+    await expect(page.getByTestId('service-order-invoice-svc-A-2-PRIVATE')).toHaveCount(0)
+    await expect(page.locator('.qxt-band')).toContainText('共 1 条')
+  })
 })

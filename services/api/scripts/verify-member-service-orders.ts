@@ -621,6 +621,191 @@ async function main() {
       assertZeroPii(afterIssue.text, afterIssue.json.data?.items ?? [], '已开后服务单')
     })
 
+    await check('7. 材料包 1 单 3 任务（主任务 + 2 子任务）四态收费与开票字段一致 + 跨用户 orderId 归属隔离', async () => {
+      const member = await createMember()
+      const outsider = await createMember()
+      const { terminalId } = await createKioskTerminal()
+      const t0 = Date.now() - 200_000
+
+      async function createPack(
+        label: string,
+        orderFields: {
+          amountCents: number
+          discountCents?: number
+          refundedAmountCents?: number
+          payStatus: string
+          withPendingRefund?: boolean
+        },
+        offsetMs: number,
+      ): Promise<{ orderId: string; orderNo: string; taskIds: [string, string, string] }> {
+        const createdAt = new Date(t0 + offsetMs)
+        const mainId = `ptask-pack-${label}-0-${next()}`
+        const sub1Id = `ptask-pack-${label}-1-${next()}`
+        const sub2Id = `ptask-pack-${label}-2-${next()}`
+        const orderNo = `ORD-PACK-${label}-${next()}`
+
+        await prisma.printTask.create({
+          data: {
+            id: mainId,
+            endUserId: member.id,
+            terminalId,
+            fileUrl: `sig://secret-${mainId}`,
+            fileMd5: `sha256-${mainId}`,
+            status: 'completed',
+            completedAt: createdAt,
+            createdAt,
+            paramsJson: JSON.stringify({ fileName: `${label}-主任务.pdf`, copies: 1, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4' }),
+          },
+        })
+        made.printTasks.push(mainId)
+
+        const order = await prisma.order.create({
+          data: {
+            orderNo,
+            type: 'print',
+            printTaskId: mainId,
+            endUserId: member.id,
+            terminalId,
+            amountCents: orderFields.amountCents,
+            discountCents: orderFields.discountCents ?? 0,
+            refundedAmountCents: orderFields.refundedAmountCents ?? 0,
+            payStatus: orderFields.payStatus,
+            paymentSource: 'offline',
+            paidAt: createdAt,
+            taskStatus: 'completed',
+            createdAt,
+          },
+        })
+        made.orders.push(order.id)
+
+        // 主任务与 2 个子任务的 PrintTask.orderId 均指向该 Order；Order.printTaskId 只指向主任务。
+        await prisma.printTask.update({ where: { id: mainId }, data: { orderId: order.id } })
+        for (const [idx, subId] of [[1, sub1Id], [2, sub2Id]] as const) {
+          const subAt = new Date(createdAt.getTime() + idx * 100)
+          await prisma.printTask.create({
+            data: {
+              id: subId,
+              endUserId: member.id,
+              terminalId,
+              orderId: order.id,
+              fileUrl: `sig://secret-${subId}`,
+              fileMd5: `sha256-${subId}`,
+              status: 'completed',
+              completedAt: subAt,
+              createdAt: subAt,
+              paramsJson: JSON.stringify({ fileName: `${label}-子任务${idx}.pdf`, copies: 1, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4' }),
+            },
+          })
+          made.printTasks.push(subId)
+        }
+
+        if (orderFields.withPendingRefund) {
+          await prisma.refund.create({
+            data: {
+              orderId: order.id,
+              refundNo: `REF-PACK-${next()}`,
+              amountCents: orderFields.amountCents,
+              reason: 'manual_refund',
+              channel: 'offline',
+              status: 'pending',
+            },
+          })
+        }
+
+        return { orderId: order.id, orderNo, taskIds: [mainId, sub1Id, sub2Id] }
+      }
+
+      const paidPack = await createPack('paid', { amountCents: 300, discountCents: 100, payStatus: 'paid' }, 1_000)
+      const partialPack = await createPack('partial', { amountCents: 300, refundedAmountCents: 100, payStatus: 'partial_refunded' }, 2_000)
+      const refundingPack = await createPack('refunding', { amountCents: 300, payStatus: 'refunding', withPendingRefund: true }, 3_000)
+      const refundedPack = await createPack('refunded', { amountCents: 300, refundedAmountCents: 300, payStatus: 'refunded' }, 4_000)
+
+      // 跨用户归属隔离负例：outsider 拥有一笔 Order，member 名下任务即使 orderId 误指向他人 Order 也不得读出他人收费/开票字段。
+      const outsiderPair = await createPrintOrderPair(outsider.id, terminalId, { amountCents: 500, payStatus: 'paid' }, new Date(t0 + 5_000), '他人订单.pdf')
+      const foreignLinkedTaskId = `ptask-pack-foreign-${next()}`
+      await prisma.printTask.create({
+        data: {
+          id: foreignLinkedTaskId,
+          endUserId: member.id,
+          terminalId,
+          orderId: outsiderPair.orderId,
+          fileUrl: `sig://secret-${foreignLinkedTaskId}`,
+          fileMd5: `sha256-${foreignLinkedTaskId}`,
+          status: 'completed',
+          completedAt: new Date(t0 + 5_100),
+          createdAt: new Date(t0 + 5_100),
+          paramsJson: JSON.stringify({ fileName: '跨人引用负例.pdf', copies: 1, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4' }),
+        },
+      })
+      made.printTasks.push(foreignLinkedTaskId)
+
+      const res = await call<{ items: Array<Record<string, unknown>> }>('GET', '/me/print-orders?pageSize=50', {
+        headers: { Authorization: `Bearer ${member.token}` },
+      })
+      assert.equal(res.status, 200, res.text)
+      assertZeroPii(res.text, res.json.data?.items ?? [], '材料包打印单')
+      const byTaskId = new Map((res.json.data?.items ?? []).map((item) => [String(item['id']), item]))
+
+      const assertPackUniform = (
+        pack: { orderId: string; orderNo: string; taskIds: [string, string, string] },
+        expected: {
+          amountCents: number
+          discountCents: number
+          payStatus: string
+          canInvoice: boolean
+          invoiceStatus: string
+          invoiceRequestId: string | null
+        },
+        stateLabel: string,
+      ) => {
+        for (const taskId of pack.taskIds) {
+          const row = byTaskId.get(taskId)
+          assert.ok(row, `${stateLabel} 缺少任务 ${taskId}`)
+          assert.equal(row['orderId'], pack.orderId, `${stateLabel} ${taskId} orderId 不一致`)
+          assert.equal(row['orderNo'], pack.orderNo, `${stateLabel} ${taskId} orderNo 不一致`)
+          assert.equal(row['amountCents'], expected.amountCents, `${stateLabel} ${taskId} amountCents 不一致`)
+          assert.equal(row['discountCents'], expected.discountCents, `${stateLabel} ${taskId} discountCents 不一致`)
+          assert.equal(row['payStatus'], expected.payStatus, `${stateLabel} ${taskId} payStatus 不一致`)
+          assert.equal(row['canInvoice'], expected.canInvoice, `${stateLabel} ${taskId} canInvoice 不一致`)
+          assert.equal(row['invoiceStatus'], expected.invoiceStatus, `${stateLabel} ${taskId} invoiceStatus 不一致`)
+          assert.equal(row['invoiceRequestId'], expected.invoiceRequestId, `${stateLabel} ${taskId} invoiceRequestId 不一致`)
+        }
+      }
+
+      assertPackUniform(paidPack, { amountCents: 300, discountCents: 100, payStatus: 'paid', canInvoice: true, invoiceStatus: 'none', invoiceRequestId: null }, 'paid')
+      assertPackUniform(partialPack, { amountCents: 300, discountCents: 0, payStatus: 'partial_refunded', canInvoice: false, invoiceStatus: 'none', invoiceRequestId: null }, 'partial_refunded')
+      assertPackUniform(refundingPack, { amountCents: 300, discountCents: 0, payStatus: 'refunding', canInvoice: false, invoiceStatus: 'none', invoiceRequestId: null }, 'refunding')
+      assertPackUniform(refundedPack, { amountCents: 300, discountCents: 0, payStatus: 'refunded', canInvoice: false, invoiceStatus: 'none', invoiceRequestId: null }, 'refunded')
+
+      const foreignRow = byTaskId.get(foreignLinkedTaskId)
+      assert.ok(foreignRow, '跨人引用负例任务应存在')
+      assert.equal(foreignRow['amountCents'], null, '不得透传他人 Order 的 amountCents')
+      assert.equal(foreignRow['payStatus'], null, '不得透传他人 Order 的 payStatus')
+      assert.equal(Object.prototype.hasOwnProperty.call(foreignRow, 'canInvoice'), false, '他人 Order 不得出现 canInvoice')
+
+      // 为 paidPack 提交开票申请后，主任务与 2 个子任务同步变为 submitted 且 canInvoice=false
+      const submittedPackReq = await invoiceRequests.submit(member.id, {
+        orderKind: 'print',
+        orderId: paidPack.orderId,
+        titleType: 'personal',
+        title: '材料包测试个人抬头',
+        email: EMAIL,
+      })
+      const afterSubmit = await call<{ items: Array<Record<string, unknown>> }>('GET', '/me/print-orders?pageSize=50', {
+        headers: { Authorization: `Bearer ${member.token}` },
+      })
+      assert.equal(afterSubmit.status, 200, afterSubmit.text)
+      const afterMap = new Map((afterSubmit.json.data?.items ?? []).map((item) => [String(item['id']), item]))
+      for (const taskId of paidPack.taskIds) {
+        const row = afterMap.get(taskId)
+        assert.ok(row)
+        assert.equal(row['canInvoice'], false, `提交后 ${taskId} 不得再开票`)
+        assert.equal(row['invoiceStatus'], 'submitted', `提交后 ${taskId} 应为 submitted`)
+        assert.equal(row['invoiceRequestId'], submittedPackReq.id, `提交后 ${taskId} 应关联同一申请 id`)
+      }
+      assertZeroPii(afterSubmit.text, afterSubmit.json.data?.items ?? [], '材料包提交开票后打印单')
+    })
+
     console.log(`PASS verify:member-service-orders（${passed.length} 组）`)
   } finally {
     await new Promise<void>((done) => app.getHttpServer().close(() => done()))

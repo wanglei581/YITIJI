@@ -278,9 +278,17 @@ export function useOrderInvoiceSession(
         }
         if (error instanceof InvoiceSessionHttpError && error.status === 429) {
           setRateLimited(true)
-          const nextStep = backoffMs < POLL_MIN_429_MS ? POLL_MIN_429_MS : Math.min(POLL_MAX_BACKOFF_MS, backoffMs * 2)
-          const waitMs = Math.min(POLL_MAX_BACKOFF_MS, Math.max(error.retryAfterMs ?? 0, nextStep))
-          backoffMs = waitMs
+          const clientBackoff = backoffMs < POLL_MIN_429_MS
+            ? POLL_MIN_429_MS
+            : Math.min(POLL_MAX_BACKOFF_MS, backoffMs * 2)
+          const serverRetryAfter = typeof error.retryAfterMs === 'number'
+            && Number.isFinite(error.retryAfterMs)
+            && error.retryAfterMs > 0
+            ? error.retryAfterMs
+            : 0
+          // 只对客户端指数退避封顶 60s，绝不截短有效服务端 Retry-After（仅防 32 位定时器溢出）。
+          const waitMs = Math.min(2_147_483_647, Math.max(serverRetryAfter, clientBackoff))
+          backoffMs = clientBackoff
           rateLimitUntil = Date.now() + waitMs
           schedule(waitMs)
           return

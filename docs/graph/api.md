@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`700` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`701` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -853,7 +853,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | — | — |
-| GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | MemberPrintOrdersService | InvoiceRequest<br/>PrintTask<br/>Terminal |
+| GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | MemberPrintOrdersService | InvoiceRequest<br/>Order<br/>PrintTask<br/>Terminal |
 | POST | `/api/v1/me/print-orders` | MemberPrintOrdersController.create | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
@@ -1041,6 +1041,12 @@
 | POST | `/api/v1/admin/orders/:id/print-return/release-paper` | AdminOrderActionsController.releasePaper | admin | — | — |
 | POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
 | POST | `/api/v1/admin/orders/:id/refund-after-paper-check` | AdminOrderActionsController.refundAfterPaperCheck | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
+
+## `services/api/src/payment/member-service-order.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/me/service-orders` | ListMemberServiceOrdersQueryDto.list | — | MemberServiceOrderService | InvoiceRequest<br/>ServiceOrder |
 
 ## `services/api/src/payment/order-quote.controller.ts`
 

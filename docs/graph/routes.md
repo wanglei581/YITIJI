@@ -31,7 +31,7 @@ flowchart LR
   app --> k["/k<br/>3 页 · 14 端点"]
   app --> legal["/legal<br/>1 页 · 36 端点"]
   app --> login["/login<br/>1 页 · 13 端点"]
-  app --> me["/me<br/>12 页 · 30 端点"]
+  app --> me["/me<br/>12 页 · 31 端点"]
   app --> member["/member<br/>1 页 · 13 端点"]
   app --> pay["/pay<br/>3 页 · 14 端点"]
   app --> print["/print<br/>14 页 · 18 端点"]
@@ -87,8 +87,8 @@ flowchart LR
 | `/me/favorites` | MyFavoritesPage | `apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx` | 14 | 12 |
 | `/me/feedback` | MyFeedbackPage | `apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx` | 14 | 11 |
 | `/me/notifications` | MyNotificationsPage | `apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx` | 14 | 12 |
-| `/me/orders/invoice` | MyOrderInvoicePage | — _(重定向)_ | 0 | — |
-| `/me/print-orders` | MyPrintOrdersPage | `apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx` | 13 | 12 |
+| `/me/orders/invoice` | MyOrderInvoicePage | `apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx` | 14 | 8 |
+| `/me/print-orders` | MyPrintOrdersPage | `apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx` | 13 | 13 |
 | `/me/privacy-requests` | MyPrivacyRequestsPage | `apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx` | 13 | 11 |
 | `/me/resumes` | MyResumesPage | `apps/kiosk/src/pages/profile/me/MyResumesPage.tsx` | 13 | 12 |
 | `/me/settings` | MySettingsPage | `apps/kiosk/src/pages/profile/me/MySettingsPage.tsx` | 21 | 10 |
@@ -142,7 +142,7 @@ flowchart LR
 | `/upload/phone` | PhoneUploadPage | `apps/kiosk/src/pages/upload/PhoneUploadPage.tsx` | 10 | 2 |
 
 <details>
-<summary>展开：每个路由触达的端点（62 个路由）</summary>
+<summary>展开：每个路由触达的端点（63 个路由）</summary>
 
 **`/`** → `DELETE /me/job-ai-sessions/:param`、`GET /:param`、`GET /advisor/sessions/:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`GET /jobs`、`GET /jobs/:param`、`GET /me/ai-consents/status`、`GET /me/job-ai-sessions`、`GET /resume/export/pricing`、`GET /resume/generate/:param`、`GET /resume/records/:param`、`GET /resume/records/:param/draft`、`GET /resume/records/:param/optimize`、`GET /resume/records/:param/versions`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /assistant/chat`、`POST /assistant/sessions/:param/summary`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /jobs/:param/ai/explain`、`POST /jobs/:param/ai/match`、`POST /jobs/ai/recommendations`、`POST /me/ai-consents`、`POST /me/ai-consents/:param/revoke`、`POST /print`、`POST /resume/generate`、`POST /resume/generate/export`、`POST /resume/parse`
 
@@ -207,6 +207,8 @@ flowchart LR
 **`/me/feedback`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`、`POST /me/feedback`
 
 **`/me/notifications`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`PATCH /me/notifications/read-all`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
+
+**`/me/orders/invoice`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/close`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
 **`/me/print-orders`** → `GET /:param`、`GET /job-fairs`、`GET /job-fairs/:param`、`GET /job-fairs/:param/companies/:param`、`GET /job-fairs/:param/map`、`GET /job-fairs/:param/materials`、`GET /job-fairs/:param/stats`、`GET /job-fairs/:param/venue-guide`、`GET /job-fairs/:param/zones`、`POST /:param/cancel`、`POST /:param/confirm`、`POST /job-fairs/:param/companies/:param/print-url`、`POST /job-fairs/:param/materials/:param/print-url`
 
