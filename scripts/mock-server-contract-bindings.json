@@ -46,6 +46,26 @@
       "note": "W-105：列表字段由详情继承；计费内容页数原值只读透传，与真实后端类型核对。"
     },
     {
+      "id": "admin-orders.print-return-query-channel",
+      "lane": "payment",
+      "endpoint": "POST /api/v1/admin/orders/:id/print-return/query-channel",
+      "serverType": {
+        "file": "services/api/src/payment/query-print-return-channel.ts",
+        "name": "QueryPrintReturnChannelOutcome"
+      },
+      "clientType": {
+        "file": "apps/admin/src/services/api/adminOrdersRegistration.ts",
+        "name": "QueryPrintReturnChannelOutcome"
+      },
+      "mocks": [
+        {
+          "file": "apps/admin/src/services/api/adminOrdersHoldDemo.ts",
+          "fn": "queryHoldDemo"
+        }
+      ],
+      "note": "P2b9d：24 小时内在途退款只查不处置，mock 与服务端返回字段及枚举值严格对齐。"
+    },
+    {
       "id": "contract-review.consent-scope",
       "lane": "privacy",
       "endpoint": "GET /api/v1/contract-reviews/consent-scope",

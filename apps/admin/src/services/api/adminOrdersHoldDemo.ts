@@ -1,6 +1,6 @@
 import { ApiHttpError } from './client'
 import type { AdminOrderReadonlyDetail, PrintReturnResolutionResult } from './adminOrdersReadonly'
-import type { ChannelResultRegistrationInput, ChannelResultRegistrationOutcome } from './adminOrdersRegistration'
+import type { ChannelResultRegistrationInput, ChannelResultRegistrationOutcome, QueryPrintReturnChannelOutcome } from './adminOrdersRegistration'
 
 /**
  * 只有浏览器用例写入这个键时才出现。默认列表不带这张单，也不带运营关注角标。
@@ -192,5 +192,71 @@ export function registerHoldDemo(id: string, input: ChannelResultRegistrationInp
     refundNo: input.refundNo,
     amountCents: order.refundLedgerCents ?? 0,
     recordedBy: 'registration',
+  }
+}
+
+/** 24 小时内在途退款「只查不处置」演示。返回字段与服务端 QueryPrintReturnChannelOutcome 逐一对齐。 */
+export function queryHoldDemo(id: string): QueryPrintReturnChannelOutcome | null {
+  const order = currentHoldDemo()
+  if (!order || order.id !== id) return null
+  if (!order.channelInFlight) {
+    return {
+      orderId: order.id,
+      outcome: 'no_in_flight',
+      payStatus: order.payStatus,
+      refundStatus: order.refundStatus,
+      channelInFlight: false,
+      checkedCount: 0,
+      message: '这单目前没有渠道在途退款，无需查询。请刷新后查看最新状态。',
+    }
+  }
+  const mode = holdDemoMode()
+  if (mode === 'pending') {
+    return {
+      orderId: order.id,
+      outcome: 'processing',
+      payStatus: order.payStatus,
+      refundStatus: order.refundStatus,
+      channelInFlight: true,
+      checkedCount: 1,
+      message: '渠道还在处理这笔退款，结果出来前不能处置，请稍后再查。',
+    }
+  }
+  const at = new Date().toISOString()
+  order.channelInFlight = false
+  order.channelResultRegistration = null
+  order.updatedAt = at
+  if (mode === 'paper-channel-manual') {
+    order.refundStatus = 'success'
+    order.printRefundReason = '渠道退款已成功并已记账，但纸已经放行或已出纸，已转待人工核对，请勿重复退款。'
+    return {
+      orderId: order.id,
+      outcome: 'conflict',
+      payStatus: order.payStatus,
+      refundStatus: 'success',
+      channelInFlight: false,
+      checkedCount: 1,
+      message: '渠道退款已成功并已记账，但纸已经放行或已出纸，已转待人工核对，请勿重复退款。',
+    }
+  }
+  order.payStatus = 'refunded'
+  order.refundStatus = 'success'
+  order.taskStatus = 'cancelled'
+  order.printRefundDisposition = 'auto_success'
+  order.printRefundReason = null
+  order.refundedAmountCents = order.refundLedgerCents ?? 0
+  order.refundedAt = at
+  order.opsAttention = false
+  order.opsAttentionCode = null
+  order.refundRequired = false
+  if (order.print) order.print = { ...order.print, status: 'cancelled' }
+  return {
+    orderId: order.id,
+    outcome: 'refunded',
+    payStatus: 'refunded',
+    refundStatus: 'success',
+    channelInFlight: false,
+    checkedCount: 1,
+    message: '渠道已确认退款成功，已按渠道金额记账。',
   }
 }

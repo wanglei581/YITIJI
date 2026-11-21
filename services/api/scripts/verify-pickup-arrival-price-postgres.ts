@@ -71,6 +71,8 @@ async function main(): Promise<void> {
     await runP2b9dMultiFailCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
     const { runServiceOrderP2b9dAbnormalCases } = await import('./support/service-order-p2b9d-abnormal-cases')
     await runServiceOrderP2b9dAbnormalCases(prisma, randomBytes(4).toString('hex'))
+    const { runP2b9dQueryChannelCases } = await import('./support/pickup-arrival-p2b9d-query-channel-cases')
+    await runP2b9dQueryChannelCases(prisma, { tag: randomBytes(4).toString('hex'), orderIds: [], taskIds: [] })
   } finally {
     await prisma.onModuleDestroy()
   }

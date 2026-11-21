@@ -54,6 +54,22 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
     await openDetail(detail.id)
   }
 
+  const queryChannel = async () => {
+    setPending('query-channel')
+    setError(null)
+    setNote(null)
+    try {
+      const outcome = await adminOrdersReadonlyService.queryPrintReturnChannel(detail.id)
+      setNote(outcome.message)
+      void refresh()
+      await openDetail(detail.id)
+    } catch (err) {
+      setError(userMessageOf(err, '向渠道查询结果没有完成，请稍后重试'))
+    } finally {
+      setPending(null)
+    }
+  }
+
   const submitVerified = async () => {
     if (!reason.trim()) return
     setPending('verified')
@@ -119,8 +135,15 @@ export function PrintReturnHoldActions({ controls }: { controls: OrderDetailCont
               {paperOut ? null : (
                 <p className="text-xs text-neutral-500">改为出纸和关单都不会把这笔钱记成已退回。关单后纸也不会再出。</p>
               )}
-              {channelPending ? <p className="text-xs font-semibold text-neutral-700">退款还在渠道处理中，结果出来前不能处置。</p> : null}
-              {channelPending ? <ChannelResultRegistration detail={detail} onDone={registered} /> : null}
+              {channelPending ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-neutral-700">退款还在渠道处理中，结果出来前不能处置。</p>
+                  <button type="button" disabled={pending !== null} onClick={() => void queryChannel()} className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-800 disabled:opacity-40">
+                    {pending === 'query-channel' ? '查询中…' : '向渠道查询结果'}
+                  </button>
+                  <ChannelResultRegistration detail={detail} onDone={registered} />
+                </div>
+              ) : null}
             </>
           )}
         </>

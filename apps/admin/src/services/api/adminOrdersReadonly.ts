@@ -1,8 +1,8 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
-import { currentHoldDemo, registerHoldDemo, resolveHoldDemo } from './adminOrdersHoldDemo'
+import { currentHoldDemo, queryHoldDemo, registerHoldDemo, resolveHoldDemo } from './adminOrdersHoldDemo'
 import { findServiceDemo, refundServiceDemo, retryServiceDemoRefund, serviceDemoPage } from './adminOrdersServiceDemo'
-import type { ChannelResultRegistrationInput, ChannelResultRegistrationOutcome } from './adminOrdersRegistration'
+import type { ChannelResultRegistrationInput, ChannelResultRegistrationOutcome, QueryPrintReturnChannelOutcome } from './adminOrdersRegistration'
 
 export type AdminOrderAftercareStatus = 'manual_check_required' | null
 
@@ -179,6 +179,7 @@ interface AdminOrdersReadonlyService {
   getById(id: string): Promise<AdminOrderReadonlyDetail>
   refundOrder(id: string, refundReason: string): Promise<AdminOrderRefundResult>
   resolvePrintReturnHold(id: string, action: 'confirm-refunded' | 'release-paper' | 'close'): Promise<PrintReturnResolutionResult>
+  queryPrintReturnChannel(id: string): Promise<QueryPrintReturnChannelOutcome>
   refundAfterPaperCheck(id: string, refundReason: string): Promise<AdminOrderRefundResult>
   registerChannelResult(id: string, input: ChannelResultRegistrationInput): Promise<ChannelResultRegistrationOutcome>
   /** 线下 / 人工确认收款入账；仅 `payStatus==='unpaid'` 的订单可成功，其余由后端拒绝并回错误码。 */
@@ -260,6 +261,8 @@ const httpAdapter: AdminOrdersReadonlyService = {
     post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund`, { refundReason }),
   resolvePrintReturnHold: (id, action) =>
     post<PrintReturnResolutionResult>(`/admin/orders/${encodeURIComponent(id)}/print-return/${action}`, {}),
+  queryPrintReturnChannel: (id) =>
+    post<QueryPrintReturnChannelOutcome>(`/admin/orders/${encodeURIComponent(id)}/print-return/query-channel`, {}),
   refundAfterPaperCheck: (id, refundReason) =>
     post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund-after-paper-check`, { refundReason }),
   registerChannelResult: (id, input) =>
@@ -476,6 +479,9 @@ const mockAdapter: AdminOrdersReadonlyService = {
       refundNo: mockDetailState.refundLedgerNo ?? '',
       amountCents: mockDetailState.refundLedgerCents ?? 0,
     }
+  },
+  async queryPrintReturnChannel(id) {
+    return queryHoldDemo(id) ?? { orderId: id, outcome: 'no_in_flight', payStatus: mockDetailState.payStatus, refundStatus: mockDetailState.refundStatus, channelInFlight: false, checkedCount: 0, message: '这单目前没有渠道在途退款，无需查询。' }
   },
   async refundAfterPaperCheck(_id, refundReason) {
     return mockAdapter.refundOrder(_id, refundReason)

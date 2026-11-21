@@ -94,6 +94,23 @@ test.describe('待人工三步按钮只看渠道在途', () => {
     await expect(detail.getByRole('button', { name: '核对后仍退款', exact: true })).toHaveCount(0)
     await expect(detail.getByText(BLOCKED, { exact: true })).toBeVisible()
     await expect(detail.getByText('退款还在渠道处理中，结果出来前不能处置，也不能重复退款。', { exact: true })).toBeVisible()
+    await expect(detail.getByRole('button', { name: '向渠道查询结果', exact: true })).toBeVisible()
+    await settleAdminPage(page, guards)
+  })
+
+  test('24 小时内在途待人工：可点「向渠道查询结果」只查不处置并即时收口', async ({ page }) => {
+    const { guards, row, detail } = await openHoldDetail(page, 'channel-manual')
+    const queryBtn = detail.getByRole('button', { name: '向渠道查询结果', exact: true })
+    await expect(queryBtn).toBeVisible()
+    await expect(queryBtn).toBeEnabled()
+    await queryBtn.click()
+
+    await expect(detail.getByText('渠道已确认退款成功，已按渠道金额记账。', { exact: true })).toBeVisible()
+    await expect(detail.getByText('支付状态', { exact: true }).locator('..')).toContainText('已退款')
+    await expect(detail.getByRole('button', { name: '向渠道查询结果', exact: true })).toHaveCount(0)
+    await detail.getByRole('button', { name: '关闭', exact: true }).click()
+    await expect(detail).toHaveCount(0)
+    await expect(row).toContainText('已退款')
     await settleAdminPage(page, guards)
   })
 })

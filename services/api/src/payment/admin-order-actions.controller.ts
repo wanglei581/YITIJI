@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Inject, Optional, Param, Post, UseGuards } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { Roles } from '../common/decorators/roles.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -7,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AdminMarkPaidDto, AdminRefundDto, AdminRegisterChannelResultDto } from './dto/order-action.dto'
 import { OrderStatusService } from './order-status.service'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
+import { queryPrintReturnChannel } from './query-print-return-channel'
 import { RefundService } from './refund.service'
 import { queryRefundChannel } from './refund-channel-query'
 import { registerChannelResult } from './refund-channel-registration'
@@ -89,6 +91,13 @@ export class AdminOrderActionsController {
   @Post('admin/orders/:id/print-return/close')
   closeHeldOrder(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
     return resolvePrintReturnHold(this.prisma, id, 'close_order', user.userId, (input) => this.askRefundChannel(input))
+  }
+
+  /** 24 小时内在途退款只查不处置：逐笔向渠道查询并落库明确答复，不放行出纸也不关单。 */
+  @Post('admin/orders/:id/print-return/query-channel')
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  queryPrintReturnChannel(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
+    return queryPrintReturnChannel(this.prisma, id, user.userId, (input) => this.askRefundChannel(input))
   }
 
   /** 长期查不到渠道结果时，按商户平台核实结果登记。先问一次渠道，有明确答复就按渠道答复记。 */

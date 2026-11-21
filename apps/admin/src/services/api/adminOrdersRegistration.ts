@@ -22,3 +22,24 @@ export interface ChannelResultRegistrationOutcome {
   /** channel：登记前问渠道已经有了明确答复，按渠道答复记账，没有用这次登记。 */
   recordedBy: 'registration' | 'channel'
 }
+
+export type ChannelQuerySummaryOutcome =
+  | 'no_in_flight'
+  | 'refunded'
+  | 'failed'
+  | 'processing'
+  | 'abnormal'
+  | 'unknown'
+  | 'unsupported'
+  | 'conflict'
+
+/** 只查不处置结果，与服务端 POST /admin/orders/:id/print-return/query-channel 对齐。 */
+export interface QueryPrintReturnChannelOutcome {
+  orderId: string
+  outcome: ChannelQuerySummaryOutcome
+  payStatus: string
+  refundStatus: string | null
+  channelInFlight: boolean
+  checkedCount: number
+  message: string
+}

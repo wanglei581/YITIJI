@@ -30,7 +30,7 @@ export async function convergeNotifiedRefundSuccess(
 ): Promise<'completed' | 'blocked' | 'idempotent'> {
   const order = await tx.order.findUnique({
     where: { id: input.orderId },
-    select: { printTaskId: true, taskStatus: true },
+    select: { payStatus: true, printTaskId: true, taskStatus: true },
   })
   if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
   const task = order.printTaskId
@@ -104,9 +104,12 @@ export async function convergeNotifiedRefundSuccess(
     })
     return 'blocked'
   }
+  if (order.payStatus === 'closed' && input.priorStatus === REFUND_STATUS_MANUAL_REVIEW) {
+    return 'idempotent'
+  }
 
   const casRefund = await tx.refund.updateMany({
-    where: { id: input.refundId, status: { in: ['pending', 'failed', 'withdrawn'] } },
+    where: { id: input.refundId, status: { in: ['pending', 'failed', 'withdrawn', REFUND_STATUS_MANUAL_REVIEW] } },
     data: {
       status: 'success',
       ...(input.channelRefundNo ? { channelRefundNo: input.channelRefundNo } : {}),
