@@ -131,6 +131,9 @@ export function PayServicePage({ what }: { what: PayWhat }) {
                 ? payCloseErrorLine(flow.error)
                 : payLookupErrorLine(flow.error)}
           </p>
+          {(flow.view === 'lookup' || flow.view === 'close_failed') && flow.rateLimited ? (
+            <p className="qxt-fine" role="status" data-testid="pay-service-rate-limit">{PAY_RATE_LIMIT_LINE}</p>
+          ) : null}
         </>
       )
       break

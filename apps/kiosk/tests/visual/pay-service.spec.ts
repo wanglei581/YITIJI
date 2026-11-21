@@ -278,15 +278,197 @@ test.describe('付款屏 @kiosk', () => {
     await primary(page).click()
     await page.waitForTimeout(50)
     mode = 'fail503'
+    const calls = recordServiceOrderCalls(page)
     await page.clock.runFor(SERVICE_PAY_TTL_MS - 4 * 60_000 + 2_000)
     await expectState(page, 'lookup')
     await expect(payScreen(page)).toContainText('暂时查不到这一次的付款结果')
     await expect(primary(page)).toHaveText('再查一次')
     expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toContain(order.id)
 
+    // 10 秒核实冷却期内点击不连发 refresh=1，过冷却期后再点「再查一次」承接晚到已付结果。
+    const refreshesAtLookup = calls.filter((c) => c.method === 'GET' && c.refresh).length
     mode = 'paid'
     await primary(page).click()
+    await page.waitForTimeout(50)
+    expect(calls.filter((c) => c.method === 'GET' && c.refresh).length).toBe(refreshesAtLookup)
+    await page.clock.runFor(9_000)
+    await primary(page).click()
     await expectState(page, 'ok')
+    await page.clock.runFor(2_000)
+    await expect(page).toHaveURL(/\/resume\/optimize$/, { timeout: 10_000 })
+  })
+
+  test('到点核实返回 checking:true：不抢判超时、普通查单不误落，12 秒后晚到 paid 自动进下一步 @kiosk', async ({ page, api }) => {
+    const start = new Date('2026-11-19T14:25:00+08:00').getTime()
+    await page.clock.install({ time: start })
+    chargingMachine(api)
+    const order = { ...ORDER_A, createdAt: start }
+    let paid = false
+    api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
+    api.respondWith('POST', serviceOrderClosePath(order.id), () => ok(serviceOrderView(order, { status: 'closed', closeReason: 'user_cancelled' })))
+    await page.route((url) => url.pathname === serviceOrderPath(order.id), (route) => {
+      const refresh = new URL(route.request().url()).searchParams.get('refresh') === '1'
+      const payload = paid
+        ? serviceOrderView(order, { status: 'paid', paidAt: new Date(start + SERVICE_PAY_TTL_MS + 12_000).toISOString(), checking: false })
+        : serviceOrderView(order, { checking: refresh })
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ok(payload).json) })
+    })
+    const calls = recordServiceOrderCalls(page)
+
+    await page.goto('/pay/resume?next=optimize')
+    await expectState(page, 'wait')
+    const pausedAt = (await page.evaluate(() => Date.now())) + 100
+    await page.clock.pauseAt(pausedAt)
+    const stepMs = async (ms: number) => {
+      for (let done = 0; done < ms; done += 1_000) {
+        await page.clock.runFor(1_000)
+        await page.waitForTimeout(15)
+      }
+    }
+
+    // 第 4 分钟点一次刷新防 5 分钟无操作清场，随后走到期后 1 秒。
+    await page.clock.runFor(4 * 60_000)
+    await primary(page).click()
+    await page.waitForTimeout(30)
+    await page.clock.runFor(SERVICE_PAY_TTL_MS - 4 * 60_000 + 1_000)
+    await page.waitForTimeout(30)
+    await expectState(page, 'check')
+    await expect(page.getByTestId('pay-service-checking')).toBeVisible()
+    const getsAfterExpiry = calls.filter((c) => c.method === 'GET').length
+
+    // 续查中间 9 秒普通查单回 checking:false 仍停在 check，不抢判 timeout，且轮询持续发请求。
+    await stepMs(9_000)
+    await expectState(page, 'check')
+    expect(calls.filter((c) => c.method === 'GET').length).toBeGreaterThan(getsAfterExpiry)
+
+    // 第 12 秒服务端变为 paid → 先落 ok，再过 1.6 秒自动推进 targets.next（按 500ms 步进，避免单次越过 1.6 秒窗口）。
+    paid = true
+    for (let waited = 0; waited < 6_000; waited += 500) {
+      await page.clock.runFor(500)
+      await page.waitForTimeout(15)
+      if ((await payScreen(page).getAttribute('data-qxt-state')) === 'ok') break
+    }
+    await expectState(page, 'ok')
+    await page.clock.runFor(2_000)
+    await expect(page).toHaveURL(/\/resume\/optimize$/, { timeout: 10_000 })
+  })
+
+  test('到点前 1 秒刚手动核实：到点自动核实推迟到距上次 >=10000ms 才发 @kiosk', async ({ page, api }) => {
+    const start = new Date('2026-11-19T14:27:00+08:00').getTime()
+    await page.clock.install({ time: start })
+    chargingMachine(api)
+    const order = { ...ORDER_A, createdAt: start }
+    api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
+    respondOrder(api, order)
+    let virtualNow = start
+    const calls = recordServiceOrderCalls(page, () => virtualNow)
+
+    await page.goto('/pay/resume')
+    await expectState(page, 'wait')
+    const baseNow = (await page.evaluate(() => Date.now())) + 100
+    await page.clock.pauseAt(baseNow)
+    virtualNow = baseNow
+    const advance = async (ms: number) => {
+      virtualNow += ms
+      await page.clock.runFor(ms)
+      await page.waitForTimeout(25)
+    }
+
+    // 第 4 分钟先点一次防闲置清场，随后走到过期前 1 秒点手动核实（发出一次 refresh=1）。
+    await advance(4 * 60_000)
+    await primary(page).click()
+    await page.waitForTimeout(25)
+    const remainBeforeManual = (start + SERVICE_PAY_TTL_MS - 1_000) - virtualNow
+    await advance(remainBeforeManual)
+    const beforeManual = calls.filter((c) => c.method === 'GET' && c.refresh).length
+    await primary(page).click()
+    await page.waitForTimeout(25)
+    const afterManual = calls.filter((c) => c.method === 'GET' && c.refresh)
+    expect(afterManual.length).toBe(beforeManual + 1)
+    const manualAt = afterManual[afterManual.length - 1]!.at
+
+    // 到点后 2 秒（距手动核实 3 秒）与 8 秒（距手动核实 9 秒）均不得发到点 refresh=1。
+    await advance(2_000)
+    await expectState(page, 'check')
+    expect(calls.filter((c) => c.method === 'GET' && c.refresh).length).toBe(afterManual.length)
+    await advance(6_000)
+    expect(calls.filter((c) => c.method === 'GET' && c.refresh).length).toBe(afterManual.length)
+
+    // 跨过 10000ms 间隔后自动发出到点 refresh=1 并落 timeout，两次间隔 >= 10000ms。
+    await advance(3_000)
+    await expectState(page, 'timeout')
+    const allRefreshes = calls.filter((c) => c.method === 'GET' && c.refresh)
+    expect(allRefreshes.length).toBe(afterManual.length + 1)
+    const expiryAt = allRefreshes[allRefreshes.length - 1]!.at
+    expect(expiryAt - manualAt, `到点核实距手动核实间隔应 ≥10000ms，实际 ${expiryAt - manualAt}ms`).toBeGreaterThanOrEqual(10_000)
+  })
+
+  test('lookup 点「再查一次」遇 429+Retry-After:15：退避期内连点 3 次发 0 次且显示限流提示，过期后恢复 @kiosk', async ({ page, api }) => {
+    const start = new Date('2026-11-19T14:29:00+08:00').getTime()
+    await page.clock.install({ time: start })
+    chargingMachine(api)
+    const order = { ...ORDER_A, createdAt: start }
+    let mode: 'pending' | 'reload503' | 'limit429' | 'paid' = 'pending'
+    api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
+    api.respondWith('POST', serviceOrderClosePath(order.id), () => ok(serviceOrderView(order, { status: 'closed', closeReason: 'user_cancelled' })))
+    await page.route((url) => url.pathname === serviceOrderPath(order.id), (route) => {
+      if (mode === 'reload503') {
+        const err = apiError(503, 'UPSTREAM_UNAVAILABLE', '服务暂时不可用')
+        return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify(err.json) })
+      }
+      if (mode === 'limit429') {
+        const err = apiError(429, 'RATE_LIMITED', '尝试过于频繁，请稍后再试')
+        return route.fulfill({
+          status: 429,
+          headers: { 'Retry-After': '15' },
+          contentType: 'application/json',
+          body: JSON.stringify(err.json),
+        })
+      }
+      const view = mode === 'paid'
+        ? serviceOrderView(order, { status: 'paid', paidAt: new Date(start + 30_000).toISOString() })
+        : serviceOrderView(order)
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ok(view).json) })
+    })
+    const calls = recordServiceOrderCalls(page)
+
+    // 先建单落入 sessionStorage，再重载遇 503 进入 lookup 态。
+    await page.goto('/pay/resume?next=optimize')
+    await expectState(page, 'wait')
+    mode = 'reload503'
+    await page.reload()
+    await expectState(page, 'lookup')
+    const pausedAt = (await page.evaluate(() => Date.now())) + 100
+    await page.clock.pauseAt(pausedAt)
+
+    // 点「再查一次」收到 429 + Retry-After: 15 → 显示限流提示。
+    mode = 'limit429'
+    const refreshesBefore = calls.filter((c) => c.method === 'GET' && c.refresh).length
+    await primary(page).click()
+    await page.waitForTimeout(40)
+    await expectState(page, 'lookup')
+    await expect(page.getByTestId('pay-service-rate-limit')).toContainText('查询的人较多')
+    const refreshesAfter429 = calls.filter((c) => c.method === 'GET' && c.refresh).length
+    expect(refreshesAfter429).toBe(refreshesBefore + 1)
+
+    // 15 秒退避期内再连点 3 次：发出 0 次新 refresh=1 且限流提示不丢失。
+    await primary(page).click()
+    await page.waitForTimeout(25)
+    await page.clock.runFor(5_000)
+    await primary(page).click()
+    await page.waitForTimeout(25)
+    await page.clock.runFor(6_000)
+    await primary(page).click()
+    await page.waitForTimeout(25)
+    expect(calls.filter((c) => c.method === 'GET' && c.refresh).length).toBe(refreshesAfter429)
+    await expect(page.getByTestId('pay-service-rate-limit')).toBeVisible()
+
+    // 过 15 秒退避期后再点「再查一次」：正常发出 refresh=1 并推进到下一步。
+    mode = 'paid'
+    await page.clock.runFor(5_000)
+    await primary(page).click()
+    await expectState(page, 'ok')
+    await expect(page.getByTestId('pay-service-rate-limit')).toHaveCount(0)
     await page.clock.runFor(2_000)
     await expect(page).toHaveURL(/\/resume\/optimize$/, { timeout: 10_000 })
   })
@@ -515,8 +697,9 @@ test.describe('付款屏 @kiosk', () => {
     await page.goto('/pay/resume')
     await expectState(page, 'wait')
     const createdAt = await page.evaluate(() => Date.now())
-    virtualNow = createdAt
-    await page.clock.pauseAt(createdAt)
+    const pausedAt = createdAt + 100
+    virtualNow = pausedAt
+    await page.clock.pauseAt(pausedAt)
     const mark = calls.length
 
     // 1) 前 12 秒不点按钮：验证自动轮询实际间隔（3 秒一拍，不自动带 refresh=1）。
