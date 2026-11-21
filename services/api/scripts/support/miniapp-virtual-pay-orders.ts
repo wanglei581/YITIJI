@@ -130,6 +130,32 @@ export async function assertVirtualPayOrders(options: {
     assert.equal(sandbox.status, 503)
     assert.equal(sandbox.json.error?.code, 'VPAY_SANDBOX_FORBIDDEN')
     assert.equal(await prisma.virtualPayOrder.count(), before)
+
+    // 生产 env=0 只配现网键（不配沙箱键）必须能正常下单；缺现网键则失败关闭不建单
+    process.env['NODE_ENV'] = 'production'
+    process.env['WECHAT_MINIAPP_VPAY_ENV'] = '0'
+    delete process.env['WECHAT_MINIAPP_VPAY_SANDBOX_APP_KEY']
+    const prodOrder = await call('POST', '/api/v1/member/virtual-pay/orders', {
+      serviceKind: 'resume_optimize',
+      code: 'ok-code',
+    }, memberHeaders)
+    assert.equal(prodOrder.status, 201, '生产 env=0 只配现网键必须能下单')
+    const prodSignData = prodOrder.json['signData'] as string
+    assert.equal(prodOrder.json['paySig'], calcPaySig('requestVirtualPayment', prodSignData, APP_KEY))
+    assert.equal((JSON.parse(prodSignData) as { env: number }).env, 0)
+    const countAfterProd = await prisma.virtualPayOrder.count()
+    assert.equal(countAfterProd, before + 1)
+
+    delete process.env['WECHAT_MINIAPP_VPAY_APP_KEY']
+    const prodMissing = await call('POST', '/api/v1/member/virtual-pay/orders', {
+      serviceKind: 'resume_optimize',
+      code: 'ok-code',
+    }, memberHeaders)
+    assert.equal(prodMissing.status, 503, '生产 env=0 缺现网键必须失败关闭')
+    assert.equal(prodMissing.json.error?.code, 'VPAY_CONFIG_MISSING')
+    assert.equal(await prisma.virtualPayOrder.count(), countAfterProd)
+
+    applyReadyEnv()
     process.env['NODE_ENV'] = 'test'
     process.env['WECHAT_MINIAPP_VPAY_ENV'] = '0'
 

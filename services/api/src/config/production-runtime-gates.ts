@@ -366,16 +366,19 @@ export function evaluateMiniappVirtualPayRuntime(
   const messageToken = trimmedEnv(env.WECHAT_MINIAPP_MESSAGE_TOKEN)
   const encodingAesKey = trimmedEnv(env.WECHAT_MINIAPP_MESSAGE_ENCODING_AES_KEY)
   const payEnv = envRaw === '0' ? 0 : envRaw === '1' ? 1 : null
-  const secretsPresent = Boolean(
-    offerId && productionAppKey && sandboxAppKey && appId && appSecret && messageToken && encodingAesKeyOk(encodingAesKey),
+  const activeAppKey = payEnv === 1 ? sandboxAppKey : payEnv === 0 ? productionAppKey : ''
+  const commonSecretsPresent = Boolean(
+    offerId && appId && appSecret && messageToken && encodingAesKeyOk(encodingAesKey),
   )
   let block: MiniappVirtualPayBlock | null = null
-  if (!secretsPresent || envRaw === '') {
+  if (envRaw === '') {
     block = 'env_missing'
   } else if (payEnv === null) {
     block = 'env_invalid'
   } else if (env.NODE_ENV === 'production' && payEnv === 1) {
     block = 'sandbox_in_production'
+  } else if (!commonSecretsPresent || !activeAppKey) {
+    block = 'env_missing'
   }
   const ready = block === null
   return {
@@ -383,7 +386,7 @@ export function evaluateMiniappVirtualPayRuntime(
     block,
     env: payEnv,
     offerId: offerId || null,
-    appKey: ready ? (payEnv === 1 ? sandboxAppKey : productionAppKey) : null,
+    appKey: ready ? activeAppKey : null,
     appId: appId || null,
     messageToken: ready ? messageToken : null,
     encodingAesKey: ready ? encodingAesKey : null,

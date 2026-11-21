@@ -141,6 +141,37 @@ async function main(): Promise<void> {
   assert.equal(ready.ready, true)
   assert.equal(ready.env, 0)
   assert.equal(ready.appKey, 'app-key-verify')
+  const prodOnlyLiveKey = evaluateMiniappVirtualPayRuntime(
+    readyEnv({ NODE_ENV: 'production', WECHAT_MINIAPP_VPAY_ENV: '0', WECHAT_MINIAPP_VPAY_SANDBOX_APP_KEY: undefined }),
+  )
+  assert.equal(prodOnlyLiveKey.ready, true, '生产 env=0 只配现网键必须放行')
+  assert.equal(prodOnlyLiveKey.block, null)
+  assert.equal(prodOnlyLiveKey.env, 0)
+  assert.equal(prodOnlyLiveKey.appKey, 'app-key-verify')
+  const prodMissingLiveKey = evaluateMiniappVirtualPayRuntime(
+    readyEnv({ NODE_ENV: 'production', WECHAT_MINIAPP_VPAY_ENV: '0', WECHAT_MINIAPP_VPAY_APP_KEY: undefined }),
+  )
+  assert.equal(prodMissingLiveKey.ready, false, '生产 env=0 缺现网键必须失败关闭')
+  assert.equal(prodMissingLiveKey.block, 'env_missing')
+  assert.equal(prodMissingLiveKey.appKey, null)
+  const devOnlySandboxKey = evaluateMiniappVirtualPayRuntime(
+    readyEnv({ NODE_ENV: 'test', WECHAT_MINIAPP_VPAY_ENV: '1', WECHAT_MINIAPP_VPAY_APP_KEY: undefined }),
+  )
+  assert.equal(devOnlySandboxKey.ready, true, '非生产 env=1 只配沙箱键必须放行')
+  assert.equal(devOnlySandboxKey.block, null)
+  assert.equal(devOnlySandboxKey.env, 1)
+  assert.equal(devOnlySandboxKey.appKey, 'sandbox-key-verify')
+  const devMissingSandboxKey = evaluateMiniappVirtualPayRuntime(
+    readyEnv({ NODE_ENV: 'test', WECHAT_MINIAPP_VPAY_ENV: '1', WECHAT_MINIAPP_VPAY_SANDBOX_APP_KEY: undefined }),
+  )
+  assert.equal(devMissingSandboxKey.ready, false, '非生产 env=1 缺沙箱键必须失败关闭')
+  assert.equal(devMissingSandboxKey.block, 'env_missing')
+  assert.equal(devMissingSandboxKey.appKey, null)
+  const prodSandboxNoLiveKey = evaluateMiniappVirtualPayRuntime(
+    readyEnv({ NODE_ENV: 'production', WECHAT_MINIAPP_VPAY_ENV: '1', WECHAT_MINIAPP_VPAY_APP_KEY: undefined }),
+  )
+  assert.equal(prodSandboxNoLiveKey.ready, false)
+  assert.equal(prodSandboxNoLiveKey.block, 'sandbox_in_production')
   const shortKey = evaluateMiniappVirtualPayRuntime(readyEnv({ WECHAT_MINIAPP_MESSAGE_ENCODING_AES_KEY: 'too-short' }))
   assert.equal(shortKey.block, 'env_missing')
   assertProductionRuntimeGates(productionBaseline(), FONT_OK)
