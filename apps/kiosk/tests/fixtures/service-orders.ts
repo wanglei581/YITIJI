@@ -56,6 +56,77 @@ export const ORDER_WECHAT: Omit<FixtureOrder, 'createdAt'> = {
   provider: 'wechat',
 }
 
+export const ORDER_SCAN: Omit<FixtureOrder, 'createdAt'> = {
+  id: 'cmi5kp4n80027s6h9m1z8w4r2f',
+  providerOrderNo: 'svc9c42e81b7f03a6d5e1920bc4',
+  serviceKey: 'scan',
+  amountCents: 100,
+  provider: 'sandbox',
+}
+
+export const ORDER_SCAN_WECHAT: Omit<FixtureOrder, 'createdAt'> = {
+  id: 'cmi5kq9r20031s6h9t6y3n8p5d',
+  providerOrderNo: 'svc2a85f10c4d96b7e3a1048fe1',
+  serviceKey: 'scan',
+  amountCents: 100,
+  provider: 'wechat',
+}
+
+export type FixtureOrderStateKind = 'paid' | 'retry_free' | 'consumed' | 'refunding' | 'refunded' | 'refund_failed'
+
+/** 扫描等服务单常用状态夹具：paid / 可免费再试 / consumed / refunding / refunded / refund_failed。 */
+export function serviceOrderViewByState(
+  order: FixtureOrder,
+  kind: FixtureOrderStateKind,
+  nowMs = Date.now(),
+): Record<string, unknown> {
+  const paidAt = new Date(nowMs - 30_000).toISOString()
+  switch (kind) {
+    case 'paid':
+      return serviceOrderView(order, { status: 'paid', paidAt, attemptsUsed: 0 })
+    case 'retry_free':
+      return serviceOrderView(order, {
+        status: 'paid',
+        paidAt,
+        attemptsUsed: 1,
+        failureReason: '扫描没出文件',
+        retryUntil: new Date(nowMs + 10 * 60 * 1000).toISOString(),
+      })
+    case 'consumed':
+      return serviceOrderView(order, {
+        status: 'consumed',
+        paidAt,
+        attemptsUsed: 1,
+        consumedAt: new Date(nowMs - 5_000).toISOString(),
+      })
+    case 'refunding':
+      return serviceOrderView(order, {
+        status: 'refunding',
+        paidAt,
+        attemptsUsed: 2,
+        failureReason: '扫描没出文件',
+        refundReason: '扫描没出文件',
+      })
+    case 'refunded':
+      return serviceOrderView(order, {
+        status: 'refunded',
+        paidAt,
+        attemptsUsed: 2,
+        failureReason: '扫描没出文件',
+        refundReason: '扫描没出文件',
+        refundedAt: new Date(nowMs - 2_000).toISOString(),
+      })
+    case 'refund_failed':
+      return serviceOrderView(order, {
+        status: 'refund_failed',
+        paidAt,
+        attemptsUsed: 2,
+        failureReason: '扫描没出文件',
+        refundReason: '扫描没出文件',
+      })
+  }
+}
+
 function qrFor(order: FixtureOrder): string {
   if (order.provider === 'wechat') return 'weixin://wxpay/bizpayurl?pr=K9dQ2xT'
   const prepay = `sbx_${order.providerOrderNo.slice(3, 27)}`

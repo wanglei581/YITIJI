@@ -859,8 +859,8 @@ assert.equal(
 )
 assert.match(
   scanSettings,
-  /createScanSession\(\s*\n\s*\{ scanType, terminalId: getTerminalId\(\) \},\s*\n\s*identityToken,\s*\n\s*rescan,\s*\n\s*\)/,
-  '取到的授权必须真的传给创建请求；取了不传 = 白取一枚，重扫照旧退化。\n'
+  /createScanSession\(\s*\n\s*\{ scanType, terminalId: getTerminalId\(\) \},\s*\n\s*identityToken,\s*\n\s*rescan,\s*\n\s*serviceHeaders,\s*\n\s*\)/,
+  '取到的授权与这一趟服务单头必须真的传给创建请求；取了不传 = 白取一枚，重扫与重放照旧退化。\n'
     + '身份那一格必须是 identityToken（创建那一刻的快照），不是现取的 getToken()——见下一条。',
 )
 
@@ -1429,8 +1429,8 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding, quietPeriodBlocked\]\)/,
-  '（2026-09-28 起多一个终端静默期标志 quietPeriodBlocked：倒计时结束、用户点「重新开始」时它变 false，同样要触发这条 effect。）五个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
+  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding, quietPeriodBlocked, pay\.loading, pay\.needsPayment\]\)/,
+  '（2026-09-28 起多一个终端静默期标志 quietPeriodBlocked：倒计时结束、用户点「重新开始」时它变 false，同样要触发这条 effect；2026-11-21 P2e-4b 增 pay.loading / pay.needsPayment 前置付款核验完成时触发创建或跳付款屏。）五个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
     + '它们变 false，这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生。\n'
     + 'rescanRefusedByServer 这一位尤其容易被判成冗余 —— 服务端拒绝那条路径上'
     + 'rescanCredentialsLost 从头到尾都是 false，复位它不构成依赖变化。\n'
@@ -2229,5 +2229,13 @@ const deviceRecoveryTest = spawnSync(
   { encoding: 'utf8' },
 )
 assert.equal(deviceRecoveryTest.status, 0, `scan device recovery behaviour failed: ${deviceRecoveryTest.stderr || deviceRecoveryTest.stdout}`)
+
+// P2e-4 / P2e-4b 扫描按次付款判定、前置闸门、加载禁点、402 防循环与旧已结案单隔离必须有运行时覆盖。
+const scanPayModelTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-pay-model.test.mjs'), resolve(kioskRoot, 'scripts/tests/scan-pay-gate.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(scanPayModelTest.status, 0, `scan pay unit tests failed: ${scanPayModelTest.stderr || scanPayModelTest.stdout}`)
 
 console.log('ALL PASS scan session truth contract')

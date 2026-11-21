@@ -79,9 +79,27 @@ export function freeMachinePricing(): Record<string, unknown> {
   return machinePricing(0, 0)
 }
 
-/** 公共就业点位：永远不向个人收费（即便带价目也按免费处理）。 */
-export function publicSiteMachinePricing(resumeCents = 100): Record<string, unknown> {
-  return { ...machinePricing(0, 0, { resume_optimize: resumeCents }), isPublicSite: true }
+/** 扫一趟收费（扫描 1.00 元，其余 0），P2e-4 用例夹具。 */
+export function scanOnlyChargedPricing(scanCents = 100): Record<string, unknown> {
+  return machinePricing(0, 0, { scan: scanCents })
+}
+
+/** 全部 0 元（免费机器），P2e-4 用例夹具。 */
+export function allFreeMachinePricing(): Record<string, unknown> {
+  return machinePricing(0, 0)
+}
+
+/** 公共就业点位：永远不向个人收费（即使后台价格位非 0，页面仍按免费展示）。 */
+export function publicSiteMachinePricing(
+  input: number | MachineServicePrices = 100,
+): Record<string, unknown> {
+  const services: MachineServicePrices = typeof input === 'number'
+    ? { resume_optimize: input }
+    : input
+  return {
+    ...machinePricing(0, 0, services),
+    isPublicSite: true,
+  }
 }
 
 /** 在已经登记的终端配置上盖上本机价，不改托管、百宝箱等其它字段。 */
