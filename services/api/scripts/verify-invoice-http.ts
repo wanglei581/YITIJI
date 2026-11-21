@@ -89,20 +89,24 @@ function flattenValidationErrors(errors: ValidationError[], parent = ''): string
 })
 class InvoiceHttpModule {}
 
-interface Reply {
+interface Reply<T = Record<string, unknown>> {
   status: number
   text: string
-  json: { success?: boolean; data?: any; error?: { code?: string; message?: string } }
+  json: { success?: boolean; data?: T; error?: { code?: string; message?: string } }
 }
 
-async function call(method: 'GET' | 'POST', path: string, options: { body?: unknown; headers?: Record<string, string> } = {}): Promise<Reply> {
+async function call<T = Record<string, unknown>>(
+  method: 'GET' | 'POST',
+  path: string,
+  options: { body?: unknown; headers?: Record<string, string> } = {},
+): Promise<Reply<T>> {
   const res = await fetch(`${base}${path}`, {
     method,
     headers: { Accept: 'application/json', ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }), ...options.headers },
     ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
   })
   const text = await res.text()
-  return { status: res.status, text, json: text ? JSON.parse(text) : {} }
+  return { status: res.status, text, json: text ? JSON.parse(text) as Reply<T>['json'] : {} }
 }
 
 async function check(label: string, operation: () => Promise<void>) {
@@ -182,11 +186,11 @@ async function main(): Promise<void> {
         body: { orderKind: 'print', orderId, titleType: 'company', title: '青岛某印务有限公司', taxId: TAX_ID, email: EMAIL },
       })
       assert.equal(created.status, 201, created.text)
-      const id = created.json.data.id as string
+      const id = String(created.json.data?.['id'] ?? '')
       const one = await call('GET', `/me/invoice-requests/${id}`, { headers: asKiosk })
       assert.equal(one.status, 200, one.text)
-      assert.equal(one.json.data.taxIdMasked, '9100**********000N')
-      assert.equal(one.json.data.emailMasked, 'f***@example.com')
+      assert.equal(one.json.data?.['taxIdMasked'], '9100**********000N')
+      assert.equal(one.json.data?.['emailMasked'], 'f***@example.com')
       assert.equal(one.text.includes(TAX_ID), false, '单条接口带回了完整税号')
       assert.equal(one.text.includes(EMAIL), false, '单条接口带回了完整邮箱')
       const lowerTaxId = '91000000ma0000000n'
@@ -199,7 +203,7 @@ async function main(): Promise<void> {
         operatorId: `verify-invoice-http-admin-${tag}`,
       })
       const returned = await call('GET', `/me/invoice-requests/${id}`, { headers: asKiosk })
-      assert.equal(returned.json.data.status, 'returned')
+      assert.equal(returned.json.data?.['status'], 'returned')
       for (const secret of [TAX_ID, lowerTaxId, tax15, tax17, tax20, EMAIL]) {
         assert.equal(returned.text.includes(secret), false, `退回原因明文逃逸了 ${secret}`)
       }
@@ -248,10 +252,14 @@ async function main(): Promise<void> {
         body: { orderKind: 'print', orderId },
       })
       assert.equal(created.status, 201, created.text)
-      made.keys.push(`invoice_session:${created.json.data.sessionId}`)
-      const resolved = await call('POST', '/kiosk/invoice-sessions/scene/resolve', { body: { scene: created.json.data.sceneToken } })
+      const createdSessionId = String(created.json.data?.['sessionId'] ?? '')
+      made.keys.push(`invoice_session:${createdSessionId}`)
+      const resolved = await call<{ sessionId: string; submitToken: string }>('POST', '/kiosk/invoice-sessions/scene/resolve', {
+        body: { scene: created.json.data?.['sceneToken'] },
+      })
       assert.equal(resolved.status, 201, resolved.text)
-      const { sessionId, submitToken } = resolved.json.data as { sessionId: string; submitToken: string }
+      assert.ok(resolved.json.data)
+      const { sessionId, submitToken } = resolved.json.data
       const good = { submitToken, titleType: 'personal', title: '刘晓楠', email: 'liuxiaonan@example.com' }
       for (const [body, code, message] of [
         [{ ...good, titleType: 'boss' }, 'INVOICE_TITLE_INVALID', '抬头要选个人或单位。'],
@@ -299,12 +307,13 @@ async function main(): Promise<void> {
       assert.equal((await client.keys('invoice_session:*')).length, sessionKeysBefore, '被拒的请求不该写会话')
       const created = await call('POST', '/kiosk/invoice-sessions', { headers: { ...kiosk, ...memberOnly }, body: { orderKind: 'print', orderId } })
       assert.equal(created.status, 201, created.text)
-      made.keys.push(`invoice_session:${created.json.data.sessionId}`)
-      const control = { 'x-invoice-control': created.json.data.controlToken as string }
-      const pollNoTerminal = await call('GET', `/kiosk/invoice-sessions/${created.json.data.sessionId}`, { headers: control })
+      const createdId = String(created.json.data?.['sessionId'] ?? '')
+      made.keys.push(`invoice_session:${createdId}`)
+      const control = { 'x-invoice-control': String(created.json.data?.['controlToken'] ?? '') }
+      const pollNoTerminal = await call('GET', `/kiosk/invoice-sessions/${createdId}`, { headers: control })
       assert.equal(pollNoTerminal.status, 401, `不带终端会话也能轮询：${pollNoTerminal.text}`)
       assert.equal(pollNoTerminal.json.error?.code, 'TERMINAL_SESSION_INVALID')
-      const poll = await call('GET', `/kiosk/invoice-sessions/${created.json.data.sessionId}`, { headers: { ...kiosk, ...control } })
+      const poll = await call('GET', `/kiosk/invoice-sessions/${createdId}`, { headers: { ...kiosk, ...control } })
       assert.equal(poll.status, 200, poll.text)
       assert.deepEqual(poll.json.data, { status: '等手机填写' })
       const refundedId = await printOrder(owner.id, kioskTerminalId, { payStatus: 'refunded', refundedAmountCents: 300 })
@@ -324,15 +333,18 @@ async function main(): Promise<void> {
       const owner = await member()
       const headers = { Authorization: `Bearer ${owner.token}` }
       for (let index = 0; index < 3; index += 1) await printOrder(owner.id, kioskTerminalId, { createdAt: new Date(Date.now() - 60_000 - index * 1000) })
-      const first = await call('GET', '/me/invoice-orders?limit=2', { headers })
+      type PageData = { items: Array<{ orderId: string }>; nextCursor: string | null }
+      const first = await call<PageData>('GET', '/me/invoice-orders?limit=2', { headers })
       assert.equal(first.status, 200, first.text)
+      assert.ok(first.json.data)
       assert.equal(first.json.data.items.length, 2)
       assert.equal(typeof first.json.data.nextCursor, 'string')
-      const second = await call('GET', `/me/invoice-orders?limit=2&cursor=${encodeURIComponent(first.json.data.nextCursor)}`, { headers })
+      const second = await call<PageData>('GET', `/me/invoice-orders?limit=2&cursor=${encodeURIComponent(first.json.data.nextCursor ?? '')}`, { headers })
       assert.equal(second.status, 200, second.text)
+      assert.ok(second.json.data)
       assert.equal(second.json.data.items.length, 1)
       assert.equal(second.json.data.nextCursor, null)
-      const all = [...first.json.data.items, ...second.json.data.items].map((row: { orderId: string }) => row.orderId)
+      const all = [...first.json.data.items, ...second.json.data.items].map((row) => row.orderId)
       assert.equal(new Set(all).size, 3)
       for (const query of ['limit=0', 'limit=51', 'limit=abc', 'cursor=%40%40%40', 'cursor=bm90LWEtY3Vyc29y']) {
         const bad = await call('GET', `/me/invoice-orders?${query}`, { headers })
