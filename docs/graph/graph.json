@@ -15375,7 +15375,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 861,
+      "reachableFileCount": 862,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15763,6 +15763,7 @@
           "path": "/interview",
           "styles": [
             "apps/kiosk/src/pages/interview/interview-service-desk.css",
+            "apps/kiosk/src/pages/interview/styles/interview-pay.css",
             "apps/kiosk/src/pages/interview/styles/interview-qx2.css",
             "apps/kiosk/src/pages/interview/styles/interview-report.css",
             "apps/kiosk/src/pages/interview/styles/interview-responsive.css",
@@ -18565,7 +18566,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1050
+      "sourceFileCount": 1051
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20055,6 +20056,7 @@
         ],
         "usedBy": [
           "services/api/src/member-privacy/member-closure.service.ts",
+          "services/api/src/mock-interview/interview-report-charge.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/payment/service-order.settle.ts"
         ]
@@ -20070,6 +20072,7 @@
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/mock-interview/interview-report-charge.ts",
           "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview-charge.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
@@ -20084,6 +20087,7 @@
         ],
         "usedBy": [
           "services/api/src/member-privacy/member-closure.service.ts",
+          "services/api/src/mock-interview/interview-report-charge.ts",
           "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview-charge.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
@@ -31309,7 +31313,8 @@
       "services/api/scripts/verify-service-order-interview-report.ts"
     ],
     "services/api/src/payment/service-order.intercept.ts": [
-      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs"
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
+      "services/api/scripts/verify-service-order-interview-report.ts"
     ],
     "services/api/src/payment/service-order.payment.ts": [
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
@@ -50361,6 +50366,7 @@
           "services/api/src/payment/providers/sandbox-payment.provider.ts",
           "services/api/src/payment/refund.service.ts",
           "services/api/src/payment/service-order.controller.ts",
+          "services/api/src/payment/service-order.intercept.ts",
           "services/api/src/payment/service-order.payment.ts",
           "services/api/src/payment/service-order.policy.ts",
           "services/api/src/payment/service-order.service.ts",

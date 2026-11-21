@@ -122,9 +122,9 @@ flowchart TD
 | **License** | 21 | Organization | 4 个文件<br/>`licenses/license-gate.ts`<br/>`licenses/license-queries.ts`<br/>`licenses/license-write.ts`<br/>… |
 | **MemberLegalConsent** | 10 | EndUser | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
-| **MockInterviewReport** | 6 | MockInterviewSession | 3 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts`<br/>`payment/service-order.settle.ts` |
-| **MockInterviewSession** | 22 | MockInterviewReport、MockInterviewTurn | 7 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
-| **MockInterviewTurn** | 13 | MockInterviewSession | 7 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>`mock-interview/mock-interview-charge.ts`<br/>… |
+| **MockInterviewReport** | 6 | MockInterviewSession | 4 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-report-charge.ts`<br/>`mock-interview/mock-interview.service.ts`<br/>… |
+| **MockInterviewSession** | 22 | MockInterviewReport、MockInterviewTurn | 8 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
+| **MockInterviewTurn** | 13 | MockInterviewSession | 8 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-report-charge.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>… |
 | **OfflineAgency** | 23 | OfflineJob | 2 个文件<br/>`offline-agencies/offline-agencies.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
 | **OfflineAgencyBranch** | 31 | Job、OfflineAgencyProfile、QualificationRecord | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |

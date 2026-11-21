@@ -3125,7 +3125,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/refund-convergence.task.ts` | `verify-api20-manual-refund.ts`<br/>`verify-refund-convergence.ts` |
 | `services/api/src/payment/refund.service.ts` | `verify-admin-orders-refund.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-order.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-service-order-interview-report.ts`<br/>`verify-service-orders-concurrency.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/payment/service-order.controller.ts` | `verify-service-order-interview-report.ts` |
-| `services/api/src/payment/service-order.intercept.ts` | `verify-backend-error-copy-coverage.mjs` |
+| `services/api/src/payment/service-order.intercept.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-service-order-interview-report.ts` |
 | `services/api/src/payment/service-order.payment.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-service-order-interview-report.ts`<br/>`verify-service-order-sandbox-simulate.ts`<br/>`verify-service-orders-concurrency.ts`<br/>`verify-service-orders-settle.ts` |
 | `services/api/src/payment/service-order.policy.ts` | `verify-service-order-interview-report.ts`<br/>`verify-service-orders-concurrency.ts`<br/>`verify-service-orders.ts` |
 | `services/api/src/payment/service-order.ref.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-service-order-open-ref-postgres.ts`<br/>`verify-service-orders-settle.ts` |
