@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`668` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`669` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -66,8 +66,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/orders` | AdminOrdersReadonlyController.list | admin | AdminOrdersReadonlyService | EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Refund<br/>Terminal |
-| GET | `/api/v1/admin/orders/:id` | AdminOrdersReadonlyController.getById | admin | AdminOrdersReadonlyService | EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Refund<br/>Terminal |
+| GET | `/api/v1/admin/orders` | AdminOrdersReadonlyController.list | admin | AdminOrdersReadonlyService | AuditLog<br/>EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Refund<br/>Terminal |
+| GET | `/api/v1/admin/orders/:id` | AdminOrdersReadonlyController.getById | admin | AdminOrdersReadonlyService | AuditLog<br/>EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Refund<br/>Terminal |
 
 ## `services/api/src/admin-print-scan/admin-print-scan.controller.ts`
 
@@ -982,6 +982,7 @@
 | POST | `/api/v1/admin/orders/:id/mark-paid` | AdminOrderActionsController.markPaid | admin | OrderStatusService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem |
 | POST | `/api/v1/admin/orders/:id/print-return/close` | AdminOrderActionsController.closeHeldOrder | admin | — | — |
 | POST | `/api/v1/admin/orders/:id/print-return/confirm-refunded` | AdminOrderActionsController.confirmRefunded | admin | — | — |
+| POST | `/api/v1/admin/orders/:id/print-return/query-channel` | AdminOrderActionsController.queryPrintReturnChannel | admin | — | — |
 | POST | `/api/v1/admin/orders/:id/print-return/register-channel-result` | AdminOrderActionsController.registerChannelResult | admin | — | — |
 | POST | `/api/v1/admin/orders/:id/print-return/release-paper` | AdminOrderActionsController.releasePaper | admin | — | — |
 | POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |

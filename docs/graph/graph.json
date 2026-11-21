@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 668,
+    "endpointCount": 669,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -3532,6 +3532,7 @@
         "handler": "AdminOrdersReadonlyController.list",
         "method": "GET",
         "models": [
+          "AuditLog",
           "EndUser",
           "Order",
           "PaymentAttempt",
@@ -3555,6 +3556,7 @@
         "handler": "AdminOrdersReadonlyController.getById",
         "method": "GET",
         "models": [
+          "AuditLog",
           "EndUser",
           "Order",
           "PaymentAttempt",
@@ -3612,6 +3614,18 @@
         "method": "POST",
         "models": [],
         "path": "/api/v1/admin/orders/:id/print-return/confirm-refunded",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/payment/admin-order-actions.controller.ts",
+        "handler": "AdminOrderActionsController.queryPrintReturnChannel",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/orders/:id/print-return/query-channel",
         "roles": [
           "admin"
         ],
@@ -14888,6 +14902,7 @@
             "GET /admin/orders/:param",
             "POST /admin/orders/:param/mark-paid",
             "POST /admin/orders/:param/print-return/:param",
+            "POST /admin/orders/:param/print-return/query-channel",
             "POST /admin/orders/:param/print-return/register-channel-result",
             "POST /admin/orders/:param/refund",
             "POST /admin/orders/:param/refund-after-paper-check",
@@ -15189,6 +15204,7 @@
             "GET /admin/users/:param",
             "POST /admin/orders/:param/mark-paid",
             "POST /admin/orders/:param/print-return/:param",
+            "POST /admin/orders/:param/print-return/query-channel",
             "POST /admin/orders/:param/print-return/register-channel-result",
             "POST /admin/orders/:param/refund",
             "POST /admin/orders/:param/refund-after-paper-check",
@@ -19058,6 +19074,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts",
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-user-closure-read.ts",
           "services/api/src/ai/quota/ai-quota.service.ts",
@@ -19082,9 +19099,11 @@
           "services/api/src/payment/refund-channel-answer.ts",
           "services/api/src/payment/refund-channel-hold-gate.ts",
           "services/api/src/payment/refund-channel-query.ts",
+          "services/api/src/payment/refund-channel-registration.ts",
           "services/api/src/payment/refund-notify-paper-guard.ts",
           "services/api/src/payment/refund-paper-exclusion.ts",
           "services/api/src/payment/resolve-print-return-hold.ts",
+          "services/api/src/payment/service-order-refund-abnormal.ts",
           "services/api/src/payment/stale-attempt-collection.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
@@ -19922,6 +19941,7 @@
           "services/api/src/payment/print-return-alert.ts",
           "services/api/src/payment/print-return-disposition.ts",
           "services/api/src/payment/print-return-settlement-fault.ts",
+          "services/api/src/payment/query-print-return-channel.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/payment/refund-channel-answer.ts",
@@ -20286,6 +20306,7 @@
           "services/api/src/payment/closed-window-unprinted.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
           "services/api/src/payment/print-return-disposition.ts",
+          "services/api/src/payment/query-print-return-channel.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-abnormal.ts",
           "services/api/src/payment/refund-amount-hold.ts",
@@ -20389,6 +20410,7 @@
         "usedBy": [
           "services/api/src/admin-ops/derived-service-return-alerts.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/payment/service-order-refund-abnormal.ts",
           "services/api/src/payment/service-order.admin.ts",
           "services/api/src/payment/service-order.payment.ts",
           "services/api/src/payment/service-order.ref.ts",
@@ -27018,6 +27040,34 @@
       "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
       "services/api/scripts/verify-pickup-arrival-price.ts"
     ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-abnormal-24h-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-conflict-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-multi-fail-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-query-channel-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
     "services/api/scripts/support/pickup-arrival-price-cases.ts": [
       "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
       "services/api/scripts/verify-pickup-arrival-price.ts"
@@ -27068,6 +27118,11 @@
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts"
+    ],
+    "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts",
+      "services/api/scripts/verify-service-orders.ts"
     ],
     "services/api/scripts/support/service-order-verify-fixture.ts": [
       "services/api/scripts/verify-service-orders-concurrency.ts",
@@ -46883,7 +46938,15 @@
           "services/api/scripts/support/pickup-arrival-p2b9-registration-cases.ts",
           "services/api/scripts/support/pickup-arrival-p2b9-submit-write-cases.ts",
           "services/api/scripts/support/pickup-arrival-p2b9-verify-reason-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-abnormal-24h-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-conflict-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-multi-fail-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-query-channel-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts",
           "services/api/scripts/support/pickup-arrival-price-cases.ts",
+          "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
@@ -46921,7 +46984,15 @@
           "services/api/scripts/support/pickup-arrival-p2b9-registration-cases.ts",
           "services/api/scripts/support/pickup-arrival-p2b9-submit-write-cases.ts",
           "services/api/scripts/support/pickup-arrival-p2b9-verify-reason-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-abnormal-24h-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-conflict-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-multi-fail-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-query-channel-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts",
           "services/api/scripts/support/pickup-arrival-price-cases.ts",
+          "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
@@ -49528,6 +49599,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts",
           "services/api/scripts/support/service-order-verify-fixture.ts",
           "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/ai/ai.service.ts",

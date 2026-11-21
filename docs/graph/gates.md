@@ -72,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 2247 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 2255 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2373,7 +2373,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 173 个文件</summary>
+<summary><code>services/api/scripts/</code> — 181 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2460,6 +2460,13 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/pickup-arrival-p2b9-registration-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/pickup-arrival-p2b9-submit-write-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/pickup-arrival-p2b9-verify-reason-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9d-abnormal-24h-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9d-conflict-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9d-multi-fail-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9d-query-channel-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
+| `services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/pickup-arrival-price-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts` |
 | `services/api/scripts/support/png-fixtures.ts` | `verify-brand-logo-image.ts`<br/>`verify-branding.ts` |
 | `services/api/scripts/support/policy-one-step-http-cases.ts` | `verify-content-pipeline-e2e.ts` |
@@ -2474,6 +2481,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/resume-optimize-regression-corpus.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/scan-panel-wording.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/serializable-race-barrier.ts` | `verify-first-admin-bootstrap-postgres.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-print-retry-lock-postgres.ts`<br/>`verify-service-order-open-ref-postgres.ts` |
+| `services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts` | `verify-pickup-arrival-price-postgres.ts`<br/>`verify-pickup-arrival-price.ts`<br/>`verify-service-orders.ts` |
 | `services/api/scripts/support/service-order-verify-fixture.ts` | `verify-service-orders-concurrency.ts`<br/>`verify-service-orders.ts` |
 | `services/api/scripts/support/sqlite-cli.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/terminal-charge-fixture.ts` | `verify-admin-billing.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-copy-c1b.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-service-orders-concurrency.ts`<br/>`verify-service-orders.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |

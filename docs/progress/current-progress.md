@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-21：收费第 2 期 b 返工第十轮 `P2b9d`，渠道退成事实保底、防二退、服务单异常与在途查询收口（未推送）
+
+- 分支 `claude/pricing-p2b-1119c`（从第九轮头 `f968e3522` 继续）。默认仍是机构承担、价目 0、个人收费总开关关、公共就业点位永不收费；未新增数据库迁移，未触碰 `apps/kiosk/`、`apps/miniapp/`、`apps/partner/`、`apps/terminal-agent/`、生产配置，未推送。
+- 渠道退成事实绝不回滚：`recordChannelAnswers` 先在事务内落库 `Refund.status = 'success'`、渠道实退额、`channelRefundNo` 与 `refund.channel_answer` 审计；遇纸已出或非过期成功退款合计超应付时不再回滚退款成功，保留 `Refund.status = 'success'`、写入 `refund.channel_success_conflict` 冲突审计并触发运维告警（同时修掉 `print-return-alert.ts` 未 `connect()` 导致告警被吞的缺陷），不再误导「先不记账，请走核对后仍退款」。`refund-notify-paper-guard.ts` 同步对齐，订单留在冲突待人工核对态。
+- 「核对后仍退款」前后端双防线守住 `channelInFlight`：前端 `PrintReturnHoldActions.tsx` 改判 `!channelPending`（`!detail.channelInFlight`）；后端 `refund-paper-exclusion.ts`（`allowFailedHold` 不放行仍在途的 `manual_review`）与 `stage-order-refund.ts`（`verifiedAfterPaper` 撤回条件加 `channelSubmittedAt: null`）联防，非默认单号在途 `manual_review` 调用 `verifiedAfterPaper` 被拒且 `provider.refund()` 调 0 次。
+- 多笔退款失败恢复计入 `manual_review`：`refund-channel-answer.ts` 统计仍有未结清退款覆盖 `pending` 与 `manual_review`，仍有在途 `manual_review` 时不把 `order.payStatus` 从 `refunding` 提前翻回 `paid`。
+- AI 服务单 `ABNORMAL` 全部三处收口：拆出 `service-order-refund-abnormal.ts`，在发起退款应答、`applyRefundQuery`、`settleServiceRefundNotify`（补 `refundState` 并纳入通知去重指纹）三处先判 `isChannelAbnormal`，不调 `markRefundFailed`、不递增 `refundAttempts`、写 `service_order.refund_abnormal` 审计与中间账户诊断并触发告警。
+- 24 小时内在途单加只查不处置端点与按钮：新增 `POST /admin/orders/:id/print-return/query-channel`（鉴权、限流、`mock-server-contract` 登记），前端在 `channelPending` 时提供「向渠道查询结果」并原地刷新详情保留中文结果提示；`refund-notify-paper-guard.ts` 打通 `manual_review` 收到微信成功通知收口（已关单重复通知仍幂等拦截）。
+- 按商户平台核实结果登记支持填实退金额（元转分、前后端校验 `0 < actualAmountCents <= refund.amountCents`，小于实付记 `partial_refunded` 留余款可退）；微信 `ABNORMAL` 满 24 小时不再误导为「长期查不到」或暴露登记按钮，引导商户平台处理后点「向渠道查询结果」收口；过期付款补收退款先查 provider 存在性并在 `db.refund.create` 原子写入 `channelSubmittedAt`。
+- 临时 PostgreSQL 16 @5677（UTC）与隔离 SQLite 全套打印到机价目、退款、服务单门禁、类型/lint/契约/文案/图谱/CI 门禁全绿；后台订单 Playwright 浏览器 18/18 通过；PG 5677 反向变异 5/5 必红并还原。
+
 ## 2026-11-19：收费第 2 期 b 返工第九轮，「已提交渠道」改成显式记录（未推送）
 
 - 分支 `claude/pricing-p2b-1119c`（从第九轮第 1 条 e85d0f262 接着做）。默认仍是机构承担、价目 0、个人收费总开关关、公共就业点位永不收费。没有推送，没改小程序、一体机、终端 Agent、设计稿、生产配置。
