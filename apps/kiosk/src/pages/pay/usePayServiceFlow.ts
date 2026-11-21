@@ -75,7 +75,8 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
   const genRef = useRef(0)
   const getLogRef = useRef<number[]>([])
   const lastRefreshRef = useRef(0)
-  const inflightRef = useRef(false)
+  const inflightRef = useRef<Promise<void> | null>(null)
+  const expiryCheckedOrderIdRef = useRef<string | null>(null)
   const leavingRef = useRef(false)
 
   /** 这一次结果还算不算数：人没走，也没换成更新的一次。 */
@@ -88,6 +89,11 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     setNowMs(now)
     const phase = serviceOrderPhase(view, now)
     setState((prev) => {
+      // 本地已到点但本次不是 refresh=1 核实、且服务端尚未关单（仍是 pending 无失败）：
+      // 不让普通轮询抢先判 timeout，先留核实态等到点那一次 refresh=1 落定。
+      if (phase === 'timed_out' && view.status === 'pending' && !fromRefresh) {
+        return { screen: 'check', order: view, phase: 'checking', error: null, checking: true }
+      }
       let checking = false
       if (phase === 'checking') checking = true
       else if (phase === 'awaiting') checking = fromRefresh ? false : prev.checking
@@ -148,14 +154,20 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     const stored = readServiceTrip(serviceKey)
     if (stored) {
       try {
-        const view = await getServiceOrder(stored.orderId, stored.kioskSessionId)
+        let view = await getServiceOrder(stored.orderId, stored.kioskSessionId)
         if (!current(gen)) return
+        let fromRefresh = false
+        if (view.status === 'pending' && !view.paymentFailed && serviceOrderExpiredLocally(view, Date.now())) {
+          view = await getServiceOrder(stored.orderId, stored.kioskSessionId, { refresh: true })
+          if (!current(gen)) return
+          fromRefresh = true
+        }
         const mapped = screenForPhase(serviceOrderPhase(view, Date.now()))
         if (mapped === 'wait' || mapped === 'check' || mapped === 'ok') {
           // 重载、或从别处回来：同一张单、同一张码。
           tripRef.current = stored
           lastRefreshRef.current = Date.now()
-          applyView(view, false)
+          applyView(view, fromRefresh)
           return
         }
         // 没付成、超时、退款中、已关的旧单：用不上了，关掉待付的、忘掉，再出一张。
@@ -198,28 +210,34 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     const refresh = manual ? sinceRefresh >= PAY_REFRESH_GAP_MS : provider !== 'sandbox' && sinceRefresh >= PAY_AUTO_REFRESH_GAP_MS
     if (refresh) lastRefreshRef.current = now
     log.push(now)
-    inflightRef.current = true
     const gen = genRef.current
-    try {
-      const view = await getServiceOrder(trip.orderId, trip.kioskSessionId, { refresh })
-      if (current(gen)) applyView(view, refresh)
-    } catch (error) {
-      if (!current(gen)) return
-      if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
-        // 这张单服务端不认了：按超时说（没收到钱，万一扣了自动退），再出一张码会建新的。
-        forgetServiceTrip(trip.serviceKey, trip.orderId)
-        tripRef.current = null
-        setState((prev) => ({ ...prev, screen: 'timeout', checking: false }))
+    const run = (async () => {
+      try {
+        const view = await getServiceOrder(trip.orderId, trip.kioskSessionId, { refresh })
+        if (current(gen)) applyView(view, refresh)
+      } catch (error) {
+        if (!current(gen)) return
+        if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
+          // 这张单服务端不认了：按超时说（没收到钱，万一扣了自动退），再出一张码会建新的。
+          forgetServiceTrip(trip.serviceKey, trip.orderId)
+          tripRef.current = null
+          setState((prev) => ({ ...prev, screen: 'timeout', checking: false }))
+        }
+        // 其它失败（多半是网络）：留着上一次的样子，下一拍再查，不伪造结果。
       }
-      // 其它失败（多半是网络）：留着上一次的样子，下一拍再查，不伪造结果。
+    })()
+    inflightRef.current = run
+    try {
+      await run
     } finally {
-      inflightRef.current = false
+      if (inflightRef.current === run) inflightRef.current = null
     }
   }, [applyView, current])
 
-  const expired = WAITING.has(state.screen) && state.order !== null && serviceOrderExpiredLocally(state.order, nowMs)
-  const view: PayScreen = expired ? 'timeout' : state.screen
-  const polling = WAITING.has(view)
+  const expiredLocally = WAITING.has(state.screen) && state.order !== null && serviceOrderExpiredLocally(state.order, nowMs)
+  // 本地倒计时归零时先保持核实态向服务端发一次 refresh=1，不直接切 timeout。
+  const view: PayScreen = expiredLocally ? 'check' : state.screen
+  const polling = WAITING.has(state.screen) && !expiredLocally
 
   useEffect(() => {
     if (!polling) return undefined
@@ -239,17 +257,61 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
   }, [polling, pollOnce])
 
   useEffect(() => {
+    if (!expiredLocally || !state.order) return undefined
+    const orderId = state.order.id
+    if (expiryCheckedOrderIdRef.current === orderId) return undefined
+    expiryCheckedOrderIdRef.current = orderId
+    const gen = genRef.current
+    void (async () => {
+      const pending = inflightRef.current
+      if (pending) await pending.catch(() => undefined)
+      if (!current(gen)) return
+      const latestOrder = orderRef.current
+      if (latestOrder && latestOrder.id === orderId && (latestOrder.status !== 'pending' || latestOrder.paymentFailed)) return
+      const trip = tripRef.current
+      if (!trip || trip.orderId !== orderId) return
+      const run = (async () => {
+        const now = Date.now()
+        lastRefreshRef.current = now
+        getLogRef.current = [...getLogRef.current.filter((at) => now - at < 60_000), now]
+        try {
+          const refreshed = await getServiceOrder(trip.orderId, trip.kioskSessionId, { refresh: true })
+          if (!current(gen)) return
+          applyView(refreshed, true)
+        } catch (error) {
+          if (!current(gen)) return
+          if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
+            forgetServiceTrip(trip.serviceKey, trip.orderId)
+            tripRef.current = null
+            setState((prev) => ({ ...prev, screen: 'timeout', phase: 'timed_out', error: null, checking: false }))
+            return
+          }
+          // 到点核实请求失败：保留单号与订单视图，落到可重试核实态，绝不误判为超时。
+          setState((prev) => ({ ...prev, screen: 'lookup', error, checking: false }))
+        }
+      })()
+      inflightRef.current = run
+      try {
+        await run
+      } finally {
+        if (inflightRef.current === run) inflightRef.current = null
+      }
+    })()
+    return undefined
+  }, [applyView, current, expiredLocally, state.order])
+
+  useEffect(() => {
     if (view !== 'ok') return undefined
     const timer = window.setTimeout(goNext, PAY_OK_ADVANCE_MS)
     return () => window.clearTimeout(timer)
   }, [view, goNext])
 
-  useBusyLock(view === 'loading' || polling)
+  useBusyLock(view === 'loading' || polling || expiredLocally)
 
   const onRefresh = useCallback(() => {
-    if (!WAITING.has(view)) return
+    if (!polling) return
     void pollOnce(true)
-  }, [pollOnce, view])
+  }, [pollOnce, polling])
 
   const onRetry = useCallback(() => {
     if (busy) return
@@ -259,8 +321,30 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       try {
         const old = tripRef.current
         if (view === 'lookup') {
-          // 本机记着的单刚才查不到：再查一次，不另建。
-          await enter(gen)
+          // 本机记着的单核实/查询失败：带 refresh=1 再核实一次，覆盖晚到已付结果，不另建新单。
+          const stored = old ?? readServiceTrip(serviceKey)
+          if (!stored) {
+            await enter(gen)
+            return
+          }
+          try {
+            const now = Date.now()
+            lastRefreshRef.current = now
+            const refreshed = await getServiceOrder(stored.orderId, stored.kioskSessionId, { refresh: true })
+            if (!current(gen)) return
+            tripRef.current = stored
+            applyView(refreshed, true)
+          } catch (error) {
+            if (!current(gen)) return
+            if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
+              forgetServiceTrip(serviceKey, stored.orderId)
+              tripRef.current = null
+              setState((prev) => ({ ...prev, screen: 'timeout', phase: 'timed_out', error: null, checking: false }))
+            } else {
+              tripRef.current = stored
+              setState((prev) => ({ ...prev, screen: 'lookup', error, checking: false }))
+            }
+          }
           return
         }
         tripRef.current = null
@@ -271,7 +355,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         setBusy(false)
       }
     })()
-  }, [busy, create, current, enter, view])
+  }, [applyView, busy, create, current, enter, serviceKey, view])
 
   const onLeave = useCallback((closeOrder: boolean) => {
     if (leavingRef.current) return

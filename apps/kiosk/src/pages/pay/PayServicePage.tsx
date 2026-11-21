@@ -118,9 +118,12 @@ export function PayServicePage({ what }: { what: PayWhat }) {
     case 'error':
     case 'lookup':
       body = (
-        <p className="pys-chline" role="alert" data-testid="pay-service-line">
-          {flow.view === 'error' ? payCreateErrorLine(flow.error) : payLookupErrorLine(flow.error)}
-        </p>
+        <>
+          {flow.view === 'lookup' ? sum : null}
+          <p className="pys-chline" role="alert" data-testid="pay-service-line">
+            {flow.view === 'error' ? payCreateErrorLine(flow.error) : payLookupErrorLine(flow.error)}
+          </p>
+        </>
       )
       break
     case 'loading':

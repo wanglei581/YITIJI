@@ -190,27 +190,100 @@ test.describe('付款屏 @kiosk', () => {
     })
   }
 
-  test('超时按本地时钟：服务端还没关单，过了 expiresAt 屏上就是超时 @kiosk', async ({ page, api }) => {
+  test('超时按本地时钟：到点先发 refresh=1 核实，明确未付成才进入超时 @kiosk', async ({ page, api }) => {
     const start = new Date('2026-11-19T14:20:00+08:00').getTime()
     await page.clock.install({ time: start })
     chargingMachine(api)
     const order = { ...ORDER_A, createdAt: start }
     api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
-    // 服务端清扫最多晚 30 秒才关单：这里一直回待付，页面不能跟着多等。
+    // 服务端清扫最多晚 30 秒才关单：到点核实仍回待付，确认未付成后立即进入超时。
     respondOrder(api, order)
+    const calls = recordServiceOrderCalls(page)
 
     await page.goto('/pay/resume')
     await expectState(page, 'wait')
     // 人还在屏前：第 4 分钟点一次「刷新付款结果」。不点的话 5 分钟没碰屏，隐私硬截止会先把这一位清场。
     await page.clock.runFor(4 * 60_000)
     await primary(page).click()
+    await page.waitForTimeout(50)
+    const refreshBeforeExpiry = calls.filter((call) => call.method === 'GET' && call.refresh).length
     await page.clock.runFor(SERVICE_PAY_TTL_MS - 4 * 60_000 + 2_000)
     await expectState(page, 'timeout')
+    const refreshAfterExpiry = calls.filter((call) => call.method === 'GET' && call.refresh).length
+    expect(refreshAfterExpiry).toBeGreaterThan(refreshBeforeExpiry)
     await expect(payScreen(page)).toContainText('等了 5 分钟，这一次没有付成')
     await expect(payScreen(page)).toContainText('没收到这一次的钱')
     await expect(page.getByTestId('pay-service-line')).toHaveText(`${TIMEOUT_FULL}可以再出一张码，或返回。`)
     await expect(primary(page)).toHaveText('再出一张码')
     await expectNoForbiddenCopy(page)
+  })
+
+  test('到点核实压哨付成：本地倒计时归零先发 refresh=1，服务端已 paid 直接去下一步 @kiosk', async ({ page, api }) => {
+    const start = new Date('2026-11-19T14:22:00+08:00').getTime()
+    await page.clock.install({ time: start })
+    chargingMachine(api)
+    const order = { ...ORDER_A, createdAt: start }
+    let buzzerPaid = false
+    api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
+    respondOrder(api, order)
+    await page.route((url) => url.pathname === serviceOrderPath(order.id) && url.searchParams.get('refresh') === '1', (route) => {
+      const payload = buzzerPaid
+        ? serviceOrderView(order, { status: 'paid', paidAt: new Date(start + SERVICE_PAY_TTL_MS - 500).toISOString() })
+        : serviceOrderView(order)
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ok(payload).json) })
+    })
+    const calls = recordServiceOrderCalls(page)
+
+    await page.goto('/pay/resume?next=optimize')
+    await expectState(page, 'wait')
+    await page.clock.runFor(4 * 60_000)
+    await primary(page).click()
+    await page.waitForTimeout(50)
+    const refreshBeforeExpiry = calls.filter((call) => call.method === 'GET' && call.refresh).length
+    buzzerPaid = true
+    await page.clock.runFor(SERVICE_PAY_TTL_MS - 4 * 60_000 + 2_000)
+    await expectState(page, 'ok')
+    expect(calls.filter((call) => call.method === 'GET' && call.refresh).length).toBeGreaterThan(refreshBeforeExpiry)
+    await page.clock.runFor(2_000)
+    await expect(page).toHaveURL(/\/resume\/optimize$/, { timeout: 10_000 })
+  })
+
+  test('到点核实网络失败：不误判超时，保留单号可再查一次并承接晚到已付结果 @kiosk', async ({ page, api }) => {
+    const start = new Date('2026-11-19T14:24:00+08:00').getTime()
+    await page.clock.install({ time: start })
+    chargingMachine(api)
+    const order = { ...ORDER_A, createdAt: start }
+    let mode: 'pending' | 'fail503' | 'paid' = 'pending'
+    api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
+    respondOrder(api, order)
+    await page.route((url) => url.pathname === serviceOrderPath(order.id) && url.searchParams.get('refresh') === '1', (route) => {
+      if (mode === 'fail503') {
+        const err = apiError(503, 'UPSTREAM_UNAVAILABLE', '服务暂时不可用')
+        return route.fulfill({ status: err.status, contentType: 'application/json', body: JSON.stringify(err.json) })
+      }
+      const view = mode === 'paid'
+        ? serviceOrderView(order, { status: 'paid', paidAt: new Date(start + SERVICE_PAY_TTL_MS + 1_000).toISOString() })
+        : serviceOrderView(order)
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ok(view).json) })
+    })
+
+    await page.goto('/pay/resume?next=optimize')
+    await expectState(page, 'wait')
+    await page.clock.runFor(4 * 60_000)
+    await primary(page).click()
+    await page.waitForTimeout(50)
+    mode = 'fail503'
+    await page.clock.runFor(SERVICE_PAY_TTL_MS - 4 * 60_000 + 2_000)
+    await expectState(page, 'lookup')
+    await expect(payScreen(page)).toContainText('暂时查不到这一次的付款结果')
+    await expect(primary(page)).toHaveText('再查一次')
+    expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toContain(order.id)
+
+    mode = 'paid'
+    await primary(page).click()
+    await expectState(page, 'ok')
+    await page.clock.runFor(2_000)
+    await expect(page).toHaveURL(/\/resume\/optimize$/, { timeout: 10_000 })
   })
 
   test('免费直通：本机这一项 0 元时不建单，直接去合法站内下一步而不是退回 report @kiosk', async ({ page, api }) => {
