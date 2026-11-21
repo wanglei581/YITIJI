@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`685` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`700` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -66,8 +66,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/orders` | AdminOrdersReadonlyController.list | admin | AdminOrdersReadonlyService | EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Terminal |
-| GET | `/api/v1/admin/orders/:id` | AdminOrdersReadonlyController.getById | admin | AdminOrdersReadonlyService | EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Terminal |
+| GET | `/api/v1/admin/orders` | AdminOrdersReadonlyController.list | admin | AdminOrdersReadonlyService | AuditLog<br/>EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Refund<br/>Terminal |
+| GET | `/api/v1/admin/orders/:id` | AdminOrdersReadonlyController.getById | admin | AdminOrdersReadonlyService | AuditLog<br/>EndUser<br/>Order<br/>PaymentAttempt<br/>PrintTaskStatusLog<br/>Refund<br/>Terminal |
 
 ## `services/api/src/admin-print-scan/admin-fulfillment-lists.controller.ts`
 
@@ -91,7 +91,7 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/users` | AdminUsersController.list | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | GET | `/api/v1/admin/users/:endUserId` | AdminUsersController.getDetail | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
-| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>CopyJob<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>InvoiceRequest<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>ServiceOrder<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
+| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>CopyJob<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>InvoiceRequest<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MemberServiceCredit<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>ServiceOrder<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification<br/>VirtualPayOrder |
 | POST | `/api/v1/admin/users/:endUserId/disable` | AdminUsersController.disable | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 | POST | `/api/v1/admin/users/:endUserId/restore` | AdminUsersController.restore | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 
@@ -1034,7 +1034,13 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/admin/orders/:id/mark-paid` | AdminOrderActionsController.markPaid | admin | OrderStatusService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem |
-| POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder |
+| POST | `/api/v1/admin/orders/:id/print-return/close` | AdminOrderActionsController.closeHeldOrder | admin | — | — |
+| POST | `/api/v1/admin/orders/:id/print-return/confirm-refunded` | AdminOrderActionsController.confirmRefunded | admin | — | — |
+| POST | `/api/v1/admin/orders/:id/print-return/query-channel` | AdminOrderActionsController.queryPrintReturnChannel | admin | — | — |
+| POST | `/api/v1/admin/orders/:id/print-return/register-channel-result` | AdminOrderActionsController.registerChannelResult | admin | — | — |
+| POST | `/api/v1/admin/orders/:id/print-return/release-paper` | AdminOrderActionsController.releasePaper | admin | — | — |
+| POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/admin/orders/:id/refund-after-paper-check` | AdminOrderActionsController.refundAfterPaperCheck | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/payment/order-quote.controller.ts`
 
@@ -1046,14 +1052,15 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/orders/:id/code-pay` | PaymentController.createCodePayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
-| POST | `/api/v1/orders/:id/pay` | PaymentController.createPayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
-| GET | `/api/v1/orders/:id/pay-status` | PaymentController.getPayStatus | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
-| POST | `/api/v1/orders/:id/pay/reconcile` | PaymentController.reconcile | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/code-pay` | PaymentController.createCodePayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/pay` | PaymentController.createPayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
+| GET | `/api/v1/orders/:id/pay-status` | PaymentController.getPayStatus | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/pay/abandon` | PaymentController.abandonPayAttempt | — | — | — |
+| POST | `/api/v1/orders/:id/pay/reconcile` | PaymentController.reconcile | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
 | POST | `/api/v1/payment/callback/:channel` | PaymentController.callback | — | — | — |
-| GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
-| POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>ServiceOrder |
-| POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder |
+| GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
+| POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
+| POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
 | GET | `/api/v1/print/price-config` | PaymentController.getPrintPriceConfig | — | PricingService | PlatformSetting<br/>PriceConfig<br/>Terminal |
 
 ## `services/api/src/payment/service-order-admin.controller.ts`
@@ -1062,6 +1069,12 @@
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/admin/orders/:id/refund-service` | ServiceOrderAdminController.refund | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 | POST | `/api/v1/admin/orders/:id/retry-service-refund` | ServiceOrderAdminController.retry | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+
+## `services/api/src/payment/service-order-sandbox.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/payment/sandbox/simulate-service-order` | SimulateServiceOrderDto.simulate | — | — | — |
 
 ## `services/api/src/payment/service-order.controller.ts`
 
@@ -1129,11 +1142,11 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/print/jobs` | PrintJobsController.create | — | PrintJobsService | AuditLog<br/>CopyJob<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PlatformSetting<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| POST | `/api/v1/print/jobs/:orderId/release` | PrintJobsController.releasePickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/print/jobs/:orderId/release` | PrintJobsController.releasePickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PaymentAttempt<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalServicePrice |
 | GET | `/api/v1/print/jobs/:taskId` | PrintJobsController.getStatus | — | PrintJobsService | AuditLog<br/>CopyJob<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PlatformSetting<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 | POST | `/api/v1/print/jobs/:taskId/retry` | PrintJobsController.retryPaidFailedJob | — | PrintJobsService | AuditLog<br/>CopyJob<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PlatformSetting<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 | POST | `/api/v1/print/jobs/:taskId/takeaway-url` | PrintJobsController.issueTakeawayUrl | — | PrintJobsService | AuditLog<br/>CopyJob<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>PlatformSetting<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| POST | `/api/v1/print/jobs/claim-pickup` | PrintJobsController.claimPickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/print/jobs/claim-pickup` | PrintJobsController.claimPickup | — | PickupOrderService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>PaymentAttempt<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability<br/>TerminalServicePrice |
 
 ## `services/api/src/print-jobs/print-queue-timeout.controller.ts`
 
@@ -1345,3 +1358,30 @@
 | POST | `/api/v1/upload-sessions/:sessionId/files` | UploadSessionsController.upload | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
 | POST | `/api/v1/upload-sessions/:sessionId/member-file` | UploadSessionsController.uploadMemberFile | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
 | POST | `/api/v1/upload-sessions/scene/resolve` | UploadSessionsController.resolveScene | — | UploadSessionsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobAiSession<br/>PrintTask |
+
+## `services/api/src/virtual-pay/virtual-pay-admin.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/billing/miniapp-virtual-pay` | VirtualPayAdminController.getSettings | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
+| PUT | `/api/v1/admin/billing/miniapp-virtual-pay` | VirtualPayAdminController.setEnabled | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
+| PUT | `/api/v1/admin/billing/miniapp-virtual-pay/goods/:serviceKind` | VirtualPayAdminController.setGoods | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
+
+## `services/api/src/virtual-pay/virtual-pay-credits.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/member/service-credits` | VirtualPayCreditsController.list | — | VirtualPayCreditsService | MemberServiceCredit |
+
+## `services/api/src/virtual-pay/virtual-pay-order.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/member/virtual-pay/orders` | VirtualPayOrderController.create | — | VirtualPayOrderService | AuditLog<br/>EndUser<br/>PlatformSetting<br/>VirtualPayOrder |
+
+## `services/api/src/virtual-pay/wechat-miniapp-message.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/wechat/miniapp/message` | WechatMiniappMessageController.verify | — | WechatMiniappMessageService | AuditLog<br/>EndUser<br/>MemberServiceCredit<br/>VirtualPayOrder |
+| POST | `/api/v1/wechat/miniapp/message` | WechatMiniappMessageController.receive | — | WechatMiniappMessageService | AuditLog<br/>EndUser<br/>MemberServiceCredit<br/>VirtualPayOrder |
