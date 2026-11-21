@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-11-21：一体机按次付款屏地基返工（P2e-1b，分支 `claude/kiosk-pay-service-p2e1`，未推送）
+
+- 来由：补全线第三十任依据 Codex 独立收货结论（针对 `a22cbb25d`）派发的 P2e-1b 返工，从 `a22cbb25d` 继续小步提交，手写修改 14 个文件。未碰 `apps/admin/`、`apps/partner/`、`apps/miniapp/`、数据库 schema/迁移与生产配置。
+- 免费直通（阻塞 1）：零价、公共就业点位、总开关关闭、机构承担、无终端身份及 409 `SERVICE_FREE_ON_THIS_TERMINAL` 均自动前往白名单合法站内 `next`（如 `/resume/optimize`），兜底 `free` 态主按钮也指向 `onStart`（`targets.next`）而非退回 `back`；`fusion-w6-route-cases.ts` 同步更新 `/pay/resume`、`/pay/interview`、`/pay/scan` 的预期落地路径与页面标记。
+- 本地到点先核实（阻塞 2）：`usePayServiceFlow.ts` 本地倒计时归零时不再直接切 `timeout` 停轮询，先停常规 3 秒轮询并发一次 `refresh=1` 核实——服务端已 `paid` 直接进 `ok` 并前进下一步；明确未付成才落 `timeout`；核实请求本身网络/5xx 失败则保留单号落 `lookup`（可点「再查一次」发 `refresh=1` 承接晚到已付结果，不误判超时）。
+- 关单失败留单（应改 3）：`retireServiceTripOrder` 改为结构化返回，仅在关单成功、单本就终态或回 404 `SERVICE_ORDER_NOT_FOUND` 时才 `forgetServiceTrip`；返回或换码关单失败时保留 `sessionStorage` 原单号与 `tripRef`，进入 `close_failed` 给出温和提示与「再查一次 / 先返回」恢复路径，不静默丢单再建新单。
+- 重载旧周期收尾与游客转会员边界（应改 4、5）：`serviceTrip.ts`（保持零运行时依赖）新增无 PII 归属标记（游客 `guest` / 会员内存随机 `mark`）、旧周期号读取 `readServiceTripSessionIds` 与清场回调 `onServiceTripsCleared`；`kioskSession.ts`（零运行时依赖）新增 `end(reason, extraSessionIds)` 与 `endSessions`（带 64 条去重、含当前周期时轮换新编号）；`useKioskSessionReporting.ts` 在 `endKioskVisit` 与清场订阅里把重载保留的旧周期号一并通知服务端 `/kiosk/session/end`；`AuthContext.tsx` 游客转会员登录分支调用 `clearServiceTrips('login_handover')`，并由 `readServiceTrip` 归属隔离双保险拦截跨人/重载后继承。
+- 429 退避、`checking` 复位、底栏离开回归与门禁加强（应改 6、7）：`serviceOrders.ts` 解析 `Retry-After` 头（不改动 `httpAdapter.ts`），轮询遇 429 按 `Retry-After` 或 10s→60s 指数退避并显示温和提示（恢复 200 自动清除）；`applyView` 在收到普通响应 `checking: false` 时立即清除 `checking` 态不再粘滞；`pay-service.spec.ts` 扩至 23 条（补齐免费直通、到点核实与压哨付成、核实失败承接晚到已付、返回/换码关单失败留单、游客转会员隔离、429 退避、底栏「问小青」与主导航离开停轮询/恢复/清场、轮询 ≥3s 与 `refresh=1` ≥10s 实际间隔断言）；`verify-service-order-sandbox-simulate.ts` 明确断言非沙箱拒绝错误码为 `SANDBOX_ONLY`。
+- 验证：本机跑通 `kiosk`/`api` `tsc --noEmit`、改动文件 `eslint --quiet`、API `verify-service-order-sandbox-simulate`（7 PASS）与 `verify-service-orders`（38 PASS）与 `verify-service-orders-concurrency`、`blk.sh` 锁下 Playwright `pay-service.spec.ts`（23/23 通过）及 W6 `/pay/{resume,interview,scan}`（3/3 通过）、17 项图谱关联 kiosk 门禁、`kiosk-session-reporting.test.mjs`（15/15）、`generate-project-graph --check`、`verify-ci-gate-coverage`、`verify-repository-integrity` 及 4 条反向变异红绿复核。未推送，未上线。
+
 ## 2026-11-19：一体机按次付款的地基与付款屏（P2e-1，分支 `claude/kiosk-pay-service-p2e1`，未推送）
 
 - 来由：补全线第二十七任派的收费第一包，清单第 7 项。起点 `origin/main` `f25d2b65f`。简历、面试、扫描三包（P2e-2/3/4）接在这一包上。
