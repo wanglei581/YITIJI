@@ -181,6 +181,7 @@ const QX_MIGRATED_ROUTES = new Set<string>([
    * 只迁一条会让「文件资产 → 打印订单」这条跨端主链在两屏之间新旧交替。 */
   '/me/documents',
   '/me/print-orders',
+  '/me/orders/invoice',
   /* 稿 30-my-profile ?screen=settings（账号设置），2026-09-23 迁入 QxMePage 的 settings 视图。
    * 它是「我的」下最后一个还挂墨青纸感 KioskPageFrame 的页；漏登记会让旧顶栏叠在青序页上。 */
   '/me/settings',
@@ -272,6 +273,7 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/notifications',
   '/me/resumes',
   '/me/print-orders',
+  '/me/orders/invoice',
   '/me/documents',
   '/me/ai-records',
   '/me/activity',

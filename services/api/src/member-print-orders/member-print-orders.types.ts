@@ -52,6 +52,11 @@ export interface MemberPrintOrderItem {
   orderId?: string | null
   /** 出纸 / 领取的那台机器；取不到为 null。与时间线接口的 terminal 同形。 */
   terminal?: MemberOrderTimelineTerminal | null
+  /** 自助开票二期：仅关联本人 Order 且 amountCents > 0 时返回；与 assessInvoiceEligibility 同源，零 PII。 */
+  payableAmountCents?: number
+  canInvoice?: boolean
+  invoiceStatus?: 'none' | 'submitted' | 'issued' | 'returned'
+  invoiceRequestId?: string | null
 }
 
 export type MemberPendingPrintStatus = 'pending' | 'claimed' | 'printing'

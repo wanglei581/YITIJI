@@ -1,5 +1,36 @@
-import { API_BASE_URL } from './client'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+import { terminalProtectedFetch } from '../terminalAuth'
+import { API_BASE_URL, API_MODE } from './client'
 import { ApiHttpError } from './httpAdapter'
+import { parseRetryAfterMs } from './serviceOrders'
+
+export type InvoiceOrderKind = 'print' | 'service'
+export type KioskInvoicePollStatus = '等手机填写' | '已提交' | '已过期'
+
+export interface KioskInvoiceSessionCreateResult {
+  sessionId: string
+  sceneToken: string
+  codeUrl: string
+  controlToken: string
+  expiresAt: string
+  status: '等手机填写'
+}
+
+export interface KioskInvoicePollResult {
+  status: KioskInvoicePollStatus
+}
+
+export class InvoiceSessionHttpError extends ApiHttpError {
+  constructor(
+    code: string,
+    message: string,
+    status: number,
+    public readonly retryAfterMs: number | null = null,
+  ) {
+    super(code, message, status)
+    this.name = 'InvoiceSessionHttpError'
+  }
+}
 
 export interface InvoiceSceneResolve {
   sessionId: string
@@ -107,4 +138,90 @@ export function submitInvoicePhone(input: {
 }): Promise<InvoiceSubmitResult> {
   const { sessionId, ...body } = input
   return requestJson<InvoiceSubmitResult>(`/kiosk/invoice-sessions/${encodeURIComponent(sessionId)}/submit`, body)
+}
+
+/**
+ * 一体机发起自助开票扫码会话（POST /api/v1/kiosk/invoice-sessions）。
+ * 必须带会员 Bearer + 终端验签头；controlToken 仅留内存 ref，绝不写进任何存储或 URL。
+ */
+export async function createKioskInvoiceSession(
+  token: string,
+  input: { orderKind: InvoiceOrderKind; orderId: string },
+): Promise<KioskInvoiceSessionCreateResult> {
+  if (API_MODE !== 'http') {
+    throw new InvoiceSessionHttpError('INVOICE_UNAVAILABLE', '当前演示模式暂不支持生成开票码。', 0)
+  }
+  let res: Response
+  try {
+    res = await terminalProtectedFetch(makeUrl('/kiosk/invoice-sessions'), {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    })
+  } catch (error) {
+    if (error instanceof ApiHttpError) throw error
+    throw new InvoiceSessionHttpError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
+  }
+
+  let payload: ResponseEnvelope<KioskInvoiceSessionCreateResult> | null = null
+  try {
+    payload = (await res.json()) as ResponseEnvelope<KioskInvoiceSessionCreateResult>
+  } catch {
+    payload = null
+  }
+  if (!res.ok) {
+    const code = payload?.error?.code ?? 'UNKNOWN_ERROR'
+    const message = payload?.error?.message ?? '网络连接失败，请稍后重试'
+    if (isMemberSessionInvalidError(res.status, code, true)) notifyMemberSessionExpired(token)
+    throw new InvoiceSessionHttpError(code, message, res.status, parseRetryAfterMs(res.headers.get('Retry-After')))
+  }
+  if (!payload || payload.data == null) {
+    throw new InvoiceSessionHttpError('INVOICE_EMPTY', '网络连接失败，请稍后重试', res.status)
+  }
+  return payload.data
+}
+
+/**
+ * 一体机轮询开票填写状态（GET /api/v1/kiosk/invoice-sessions/:sessionId）。
+ * 带终端验签头与内存中的 x-invoice-control，只返回三种状态，不含抬头/税号/邮箱。
+ */
+export async function pollKioskInvoiceSession(
+  sessionId: string,
+  controlToken: string,
+): Promise<KioskInvoicePollResult> {
+  let res: Response
+  try {
+    res = await terminalProtectedFetch(makeUrl(`/kiosk/invoice-sessions/${encodeURIComponent(sessionId)}`), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'x-invoice-control': controlToken,
+      },
+      credentials: 'include',
+    })
+  } catch (error) {
+    if (error instanceof ApiHttpError) throw error
+    throw new InvoiceSessionHttpError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
+  }
+
+  let payload: ResponseEnvelope<KioskInvoicePollResult> | null = null
+  try {
+    payload = (await res.json()) as ResponseEnvelope<KioskInvoicePollResult>
+  } catch {
+    payload = null
+  }
+  if (!res.ok) {
+    const code = payload?.error?.code ?? 'UNKNOWN_ERROR'
+    const message = payload?.error?.message ?? '网络连接失败，请稍后重试'
+    throw new InvoiceSessionHttpError(code, message, res.status, parseRetryAfterMs(res.headers.get('Retry-After')))
+  }
+  if (!payload || payload.data == null) {
+    throw new InvoiceSessionHttpError('INVOICE_EMPTY', '网络连接失败，请稍后重试', res.status)
+  }
+  return payload.data
 }

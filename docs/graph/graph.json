@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 700,
+    "endpointCount": 701,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -9842,6 +9842,8 @@
         "handler": "MemberPrintOrdersController.list",
         "method": "GET",
         "models": [
+          "InvoiceRequest",
+          "Order",
           "PrintTask",
           "Terminal"
         ],
@@ -10004,6 +10006,7 @@
         "method": "GET",
         "models": [
           "FileObject",
+          "InvoiceRequest",
           "Order",
           "PrintTask",
           "Terminal"
@@ -10056,6 +10059,23 @@
         "roles": [],
         "serviceFiles": [],
         "services": []
+      },
+      {
+        "controller": "services/api/src/payment/member-service-order.controller.ts",
+        "handler": "ListMemberServiceOrdersQueryDto.list",
+        "method": "GET",
+        "models": [
+          "InvoiceRequest",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/me/service-orders",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/payment/member-service-order.service.ts"
+        ],
+        "services": [
+          "MemberServiceOrderService"
+        ]
       },
       {
         "controller": "services/api/src/member-auth/member-auth.controller.ts",
@@ -15820,7 +15840,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 864,
+      "reachableFileCount": 871,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16294,6 +16314,7 @@
         {
           "component": "PhoneInvoicePage",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16302,6 +16323,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -16966,6 +16990,7 @@
         {
           "component": "InvoiceSceneEntry",
           "endpoints": [
+            "GET /:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -16974,6 +16999,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -17435,6 +17463,44 @@
           "wrappers": []
         },
         {
+          "component": "MyOrderInvoicePage",
+          "endpoints": [
+            "GET /:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx",
+          "layout": [
+            "KioskHandoverGate",
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/me/orders/invoice",
+          "styles": [
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
+            "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/pages/profile/me/orders/order-invoice.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
+          ],
+          "wrappers": []
+        },
+        {
           "component": "MyPrintOrdersPage",
           "endpoints": [
             "GET /:param",
@@ -17461,6 +17527,7 @@
           "path": "/me/print-orders",
           "styles": [
             "apps/kiosk/src/layouts/license-gate.css",
+            "apps/kiosk/src/pages/profile/me/orders/order-invoice.css",
             "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
             "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/pages/profile/touch/me-pages.css",
@@ -19060,7 +19127,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1053
+      "sourceFileCount": 1060
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20343,8 +20410,10 @@
           "services/api/src/invoices/invoice-email-retention.ts",
           "services/api/src/invoices/invoice-privacy.test.ts",
           "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
-          "services/api/src/member-privacy/member-data-export.mapper.ts"
+          "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/payment/member-service-order.service.ts"
         ]
       },
       {
@@ -20716,6 +20785,7 @@
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-print-orders/order-submission-ledger.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
@@ -21213,6 +21283,7 @@
           "services/api/src/admin-ops/derived-service-return-alerts.ts",
           "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/payment/member-service-order.service.ts",
           "services/api/src/payment/service-order-refund-abnormal.ts",
           "services/api/src/payment/service-order-sandbox.controller.ts",
           "services/api/src/payment/service-order.admin.ts",
@@ -24215,6 +24286,25 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/orders/order-invoice.css": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -27770,6 +27860,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
       "services/api/scripts/verify-miniapp-virtual-pay.ts",
@@ -29577,6 +29668,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-qa-records.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
       "services/api/scripts/verify-miniapp-virtual-pay.ts",
@@ -29977,6 +30069,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-restore.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
@@ -30022,6 +30115,7 @@
       "services/api/scripts/verify-member-favorites-benefits.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
@@ -30243,6 +30337,7 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-restore.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-virtual-pay.ts",
@@ -30707,23 +30802,28 @@
     ],
     "services/api/src/invoices/admin-invoice.service.ts": [
       "services/api/scripts/verify-invoice-http.ts",
-      "services/api/scripts/verify-invoice-real-db.ts"
+      "services/api/scripts/verify-invoice-real-db.ts",
+      "services/api/scripts/verify-member-service-orders.ts"
     ],
     "services/api/src/invoices/invoice-member-list.ts": [
       "services/api/scripts/verify-invoice-real-db.ts"
     ],
     "services/api/src/invoices/invoice-requests.service.ts": [
       "services/api/scripts/verify-invoice-http.ts",
-      "services/api/scripts/verify-invoice-real-db.ts"
+      "services/api/scripts/verify-invoice-real-db.ts",
+      "services/api/scripts/verify-member-service-orders.ts"
     ],
     "services/api/src/invoices/invoice-sessions.service.ts": [
-      "services/api/scripts/verify-invoice-http.ts"
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-member-service-orders.ts"
     ],
     "services/api/src/invoices/kiosk-invoice-sessions.controller.ts": [
-      "services/api/scripts/verify-invoice-http.ts"
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-member-service-orders.ts"
     ],
     "services/api/src/invoices/member-invoice.controller.ts": [
-      "services/api/scripts/verify-invoice-http.ts"
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-member-service-orders.ts"
     ],
     "services/api/src/job-ai/governed-job-fit.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -31480,6 +31580,7 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "services/api/src/member-print-orders/member-order-timeline.service.ts": [
@@ -31487,6 +31588,7 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-pickup-code-resume.ts"
     ],
     "services/api/src/member-print-orders/member-order-timeline.status.ts": [
@@ -31502,6 +31604,7 @@
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
@@ -31514,6 +31617,7 @@
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
@@ -31524,6 +31628,7 @@
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-pickup-code-resume.ts"
@@ -31552,6 +31657,7 @@
     "services/api/src/member-print-orders/pickup-code-reissue.service.ts": [
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/member-privacy/admin-member-privacy.controller.ts": [
@@ -31886,6 +31992,12 @@
     "services/api/src/payment/effective-user-prices.ts": [
       "services/api/scripts/verify-terminal-charge-public-reset.ts",
       "services/api/scripts/verify-terminal-charge-settings.ts"
+    ],
+    "services/api/src/payment/member-service-order.controller.ts": [
+      "services/api/scripts/verify-member-service-orders.ts"
+    ],
+    "services/api/src/payment/member-service-order.service.ts": [
+      "services/api/scripts/verify-member-service-orders.ts"
     ],
     "services/api/src/payment/online-payment.service.ts": [
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -32623,6 +32735,7 @@
       "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-restore.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
@@ -33182,6 +33295,7 @@
       "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-member-closure.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-scan-tasks.ts",
@@ -33210,6 +33324,7 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-member-service-orders.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -35557,6 +35672,7 @@
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+          "apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts",
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
           "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
@@ -36888,6 +37004,12 @@
           "apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts",
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+          "apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx",
+          "apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx",
+          "apps/kiosk/src/pages/profile/me/orders/order-invoice.css",
+          "apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts",
+          "apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts",
+          "apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
@@ -47444,6 +47566,44 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:member-restore"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/invoices/admin-invoice.service.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/invoices/invoice-sessions.service.ts",
+          "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+          "services/api/src/invoices/member-invoice.controller.ts",
+          "services/api/src/member-print-orders/member-order-claim-here.service.ts",
+          "services/api/src/member-print-orders/member-order-timeline.service.ts",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.controller.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
+          "services/api/src/member-print-orders/pickup-code-reissue.service.ts",
+          "services/api/src/payment/member-service-order.controller.ts",
+          "services/api/src/payment/member-service-order.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-member-service-orders.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:member-service-orders"
       ],
       "wired": true
     },
