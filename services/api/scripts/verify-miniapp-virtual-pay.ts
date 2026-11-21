@@ -48,6 +48,7 @@ import { assertVirtualPayCredits } from './support/miniapp-virtual-pay-credits'
 import { assertVirtualPayReconcile } from './support/miniapp-virtual-pay-reconcile'
 import { assertVirtualPayReconcileEdge } from './support/miniapp-virtual-pay-reconcile-edge'
 import { assertVirtualPayNotifyProvideGoods } from './support/miniapp-virtual-pay-notify-goods'
+import { assertConcurrentReconcileFailureCount } from './support/miniapp-virtual-pay-concurrent-reconcile'
 import {
   assertVirtualPayManualReviewLocked,
   assertVirtualPayMemberClosureWriteProtection,
@@ -429,6 +430,7 @@ async function main(): Promise<void> {
     await assertVirtualPayNotifyProvideGoods({ prisma, redis })
     await assertVirtualPayMemberClosureWriteProtection({ prisma, base, redis })
     await assertVirtualPayManualReviewLocked({ prisma, base, redis })
+    await assertConcurrentReconcileFailureCount({ prisma, redis })
     await assertVirtualPayCredits({ prisma, call, jwt, redis })
   } finally {
     await app.close()

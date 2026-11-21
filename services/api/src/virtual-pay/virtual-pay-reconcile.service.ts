@@ -219,23 +219,41 @@ export class VirtualPayReconcileService {
     failReason: string,
     fetchImpl: typeof fetch,
   ): Promise<void> {
-    const nextFails = (order.queryFailCount ?? 0) + 1
     const ageMs = now.getTime() - order.createdAt.getTime()
-    if (nextFails >= VIRTUAL_PAY_QUERY_MAX_FAILS || ageMs >= VIRTUAL_PAY_MANUAL_REVIEW_MAX_AGE_MS) {
-      await this.moveToManualReview(
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const incremented = await tx.virtualPayOrder.updateMany({
+        where: { id: order.id, status: 'pending' },
+        data: { queryFailCount: { increment: 1 } },
+      })
+      if (incremented.count !== 1) return null
+      const fresh = await tx.virtualPayOrder.findUnique({
+        where: { id: order.id },
+        select: { queryFailCount: true },
+      })
+      if (!fresh) return null
+      if (
+        fresh.queryFailCount >= VIRTUAL_PAY_QUERY_MAX_FAILS ||
+        ageMs >= VIRTUAL_PAY_MANUAL_REVIEW_MAX_AGE_MS
+      ) {
+        const moved = await tx.virtualPayOrder.updateMany({
+          where: { id: order.id, status: 'pending' },
+          data: { status: 'manual_review' },
+        })
+        return { nextFails: fresh.queryFailCount, movedToManualReview: moved.count === 1 }
+      }
+      return { nextFails: fresh.queryFailCount, movedToManualReview: false }
+    })
+    if (!outcome) return
+    if (outcome.movedToManualReview) {
+      await this.finalizeManualReview(
         order,
         'query_manual_review',
-        { failCount: nextFails, lastError: failReason },
+        { failCount: outcome.nextFails, lastError: failReason },
         fetchImpl,
-        nextFails,
       )
       return
     }
-    await this.prisma.virtualPayOrder.updateMany({
-      where: { id: order.id, status: 'pending' },
-      data: { queryFailCount: nextFails },
-    })
-    await this.diagnoseOrder(order, failReason)
+    await this.diagnoseOrder(order, failReason, {}, 'pending')
   }
 
   private async moveToManualReview(
@@ -243,14 +261,22 @@ export class VirtualPayReconcileService {
     reason: string,
     extra: Record<string, unknown>,
     fetchImpl: typeof fetch,
-    queryFailCount?: number,
   ): Promise<void> {
     const moved = await this.prisma.virtualPayOrder.updateMany({
       where: { id: order.id, status: 'pending' },
-      data: { status: 'manual_review', ...(queryFailCount === undefined ? {} : { queryFailCount }) },
+      data: { status: 'manual_review' },
     })
     if (moved.count !== 1) return
-    await this.diagnoseOrder(order, reason, extra)
+    await this.finalizeManualReview(order, reason, extra, fetchImpl)
+  }
+
+  private async finalizeManualReview(
+    order: PendingOrder,
+    reason: string,
+    extra: Record<string, unknown>,
+    fetchImpl: typeof fetch,
+  ): Promise<void> {
+    await this.diagnoseOrder(order, reason, extra, 'manual_review')
     await sendVirtualPayOpsAlert({
       redis: this.redis,
       fetchImpl,
@@ -288,8 +314,18 @@ export class VirtualPayReconcileService {
     order: PendingOrder,
     reason: string,
     extra: Record<string, unknown> = {},
+    expectedStatus?: 'pending' | 'manual_review',
   ): Promise<void> {
-    if (order.lastDiagnosticReason === reason) return
+    const claimed = await this.prisma.virtualPayOrder.updateMany({
+      where: {
+        id: order.id,
+        ...(expectedStatus ? { status: expectedStatus } : {}),
+        OR: [{ lastDiagnosticReason: null }, { lastDiagnosticReason: { not: reason } }],
+      },
+      data: { lastDiagnosticReason: reason },
+    })
+    if (claimed.count !== 1) return
+    order.lastDiagnosticReason = reason
     await this.audit.write({
       actorId: null,
       actorRole: 'system',
@@ -297,11 +333,6 @@ export class VirtualPayReconcileService {
       targetType: 'virtual_pay_order',
       targetId: order.outTradeNo,
       payload: { reason, ...extra },
-    })
-    order.lastDiagnosticReason = reason
-    await this.prisma.virtualPayOrder.update({
-      where: { id: order.id },
-      data: { lastDiagnosticReason: reason },
     })
   }
 

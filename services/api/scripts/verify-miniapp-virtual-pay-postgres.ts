@@ -19,6 +19,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { installBodyParsers } from '../src/config/body-parsers'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { assertConcurrentReconcileFailureCount } from './support/miniapp-virtual-pay-concurrent-reconcile'
 import { assertConcurrentDelivery } from './support/miniapp-virtual-pay-delivery'
 
 const API_ROOT = resolve(__dirname, '..')
@@ -68,6 +69,18 @@ async function main(): Promise<void> {
     await app.listen(0, '127.0.0.1')
     const port = (app.getHttpServer().address() as AddressInfo).port
     await assertConcurrentDelivery({ prisma, base: `http://127.0.0.1:${port}` })
+    const store = new Map<string, string>()
+    const redis = {
+      async get(key: string) { return store.get(key) ?? null },
+      async setEx(key: string, _ttl: number, value: string) { store.set(key, value) },
+      async setIfAbsent(key: string, value: string) {
+        if (store.has(key)) return false
+        store.set(key, value)
+        return true
+      },
+      async del(key: string) { return store.delete(key) ? 1 : 0 },
+    }
+    await assertConcurrentReconcileFailureCount({ prisma, redis })
   } finally {
     await app.close()
     await prisma.onModuleDestroy()
