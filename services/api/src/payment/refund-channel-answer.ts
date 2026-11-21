@@ -120,8 +120,18 @@ export async function recordChannelAnswers(
       }
     }
     if (!paidBack) {
-      // 这单没有还在办的退款了，订单不能停在退款中。
-      const stillOpen = await tx.refund.count({ where: { orderId, status: 'pending' } })
+      // 只要还有任一在途或非过期未结清退款（pending / manual_review），订单不能提前离开退款中。
+      const stillOpen = await tx.refund.count({
+        where: {
+          orderId,
+          status: { in: [...OPEN_STATUSES] },
+          OR: [
+            { channelSubmittedAt: { not: null } },
+            { reason: null },
+            { reason: { not: STALE_ATTEMPT_REFUND_REASON } },
+          ],
+        },
+      })
       if (stillOpen === 0 && answers.some((answer) => answer.verdict === 'failed')) {
         const current = await tx.order.findUniqueOrThrow({
           where: { id: orderId },
