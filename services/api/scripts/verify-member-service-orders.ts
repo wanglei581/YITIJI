@@ -517,28 +517,34 @@ async function main() {
       const byTask = new Map((res.json.data?.items ?? []).map((row) => [String(row['id']), row]))
 
       assert.equal(byTask.get(pPaid.taskId)?.['orderId'], pPaid.orderId)
+      assert.equal(byTask.get(pPaid.taskId)?.['payableAmountCents'], 200)
       assert.equal(byTask.get(pPaid.taskId)?.['canInvoice'], true)
       assert.equal(byTask.get(pPaid.taskId)?.['invoiceStatus'], 'none')
       assert.equal(byTask.get(pPaid.taskId)?.['invoiceRequestId'], null)
 
+      assert.equal(byTask.get(pSubmitted.taskId)?.['payableAmountCents'], 300)
       assert.equal(byTask.get(pSubmitted.taskId)?.['canInvoice'], false)
       assert.equal(byTask.get(pSubmitted.taskId)?.['invoiceStatus'], 'submitted')
       assert.equal(byTask.get(pSubmitted.taskId)?.['invoiceRequestId'], rSub.id)
 
+      assert.equal(byTask.get(pIssued.taskId)?.['payableAmountCents'], 400)
       assert.equal(byTask.get(pIssued.taskId)?.['canInvoice'], false)
       assert.equal(byTask.get(pIssued.taskId)?.['invoiceStatus'], 'issued')
       assert.equal(byTask.get(pIssued.taskId)?.['invoiceRequestId'], rIss.id)
 
+      assert.equal(byTask.get(pReturned.taskId)?.['payableAmountCents'], 250)
       assert.equal(byTask.get(pReturned.taskId)?.['canInvoice'], true)
       assert.equal(byTask.get(pReturned.taskId)?.['invoiceStatus'], 'returned')
       assert.equal(byTask.get(pReturned.taskId)?.['invoiceRequestId'], rRet.id)
 
       assert.equal(byTask.get(pRefunded.taskId)?.['canInvoice'], false)
+      assert.equal(byTask.get(pZeroNet.taskId)?.['payableAmountCents'], 0)
       assert.equal(byTask.get(pZeroNet.taskId)?.['canInvoice'], false)
 
-      // 免费单与无 Order 历史单保持 100% 向后兼容：不附加开票字段键
+      // 免费单与无 Order 历史单保持 100% 向后兼容：不附加实付/开票字段键
       for (const legacyTaskId of [pFree.taskId, pNoOrder.taskId]) {
         const row = byTask.get(legacyTaskId)!
+        assert.equal(Object.prototype.hasOwnProperty.call(row, 'payableAmountCents'), false)
         assert.equal(Object.prototype.hasOwnProperty.call(row, 'canInvoice'), false)
         assert.equal(Object.prototype.hasOwnProperty.call(row, 'invoiceStatus'), false)
         assert.equal(Object.prototype.hasOwnProperty.call(row, 'invoiceRequestId'), false)
@@ -751,6 +757,7 @@ async function main() {
         expected: {
           amountCents: number
           discountCents: number
+          payableAmountCents: number
           payStatus: string
           canInvoice: boolean
           invoiceStatus: string
@@ -765,6 +772,7 @@ async function main() {
           assert.equal(row['orderNo'], pack.orderNo, `${stateLabel} ${taskId} orderNo 不一致`)
           assert.equal(row['amountCents'], expected.amountCents, `${stateLabel} ${taskId} amountCents 不一致`)
           assert.equal(row['discountCents'], expected.discountCents, `${stateLabel} ${taskId} discountCents 不一致`)
+          assert.equal(row['payableAmountCents'], expected.payableAmountCents, `${stateLabel} ${taskId} payableAmountCents 不一致`)
           assert.equal(row['payStatus'], expected.payStatus, `${stateLabel} ${taskId} payStatus 不一致`)
           assert.equal(row['canInvoice'], expected.canInvoice, `${stateLabel} ${taskId} canInvoice 不一致`)
           assert.equal(row['invoiceStatus'], expected.invoiceStatus, `${stateLabel} ${taskId} invoiceStatus 不一致`)
@@ -772,16 +780,19 @@ async function main() {
         }
       }
 
-      assertPackUniform(paidPack, { amountCents: 300, discountCents: 100, payStatus: 'paid', canInvoice: true, invoiceStatus: 'none', invoiceRequestId: null }, 'paid')
-      assertPackUniform(partialPack, { amountCents: 300, discountCents: 0, payStatus: 'partial_refunded', canInvoice: false, invoiceStatus: 'none', invoiceRequestId: null }, 'partial_refunded')
-      assertPackUniform(refundingPack, { amountCents: 300, discountCents: 0, payStatus: 'refunding', canInvoice: false, invoiceStatus: 'none', invoiceRequestId: null }, 'refunding')
-      assertPackUniform(refundedPack, { amountCents: 300, discountCents: 0, payStatus: 'refunded', canInvoice: false, invoiceStatus: 'none', invoiceRequestId: null }, 'refunded')
+      assertPackUniform(paidPack, { amountCents: 300, discountCents: 100, payableAmountCents: 200, payStatus: 'paid', canInvoice: true, invoiceStatus: 'none', invoiceRequestId: null }, 'paid')
+      assertPackUniform(partialPack, { amountCents: 300, discountCents: 0, payableAmountCents: 300, payStatus: 'partial_refunded', canInvoice: false, invoiceStatus: 'none', invoiceRequestId: null }, 'partial_refunded')
+      assertPackUniform(refundingPack, { amountCents: 300, discountCents: 0, payableAmountCents: 300, payStatus: 'refunding', canInvoice: false, invoiceStatus: 'none', invoiceRequestId: null }, 'refunding')
+      assertPackUniform(refundedPack, { amountCents: 300, discountCents: 0, payableAmountCents: 300, payStatus: 'refunded', canInvoice: false, invoiceStatus: 'none', invoiceRequestId: null }, 'refunded')
 
       const foreignRow = byTaskId.get(foreignLinkedTaskId)
       assert.ok(foreignRow, '跨人引用负例任务应存在')
+      assert.equal(foreignRow['orderId'], null, '不得透传他人 Order 的 orderId')
       assert.equal(foreignRow['amountCents'], null, '不得透传他人 Order 的 amountCents')
       assert.equal(foreignRow['payStatus'], null, '不得透传他人 Order 的 payStatus')
+      assert.equal(Object.prototype.hasOwnProperty.call(foreignRow, 'payableAmountCents'), false, '他人 Order 不得出现 payableAmountCents')
       assert.equal(Object.prototype.hasOwnProperty.call(foreignRow, 'canInvoice'), false, '他人 Order 不得出现 canInvoice')
+      assert.equal(Object.prototype.hasOwnProperty.call(foreignRow, 'invoiceStatus'), false, '他人 Order 不得出现 invoiceStatus')
 
       // 为 paidPack 提交开票申请后，主任务与 2 个子任务同步变为 submitted 且 canInvoice=false
       const submittedPackReq = await invoiceRequests.submit(member.id, {

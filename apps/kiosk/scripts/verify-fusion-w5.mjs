@@ -77,7 +77,13 @@ const FROZEN = new Map([
   // 只改这一句，原有导出、实付不推算、不承诺到账天数都没动；求助句由详单在说明后面按标准句 1 加（服务电话）。
   // 冻结契约不放宽，仍逐字节校验，只是基线随有意改动前移。
   // 旧哈希 e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', '9b16f46cfdfd247e76963eb2ff2fb74571698499c76ab684d42bd12c03c714a9'],
+  // 2026-11-21 P2c2c（总指挥授权沿用本冻结表前移先例）：后端 GET /me/print-orders 对收费打印单显式下发
+  // 实付真源字段 payableAmountCents（同源 assessInvoiceEligibility）；netPaidDisplay 仅在后端提供合法非负整数
+  // payableAmountCents 时返回无货币符号「X.XX 元」，缺省仍保持「未记录」（前端绝不拿应付减优惠推算）；
+  // 新增 formatYuanText 供详单下单金额/抵扣/已退款/实付统一采用「X.XX 元」消除 ¥，保留 formatAmountCents 与
+  // formatRecordedCents 导出不变。冻结契约不放宽，仍逐字节校验，基线随有意改动前移。
+  // 旧哈希 9b16f46cfdfd247e76963eb2ff2fb74571698499c76ab684d42bd12c03c714a9。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', '335a5e3432e2433d58a43c06fd3beb69280311b4388f9fe30700b7b981b97cbd'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],

@@ -59,7 +59,7 @@ function svcOrder(overrides: Record<string, unknown> = {}) {
 }
 
 function printOrder(overrides: Record<string, unknown> = {}) {
-  return {
+  const base: Record<string, unknown> = {
     id: 'ptask-1',
     orderId: 'ord-print-1',
     orderNo: 'ORD-20261121-001',
@@ -91,6 +91,11 @@ function printOrder(overrides: Record<string, unknown> = {}) {
     invoiceRequestId: null,
     ...overrides,
   }
+  if (!('payableAmountCents' in overrides) && typeof base['amountCents'] === 'number' && base['amountCents'] > 0) {
+    const discount = typeof base['discountCents'] === 'number' && base['discountCents'] > 0 ? base['discountCents'] : 0
+    base['payableAmountCents'] = Math.max(0, base['amountCents'] - discount)
+  }
+  return base
 }
 
 async function assertNoForbiddenCopy(page: Page): Promise<void> {
@@ -578,7 +583,7 @@ test.describe('我的订单与自助开票扫码屏 @kiosk', () => {
     await assertNoInvoiceSecretsInStorage(page, [CTRL_TOKEN_1])
   })
 
-  test('部分抵扣打印单订单行与开票屏统一展示抵扣后实付，全额抵扣不显示开发票按钮 @kiosk', async ({ page, api }) => {
+  test('部分抵扣打印单订单行、展开详单与开票屏三处统一展示抵扣后实付且无 ¥，全额抵扣不显示开发票按钮 @kiosk', async ({ page, api }) => {
     setupMachine(api, 100, 200, { resume_optimize: 100 })
     api.respond('GET', SERVICE_ORDERS_PATH, ok({ items: [], nextCursor: null, total: 0 }))
     api.respond('GET', PRINT_ORDERS_PATH, ok({
@@ -589,6 +594,7 @@ test.describe('我的订单与自助开票扫码屏 @kiosk', () => {
           fileName: '部分抵扣打印单.pdf',
           amountCents: 200,
           discountCents: 100,
+          payableAmountCents: 100,
           payStatus: 'paid',
           paymentSource: 'offline',
           canInvoice: true,
@@ -601,6 +607,7 @@ test.describe('我的订单与自助开票扫码屏 @kiosk', () => {
           fileName: '全额抵扣打印单.pdf',
           amountCents: 200,
           discountCents: 200,
+          payableAmountCents: 0,
           payStatus: 'paid',
           paymentSource: 'offline',
           canInvoice: false,
@@ -645,9 +652,28 @@ test.describe('我的订单与自助开票扫码屏 @kiosk', () => {
     await expect(partialCard).not.toContainText('2.00 元')
     await expect(page.getByTestId('print-order-invoice-pt-partial-disc')).toBeVisible()
 
+    // 显式展开部分抵扣单详单：下单金额 2.00 元 / 优惠抵扣 1.00 元 / 实付 1.00 元，零 ¥、零「未记录」
+    await partialCard.getByRole('button', { name: '查看订单详单 部分抵扣打印单.pdf' }).click()
+    const partialSummary = partialCard.locator('.me-payment-summary')
+    await expect(partialSummary.locator('.me-payment-row', { hasText: '下单金额' })).toContainText('2.00 元')
+    await expect(partialSummary.locator('.me-payment-row', { hasText: '优惠/权益抵扣' })).toContainText('1.00 元')
+    await expect(partialSummary.locator('.me-payment-row', { hasText: '已退款' })).toContainText('0.00 元')
+    await expect(partialSummary.locator('.me-payment-row', { hasText: '实付' })).toContainText('1.00 元')
+    await expect(partialSummary).not.toContainText('未记录')
+    await expect(partialSummary).not.toContainText('没有单独记下实付')
+    await assertNoForbiddenCopy(page)
+
+    // 显式展开全额抵扣单详单：实付 0.00 元，无「开发票」按钮、零 ¥
     const fullCard = page.getByTestId('member-assets-order').filter({ hasText: '全额抵扣打印单.pdf' })
     await expect(fullCard).toContainText('0.00 元 · 已支付（线下收款）')
     await expect(page.getByTestId('print-order-invoice-pt-full-disc')).toHaveCount(0)
+    await fullCard.getByRole('button', { name: '查看订单详单 全额抵扣打印单.pdf' }).click()
+    const fullSummary = fullCard.locator('.me-payment-summary')
+    await expect(fullSummary.locator('.me-payment-row', { hasText: '下单金额' })).toContainText('2.00 元')
+    await expect(fullSummary.locator('.me-payment-row', { hasText: '优惠/权益抵扣' })).toContainText('2.00 元')
+    await expect(fullSummary.locator('.me-payment-row', { hasText: '实付' })).toContainText('0.00 元')
+    await expect(fullSummary).not.toContainText('未记录')
+    await assertNoForbiddenCopy(page)
 
     await page.getByTestId('print-order-invoice-pt-partial-disc').click()
     await page.waitForURL((url) => url.pathname === '/me/orders/invoice')

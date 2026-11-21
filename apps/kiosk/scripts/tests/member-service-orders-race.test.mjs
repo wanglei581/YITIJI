@@ -296,22 +296,21 @@ test('S3：稳定 getToken 引用下仅 user.id A→B 切换，立即重拉且�
   }
 })
 
-test('S4：effectivePrintPayableCents 部分抵扣与全额抵扣与后端统一', () => {
-  assert.equal(copyMod.effectivePrintPayableCents({ amountCents: 200, discountCents: 100 }), 100)
-  assert.equal(copyMod.effectivePrintPayableCents({ amountCents: 200, discountCents: 200 }), 0)
-  assert.equal(copyMod.effectivePrintPayableCents({ amountCents: 200, discountCents: 300 }), 0)
-  assert.equal(copyMod.effectivePrintPayableCents({ amountCents: 200, discountCents: null }), 200)
-  assert.equal(copyMod.effectivePrintPayableCents({ amountCents: null, discountCents: null }), null)
+test('S4：effectivePrintPayableCents 严格消费后端真源 payableAmountCents，不在前端推算', () => {
+  assert.equal(copyMod.effectivePrintPayableCents({ payableAmountCents: 100 }), 100)
+  assert.equal(copyMod.effectivePrintPayableCents({ payableAmountCents: 0 }), 0)
+  assert.equal(copyMod.effectivePrintPayableCents({ amountCents: 200, discountCents: 100 }), null)
+  assert.equal(copyMod.effectivePrintPayableCents({ payableAmountCents: undefined }), null)
   assert.equal(
-    copyMod.canShowPrintOrderInvoiceButton({ amountCents: 200, discountCents: 100, canInvoice: true, orderId: 'o1' }),
+    copyMod.canShowPrintOrderInvoiceButton({ amountCents: 200, discountCents: 100, payableAmountCents: 100, canInvoice: true, orderId: 'o1' }),
     true,
   )
   assert.equal(
-    copyMod.canShowPrintOrderInvoiceButton({ amountCents: 200, discountCents: 200, canInvoice: false, orderId: 'o2' }),
+    copyMod.canShowPrintOrderInvoiceButton({ amountCents: 200, discountCents: 200, payableAmountCents: 0, canInvoice: false, orderId: 'o2' }),
     false,
   )
   assert.equal(
-    copyMod.canShowPrintOrderInvoiceButton({ amountCents: 200, discountCents: 200, canInvoice: true, orderId: 'o3' }),
+    copyMod.canShowPrintOrderInvoiceButton({ amountCents: 200, discountCents: 200, payableAmountCents: 0, canInvoice: true, orderId: 'o3' }),
     false,
   )
 })

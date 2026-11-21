@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-21：自助开票二期终审收口 P2c2c（分支 `claude/invoice-p2c2-1121`，未推送，未上线）
+
+- 来由：按 Codex 终审 `20939f92a` 查出的最后 2 项 P1 极小收口，接在 `20939f92a` 之后提交（0 新增 Prisma 迁移，全部改动业务源码 `< 500` 行）。
+- ① 封死跨用户 `Order` 的 `orderId` 回退透传（P1）：`services/api/src/member-print-orders/member-print-orders.service.ts` 改为 `orderId: order?.id ?? null`（严禁回退未经归属校验的 `r.orderId`）；`verify-member-service-orders.ts` 第 7 组跨用户负例在 SQLite + PG 16 双库显式断言 `foreignRow.orderId === null` 且无 `payableAmountCents`/`canInvoice`/`invoiceStatus`。
+- ② 统一「列表摘要 / 展开详单 / 开票屏」抵扣后实付口径并消除详单 `¥`（P1）：`packages/shared/src/types/memberPrintOrders.ts` 与 `member-print-orders.{types,service}.ts` 为本人收费打印单新增后端真源只增可选字段 `payableAmountCents: decision.amountCents`（免费/无单保持零新增键）；获总指挥沿用 `verify-fusion-w5.mjs:61-80` 先例授权增量更新 `paymentCopy.ts`（同步前移 SHA-256 基线至 `335a5e34...`，记录旧哈希 `9b16f46c...` 与理由）与 `OrderPaymentSummary.tsx`：`netPaidDisplay` 仅在服务端显式返回 `payableAmountCents` 时展示 `X.XX 元`、缺失时保持 `未记录`（前端零 `amountCents - discountCents` 推算，`print-walk-copy.test.mjs` 0 改期望全绿），详单下单金额/抵扣/已退款/实付统一采用无 `¥` 的 `X.XX 元`；`orderInvoiceCopy.ts` 与 `MyPrintOrdersPage.tsx` 严格优先消费 `payableAmountCents` 使三处金额完全一致；`my-orders-invoice.spec.ts` Test 9 显式点击展开详单验证部分抵扣与全额抵扣全部字段。
+- 验证：正式迁移 SQLite + PG 16（5673）+ 真 Redis（6673）跑通 `verify:member-service-orders`（7 组）、`verify:member-print-orders`、`verify:invoice-real-db`、`verify:invoice-http`、`verify:member-closure`（22 组，真 Redis）；`blk.sh` 下 Playwright `my-orders-invoice.spec.ts`（11/11）+ `account-assets-journey`（1/1）+ `profile-qx`/`fusion-w5`（20/20）、`verify:kiosk-session-reporting`（25/25）、`verify:print-done-truth`（71/71，含 `print-walk-copy.test.mjs` 0 改期望）、`verify:member-print-orders-ui`、`verify:profile-print-orders-inkpaper`、`verify:profile-commercial-first-batch`、`verify:fusion-w5`、`tsc`、`eslint --quiet`、全仓 `pnpm lint`（0 error）、`verify:ci-gate-coverage`、`verify:repository-integrity` 及提交后独立 `node scripts/generate-project-graph.mjs --check` 退出 0；2 条反向变异 C-M1/C-M2 跑红并逐字节还原复绿；隔离端口已全停；未推送，未上线。
+
 ## 2026-11-21：自助开票二期返工收口 P2c2b（分支 `claude/invoice-p2c2-1121`，未推送，未上线）
 
 - 来由：按 Codex 独立审查 `cdaab9ba6` 查出的 3 项 P1 + 2 项 P2 一次性收口，接在 `cdaab9ba6` 之后提交（0 新增 Prisma 迁移，全部改动/新增业务源码 `< 500` 行）。

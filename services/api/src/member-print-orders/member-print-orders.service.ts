@@ -306,6 +306,7 @@ export class MemberPrintOrdersService {
             )
             const invoiceStatus: MemberInvoiceStatus = picked?.status ?? 'none'
             return {
+              payableAmountCents: decision.amountCents,
               canInvoice: decision.ok,
               invoiceStatus,
               invoiceRequestId: invoiceStatus === 'none' ? null : (picked?.id ?? null),
@@ -323,8 +324,8 @@ export class MemberPrintOrdersService {
         duplex: params.duplex,
         paperSize: params.paperSize,
         pageRange: params.pageRange,
-        // 单件订单经 Order.printTaskId 关联本任务；材料包子任务才在 PrintTask.orderId 上。
-        orderId: order?.id ?? r.orderId ?? null,
+        // 只返回已经归属核验的本人订单标识；绝不回退透传未经归属校验的 r.orderId。
+        orderId: order?.id ?? null,
         orderNo: order?.orderNo ?? null,
         terminal: terminal ? { id: terminal.id, displayName: terminal.displayName ?? null, locationLabel: terminal.locationLabel ?? null } : null,
         failureCode: r.status === 'failed' && r.errorCode && MEMBER_VISIBLE_FAILURE_CODES.has(r.errorCode) ? r.errorCode : null,
