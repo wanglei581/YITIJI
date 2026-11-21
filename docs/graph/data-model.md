@@ -122,7 +122,7 @@ flowchart TD
 | **License** | 21 | Organization | 4 个文件<br/>`licenses/license-gate.ts`<br/>`licenses/license-queries.ts`<br/>`licenses/license-write.ts`<br/>… |
 | **MemberLegalConsent** | 10 | EndUser | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
-| **MockInterviewReport** | 6 | MockInterviewSession | 2 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
+| **MockInterviewReport** | 6 | MockInterviewSession | 3 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts`<br/>`payment/service-order.settle.ts` |
 | **MockInterviewSession** | 22 | MockInterviewReport、MockInterviewTurn | 7 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **MockInterviewTurn** | 13 | MockInterviewSession | 7 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>`mock-interview/mock-interview-charge.ts`<br/>… |
 | **OfflineAgency** | 23 | OfflineJob | 2 个文件<br/>`offline-agencies/offline-agencies.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
@@ -156,7 +156,7 @@ flowchart TD
 | **ServiceDeployment** | 12 | ServiceIncident、ServiceProject、Terminal | 4 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>… |
 | **ServiceIncident** | 19 | ServiceDeployment、ServiceIncidentEvent、ServiceProject | 2 个文件<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-report-builder.ts` |
 | **ServiceIncidentEvent** | 7 | ServiceIncident | 1 个文件<br/>`first-order/first-order-incidents.service.ts` |
-| **ServiceOrder** | 37 | Terminal | 11 个文件<br/>`admin-ops/derived-service-return-alerts.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/service-order-sandbox.controller.ts`<br/>… |
+| **ServiceOrder** | 38 | Terminal | 11 个文件<br/>`admin-ops/derived-service-return-alerts.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/service-order-sandbox.controller.ts`<br/>… |
 | **ServiceProject** | 15 | Organization、ServiceDeployment、ServiceIncident、ServiceReport | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
 | **ServiceReport** | 9 | ServiceProject | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
 | **StorageDeletion** | 6 | — | 2 个文件<br/>`files/closure-file-deletion.ts`<br/>`member-privacy/member-closure-redis.service.ts` |

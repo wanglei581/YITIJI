@@ -1035,8 +1035,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/admin/orders/:id/refund-service` | ServiceOrderAdminController.refund | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| POST | `/api/v1/admin/orders/:id/retry-service-refund` | ServiceOrderAdminController.retry | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/admin/orders/:id/refund-service` | ServiceOrderAdminController.refund | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/admin/orders/:id/retry-service-refund` | ServiceOrderAdminController.retry | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/payment/service-order-sandbox.controller.ts`
 
@@ -1048,9 +1048,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/service-orders` | ServiceOrderController.create | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| GET | `/api/v1/kiosk/service-orders/:id` | ServiceOrderController.get | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| POST | `/api/v1/kiosk/service-orders/:id/close` | ServiceOrderController.close | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/service-orders` | ServiceOrderController.create | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| GET | `/api/v1/kiosk/service-orders/:id` | ServiceOrderController.get | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/service-orders/:id/close` | ServiceOrderController.close | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/policies/policies.controller.ts`
 

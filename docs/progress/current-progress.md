@@ -1,5 +1,20 @@
 # 当前开发进度
 
+## 2026-11-21：模拟面试按次付款、「报告没生成」免费再试与自动原路退、付款前 14 岁确认（P2e-3，分支 `claude/kiosk-pay-interview-p2e3`，未推送）
+
+- 来由：补全线第三十任派发的收费第 7 项第三包（P2e-3），起点为 P2e-1c 过审头 `588e46904`，按后端阻塞项 → `InterviewSetupPage` 零行为拆分 → 付款前 14 岁确认 → 开练页 `iv-3` → 作答页 `iv-run` → 浏览器用例与并发门禁收紧分步提交。未碰简历/扫描/打印页、`apps/miniapp/**`、`apps/admin/**`、`apps/partner/**`、`docs/design/**`、生产配置与 P2e-1 地基行为。
+- 后端「报告没生成算这一趟没做成」（阻塞项）：
+  - SQLite 与 PostgreSQL `ServiceOrder` 同步新增可空字段 `reportState`（`null | 'retry' | 'done'`）与联合索引 `@@index([status, reportState, retryUntil])`，新增只加不改迁移 `20261121120000_service_order_report_state`（模型数仍 124，同步 `verify-first-order-migrations.ts`，过 `db:pg:sync:check`）。
+  - 全部判据集中落在 `services/api/src/payment/service-order.policy.ts`：`interview_report_completed`（`made`）、`interview_report_failed`（`not_made`，失败原因「报告没生成」）、`SERVICE_REPORT_STATES`、`decideInterviewReportFailure`、`SERVICE_REFUND_REASON_REPORT_FAILED`（「报告没生成」）、`SERVICE_REFUND_REASON_REPORT_LEFT`（「人已离开，报告没生成」）。保持「开场即做成（不出报告就离开不退）」与「追问失败算做成」语义不变，免费机器与无服务单场次完全不碰。
+  - 状态迁移全部带条件 `updateMany`：`markInterviewReportNotMade` 首次失败写 `consumed + reportState='retry'` 与 10 分钟 `retryUntil`（不回 `paid`，不可再开新场、不可被新单顶替），再次失败或会话已结束走 `executeServiceOrderRefund(..., { requireConsumedReportState: 'retry' | null })`；`markInterviewReportMade` 将 `consumed` 写 `reportState='done'` 并清失败原因与窗口；`claimRefund` 对 `consumed` 单强制校验 `reportState !== 'done'`（或精确匹配 `requireConsumedReportState`），确保并发 `end` + `sweep` 只退一次、做成后不退、退后不倒回做成；`sweepConsumedReportRetry` 与 `onSessionEnded` 仅回收 `status='consumed', reportState='retry'` 的单，与 `settledAt: null` 复核及 `service-order.ref.ts` 顶替路径互不打架。
+  - 新增 `services/api/scripts/verify-service-order-interview-report.ts`（SQLite 与 PostgreSQL 16 双库同跑，接入 `ci.yml` `build-and-verify` 与 `postgres-readiness` 并登记 `verify-ci-gate-coverage.mjs`），覆盖 10 组场景含三路并发竞态屏障（两路独立实例 `end` + `sweep` 同时撞 `claimRefund` 只退 1 次）。
+- 一体机前台（`iv-3`、`iv-run` 与付款前 14 岁确认）：
+  - 先独立提交纯拆分 `InterviewSetupPage.tsx`（765 行 → 437 行，新增 `interviewSetupModel.ts`、`InterviewSetupBlocks.tsx`、`useInterviewSetupEffects.ts`，零行为变化），接入收费后所有新增/拆分 TS/TSX 业务源码均 `< 500` 行（`InterviewSetupPage.tsx` 475 行、`InterviewSessionPage.tsx` 493 行）。
+  - `aiDeclarationGate.ts` 新增 `ensureAge14DeclaredForPay` 复用现有 `AiDeclarationHost` 与 `/me/ai-consents`：收费机器点「付 X.XX 元开始练」前先确认年满 14 周岁，不确认留本页且 0 次建单，确认后进 `/pay/interview`、付成回到 `/interview` 自动带齐 `x-kiosk-session-id` / `x-service-order-id`（`interview.ts` 新增可选 `headers` 参数）与 `x-age-14-plus` 开场，不再弹第二次年龄框；不收费机器行为不变。
+  - `iv-3`（`useInterviewCharge.ts` + `InterviewSetupChargeBar.tsx`）：金额来自本机生效价（无硬编码），按稿显示「这一次 X.XX 元」说明条与「付 X.XX 元开始练」；小青/面试不可用时不出付款按钮仍走通用题目单；已付未开成可免费再试时主按钮切「免费再试一次」并沿用原订单号；遇 402 / `SERVICE_*` 兜底回付款屏。
+  - `iv-run`（`useInterviewReportCharge.ts` + `InterviewSessionBar.tsx` + `interviewTurnActions.ts` + `useInterviewDeadlineSeal.tsx` + `InterviewTimeUp.tsx`）：收费付过场次首次出报告失败切稿 467 句与主按钮「免费再试一次」；再次失败后轮询查单，仅后端 `refunding`/`refunded` 才写「钱在退回」，仅 `refunded` 才写「已退回」，`refund_failed` 给无人值守标准句；不收费机器仍为「报告生成失败，请重试」。
+- 验证：本机跑通 `verify:service-order-interview-report`（SQLite 5/5、PostgreSQL 16 端口 5671 5/5）、`verify:service-orders`、`verify:service-orders-concurrency`（5/5）、`verify:service-order-sandbox-simulate`、全部关联 API/kiosk/根门禁、`tsc --noEmit`、改动文件 `eslint --quiet` 与全仓 `pnpm lint`（0 errors）、`blk.sh` 锁下 `interview-pay.spec.ts`（10/10，已接入 `test:browser:truth`）及未改期望的 `fusion-w3.spec.ts`（23/23）/ `interview-mic-capability.spec.ts` / `w16-ai-declaration.spec.ts` / `pay-service.spec.ts`（26/26）、本机真服务（PG 5671 + SQLite 各四遍，证据存 `/tmp/p2e3-evidence/`）、4 张 1080×1920 照稿并排图（存 `/tmp/p2e3-sbs/`）、6 条反向变异 M1–M6 红绿复核及 `generate-project-graph --check`。未推送，未上线。
+
 ## 2026-11-21：一体机付款屏到点核实端到端闭合与统一节流退避（P2e-1c，分支 `claude/kiosk-pay-service-p2e1`，未推送）
 
 - 来由：补全线第三十任依据 Codex 独立复收 `6819fb0c8` 暴露的 2 处精确缺陷派发的极小范围收口返工，从 `6819fb0c8` 继续按 2 项逐项提交，所有改动/新增业务源码保持 `< 500` 行，未新增数据库迁移、未触碰 P2e-2/3/4 业务页与生产配置。
