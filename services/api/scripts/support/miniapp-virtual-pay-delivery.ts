@@ -6,6 +6,7 @@ import { VIRTUAL_PAY_DIAGNOSTIC_ACTION } from '../../src/virtual-pay/virtual-pay
 import {
   VIRTUAL_PAY_CLOSED_RECOVERY_AUDIT_ACTION,
   VIRTUAL_PAY_MESSAGE_AUDIT_ACTION,
+  parseWechatXml,
 } from '../../src/virtual-pay/wechat-miniapp-message.service'
 
 const MEMBER = 'vpay-deliver-member'
@@ -249,7 +250,46 @@ export async function assertVirtualPayDelivery(options: { prisma: PrismaService;
   assert.equal(await creditCount(prisma, cdataGapOrder.id), 1, '标签与 CDATA 之间带空白的 XML 推送必须正常记权益')
   assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: cdataGapOrder.id } })).status, 'paid')
 
-  console.log('PASS 发货推送验签解密；重复推送只有一条权益；金额或道具不对不记权益；关单后到账补记并告警；XML 空白容错')
+  // P2d1b3 第 5 项：同层级出现重复且值不同的关键字段（<OpenId>/<ActualPrice>）必须拒绝解析，不得静默取末值
+  const dupXmlOrder = await createPending(prisma, 'vpxmldup00001')
+  const dupOpenIdXml = [
+    '<xml>',
+    '<Event><![CDATA[xpay_goods_deliver_notify]]></Event>',
+    '<OpenId><![CDATA[openid-conflict-first]]></OpenId>',
+    `<OpenId><![CDATA[${OPEN_ID}]]></OpenId>`,
+    `<OutTradeNo><![CDATA[${dupXmlOrder.outTradeNo}]]></OutTradeNo>`,
+    '<Env>0</Env>',
+    `<WeChatPayInfo><MchOrderNo><![CDATA[WXDUP1]]></MchOrderNo><PaidTime>${paidTime}</PaidTime></WeChatPayInfo>`,
+    `<GoodsInfo><ProductId><![CDATA[${PRODUCT_ID}]]></ProductId><Quantity>1</Quantity><ActualPrice>${PRICE_CENTS}</ActualPrice></GoodsInfo>`,
+    '</xml>',
+  ].join('')
+  assert.throws(() => parseWechatXml(dupOpenIdXml), /VPAY_XML_DUPLICATE_CONFLICT/)
+  const dupOpenIdRes = await post(base, seal(dupOpenIdXml), undefined, 'text/xml')
+  assert.equal(dupOpenIdRes.status, 200)
+  assert.equal(await dupOpenIdRes.text(), '')
+  assert.equal(await creditCount(prisma, dupXmlOrder.id), 0, '重复冲突 <OpenId> 推送不得记权益')
+  assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: dupXmlOrder.id } })).status, 'pending')
+
+  const dupPriceXml = [
+    '<xml>',
+    '<Event><![CDATA[xpay_goods_deliver_notify]]></Event>',
+    `<OpenId><![CDATA[${OPEN_ID}]]></OpenId>`,
+    `<OutTradeNo><![CDATA[${dupXmlOrder.outTradeNo}]]></OutTradeNo>`,
+    '<Env>0</Env>',
+    `<WeChatPayInfo><MchOrderNo><![CDATA[WXDUP2]]></MchOrderNo><PaidTime>${paidTime}</PaidTime></WeChatPayInfo>`,
+    `<GoodsInfo><ProductId><![CDATA[${PRODUCT_ID}]]></ProductId><Quantity>1</Quantity><ActualPrice>1</ActualPrice><ActualPrice>${PRICE_CENTS}</ActualPrice></GoodsInfo>`,
+    '</xml>',
+  ].join('')
+  assert.throws(() => parseWechatXml(dupPriceXml), /VPAY_XML_DUPLICATE_CONFLICT/)
+  const dupPriceRes = await post(base, seal(dupPriceXml), undefined, 'text/xml')
+  assert.equal(dupPriceRes.status, 200)
+  assert.equal(await dupPriceRes.text(), '')
+  assert.equal(await creditCount(prisma, dupXmlOrder.id), 0, '子层级重复冲突 <ActualPrice> 推送不得记权益')
+  assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: dupXmlOrder.id } })).status, 'pending')
+  assert.equal(await latestReason(prisma), 'payload_incomplete')
+  await prisma.virtualPayOrder.update({ where: { id: dupXmlOrder.id }, data: { status: 'closed' } })
+
+  console.log('PASS 发货推送验签解密；重复推送只有一条权益；金额或道具不对不记权益；关单后到账补记并告警；XML 空白容错与重复冲突标签拒绝')
 }
 
 export async function assertConcurrentDelivery(options: { prisma: PrismaService; base: string }): Promise<void> {

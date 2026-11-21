@@ -168,9 +168,11 @@ function readQuery(query: Record<string, unknown>, key: string): string | null {
 function extractEncrypt(raw: string, contentType: string): string | null {
   const trimmed = raw.trim()
   if (contentType.includes('xml') || trimmed.startsWith('<')) {
-    const match = trimmed.match(/<Encrypt>\s*(?:<!\[CDATA\[([\s\S]*?)\]\]>|([^<]*))\s*<\/Encrypt>/)
-    const value = match?.[1] ?? match?.[2]
-    return value ? value.trim() : null
+    const matches = [...trimmed.matchAll(/<Encrypt>\s*(?:<!\[CDATA\[([\s\S]*?)\]\]>|([^<]*))\s*<\/Encrypt>/g)]
+    if (matches.length === 0) return null
+    const values = matches.map((m) => (m[1] ?? m[2] ?? '').trim()).filter((v) => v.length > 0)
+    if (values.length !== matches.length || new Set(values).size !== 1) return null
+    return values[0] ?? null
   }
   try {
     const parsed = JSON.parse(trimmed) as { Encrypt?: unknown }
@@ -208,15 +210,34 @@ function parseXmlChildren(input: string): Record<string, unknown> | string {
   let saw = false
   for (const match of text.matchAll(pattern)) {
     saw = true
+    const tag = match[1]
     const rawInner = (match[2] ?? '').trim()
     const cdata = rawInner.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/)
-    if (cdata) {
-      out[match[1]] = cdata[1].trim()
-    } else {
-      out[match[1]] = rawInner.includes('<') ? parseXmlChildren(rawInner) : rawInner
+    const value: unknown = cdata
+      ? cdata[1].trim()
+      : rawInner.includes('<')
+        ? parseXmlChildren(rawInner)
+        : rawInner
+    if (Object.prototype.hasOwnProperty.call(out, tag)) {
+      if (!xmlValuesEqual(out[tag], value)) {
+        throw new Error('VPAY_XML_DUPLICATE_CONFLICT')
+      }
+      continue
     }
+    out[tag] = value
   }
   return saw ? out : text
+}
+
+function xmlValuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  const left = asRecord(a)
+  const right = asRecord(b)
+  if (!left || !right) return false
+  const leftKeys = Object.keys(left)
+  const rightKeys = Object.keys(right)
+  if (leftKeys.length !== rightKeys.length) return false
+  return leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && xmlValuesEqual(left[key], right[key]))
 }
 
 function readDeliver(payload: Record<string, unknown>): {
