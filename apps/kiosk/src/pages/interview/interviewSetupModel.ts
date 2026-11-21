@@ -119,12 +119,20 @@ export function practiceSheetFileMeta(file: InterviewPracticeSheetResponse): {
   }
 }
 
+export interface InterviewStartTrip {
+  orderId: string
+  kioskSessionId: string
+  headers: Record<string, string>
+}
+
 /** 授权后重试刚才那场带简历的 start，不再新建一场。 */
 export async function continueInterviewWithResume(ctx: {
   created: CreateInterviewResponse
   pos: string
   duration: InterviewDuration
   interviewerType: InterviewerType
+  trip?: InterviewStartTrip
+  onStartError?: (err: unknown, trip?: InterviewStartTrip) => Promise<boolean>
   getToken: () => string | null
   onGoStage?: (stage: InterviewStage) => void
   navigate: NavigateFunction
@@ -137,7 +145,7 @@ export async function continueInterviewWithResume(ctx: {
   setOfferStartWithoutResume: Dispatch<SetStateAction<boolean>>
   setProbed: Dispatch<SetStateAction<boolean>>
 }): Promise<void> {
-  const { created, pos, duration, interviewerType } = ctx
+  const { created, pos, duration, interviewerType, trip } = ctx
   ctx.setCreating(true)
   ctx.setError(null)
   ctx.setAiOutage(null)
@@ -146,9 +154,14 @@ export async function continueInterviewWithResume(ctx: {
   ctx.setOfferStartWithoutResume(false)
   try {
     const token = ctx.getToken()
-    const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
+    const first = await startInterview(
+      created.sessionId,
+      { token, accessToken: created.accessToken },
+      trip ? { headers: trip.headers } : undefined,
+    )
     const opened = openedInterviewDeadline(first, duration)
     ctx.setProbed(true)
+    const paidFields = trip ? { paidOrderId: trip.orderId, paidKioskSessionId: trip.kioskSessionId } : {}
     patchInterviewWorkbenchSession({
       stage: 'session',
       live: {
@@ -165,6 +178,7 @@ export async function continueInterviewWithResume(ctx: {
         deadlineAtLocalMs: opened.deadlineAtLocalMs,
         deadlineSource: opened.deadlineSource,
         omitPrintAnswers: false,
+        ...paidFields,
       },
     })
     if (ctx.onGoStage) {
@@ -182,6 +196,7 @@ export async function continueInterviewWithResume(ctx: {
           firstQuestion: first.question ?? '',
           deadlineAtLocalMs: opened.deadlineAtLocalMs,
           deadlineSource: opened.deadlineSource,
+          ...paidFields,
         },
       })
     }
@@ -191,6 +206,7 @@ export async function continueInterviewWithResume(ctx: {
       ctx.setError(declined)
       return
     }
+    if (ctx.onStartError && await ctx.onStartError(err, trip)) return
     if (ctx.promptConsent(err, Boolean(ctx.getToken()), () => { void continueInterviewWithResume(ctx) })) return
     const message = interviewStartMessage(err)
     ctx.setError(message)

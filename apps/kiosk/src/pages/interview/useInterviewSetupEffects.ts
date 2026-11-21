@@ -16,6 +16,8 @@ export function useInterviewSetupPersist(draft: InterviewSetupDraft): void {
     aiOutage,
     startFailed,
     probed,
+    step,
+    autoStartAfterPay,
   } = draft
 
   useEffect(() => {
@@ -33,6 +35,8 @@ export function useInterviewSetupPersist(draft: InterviewSetupDraft): void {
         aiOutage,
         startFailed,
         probed,
+        ...(step !== undefined ? { step } : {}),
+        ...(autoStartAfterPay ? { autoStartAfterPay: true } : {}),
       },
     })
   }, [
@@ -48,6 +52,8 @@ export function useInterviewSetupPersist(draft: InterviewSetupDraft): void {
     aiOutage,
     startFailed,
     probed,
+    step,
+    autoStartAfterPay,
   ])
 }
 

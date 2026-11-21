@@ -5,7 +5,7 @@
 // 合规：仅供本人练习参考，不代表任何招聘结果承诺。
 // ============================================================
 
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   EMPLOYMENT_INDUSTRY_SECTORS,
@@ -32,6 +32,7 @@ import { RESUME_AI_CONSENT_NEEDED_COPY } from '../resume/resumeAiConsentPrompt'
 import { useInlineResumeAiConsent } from '../resume/useInlineResumeAiConsent'
 import { interviewUserLine } from './interviewMicCopy'
 import { InterviewNote } from './interviewQxParts'
+import { InterviewSetupChargeBar } from './InterviewSetupChargeBar'
 import { InterviewSetupPersonas, InterviewSetupResume } from './InterviewSetupExtras'
 import {
   InterviewIndustryModal,
@@ -56,6 +57,7 @@ import {
   openPracticeSheetSession,
   practiceSheetFileMeta,
   validateInterviewBasics,
+  type InterviewStartTrip,
 } from './interviewSetupModel'
 import { InterviewShell } from './InterviewShell'
 import { INTERVIEW_DOWN_NOTE, interviewStartControl } from './interviewStartControl'
@@ -63,6 +65,7 @@ import type { InterviewStage } from './interviewWorkbenchModel'
 import { patchInterviewWorkbenchSession, readInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import { openedInterviewDeadline } from './session/interviewDeadline'
 import { assistantOffAsk, interviewAiPill, isAiGateDown, useInterviewAiCapabilities, type InterviewAiState } from './useInterviewAiCapabilities'
+import { useInterviewCharge } from './useInterviewCharge'
 import { useInterviewSetupPersist, useInterviewStepFocus } from './useInterviewSetupEffects'
 import { useMockInterviewAvailability } from './useMockInterviewAvailability'
 import './interview-service-desk.css'
@@ -83,7 +86,7 @@ const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string; m
 export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
-  const { getToken } = useAuth()
+  const { getToken, user } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const kiosk = useTerminalKiosk()
   const contact = useSupportContact()
@@ -112,7 +115,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [probed, setProbed] = useState(setupDraft?.probed ?? false)
   const [printingSheet, setPrintingSheet] = useState(false)
   const [startFailed, setStartFailed] = useState(setupDraft?.startFailed ?? false)
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(setupDraft?.step ?? 1)
+  const [autoStartAfterPay, setAutoStartAfterPay] = useState(setupDraft?.autoStartAfterPay === true)
   const [offerStartWithoutResume, setOfferStartWithoutResume] = useState(false)
   const resumeAiConsent = useInlineResumeAiConsent(() => {
     setStartFailed(false)
@@ -124,8 +128,29 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   useInterviewSetupPersist({
     directionSelectionVersion: 1, interviewerType, industry, position, experience,
     difficulty, duration, resumeFile, pendingSession, aiOutage, startFailed, probed,
+    step, autoStartAfterPay,
   })
   useInterviewStepFocus(step)
+
+  const handleStartRef = useRef<(omitResume?: boolean, trip?: InterviewStartTrip) => Promise<void>>(async () => undefined)
+  const onBeforeNavigatePay = useCallback((autoStart: boolean) => {
+    setAutoStartAfterPay(autoStart)
+    patchInterviewWorkbenchSession({
+      setup: {
+        directionSelectionVersion: 1, interviewerType, industry, position, experience,
+        difficulty, duration, resumeFile, pendingSession, aiOutage, startFailed, probed,
+        step: 3, ...(autoStart ? { autoStartAfterPay: true } : {}),
+      },
+    })
+  }, [aiOutage, difficulty, duration, experience, industry, interviewerType, pendingSession, position, probed, resumeFile, startFailed])
+  const onClearAutoStart = useCallback(() => setAutoStartAfterPay(false), [])
+  const onAutoStart = useCallback((trip: InterviewStartTrip) => { void handleStartRef.current(false, trip) }, [])
+  const validateBasicsNow = useCallback(() => validateInterviewBasics({ position, industry, experience }), [experience, industry, position])
+  const charge = useInterviewCharge({
+    step, creating, controlMode: control.mode, aiOutage, hasPendingSession: Boolean(pendingSession),
+    autoStartAfterPay, endUserId: user?.id ?? null, getToken, navigate,
+    validateBasics: validateBasicsNow, setError, onBeforeNavigatePay, onClearAutoStart, onAutoStart,
+  })
 
   const handleFileChosen = async (e: ChangeEvent<HTMLInputElement>) => {
     if (isTerminalKiosk()) return
@@ -144,7 +169,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     }
   }
 
-  const handleStart = async (omitResume = false) => {
+  const handleStart = async (omitResume = false, trip?: InterviewStartTrip) => {
     const pos = position.trim()
     if (!pos) { setError('请先填写目标岗位，例如：前端开发工程师、行政专员'); return }
     if (!industry.trim()) { setError('请先选择本次练习的行业，不会替你预选'); return }
@@ -164,7 +189,11 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       created = await createInterview(input, { token })
       // 先记下来再 start：start 一旦 503，这个 sessionId 就是通用题目单的落点。
       setPendingSession({ sessionId: created.sessionId, accessToken: created.accessToken })
-      const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
+      const first = await startInterview(
+        created.sessionId,
+        { token, accessToken: created.accessToken },
+        trip ? { headers: trip.headers } : undefined,
+      )
       const opened = openedInterviewDeadline(first, duration)
       setProbed(true)
       const live = {
@@ -181,6 +210,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         deadlineAtLocalMs: opened.deadlineAtLocalMs,
         deadlineSource: opened.deadlineSource,
         omitPrintAnswers: false,
+        ...(trip ? { paidOrderId: trip.orderId, paidKioskSessionId: trip.kioskSessionId } : {}),
       }
       patchInterviewWorkbenchSession({ stage: 'session', live })
       if (onGoStage) onGoStage('session')
@@ -188,12 +218,14 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     } catch (err) {
       const declined = aiDeclarationDeclineMessage(err)
       if (declined) { setError(declined); return }
+      if (await charge.handleStartError(err, trip)) return
       if (!omitResume && created && resumeFile) {
         const started = created
         setOfferStartWithoutResume(false)
         if (resumeAiConsent.promptIfNeeded(err, Boolean(getToken()), () => {
           void continueInterviewWithResume({
-            created: started, pos, duration, interviewerType, getToken, onGoStage, navigate,
+            created: started, pos, duration, interviewerType, trip, onStartError: charge.handleStartError,
+            getToken, onGoStage, navigate,
             promptConsent: resumeAiConsent.promptIfNeeded, setCreating, setError, setAiOutage,
             setAssistantDown, setStartFailed, setOfferStartWithoutResume, setProbed,
           })
@@ -209,6 +241,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       setCreating(false)
     }
   }
+  handleStartRef.current = handleStart
 
   /** 通用题目与答案单：AI 挂掉时唯一不经过模型的出纸路径。 */
   const handlePracticeSheet = async (session?: { sessionId: string; accessToken?: string }) => {
@@ -241,14 +274,16 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const sheetAction = pendingSession
     ? { action: { label: printingSheet ? '正在生成题目单…' : '打印通用题目与答案单', onClick: () => void handlePracticeSheet() } }
     : {}
-  const fallback: AiTaskFallback = aiOutage
+  const fallback: AiTaskFallback = aiOutage && !charge.isRetryFree
     ? { mode: 'blocked', reason: say(aiOutage) ?? aiOutage, blockedActionLabel: '创建并开始练习（AI 面试官）', stillAvailable: STILL_AVAILABLE, ...sheetAction }
     : {
         mode: 'result-unavailable',
         reason: say((startFailed ? error : null) ?? '本次没能进入 AI 面试间。') ?? '本次没能进入 AI 面试间。',
-        retryHint: pendingSession
-          ? `本次没有进入面试间。可以再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`
-          : `本次没有进入面试间。可以直接再点一次「创建并开始练习」。${STILL_AVAILABLE}`,
+        retryHint: charge.startFailureHint
+          ? `${charge.startFailureHint}${STILL_AVAILABLE}`
+          : pendingSession
+            ? `本次没有进入面试间。可以再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`
+            : `本次没有进入面试间。可以直接再点一次「创建并开始练习」。${STILL_AVAILABLE}`,
         ...sheetAction,
       }
 
@@ -299,13 +334,16 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             : assistantOffAsk(assistantState, '可继续手动设置')}
           alert={shownError && shownError !== fallbackReason ? <p className="qxt-iv-alert" role="alert" data-testid="interview-setup-error">{shownError}</p> : undefined}
           primary={{
-            label: step < 3 ? '下一步' : creating ? '正在为你准备面试官…' : aiOutage && pendingSession ? '打印通用题目与答案单' : control.mode === 'sheet' ? '打印通用题目单' : '创建并开始练习',
+            label: step < 3 ? '下一步' : creating ? '正在为你准备面试官…' : charge.primaryLabel(aiOutage && pendingSession ? '打印通用题目与答案单' : control.mode === 'sheet' ? '打印通用题目单' : '创建并开始练习'),
             testId: step === 3 ? 'interview-primary' : undefined,
-            disabled: step === 3 && (creating || uploading || printingSheet || (control.mode === 'wait' && !(aiOutage && pendingSession))),
+            disabled: step === 3 && (creating || uploading || printingSheet || charge.checkingPay || (control.mode === 'wait' && !(aiOutage && pendingSession) && !charge.isRetryFree)),
             onClick: () => {
               if (step < 3) goNext()
+              else if (charge.isRetryFree && charge.paidTrip) void handleStart(false, charge.paidTrip)
               else if (aiOutage && pendingSession) void handlePracticeSheet()
               else if (control.mode === 'sheet') void handleOpenSheet()
+              else if (control.mode === 'start' && charge.needsPay) void charge.startPay()
+              else if (control.mode === 'start' && charge.paidTrip) void handleStart(false, charge.paidTrip)
               else if (control.mode === 'start') void handleStart()
             },
           }}
@@ -418,7 +456,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 )}
               </div>
               {offerStartWithoutResume ? (
-                <button type="button" className="qxt-iv-wide" onClick={() => { setOfferStartWithoutResume(false); void handleStart(true) }}>
+                <button type="button" className="qxt-iv-wide" onClick={() => { setOfferStartWithoutResume(false); void handleStart(true, charge.paidTrip ?? undefined) }}>
                   <b>不上传也能开始</b>
                   <small>没有简历时按通用问题练习，不会因此少一道题。</small>
                 </button>
@@ -428,6 +466,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
               <InterviewSetupStep3Guide
                 disclaimer={<><b>模拟面试不是企业面试。</b>不代表任何招聘结果承诺，不会发出面试邀请，也不用于候选人筛选或录用判断。</>}
               />
+              {charge.showChargeBar && <InterviewSetupChargeBar priceCents={charge.priceCents} />}
             </section>
           )}
         </div>
