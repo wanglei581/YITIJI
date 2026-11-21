@@ -116,13 +116,47 @@ export function forgetServiceTrip(serviceKey: ServiceOrderKey, orderId?: string)
   writeTable(table)
 }
 
-/** 清场用：这一趟记的单全部作废。 */
-export function clearServiceTrips(): void {
-  const store = storage()
-  if (!store) return
-  try {
-    store.removeItem(SERVICE_TRIP_STORAGE_KEY)
-  } catch {
-    // 清不掉也不拦清场；读的时候还有过期判断。
+export type ServiceTripClearReason = 'clear' | 'login_handover'
+type ServiceTripClearListener = (sessionIds: readonly string[], reason: ServiceTripClearReason) => void
+
+const clearListeners = new Set<ServiceTripClearListener>()
+
+/** 订阅服务单清场/换人事件：在旧单号被抹掉时拿到它们关联的旧周期编号，便于同步通知服务端收尾。 */
+export function onServiceTripsCleared(listener: ServiceTripClearListener): () => void {
+  clearListeners.add(listener)
+  return () => { clearListeners.delete(listener) }
+}
+
+/** 读出本机所有服务单记录里关联的使用周期编号（去重）。重载后清场收尾用。 */
+export function readServiceTripSessionIds(): string[] {
+  const table = readTable()
+  const ids = new Set<string>()
+  for (const key of SERVICE_ORDER_KEYS) {
+    const trip = table[key]
+    if (trip) ids.add(trip.kioskSessionId)
   }
+  return [...ids]
+}
+
+/** 清场用：这一趟记的单全部作废，并返回 / 广播它们关联的旧周期编号以便服务端收尾。 */
+export function clearServiceTrips(reason: ServiceTripClearReason = 'clear'): string[] {
+  const sessionIds = readServiceTripSessionIds()
+  const store = storage()
+  if (store) {
+    try {
+      store.removeItem(SERVICE_TRIP_STORAGE_KEY)
+    } catch {
+      // 清不掉也不拦清场；读的时候还有过期判断。
+    }
+  }
+  if (sessionIds.length > 0) {
+    clearListeners.forEach((listener) => {
+      try {
+        listener(sessionIds, reason)
+      } catch {
+        // 通知收尾失败不拦清场。
+      }
+    })
+  }
+  return sessionIds
 }

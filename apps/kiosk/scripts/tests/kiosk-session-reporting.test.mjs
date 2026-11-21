@@ -319,3 +319,88 @@ test('R10 白名单与服务端源码一致；路径归类抽样', () => {
     if (got !== null) assert.ok(KIOSK_VISIT_CATEGORIES.includes(got), `${path} 归到了白名单外的 ${got}`)
   }
 })
+
+test('R11 重载后旧服务单挂在旧周期 A：结束新周期 B 一并通知服务端结束 A 且去重不重发', async () => {
+  const sessionA = '11111111-1111-4111-8111-111111111111'
+  const h = harness()
+  // 新周期 B 已开始
+  h.reporter.enterPath('/resume/optimize')
+  await h.reporter.settle()
+  const sessionB = h.calls[0].body.clientSessionId
+  h.advance(MIN)
+  const endAt = h.at()
+  h.reporter.end('user_exit', [sessionA, sessionB])
+  await h.reporter.settle()
+  const ends = h.calls.filter((c) => c.endpoint === 'end')
+  assert.deepEqual(ends.map((c) => c.body.clientSessionId), [sessionB, sessionA], 'B 和旧周期 A 都收到 end，B 不重复')
+  assert.deepEqual(ends[1].body, { clientSessionId: sessionA, endedAt: h.iso(endAt), endReason: 'user_exit' })
+  // 紧接着 clearServiceTrips 回调再次传入 A：已发过 end，去重不再重发。
+  h.reporter.endSessions([sessionA], 'privacy_clear')
+  await h.reporter.settle()
+  assert.equal(h.calls.filter((c) => c.endpoint === 'end').length, 2)
+
+  // 新周期根本没开始（例如重载落首页后直接结束使用）：仍须通知服务端结束旧周期 A，404 不伪造 start。
+  const hIdle = harness({ respond: () => 404 })
+  hIdle.reporter.end('idle_timeout', [sessionA])
+  await hIdle.reporter.settle()
+  assert.deepEqual(hIdle.calls.map((c) => [c.endpoint, c.body.clientSessionId, c.body.endReason]), [
+    ['end', sessionA, 'idle_timeout'],
+  ])
+})
+
+test('R12 endSessions：含当前周期时同步结束并轮换新周期；只含旧周期时不打断当前周期', async () => {
+  const oldA = '22222222-2222-4222-8222-222222222222'
+  const h = harness()
+  const cur1 = h.reporter.snapshot().clientSessionId
+  h.reporter.endSessions([oldA], 'handover')
+  await h.reporter.settle()
+  assert.equal(h.reporter.snapshot().clientSessionId, cur1, '只收尾旧周期 A 时不打断当前周期')
+  assert.deepEqual(h.calls.map((c) => [c.endpoint, c.body.clientSessionId, c.body.endReason]), [
+    ['end', oldA, 'handover'],
+  ])
+
+  // 当旧单就在当前周期里：收尾当前周期并轮换新编号，避免后续用户沿用已结束周期建单被拒。
+  h.reporter.enterPath('/pay/resume')
+  await h.reporter.settle()
+  const curBefore = h.reporter.snapshot().clientSessionId
+  h.reporter.endSessions([curBefore], 'handover')
+  await h.reporter.settle()
+  assert.notEqual(h.reporter.snapshot().clientSessionId, curBefore, '含当前周期时必须轮换新周期编号')
+  assert.ok(h.calls.some((c) => c.endpoint === 'end' && c.body.clientSessionId === curBefore && c.body.endReason === 'handover'))
+})
+
+test('R13 serviceTrip 保持零运行时依赖，清场前收集旧周期号并回调收尾', async () => {
+  const tripSrc = readFileSync(join(kioskRoot, 'src/services/serviceTrip.ts'), 'utf8')
+  const tripOut = ts.transpileModule(tripSrc, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: 'serviceTrip.ts',
+  }).outputText
+  assert.deepEqual([...tripOut.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]), [], 'serviceTrip.ts 必须保持零运行时依赖')
+  const map = new Map()
+  const prevWin = globalThis.window
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(String(k), String(v)) },
+      removeItem: (k) => { map.delete(k) },
+    },
+  }
+  try {
+    const tripMod = await import(`data:text/javascript;base64,${Buffer.from(tripOut).toString('base64')}`)
+    tripMod.rememberServiceTrip({ serviceKey: 'resume_optimize', orderId: 'ord-a', kioskSessionId: 'sess-a' }, 1_000)
+    tripMod.rememberServiceTrip({ serviceKey: 'scan', orderId: 'ord-b', kioskSessionId: 'sess-b' }, 1_000)
+    assert.deepEqual(tripMod.readServiceTripSessionIds().sort(), ['sess-a', 'sess-b'])
+    const received = []
+    const off = tripMod.onServiceTripsCleared((ids, reason) => received.push({ ids: [...ids].sort(), reason }))
+    const offBoom = tripMod.onServiceTripsCleared(() => { throw new Error('listener boom') })
+    const cleared = tripMod.clearServiceTrips('clear')
+    off()
+    offBoom()
+    assert.deepEqual(cleared.sort(), ['sess-a', 'sess-b'])
+    assert.equal(tripMod.readServiceTrip('resume_optimize', 1_000), null)
+    assert.deepEqual(received, [{ ids: ['sess-a', 'sess-b'], reason: 'clear' }])
+  } finally {
+    if (prevWin === undefined) delete globalThis.window
+    else globalThis.window = prevWin
+  }
+})

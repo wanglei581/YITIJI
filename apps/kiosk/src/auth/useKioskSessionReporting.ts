@@ -17,6 +17,7 @@ import {
   type KioskVisitEndpoint,
 } from '../services/api/kioskSession'
 import { getTerminalId } from '../services/api/screensaver'
+import { onServiceTripsCleared, readServiceTripSessionIds } from '../services/serviceTrip'
 import { terminalProtectedFetch } from '../services/terminalAuth'
 import { IS_E2E_BUILD } from '../utils/buildMode'
 
@@ -55,10 +56,20 @@ const reporter = createKioskVisitReporter(
   REPORTING_ENABLED,
 )
 
-/** 清场时调用：结束当前使用周期。不抛错、不等待。 */
+// 换人 / 401 登出 / 引导票换票直接清本机服务单时，把这些旧单关联的旧周期编号同步通知服务端收尾。
+onServiceTripsCleared((sessionIds, clearReason) => {
+  try {
+    const endReason: KioskVisitEndReason = clearReason === 'login_handover' ? 'handover' : 'privacy_clear'
+    reporter.endSessions(sessionIds, endReason)
+  } catch {
+    // 上报绝不影响清场或换人。
+  }
+})
+
+/** 清场时调用：结束当前使用周期及重载保留的旧服务单关联周期。不抛错、不等待。 */
 export function endKioskVisit(reason: KioskVisitEndReason): void {
   try {
-    reporter.end(reason)
+    reporter.end(reason, readServiceTripSessionIds())
   } catch {
     // 上报绝不影响清场。
   }
