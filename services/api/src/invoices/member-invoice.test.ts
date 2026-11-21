@@ -380,7 +380,7 @@ test('提交认登录的会员，不认请求体里写的别人', async () => {
   assert.equal('email' in response.data, false)
 })
 
-test('会员单条接口：退回原因里抄到的邮箱和税号也打码，个人申请没有税号', async () => {
+test('会员单条接口：退回原因里抄到的邮箱、大小写 18 位与 15/17/20 位税号均打码，不误伤订单号和日期', async () => {
   const { requests, invoices } = createHarness()
   const created = await requests.submit(MEMBER, {
     orderKind: 'print',
@@ -389,16 +389,25 @@ test('会员单条接口：退回原因里抄到的邮箱和税号也打码，�
     title: '张三',
     email: EMAIL,
   })
+  const lowerTaxId = '91000000ma0000000n'
+  const tax15 = '110108123456789'
+  const tax17 = '11010812345678901'
+  const tax20 = '91000000ma0000000n01'
   const row = invoices.find((item) => item.id === created.id)!
   row.status = 'returned'
-  row.returnReason = `邮箱 ${EMAIL} 收不到；单位税号 ${TAX_ID} 也对不上，请改成单位抬头再交`
+  row.returnReason =
+    `邮箱 ${EMAIL} 收不到；18位 ${TAX_ID}、小写 ${lowerTaxId}、15位 ${tax15}、17位 ${tax17}、20位 ${tax20} 对不上；订单 ORD-202611210000001 日期 2026-11-21 金额 300 telecommunications`
   const view = await requests.getForMember(MEMBER, created.id)
   assert.equal(view.taxIdMasked, null)
   assert.equal(view.emailMasked, 'p***@example.com')
-  assert.equal(view.returnReason, '邮箱 p***@example.com 收不到；单位税号 9100**********000N 也对不上，请改成单位抬头再交')
+  assert.equal(
+    view.returnReason,
+    '邮箱 p***@example.com 收不到；18位 9100**********000N、小写 9100**********000n、15位 1101*******6789、17位 1101*********8901、20位 9100************0n01 对不上；订单 ORD-202611210000001 日期 2026-11-21 金额 300 telecommunications',
+  )
   const text = JSON.stringify(view)
-  assert.equal(text.includes(EMAIL), false)
-  assert.equal(text.includes(TAX_ID), false)
+  for (const secret of [EMAIL, TAX_ID, lowerTaxId, tax15, tax17, tax20]) {
+    assert.equal(text.includes(secret), false, `返回里逃逸了 ${secret}`)
+  }
 })
 
 test('会员列表批量读三次库，不对每张单逐个查；一页默认最多 20 张，后面还有就给翻页标记', async () => {

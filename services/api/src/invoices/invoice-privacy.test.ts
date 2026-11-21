@@ -174,6 +174,10 @@ test('注销擦掉本人申请里的个人抬头和邮箱：退回原因里的�
   const submitted = rows.find((row) => row.id === 'submitted-personal')!
   assert.equal(submitted.status, 'returned')
   assert.equal(submitted.returnReason, '会员已注销')
+  // 期望值改动（返工包 P2c1c 第 2 条）：已退回申请不是法定已开发票存根，注销时退回原因统一清空为 null，
+  // 彻底消除管理员在退回原因里手写的非账号姓名与旧税号残留。
+  assert.equal(rows.find((row) => row.id === 'returned-personal')!.returnReason, null)
+  assert.equal(rows.find((row) => row.id === 'returned-company')!.returnReason, null)
   assert.equal(rows.find((row) => row.id === 'issued-company')!.status, 'issued')
   assert.equal(rows.find((row) => row.id === 'returned-company')!.title, COMPANY_NAME)
   assert.equal(rows.find((row) => row.id === 'returned-company')!.taxId, TAX_ID)
@@ -182,6 +186,39 @@ test('注销擦掉本人申请里的个人抬头和邮箱：退回原因里的�
   assert.equal(other.title, NAME)
   assert.equal(other.email, OWN_EMAIL)
   assert.equal(other.returnReason, `${NAME} ${OWN_EMAIL}`)
+})
+
+test('仅开过单位发票的会员注销后，退回原因里的非账号姓名与 15 位旧税号彻底清空', async () => {
+  const now = new Date(Date.now() - 60_000)
+  const { rows, tx } = createStore([
+    {
+      id: 'company-only-returned',
+      endUserId: 'member-company-only',
+      orderKind: 'print',
+      orderId: 'order-co-1',
+      titleType: 'company',
+      title: COMPANY_NAME,
+      taxId: TAX_ID,
+      email: 'desk@example.com',
+      emailClearedAt: null,
+      returnReason: '个体户税号 110108123456789 错误，请王小明核对后重新提交',
+      amountCents: 300,
+      status: 'returned',
+      updatedAt: now,
+    },
+  ])
+  const scrub = (text: string) => text.split('微信用户999').join('[已去标识]')
+  const count = await deidentifyClosedMemberInvoices(tx as never, 'member-company-only', scrub)
+  assert.equal(count, 1)
+  const row = rows[0]!
+  assert.equal(row.status, 'returned')
+  assert.equal(row.title, COMPANY_NAME)
+  assert.equal(row.taxId, TAX_ID)
+  assert.equal(row.email, null)
+  assert.equal(row.returnReason, null)
+  const serialized = JSON.stringify(row)
+  assert.equal(serialized.includes('王小明'), false)
+  assert.equal(serialized.includes('110108123456789'), false)
 })
 
 // 期望值改动（返工包 P2c1b 第 11 条）：邮箱保留天数单独设 INVOICE_EMAIL_RETENTION_DAYS（默认 90），
@@ -353,11 +390,13 @@ test('每小时任务现读开票邮箱自己的保留天数（不看 AI 日志�
 
 test('会员数据导出收本人的开票申请：字段写清，税号和邮箱只导打码后的样子，退回原因里抄到的也打码', async () => {
   const EMAIL = 'finance.desk@example.com'
+  const LOWER_TAX = '91000000ma0000000n'
+  const TAX_15 = '110108123456789'
   const created = new Date(Date.now() - 3 * DAY_MS)
   const invoiceRows = [
     { id: 'inv-mine', endUserId: 'member-1', orderKind: 'print', orderId: 'order-1', titleType: 'company', title: COMPANY_NAME, taxId: TAX_ID,
       email: EMAIL, amountCents: 300, status: 'returned', issuedAt: null, invoiceNo: null,
-      returnReason: `邮箱 ${EMAIL} 收不到，税号 ${TAX_ID} 对不上`, operatorId: 'admin-secret', emailClearedAt: null, createdAt: created },
+      returnReason: `邮箱 ${EMAIL} 收不到，税号 ${TAX_ID} / ${LOWER_TAX} / ${TAX_15} 对不上`, operatorId: 'admin-secret', emailClearedAt: null, createdAt: created },
     { id: 'inv-other', endUserId: 'member-2', orderKind: 'print', orderId: 'order-2', titleType: 'personal', title: '会员乙', taxId: null,
       email: 'member-b@example.com', amountCents: 100, status: 'submitted', issuedAt: null, invoiceNo: null, returnReason: null,
       operatorId: null, emailClearedAt: null, createdAt: created },
@@ -382,11 +421,11 @@ test('会员数据导出收本人的开票申请：字段写清，税号和邮�
   ])
   assert.equal(exported[0]!['taxIdMasked'], '9100**********000N')
   assert.equal(exported[0]!['emailMasked'], 'f***@example.com')
-  assert.equal(exported[0]!['returnReason'], '邮箱 f***@example.com 收不到，税号 9100**********000N 对不上')
+  assert.equal(exported[0]!['returnReason'], '邮箱 f***@example.com 收不到，税号 9100**********000N / 9100**********000n / 1101*******6789 对不上')
   assert.equal(exported[0]!['title'], COMPANY_NAME)
   assert.equal('operatorId' in invoiceSelect, false, '导出不查操作人')
   const text = JSON.stringify(envelope)
-  for (const secret of [TAX_ID, EMAIL, 'member-b@example.com', '会员乙', 'admin-secret']) {
+  for (const secret of [TAX_ID, LOWER_TAX, TAX_15, EMAIL, 'member-b@example.com', '会员乙', 'admin-secret']) {
     assert.equal(text.includes(secret), false, `导出里出现了 ${secret}`)
   }
 })

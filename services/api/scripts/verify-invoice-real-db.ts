@@ -13,6 +13,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { AdminInvoiceService } from '../src/invoices/admin-invoice.service'
 import { compareListPosition } from '../src/invoices/invoice-member-list'
 import { InvoiceRequestsService } from '../src/invoices/invoice-requests.service'
+import { deidentifyClosedMemberInvoices } from '../src/member-privacy/member-closure-retention'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
@@ -283,6 +284,33 @@ async function main(): Promise<void> {
       }
       assert.equal(await prisma.invoiceRequest.count({ where: { endUserId } }), 0, `${label} 会员不应落行`)
     }
+  })
+
+  await check('9 注销去标识：仅开过单位发票的已退回申请，退回原因清空为 null，不留非账号姓名与旧税号', async () => {
+    const endUserId = await member()
+    const orderId = await printOrder(endUserId, commercialTerminal)
+    const stored = await requests.submit(endUserId, {
+      orderKind: 'print',
+      orderId,
+      titleType: 'company',
+      title: '青岛某印务有限公司',
+      taxId: '91000000MA0000000N',
+      email: EMAIL,
+    })
+    await admin.returnRequest(stored.id, {
+      reason: '个体户税号 110108123456789 错误，请王小明核对后重新提交',
+      operatorId: OPERATOR,
+    })
+    await deidentifyClosedMemberInvoices(prisma as never, endUserId, (text) => text)
+    const after = await prisma.invoiceRequest.findUniqueOrThrow({ where: { id: stored.id } })
+    assert.equal(after.status, 'returned')
+    assert.equal(after.title, '青岛某印务有限公司')
+    assert.equal(after.taxId, '91000000MA0000000N')
+    assert.equal(after.email, null)
+    assert.ok(after.emailClearedAt)
+    assert.equal(after.returnReason, null, '已退回申请注销后必须清空退回原因')
+    assert.equal(JSON.stringify(after).includes('王小明'), false)
+    assert.equal(JSON.stringify(after).includes('110108123456789'), false)
   })
 
   console.log(`PASS verify:invoice-real-db（${passed.length} 组）`)

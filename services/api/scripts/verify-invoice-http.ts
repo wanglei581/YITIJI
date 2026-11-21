@@ -189,11 +189,22 @@ async function main(): Promise<void> {
       assert.equal(one.json.data.emailMasked, 'f***@example.com')
       assert.equal(one.text.includes(TAX_ID), false, '单条接口带回了完整税号')
       assert.equal(one.text.includes(EMAIL), false, '单条接口带回了完整邮箱')
-      await admin.returnRequest(id, { reason: `税号 ${TAX_ID} 与邮箱 ${EMAIL} 对不上`, operatorId: `verify-invoice-http-admin-${tag}` })
+      const lowerTaxId = '91000000ma0000000n'
+      const tax15 = '110108123456789'
+      const tax17 = '11010812345678901'
+      const tax20 = '91000000ma0000000n01'
+      const keepOrder = 'ORD-202611210000001'
+      await admin.returnRequest(id, {
+        reason: `税号 ${TAX_ID}、小写 ${lowerTaxId}、15位 ${tax15}、17位 ${tax17}、20位 ${tax20} 与邮箱 ${EMAIL} 对不上；单号 ${keepOrder} 日期 2026-11-21`,
+        operatorId: `verify-invoice-http-admin-${tag}`,
+      })
       const returned = await call('GET', `/me/invoice-requests/${id}`, { headers: asKiosk })
       assert.equal(returned.json.data.status, 'returned')
-      assert.equal(returned.text.includes(TAX_ID), false, '退回原因带回了完整税号')
-      assert.equal(returned.text.includes(EMAIL), false, '退回原因带回了完整邮箱')
+      for (const secret of [TAX_ID, lowerTaxId, tax15, tax17, tax20, EMAIL]) {
+        assert.equal(returned.text.includes(secret), false, `退回原因明文逃逸了 ${secret}`)
+      }
+      assert.equal(returned.text.includes(keepOrder), true, '带连字符订单号不应被误脱敏')
+      assert.equal(returned.text.includes('2026-11-21'), true, '日期不应被误脱敏')
       const list = await call('GET', '/me/invoice-orders', { headers: asKiosk })
       assert.equal(list.status, 200, list.text)
       assert.equal(list.text.includes(TAX_ID) || list.text.includes(EMAIL), false)

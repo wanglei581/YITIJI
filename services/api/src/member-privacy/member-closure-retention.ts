@@ -43,13 +43,12 @@ export function closureTextScrubber(identity: ClosureIdentity): (text: string) =
 }
 
 export const CLOSED_MEMBER_INVOICE_RETURN_REASON = '会员已注销'
-const EMAIL_IN_TEXT = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
 
 /**
  * 开票申请是收款凭证，行留下。个人抬头整段换成去标识（姓名不一定等于账号昵称）。
  * 单位名称只擦掉已知身份，统一社会信用代码不动。邮箱一律清空。
- * 退回原因由管理员手写，可能写到本人在任何一份申请里填的姓名抬头或邮箱：这些值不是账号身份，
- * 身份擦除器认不出，这里先按本人全部申请的个人抬头与邮箱擦，再把剩下任何像邮箱的串清掉。
+ * 已退回申请不是法定已开发票存根，管理员手写的退回原因可能含非账号姓名、旧税号或邮箱，注销时直接清空为 null，
+ * 根除仅开过单位发票时退回原因里的个人身份残留。
  * 已提交、还没处理的申请转「已退回」，原因只写「会员已注销」：注销后没有人能收发票，也不该再标已开。
  */
 export async function deidentifyClosedMemberInvoices(
@@ -58,18 +57,6 @@ export async function deidentifyClosedMemberInvoices(
   scrub: (text: string) => string,
 ): Promise<number> {
   const rows = await tx.invoiceRequest.findMany({ where: { endUserId } })
-  const own = new Set<string>()
-  for (const row of rows) {
-    const title = row.title.trim()
-    if (row.titleType === 'personal' && title && title !== '[已去标识]') own.add(title)
-    if (row.email?.trim()) own.add(row.email.trim())
-  }
-  const ownValues = [...own].sort((left, right) => right.length - left.length)
-  const scrubReason = (text: string) => {
-    let safe = text
-    for (const value of ownValues) safe = safe.split(value).join('[已去标识]')
-    return scrub(safe).replace(EMAIL_IN_TEXT, '[邮箱已清除]')
-  }
   for (const row of rows) {
     const open = row.status === 'submitted'
     await tx.invoiceRequest.update({
@@ -80,7 +67,9 @@ export async function deidentifyClosedMemberInvoices(
         ...(row.email != null ? { emailClearedAt: new Date() } : {}),
         ...(open
           ? { status: 'returned', returnReason: CLOSED_MEMBER_INVOICE_RETURN_REASON, invoiceNo: null, issuedAt: null }
-          : { returnReason: row.returnReason ? scrubReason(row.returnReason) : null }),
+          : row.status === 'returned'
+            ? { returnReason: row.returnReason === CLOSED_MEMBER_INVOICE_RETURN_REASON ? CLOSED_MEMBER_INVOICE_RETURN_REASON : null }
+            : {}),
       },
     })
   }

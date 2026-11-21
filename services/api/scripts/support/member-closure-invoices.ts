@@ -78,7 +78,9 @@ export async function assertClosureInvoices(
   assert.equal(namedInvoice.title, '[已去标识]')
   assert.equal(namedInvoice.email, null)
   assert.equal(namedInvoice.status, 'returned')
-  assert.ok(namedInvoice.returnReason, '退回原因应保留（擦过的）')
+  // 期望值改动（返工包 P2c1c 第 2 条）：已退回申请不是法定已开发票存根，注销时退回原因直接清空为 null，
+  // 彻底消除仅开过单位发票时退回原因里管理员手写的非账号姓名与 15 位旧税号残留。
+  assert.equal(namedInvoice.returnReason, null, '已退回申请注销后应清空退回原因')
   for (const row of rows) {
     const text = JSON.stringify(row)
     assert.equal(text.includes(CLOSURE_INVOICE_NAME), false, `申请 ${row.id} 注销后还留着姓名抬头`)
