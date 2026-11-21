@@ -417,7 +417,8 @@ test.describe('简历按次付款接线（P2e-2） @kiosk', () => {
     await expectNoChargingForbiddenCopy(page)
 
     await page.getByTestId('resume-generate-preview-cta-export').click()
-    await expect(page.locator('[data-kiosk-screen="resume-generate-preview"]')).toContainText('导出不另收钱')
+    await expect(page.locator('[data-kiosk-screen="resume-generate-preview"][data-deliver-phase="export"]')).toBeVisible()
+    await expect(page.locator('[data-kiosk-screen="resume-generate-preview"] .qx-rd-price')).toHaveText('导出不另收钱')
     await expectNoChargingForbiddenCopy(page)
 
     // 免费机器：选格式屏仍写「免费试运营」，不出「导出不另收钱」；优化导出也写「免费试运营，本单 0 元」。
@@ -427,7 +428,8 @@ test.describe('简历按次付款接线（P2e-2） @kiosk', () => {
     await spaNavigate(page, `/resume/generate/preview?taskId=${GENERATE_OK.taskId}`)
     await expect(page.getByTestId('resume-generate-export-no-extra')).toHaveCount(0)
     await page.getByTestId('resume-generate-preview-cta-export').click()
-    await expect(page.locator('[data-kiosk-screen="resume-generate-preview"]')).toContainText('免费试运营')
+    await expect(page.locator('[data-kiosk-screen="resume-generate-preview"][data-deliver-phase="export"]')).toBeVisible()
+    await expect(page.locator('[data-kiosk-screen="resume-generate-preview"] .qx-rd-price')).toContainText('免费试运营')
     await expect(page.locator('body')).not.toContainText('导出不另收钱')
 
     await spaNavigate(page, '/resume/optimize')
