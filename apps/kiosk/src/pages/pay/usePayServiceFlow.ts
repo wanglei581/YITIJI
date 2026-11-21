@@ -11,8 +11,10 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
+import { ApiHttpError } from '../../services/api/httpAdapter'
 import {
   getServiceOrder,
+  retryAfterMsOf,
   serviceOrderExpiredLocally,
   serviceOrderPhase,
   type ServiceOrderPhase,
@@ -34,6 +36,8 @@ export const PAY_POLL_MS = 3_000
 export const PAY_REFRESH_GAP_MS = 10_000
 export const PAY_AUTO_REFRESH_GAP_MS = 15_000
 export const PAY_GET_CAP_PER_MINUTE = 28
+export const PAY_429_BACKOFF_BASE_MS = 10_000
+export const PAY_429_BACKOFF_MAX_MS = 60_000
 /** 稿：付款成功在屏上停 1.6 秒再进入下一步。 */
 export const PAY_OK_ADVANCE_MS = 1_600
 
@@ -43,12 +47,14 @@ interface FlowState {
   phase: ServiceOrderPhase | null
   /** 没出成码或查不到时的那次错误。句子在画屏时才拼：服务电话晚到时跟着更新。 */
   error: unknown
-  /** 向渠道核实过、还没确认到账。普通查单不清它，只有下一次核实或状态变了才清。 */
+  /** 服务端最新视图处于核实中（checking:true）；收到 checking:false 时立即复位。 */
   checking: boolean
+  /** 轮询遇到 429 限流，当前正按 Retry-After 或退避间隔等待下一次核对。 */
+  rateLimited: boolean
 }
 
 export interface PayFlow extends FlowState {
-  /** 屏上实际画的那一态：等待中本地已过期就是超时。 */
+  /** 屏上实际画的那一态：等待中本地已到点先进入核实态，经 refresh=1 确认后才落超时。 */
   view: PayScreen
   remainMs: number | null
   busy: boolean
@@ -58,8 +64,15 @@ export interface PayFlow extends FlowState {
   onStart: () => void
 }
 
-const INITIAL: FlowState = { screen: 'loading', order: null, phase: null, error: null, checking: false }
+const INITIAL: FlowState = { screen: 'loading', order: null, phase: null, error: null, checking: false, rateLimited: false }
 const WAITING: ReadonlySet<PayScreen> = new Set(['wait', 'check'])
+
+function isRateLimitedError(error: unknown): boolean {
+  if (error instanceof ApiHttpError && error.status === 429) return true
+  if (error && typeof error === 'object' && 'status' in error && (error as { status?: unknown }).status === 429) return true
+  const code = errorCodeOf(error)
+  return code === 'RATE_LIMITED' || code === 'RECONCILE_TOO_FREQUENT'
+}
 
 export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: string }): PayFlow {
   const navigate = useNavigate()
@@ -77,6 +90,9 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
   const lastRefreshRef = useRef(0)
   const inflightRef = useRef<Promise<void> | null>(null)
   const expiryCheckedOrderIdRef = useRef<string | null>(null)
+  const rateLimitHitsRef = useRef(0)
+  const backoffUntilRef = useRef(0)
+  const rescheduleRef = useRef<((delayMs: number) => void) | null>(null)
   const leavingRef = useRef(false)
 
   /** 这一次结果还算不算数：人没走，也没换成更新的一次。 */
@@ -88,18 +104,17 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     // 剩余时间按这一刻算：进屏到出码之间隔了一两秒，沿用挂载时的时刻会多写一秒（5:01）。
     setNowMs(now)
     const phase = serviceOrderPhase(view, now)
-    setState((prev) => {
+    setState(() => {
       // 本地已到点但本次不是 refresh=1 核实、且服务端尚未关单（仍是 pending 无失败）：
       // 不让普通轮询抢先判 timeout，先留核实态等到点那一次 refresh=1 落定。
       if (phase === 'timed_out' && view.status === 'pending' && !fromRefresh) {
-        return { screen: 'check', order: view, phase: 'checking', error: null, checking: true }
+        return { screen: 'check', order: view, phase: 'checking', error: null, checking: true, rateLimited: false }
       }
-      let checking = false
-      if (phase === 'checking') checking = true
-      else if (phase === 'awaiting') checking = fromRefresh ? false : prev.checking
+      // checking 严格跟随服务端最新视图：普通查单返回 checking:false 时立即复位，不粘滞假核实。
+      const checking = phase === 'checking'
       const mapped = screenForPhase(phase)
       const screen: PayScreen = mapped === 'renew' ? 'timeout' : WAITING.has(mapped) ? (checking ? 'check' : 'wait') : mapped
-      return { screen, order: view, phase, error: null, checking }
+      return { screen, order: view, phase, error: null, checking, rateLimited: false }
     })
   }, [])
 
@@ -125,6 +140,8 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       keepServiceTripOrder(opened.trip)
       tripRef.current = opened.trip
       lastRefreshRef.current = Date.now()
+      rateLimitHitsRef.current = 0
+      backoffUntilRef.current = 0
       applyView(opened.view, false)
     } catch (error) {
       if (!current(gen)) return
@@ -176,7 +193,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         if (!retired.ok) {
           tripRef.current = stored
           orderRef.current = view
-          setState({ screen: 'close_failed', order: view, phase: serviceOrderPhase(view, Date.now()), error: retired.error, checking: false })
+          setState({ screen: 'close_failed', order: view, phase: serviceOrderPhase(view, Date.now()), error: retired.error, checking: false, rateLimited: false })
           return
         }
       } catch (error) {
@@ -204,22 +221,28 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     // 只在进屏时跑一次。
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pollOnce = useCallback(async (manual: boolean) => {
+  const pollOnce = useCallback(async (manual: boolean): Promise<{ nextDelayMs: number; sent: boolean }> => {
     const trip = tripRef.current
-    if (!trip || inflightRef.current) return
+    if (!trip || inflightRef.current) return { nextDelayMs: PAY_POLL_MS, sent: false }
     const now = Date.now()
+    if (now < backoffUntilRef.current) {
+      return { nextDelayMs: Math.max(PAY_POLL_MS, backoffUntilRef.current - now), sent: false }
+    }
     const log = getLogRef.current.filter((at) => now - at < 60_000)
     getLogRef.current = log
-    if (log.length >= PAY_GET_CAP_PER_MINUTE) return
+    if (log.length >= PAY_GET_CAP_PER_MINUTE) return { nextDelayMs: PAY_POLL_MS, sent: false }
     const sinceRefresh = now - lastRefreshRef.current
     const provider = orderRef.current?.provider
     const refresh = manual ? sinceRefresh >= PAY_REFRESH_GAP_MS : provider !== 'sandbox' && sinceRefresh >= PAY_AUTO_REFRESH_GAP_MS
     if (refresh) lastRefreshRef.current = now
     log.push(now)
     const gen = genRef.current
+    let nextDelayMs = PAY_POLL_MS
     const run = (async () => {
       try {
         const view = await getServiceOrder(trip.orderId, trip.kioskSessionId, { refresh })
+        rateLimitHitsRef.current = 0
+        backoffUntilRef.current = 0
         if (current(gen)) applyView(view, refresh)
       } catch (error) {
         if (!current(gen)) return
@@ -227,7 +250,18 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
           // 这张单服务端不认了：按超时说（没收到钱，万一扣了自动退），再出一张码会建新的。
           forgetServiceTrip(trip.serviceKey, trip.orderId)
           tripRef.current = null
-          setState((prev) => ({ ...prev, screen: 'timeout', checking: false }))
+          setState((prev) => ({ ...prev, screen: 'timeout', checking: false, rateLimited: false }))
+          return
+        }
+        if (isRateLimitedError(error)) {
+          // 遇到 429 限流：按 Retry-After 或指数退避拉长间隔，不再 3 秒死打，并给出清晰不恐慌提示。
+          rateLimitHitsRef.current += 1
+          const headerMs = retryAfterMsOf(error)
+          nextDelayMs = headerMs !== null
+            ? Math.min(PAY_429_BACKOFF_MAX_MS, Math.max(PAY_POLL_MS, headerMs))
+            : Math.min(PAY_429_BACKOFF_MAX_MS, PAY_429_BACKOFF_BASE_MS * (2 ** (rateLimitHitsRef.current - 1)))
+          backoffUntilRef.current = Date.now() + nextDelayMs
+          setState((prev) => (prev.rateLimited ? prev : { ...prev, rateLimited: true }))
         }
         // 其它失败（多半是网络）：留着上一次的样子，下一拍再查，不伪造结果。
       }
@@ -238,6 +272,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     } finally {
       if (inflightRef.current === run) inflightRef.current = null
     }
+    return { nextDelayMs, sent: true }
   }, [applyView, current])
 
   const expiredLocally = WAITING.has(state.screen) && state.order !== null && serviceOrderExpiredLocally(state.order, nowMs)
@@ -249,14 +284,23 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     if (!polling) return undefined
     let stopped = false
     let timer = 0
-    const tick = async () => {
-      await pollOnce(false)
-      if (!stopped) timer = window.setTimeout(() => void tick(), PAY_POLL_MS)
+    const schedule = (delayMs: number) => {
+      window.clearTimeout(timer)
+      if (!stopped) timer = window.setTimeout(() => void tick(), delayMs)
     }
-    timer = window.setTimeout(() => void tick(), PAY_POLL_MS)
+    const tick = async () => {
+      const { nextDelayMs } = await pollOnce(false)
+      schedule(nextDelayMs)
+    }
+    rescheduleRef.current = schedule
+    const initialDelay = backoffUntilRef.current > Date.now()
+      ? Math.max(PAY_POLL_MS, backoffUntilRef.current - Date.now())
+      : PAY_POLL_MS
+    schedule(initialDelay)
     const clock = window.setInterval(() => setNowMs(Date.now()), 1_000)
     return () => {
       stopped = true
+      rescheduleRef.current = null
       window.clearTimeout(timer)
       window.clearInterval(clock)
     }
@@ -316,7 +360,9 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
 
   const onRefresh = useCallback(() => {
     if (!polling) return
-    void pollOnce(true)
+    void pollOnce(true).then(({ nextDelayMs, sent }) => {
+      if (sent) rescheduleRef.current?.(nextDelayMs)
+    })
   }, [pollOnce, polling])
 
   const onRetry = useCallback(() => {

@@ -77,6 +77,7 @@ export const PAY_BACK = `自动退回原付款账户，${CHANNEL}`
 export const PAY_TIMEOUT_FULL = `没收到这一次的钱；万一已经扣了，会${PAY_BACK}。`
 export const PAY_WAIT_BACK = `返回后，万一已经付了，会${PAY_BACK}。`
 export const PAY_CHECK_LINE = '正在向支付渠道核实这一次的结果。这一次还没有确认到账。'
+export const PAY_RATE_LIMIT_LINE = '查询的人较多，稍后会自动继续核对付款结果，请稍候，先别重复付款。'
 
 export const PAY_TRIP: Record<PayWhat, string> = {
   resume: '付一次管这一趟：这一趟的改写都包含，不再另收费。打印另按页计价。',

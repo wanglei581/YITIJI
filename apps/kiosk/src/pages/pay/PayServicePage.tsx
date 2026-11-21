@@ -12,6 +12,7 @@ import { useSupportContact } from '../../hooks/useSupportContact'
 import { PrintArt } from '../print/art/PrintArt'
 import { PayServiceQr } from './PayServiceQr'
 import {
+  PAY_RATE_LIMIT_LINE,
   PAY_SERVICE_NAME,
   PAY_TIMEOUT_LINE,
   PAY_TRIP,
@@ -101,6 +102,7 @@ export function PayServicePage({ what }: { what: PayWhat }) {
             remain={formatRemain(flow.remainMs ?? 0)}
             checking={flow.view === 'check'}
           />
+          {flow.rateLimited ? <p className="qxt-fine" role="status" data-testid="pay-service-rate-limit">{PAY_RATE_LIMIT_LINE}</p> : null}
         </>
       )
       break

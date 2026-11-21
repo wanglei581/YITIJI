@@ -124,6 +124,10 @@ test.describe('付款屏 @kiosk', () => {
     await expect(page.getByTestId('pay-service-checking')).toHaveText('正在向支付渠道核实这一次的结果。这一次还没有确认到账。')
     expect(calls.some((call) => call.method === 'GET' && call.refresh)).toBe(true)
     await expectNoForbiddenCopy(page)
+
+    // 下一拍普通查单返回 checking:false 时必须复位回 wait，不得粘滞假核实。
+    await expectState(page, 'wait')
+    await expect(page.getByTestId('pay-service-checking')).toHaveCount(0)
   })
 
   test('付好了：写「付好了，马上开始」，停一会儿自动去下一步，不关单 @kiosk', async ({ page, api }) => {
@@ -539,5 +543,138 @@ test.describe('付款屏 @kiosk', () => {
     await page.waitForTimeout(4_000)
     expect(calls.filter((call) => call.method === 'POST' && call.path === SERVICE_ORDERS_PATH)).toHaveLength(2)
     await expectNoForbiddenCopy(page)
+  })
+
+  test('轮询遇 429：按 Retry-After 拉长退避并给不恐慌提示，恢复 200 后清除提示 @kiosk', async ({ page, api }) => {
+    const start = new Date('2026-11-19T14:50:00+08:00').getTime()
+    await page.clock.install({ time: start })
+    chargingMachine(api)
+    const order = { ...ORDER_A, createdAt: start }
+    let mode: 'limit_header' | 'limit_backoff' | 'ok' = 'limit_header'
+    api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
+    api.respondWith('POST', serviceOrderClosePath(order.id), () => ok(serviceOrderView(order, { status: 'closed', closeReason: 'user_cancelled' })))
+    await page.route((url) => url.pathname === serviceOrderPath(order.id), (route) => {
+      if (mode === 'limit_header') {
+        const err = apiError(429, 'RATE_LIMITED', '尝试过于频繁，请稍后再试')
+        return route.fulfill({
+          status: 429,
+          headers: { 'Retry-After': '15' },
+          contentType: 'application/json',
+          body: JSON.stringify(err.json),
+        })
+      }
+      if (mode === 'limit_backoff') {
+        const err = apiError(429, 'RATE_LIMITED', '尝试过于频繁，请稍后再试')
+        return route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify(err.json) })
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ok(serviceOrderView(order)).json) })
+    })
+    let virtualNow = start
+    const calls = recordServiceOrderCalls(page, () => virtualNow)
+
+    await page.goto('/pay/resume')
+    await expectState(page, 'wait')
+    await page.clock.pauseAt(start + 100)
+    virtualNow = start + 100
+    const stepMs = async (ms: number) => {
+      for (let done = 0; done < ms; done += 1_000) {
+        virtualNow += 1_000
+        await page.clock.runFor(1_000)
+        await page.waitForTimeout(15)
+      }
+    }
+
+    // 第 3 秒首次轮询撞 429（Retry-After: 15）：出现温和提示且二维码不消失。
+    await stepMs(4_000)
+    await expect(page.getByTestId('pay-service-rate-limit')).toContainText('查询的人较多')
+    await expect(page.getByTestId('pay-service-qr-code')).toBeVisible()
+    await expectNoForbiddenCopy(page)
+    const afterFirst429 = calls.filter((c) => c.method === 'GET').length
+    expect(afterFirst429).toBe(1)
+
+    // 退避窗口内 12 秒不得按 3 秒死打（包含手动点刷新也被退避挡住）。
+    await stepMs(6_000)
+    await primary(page).click()
+    await stepMs(6_000)
+    expect(calls.filter((c) => c.method === 'GET').length).toBe(afterFirst429)
+
+    // 过了 15 秒窗口，下一次轮询恢复发出并拿到 200，提示清除。
+    mode = 'ok'
+    await stepMs(5_000)
+    expect(calls.filter((c) => c.method === 'GET').length).toBeGreaterThan(afterFirst429)
+    await expect(page.getByTestId('pay-service-rate-limit')).toHaveCount(0)
+
+    // 无 Retry-After 头时按默认指数退避（≥10s），同样不再 3 秒死打。
+    mode = 'limit_backoff'
+    const beforeSecond429 = calls.filter((c) => c.method === 'GET').length
+    await stepMs(4_000)
+    await expect(page.getByTestId('pay-service-rate-limit')).toBeVisible()
+    const afterSecond429 = calls.filter((c) => c.method === 'GET').length
+    expect(afterSecond429).toBeGreaterThan(beforeSecond429)
+    await stepMs(7_000)
+    expect(calls.filter((c) => c.method === 'GET').length).toBe(afterSecond429)
+  })
+
+  test('底栏「问小青」与主导航离开：停轮询、不关单、返回恢复原单，最终清场作废 @kiosk', async ({ page, api }) => {
+    const start = new Date('2026-11-19T14:55:00+08:00').getTime()
+    await page.clock.install({ time: start })
+    chargingMachine(api, { resume_optimize: 200 })
+    const first = { ...ORDER_A, createdAt: start }
+    const second = { ...ORDER_B, createdAt: start + 220_000 }
+    api.respondWith('POST', SERVICE_ORDERS_PATH, (n) => ok(serviceOrderView(n === 1 ? first : second)))
+    respondOrder(api, first)
+    respondOrder(api, second)
+    const calls = recordServiceOrderCalls(page)
+
+    await page.goto('/pay/resume')
+    await expectState(page, 'wait')
+    expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toContain(first.id)
+
+    // 1) 点底栏「问小青」离开付款屏：不关单、保留旧单号、立即停轮询。
+    await page.getByRole('button', { name: '问小青：这一次怎么付' }).click()
+    await expect(page).toHaveURL(/\/assistant/, { timeout: 15_000 })
+    const markOnAssistant = calls.length
+    await page.clock.runFor(9_000)
+    await page.waitForTimeout(50)
+    expect(calls.slice(markOnAssistant).filter((c) => c.method === 'GET')).toEqual([])
+    expect(calls.filter((c) => c.path === serviceOrderClosePath(first.id))).toEqual([])
+    expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toContain(first.id)
+
+    // 2) 返回付款屏：恢复同一张旧单，不建第二单。
+    const markBeforeReturn = calls.length
+    await page.evaluate(() => window.history.back())
+    await page.waitForURL((url) => url.pathname === '/pay/resume', { timeout: 15_000 })
+    await expectState(page, 'wait')
+    const returnCalls = calls.slice(markBeforeReturn)
+    expect(returnCalls.filter((c) => c.method === 'POST' && c.path === SERVICE_ORDERS_PATH)).toEqual([])
+    expect(returnCalls.some((c) => c.method === 'GET' && c.path === serviceOrderPath(first.id))).toBe(true)
+
+    // 3) 点主导航「首页」离开：同样停轮询、不关单。
+    await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '首页' }).click()
+    await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 15_000 })
+    const markOnHome = calls.length
+    await page.clock.runFor(9_000)
+    await page.waitForTimeout(50)
+    expect(calls.slice(markOnHome).filter((c) => c.method === 'GET')).toEqual([])
+
+    // 4) 最终闲置结束使用清场：旧单号作废，后续进入付款屏建新单。
+    await page.clock.runFor(185_000)
+    await page.waitForTimeout(800)
+    await page.waitForLoadState('load')
+    await expect(page.getByTestId('session-guard-state-clearing')).toHaveCount(0)
+    await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 15_000 })
+    expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toBeNull()
+    const markAfterClear = calls.length
+    await page.evaluate(() => {
+      const current = window.history.state as { idx?: number } | null
+      const idx = typeof current?.idx === 'number' ? current.idx + 1 : 1
+      window.history.pushState({ usr: null, key: 'pay-after-nav-clear', idx }, '', '/pay/resume')
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+    })
+    await page.waitForURL((url) => url.pathname === '/pay/resume')
+    await expectState(page, 'wait')
+    await expect(page.getByTestId('pay-service-amount')).toHaveText('2.00 元')
+    expect(calls.slice(markAfterClear).filter((c) => c.path.startsWith(serviceOrderPath(first.id)))).toEqual([])
+    expect(calls.slice(markAfterClear).filter((c) => c.method === 'POST' && c.path === SERVICE_ORDERS_PATH)).toHaveLength(1)
   })
 })

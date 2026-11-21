@@ -47,6 +47,43 @@ export const SERVICE_ORDER_ADMIN_CLOSE_REASONS: ReadonlySet<string> = new Set([
 
 const REQUEST_TIMEOUT_MS = 15_000
 
+/** 带 Retry-After 退避时长的服务单 HTTP 错误（继承 ApiHttpError，不改动公共 httpAdapter）。 */
+export class ServiceOrderHttpError extends ApiHttpError {
+  constructor(
+    code: string,
+    message: string,
+    status: number,
+    public readonly retryAfterMs: number | null = null,
+  ) {
+    super(code, message, status)
+    this.name = 'ServiceOrderHttpError'
+  }
+}
+
+/** 解析 HTTP Retry-After（秒数或日期），返回正毫秒数；解析不出返回 null。 */
+export function parseRetryAfterMs(header: string | null, nowMs = Date.now()): number | null {
+  if (!header) return null
+  const trimmed = header.trim()
+  if (!trimmed) return null
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number(trimmed)
+    return Number.isFinite(seconds) && seconds > 0 ? seconds * 1_000 : null
+  }
+  const at = Date.parse(trimmed)
+  if (!Number.isFinite(at)) return null
+  const delta = at - nowMs
+  return delta > 0 ? delta : null
+}
+
+export function retryAfterMsOf(error: unknown): number | null {
+  if (error instanceof ServiceOrderHttpError) return error.retryAfterMs
+  if (error && typeof error === 'object' && 'retryAfterMs' in error) {
+    const value = (error as { retryAfterMs?: unknown }).retryAfterMs
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
+  }
+  return null
+}
+
 function str(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
 }
@@ -132,7 +169,8 @@ async function send(path: string, init: { method: 'GET' | 'POST'; body?: unknown
   }
   if (!res.ok) {
     const { code, message } = await readHttpError(res)
-    throw new ApiHttpError(code, message, res.status)
+    const retryAfterMs = parseRetryAfterMs(res.headers.get('retry-after'))
+    throw new ServiceOrderHttpError(code, message, res.status, retryAfterMs)
   }
   let payload: unknown
   try {
