@@ -220,6 +220,7 @@ export function ResumeReportPage() {
     ? reportBlocksSubtitle(displayReport?.contentBlocks?.length ?? 0)
     : REPORT_HEAD[viewState].sub
   const isFixture = Boolean(fixtureKind)
+  const isDemoReport = isFixture || providerName === 'mock'
   const direction = targetContext ?? state.targetContext
   const summary = targetSummary(direction)
 
@@ -258,7 +259,7 @@ export function ResumeReportPage() {
     if (parsed.tech) setSearch({ state: 'loading' })
   }
   const tripCharge = useResumeTripCharge({ inspectOrder: true })
-  const needsPay = !isFixture && !viewOnly && canOptimize
+  const needsPay = !isDemoReport && !viewOnly && canOptimize
     && tripCharge.resumePriceCents > 0 && !tripCharge.alreadyPaidForOptimize && !tripCharge.checkingOrder
   const openOptimize = () => navigate('/resume/optimize', { state: { ...state, taskId, accessToken, targetContext: state.targetContext ?? targetContext } })
   const openPay = () => {
@@ -341,7 +342,6 @@ export function ResumeReportPage() {
   if (recoveredFail && viewState === 'diagnose-failed' && !parsed.tech) return failView(recoveredFail, failCharge)
   if (viewState === 'diagnose-failed') return failView(reason ?? recoveredFail ?? '简历解析未能完成，请重试', failCharge)
 
-  const isDemoReport = isFixture || providerName === 'mock'
   const why =
     viewState === 'loading' ? '读取还没有结束，现在还不知道有没有报告，所以下一步先不给出口。'
     : viewState === 'unavailable' ? 'AI 暂时不可用，可以先查政策、查看官方渠道或打印材料。'
