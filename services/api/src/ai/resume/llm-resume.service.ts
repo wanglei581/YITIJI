@@ -217,10 +217,10 @@ export class LlmResumeService {
       })
     }
 
-    // S0-2 / 风险 R2：先截断控成本，再遮盖高置信 PII，最后才拼 prompt。
+    // S0-2 / 风险 R2：先遮盖高置信 PII，再截断控成本，最后才拼 prompt。
     // 诊断只看简历「文本表达」，姓名 / 手机 / 身份证 / 邮箱 / 住址对结论没有贡献，
     // 没有理由原样出境到第三方模型。遮盖失败不阻塞诊断（见 llm-input-mask.ts 说明）。
-    const text = maskUserTextForLlmText((extractedText ?? '').slice(0, MAX_DIAGNOSIS_INPUT_CHARS), 'resume_diagnosis')
+    const text = maskUserTextForLlmText(extractedText ?? '', 'resume_diagnosis').slice(0, MAX_DIAGNOSIS_INPUT_CHARS)
     // 只送前 MAX_DIAGNOSIS_INPUT_CHARS 字符 → 后面的内容块会整块缺席。不说出来，
     // 用户会把「没送进模型」读成「简历里没有这几块」（CLAUDE.md §9 不伪造能力）。
     // ai.service.ts 已就同一事实下发 extractionNotice 告警，这里是报告体内的同源标记。

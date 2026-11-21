@@ -60,21 +60,30 @@ export class AdvisorQaMemory {
    */
   begin(sessionId: string, ownerKey: string | null): number {
     const id = sessionId.trim()
+    const captured = this.epoch.capture(id)
     if (id) {
       const current = this.inflight.get(id)
       if (current) current.n += 1
       else this.inflight.set(id, { ownerKey, n: 1 })
+      this.epoch.hold(id)
     }
-    return this.epoch.capture(id)
+    return captured
   }
 
-  /** 这一次请求结束（答完、抛错、设备故障早退）后注销登记。 */
+  /**
+   * 这一次请求结束（答完、抛错、设备故障早退）后注销登记。
+   * 没有登记就返回，不能在这里无条件放开。
+   * 清场、清扫、读取都不摘登记；只有这里摘，而且紧挨着放开。
+   * 登记已经没了还放开，会把另一次仍在途的钉一起放掉。
+   * 公开入口只在 advisor.service.ts 的 ask 里成对调用：进来就 begin，finally 里 end。
+   */
   end(sessionId: string): void {
     const id = sessionId.trim()
     const current = id ? this.inflight.get(id) : undefined
     if (!current) return
     current.n -= 1
     if (current.n <= 0) this.inflight.delete(id)
+    this.epoch.release(id)
   }
 
   /** 读上下文。过期的当作没有 —— 不返回陈旧上下文，也不报错。 */
@@ -149,6 +158,7 @@ export class AdvisorQaMemory {
   /** 空闲超过 TTL 的作业问答立刻丢掉。每分钟扫，不等下一次追问。 */
   @Cron(CronExpression.EVERY_MINUTE)
   sweep(now = Date.now()): number {
+    this.epoch.sweep()
     const before = this.store.size
     for (const [id, entry] of this.store) {
       if (now - entry.updatedAt > TTL_MS) this.drop(id)

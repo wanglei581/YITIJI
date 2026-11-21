@@ -499,7 +499,12 @@ includes('src/pages/resume/JobFitPage.tsx', 'printJobFit(', 'job-fit keeps real 
 includes('src/pages/resume/CareerPlanPage.tsx', 'generateCareerPlan(', 'career plan keeps real generation')
 includes('src/pages/resume/CareerPlanPage.tsx', 'printCareerPlan(', 'career plan keeps real print output')
 includes('src/pages/assistant/AssistantPage.tsx', 'requestTokenRef.current', 'assistant ignores stale responses')
-includes('src/pages/assistant/AssistantPage.tsx', 'sessionIdRef.current = newSessionId()', 'assistant resets shared-terminal sessions')
+{
+  const assistantPage = read('src/pages/assistant/AssistantPage.tsx')
+  const clearCalls = assistantPage.match(/applyAssistantSessionClear\(\s*requestTokenRef,\s*sessionIdRef/g) ?? []
+  check(clearCalls.length >= 3, 'assistant clear, theme switch, and reset share the session-clear function')
+}
+includes('src/pages/assistant/assistantSessionClear.ts', 'sessionId.current = newSessionId()', 'shared clear still mints a new session id')
 includes('src/pages/assistant/AssistantPage.tsx', 'safeActions', 'assistant filters returned actions')
 includes('src/pages/assistant/AssistantPage.tsx', 'ASSISTANT_USER_MESSAGE_MAX_LENGTH', 'assistant retains input limit')
 includes('src/pages/assistant/AssistantCallPanel.tsx', 'data-kiosk-screen="assistant-call"', 'assistant call exposes its sub-state landmark')

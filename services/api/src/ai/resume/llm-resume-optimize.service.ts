@@ -31,7 +31,8 @@ import { withAiSafety } from '../llm/ai-prompt-safety'
 import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
 import { foldCjkRadicalStrings, foldCjkRadicals, foldCjkRadicalsInJsonText } from '../../common/text/cjk-radical-fold'
 import type { OptimizeRejectRule } from './resume-optimize-reject-rule'
-import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
+import { maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
+import { maskLayoutAdjustOutbound, stripLayoutTokensForFacts } from './layout-adjust-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { detectResumeName, RESUME_STRUCTURE_PROMPT_RULE } from './resume-structure'
 import {
@@ -67,12 +68,6 @@ import { RESUME_DOC_LIMITS, fitResumeToDocLimits } from './resume-doc-limits'
 
 const MAX_INPUT_CHARS = 12000
 const OPTIMIZE_TEMPERATURE = 0.3
-
-/**
- * 把「简历原文」「事实基线」「结构化简历 JSON」拼成一次遮盖调用时的分隔符。
- * 必须是遮盖引擎不会改写、且不可能出现在简历正文里的串。
- */
-const MASK_SPLIT = '\n<<<PII_MASK_SPLIT>>>\n'
 const MAX_OPTIMIZE_DESC_CHARS = 2000
 /** 覆盖补回条目的固定说明句。同文过滤不得把它当成「改写等于原文」丢掉。 */
 const KEEP_ORIGINAL_NOTE = '这一段没有改动，保留原文'
@@ -236,12 +231,11 @@ export class LlmResumeOptimizeService {
     // 服务端内存里发生，真值从未离开本进程）。
     // 库里早先存下的简历文字可能还带着部首字符（新上传的在抽取时已经换掉）：在入口换一次，后面的遮盖、章节识别、送模型、事实串比对用的都是同一份常用字文本。
     const original = foldCjkRadicals(extractedText ?? '')
-    const input = original.slice(0, MAX_INPUT_CHARS)
-    const masked = maskUserTextForLlmReversible(input, 'resume_optimize')
-    // 旧报告摘录仍是部首字符。只换字符串叶子，返回新对象，不改报告本身。覆盖检查和提示词用同一份。
+    const masked = maskUserTextForLlmReversible(original, 'resume_optimize')
+    // 先遮盖再截到上限。旧报告摘录仍是部首字符，只换字符串叶子，不改报告本身。
     const foldedReport = foldCjkRadicalStrings(report)
-    const baseline = buildOriginalCoverage(original, foldedReport, input.length, masked.restore)
-    const text = masked.text
+    const baseline = buildOriginalCoverage(original, foldedReport, Math.min(original.length, MAX_INPUT_CHARS), masked.restore)
+    const text = masked.text.slice(0, MAX_INPUT_CHARS)
     const reportBrief = foldedReport.sections.map((s) => `${s.label}:${s.score}/${s.maxScore}`).join('、')
     const directionPrompt = buildTargetContextPrompt(targetContext)
     const baseMessages: ChatMessage[] = [
@@ -310,34 +304,21 @@ export class LlmResumeOptimizeService {
       })
     }
 
-    const originalText = (input.originalText ?? '').slice(0, MAX_INPUT_CHARS)
+    const originalText = input.originalText ?? ''
     if (!originalText.trim()) {
       throw new ServiceUnavailableException({
         error: { code: 'AI_RESUME_SOURCE_UNAVAILABLE', message: '简历原文已按隐私策略自动清理，请重新上传简历后再调整排版' },
       })
     }
-    // S0-2 红线：原文与结构化简历都含 PII，必须在**同一次遮盖调用**里处理 ——
-    // 分多次调用会各自从 1 开始编号，同一个人在不同文本里拿到不同占位符，
-    // 事实串校验就会全线判假。用分隔符拼一次、遮盖、再切回来。
-    //
-    // 三段：原文 / 事实基线（仅字段值）/ 送模型的结构化 JSON。
-    // 事实基线仍然只由**字段值**构成 —— 不能改用 JSON 串，否则 "school"、"company"
-    // 这些字段名会变成合法事实来源，等于放宽既有的防编造断言。
-    //
-    // 预算：遮盖入口会把超过 LLM_MASK_INPUT_LIMIT 的部分静默截断，被截掉的是**后半段**。
-    // JSON 残缺会直接毁掉条目数量上限校验，所以优先保后两段完整，不够的额度从
-    // originalText 预算里扣（originalText 本来就已按 MAX_INPUT_CHARS 截断）。
-    const resumeJson = JSON.stringify(input.currentResume)
-    const resumeValues = extractResumeValueText(input.currentResume)
-    const originalBudget = Math.max(
-      0,
-      LLM_MASK_INPUT_LIMIT - resumeJson.length - resumeValues.length - MASK_SPLIT.length * 2,
-    )
-    const maskedTriple = maskUserTextForLlmReversible(
-      `${originalText.slice(0, originalBudget)}${MASK_SPLIT}${resumeValues}${MASK_SPLIT}${resumeJson}`,
-      'resume_layout_adjust',
-    )
-    const [maskedOriginal = '', maskedResumeValues = '', maskedResumeJson = ''] = maskedTriple.text.split(MASK_SPLIT)
+    // 三段同一次遮盖，占位符编号一致。先完整遮盖，再截原文；任一段超入口上限就失败，不送半截。
+    // 事实基线仍然只由字段值构成。改用 JSON 串会让字段名变成合法事实来源。
+    const maskedTriple = maskLayoutAdjustOutbound({
+      originalText,
+      resumeValues: extractResumeValueText(input.currentResume),
+      resumeJson: JSON.stringify(input.currentResume),
+      maxOriginalChars: MAX_INPUT_CHARS,
+    })
+    const { maskedOriginal, maskedResumeValues, maskedResumeJson, tokens } = maskedTriple
     const factSource = `${maskedOriginal}\n${maskedResumeValues}`
     const layoutHint = buildLayoutHint(input.layout)
     const actionHint =
@@ -360,7 +341,7 @@ export class LlmResumeOptimizeService {
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
         `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, input.onLlmCall,
       ))
-      const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume)
+      const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume, tokens)
       if (result) {
         // 条目数量上限校验用的是原始 currentResume（未遮盖，长度不受遮盖影响）；
         // 这里只还原文本内容，basic 身份字段另以服务端权威值兜底。
@@ -654,6 +635,7 @@ export class LlmResumeOptimizeService {
     factSource: string,
     forbiddenWords: string[],
     currentResume: GeneratedResume,
+    tokens: ReadonlySet<string>,
   ): LayoutAdjustResult | null {
     const jsonStr = extractJson(raw)
     if (!jsonStr) return null
@@ -675,10 +657,15 @@ export class LlmResumeOptimizeService {
     if (arrayLength(r['skills']) > currentResume.skills.length) return null
     if (arrayLength(r['certificates']) > currentResume.certificates.length) return null
 
-    const normFact = normalizeResumeFactText(factSource)
-    const inFact = makeFactMatcher(factSource)
+    const strippedFactSource = stripLayoutTokensForFacts(factSource, tokens)
+    const normFact = normalizeResumeFactText(strippedFactSource)
+    const factMatcher = makeFactMatcher(strippedFactSource)
+    // 字段值也按同一份集合去标记再比：只剩标记的（电话、邮箱被遮）算空值，夹着标记的（证书编号被遮）比剩下的字。
+    const inFact = (value: string | undefined): boolean =>
+      factMatcher(value === undefined ? undefined : stripLayoutTokensForFacts(value, tokens))
     const hasNoNewNumbers = (value: string): boolean => {
-      for (const token of value.match(/\d+(?:\.\d+)?%?/g) ?? []) {
+      const visible = stripLayoutTokensForFacts(value, tokens)
+      for (const token of visible.match(/\d+(?:\.\d+)?%?/g) ?? []) {
         if (!normFact.includes(normalizeResumeFactText(token))) return false
       }
       return true

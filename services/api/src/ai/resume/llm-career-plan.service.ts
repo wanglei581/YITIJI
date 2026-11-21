@@ -124,9 +124,9 @@ export class LlmCareerPlanService {
   async build(ctx: CareerPlanContext): Promise<CareerPlanPayload> {
     const sys = CAREER_PLAN_SYSTEM_PROMPT
 
-    // S0-2 / 风险 R2：简历先截断再遮盖高置信 PII。
+    // S0-2 / 风险 R2：简历先遮盖高置信 PII，再截到 8000 字。
     // 校验同样必须用送出去的这份，理由见 llm-job-fit.service.ts 同位置注释。
-    const maskedResume = maskUserTextForLlmText(ctx.resumeText.slice(0, 8000), 'career_plan')
+    const maskedResume = maskUserTextForLlmText(ctx.resumeText, 'career_plan').slice(0, 8000)
     const parts: string[] = [`【简历原文】\n${maskedResume}`]
     if (ctx.jobFit) {
       parts.push(

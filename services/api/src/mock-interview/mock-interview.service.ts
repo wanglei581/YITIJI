@@ -157,9 +157,9 @@ export class MockInterviewService {
           error: { code: 'INTERVIEW_RESUME_EXTRACT_FAILED', message: extraction.errorMessage ?? '简历文件无法提取，请更换文件或选择「暂不使用简历」' },
         })
       }
-      // 摘要只给模型出题用，用户看不到它 —— 在生成时就遮掉，库里只存遮盖后的那份，
+      // 摘要只给出题用，用户看不到。先遮盖再截到 6000，库里只存遮盖后的那份，
       // 简历原文（手机 / 证件 / 邮箱 / 姓名 / 住址）不随练习会话落库。不可还原即可。
-      const digest = maskUserTextForLlmText(extraction.text?.slice(0, 6000) ?? '', 'mock_interview_resume_digest')
+      const digest = maskUserTextForLlmText(extraction.text ?? '', 'mock_interview_resume_digest').slice(0, 6000)
       resumeDigest = digest.trim() ? digest : null
     }
 

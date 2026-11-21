@@ -145,6 +145,11 @@ overrides:
   # 同 major 升级，且比已有的 deepmerge-ts 7.1.5 → 8.0.0（同样来自 prisma@7.8.0，跨 major）更保守。
   # 3.22 的行为变化就是漏洞修复本身：默认关掉 mysql_clear_password。
   mysql2: 3.24.0
+  # effect: GHSA-7589-6fvf-x4pw（HIGH，2026-11-19T20:51Z 发布）
+  # Schema.TemplateLiteral 编译正则存在 ReDoS；影响 <= 3.22.0，首个修复版 3.22.1（2026-07-30 发布，已过 minimumReleaseAge）。
+  # 载体路径：@ai-job-print/api → @prisma/client / prisma@7.8.0 → @prisma/config@7.8.0 → effect@3.20.0（精确锁定）。
+  # 同大版本（3.x）最小安全修复，不跨到 4.x，不放宽安全门禁。
+  effect@3.20.0: 3.22.1
 allowBuilds:
   '@alicloud/openapi-core': true
   '@nestjs/core': true

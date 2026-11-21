@@ -48,7 +48,7 @@ import {
   type ResumeParseIntentHeaders,
 } from '../resumeParseIntent'
 import { terminalAttributedFetch } from '../terminalAuth'
-import { rememberAdvisorSession, rememberAssistantSession } from './aiSessionForget'
+import { rememberAdvisorSession, trackAssistantSessionRequest } from './aiSessionForget'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 import { networkError } from './throwHttpError'
@@ -298,8 +298,9 @@ export const aiHttpAdapter = {
   },
 
   async chatWithAssistant(req: AssistantChatRequest, token?: string | null): Promise<AssistantChatResponse> {
+    const settle = trackAssistantSessionRequest(req.sessionId)
     const res = await post<AssistantChatResponse>('/assistant/chat', req, token, LLM_TIMEOUT_MS)
-    rememberAssistantSession(res.sessionId)
+    settle(res.sessionId)
     return res
   },
 

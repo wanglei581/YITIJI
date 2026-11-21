@@ -76,7 +76,8 @@ export class JobAiLlmService {
     // S0-2 红线：简历原文送模型前必须遮盖高置信 PII（姓名/手机/身份证/邮箱/住址）。
     // 岗位推荐的产物只有 jobId / fitLevel / 参考说明，不回填任何身份字段，
     // 因此这里只需遮盖，不需要 restore()。
-    const maskedResume = maskUserTextForLlmText(resumePlainText.slice(0, 6000), 'job_recommend')
+    // 先遮盖再截断。证件号跨在 6000 字上时，先截断会把前 10 位明文送出去。
+    const maskedResume = maskUserTextForLlmText(resumePlainText, 'job_recommend').slice(0, 6000)
     const user = `【简历原文】\n${maskedResume}\n\n【候选岗位】\n${jobLines}`
     const raw = await this.callLlm(system, user, 'jobRecommend')
     const parsed = parseJson(raw.text)

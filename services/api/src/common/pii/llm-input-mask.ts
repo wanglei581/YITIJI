@@ -35,6 +35,7 @@
 // ============================================================
 
 import { Logger, ServiceUnavailableException } from '@nestjs/common'
+import { llmMaskPlaceholderPattern } from './mask-placeholder'
 import { assertNoHighConfidencePii, maskContractPages } from './pii-masker'
 
 const logger = new Logger('LlmInputMask')
@@ -68,8 +69,7 @@ const FALLBACK_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
  * 遮盖占位符 token，形态与 pii-masker 的 placeholderFor 输出严格一致。
  * 用于把模型回包里的占位符换回原值。
  */
-const PLACEHOLDER_TOKEN =
-  /\[(?:劳动者|用人单位|身份证|手机号|银行卡|邮箱|详细地址|统一社会信用代码)_\d+\]/gu
+const PLACEHOLDER_TOKEN = llmMaskPlaceholderPattern('gu')
 
 export interface LlmInputMaskResult {
   /** 遮盖后的文本。**这就是应当送模型的文本**，调用方不得再用原文拼 prompt。 */
@@ -90,6 +90,11 @@ export interface LlmInputMaskReversibleResult extends LlmInputMaskResult {
    * 禁止把还原结果再送模型、写日志或落到与本人无关的存储里。
    */
   restore(value: string): string
+  /**
+   * 每个占位符按出现顺序对应的原文。同一号码的不同写法各留各的。
+   * 只在这次遮盖的内存里用，禁止落日志、落库或送模型。
+   */
+  readonly occurrences: ReadonlyMap<string, readonly string[]>
 }
 
 /** 空映射时 restore 是恒等函数；有映射时按 token 精确替换。 */
@@ -164,7 +169,14 @@ export function maskUserTextsForLlmReversible(
 ): LlmInputMaskManyResult {
   const normalized = (Array.isArray(raws) ? raws : []).map((raw) => normalizeForMask(raw))
   if (normalized.every((text) => !text)) {
-    return { texts: normalized, changed: false, strict: true, degraded: false, restore: (value) => value }
+    return {
+      texts: normalized,
+      changed: false,
+      strict: true,
+      degraded: false,
+      restore: (value) => value,
+      occurrences: new Map(),
+    }
   }
   const chars = normalized.reduce((sum, text) => sum + text.length, 0)
 
@@ -189,6 +201,7 @@ export function maskUserTextsForLlmReversible(
       strict,
       degraded: false,
       restore: makeRestore(masked.restoreMap ?? new Map()),
+      occurrences: masked.restoreOccurrences ?? new Map(),
     }
   } catch (error) {
     // 引擎异常（超限 / 输入非法等）：退到兜底正则，绝不退到「送原文」
@@ -198,18 +211,23 @@ export function maskUserTextsForLlmReversible(
     )
     // 兜底路径同样产出 `[类别_序号]`，且跨段共用编号，保证 restore() 在降级时依然可用
     const fallbackMap = new Map<string, string>()
+    const fallbackOccurrences = new Map<string, string[]>()
     const seqByCategory = new Map<string, number>()
     const texts = normalized.map((segment) => {
       let text = segment
       for (const [pattern, category] of FALLBACK_PATTERNS) {
         text = text.replace(pattern, (hit) => {
           for (const [token, original] of fallbackMap) {
-            if (original === hit && token.startsWith(`[${category}_`)) return token
+            if (original === hit && token.startsWith(`[${category}_`)) {
+              fallbackOccurrences.get(token)?.push(hit)
+              return token
+            }
           }
           const seq = (seqByCategory.get(category) ?? 0) + 1
           seqByCategory.set(category, seq)
           const token = `[${category}_${seq}]`
           fallbackMap.set(token, hit)
+          fallbackOccurrences.set(token, [hit])
           return token
         })
       }
@@ -233,6 +251,7 @@ export function maskUserTextsForLlmReversible(
       strict: false,
       degraded: true,
       restore: makeRestore(fallbackMap),
+      occurrences: fallbackOccurrences,
     }
   }
 }
