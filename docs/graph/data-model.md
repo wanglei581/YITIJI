@@ -87,7 +87,7 @@ flowchart TD
 | **ContractReviewTask** | 30 | EndUser | 8 个文件<br/>`contract-review/__tests__/contract-review-orchestrator.test.ts`<br/>`contract-review/contract-review-lifecycle.service.ts`<br/>`contract-review/contract-review-orchestrator.service.ts`<br/>… |
 | **CopyJob** | 21 | Order | 7 个文件<br/>`admin-print-scan/admin-fulfillment-lists.ts`<br/>`copy-jobs/copy-agent.service.ts`<br/>`copy-jobs/copy-authorization.ts`<br/>… |
 | **DocumentProcessTask** | 19 | EndUser、FileObject、PiiFinding | 6 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`materials/materials-manual-confirmation.service.ts`<br/>`materials/materials.service.ts`<br/>… |
-| **EndUser** | 37 | AiResumeResult、AiServiceLog、AiUsageRecord、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、InvoiceRequest、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、MemberServiceCredit、PrintTask、ScanTask、UserAiConsent、UserDataRequest、VirtualPayOrder | 18 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
+| **EndUser** | 37 | AiResumeResult、AiServiceLog、AiUsageRecord、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、InvoiceRequest、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、MemberServiceCredit、PrintTask、ScanTask、UserAiConsent、UserDataRequest、VirtualPayOrder | 19 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
 | **ExternalJumpLog** | 13 | EndUser | 6 个文件<br/>`activity/activity.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/resume/fair-visit-plan.service.ts`<br/>… |
 | **FairCompany** | 22 | FairCompanyPosition、FairVenueHallCompany、JobFair | 8 个文件<br/>`activity/activity.service.ts`<br/>`companies/companies.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **FairCompanyBooth** | 9 | — | **无代码读写** |
@@ -118,12 +118,12 @@ flowchart TD
 | **JobSource** | 30 | FieldMappingRule、ImportBatch、Job、JobFair、Organization、SyncLog | 7 个文件<br/>`job-sync/job-sync.service.ts`<br/>`jobs/data-source-credential-policy.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **KioskActivity** | 12 | — | **无代码读写** |
 | **KioskJobBoardConfig** | 6 | — | 1 个文件<br/>`terminals/kiosk-job-board.service.ts` |
-| **KioskSession** | 14 | — | 10 个文件<br/>`ai/resume/resume-draft-source.service.ts`<br/>`console-screen/console-screen.visits.ts`<br/>`first-order/first-order-report-builder.ts`<br/>… |
+| **KioskSession** | 14 | — | 11 个文件<br/>`ai/resume/resume-draft-source.service.ts`<br/>`console-screen/console-screen.visits.ts`<br/>`first-order/first-order-report-builder.ts`<br/>… |
 | **LegalDocVersion** | 10 | — | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`legal/legal.service.ts`<br/>`member-auth/member-auth.service.ts` |
 | **License** | 21 | Organization | 4 个文件<br/>`licenses/license-gate.ts`<br/>`licenses/license-queries.ts`<br/>`licenses/license-write.ts`<br/>… |
 | **MemberLegalConsent** | 10 | EndUser | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
-| **MemberServiceCredit** | 11 | EndUser、VirtualPayOrder | 3 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`virtual-pay/virtual-pay-credits.service.ts`<br/>`virtual-pay/virtual-pay-delivery.ts` |
+| **MemberServiceCredit** | 11 | EndUser、VirtualPayOrder | 8 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`virtual-pay/virtual-pay-credit-redeem.service.ts`<br/>`virtual-pay/virtual-pay-credit-redeem.ts`<br/>… |
 | **MockInterviewReport** | 6 | MockInterviewSession | 2 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
 | **MockInterviewSession** | 22 | MockInterviewReport、MockInterviewTurn | 7 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **MockInterviewTurn** | 13 | MockInterviewSession | 7 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>`mock-interview/mock-interview-charge.ts`<br/>… |
@@ -158,7 +158,7 @@ flowchart TD
 | **ServiceDeployment** | 12 | ServiceIncident、ServiceProject、Terminal | 4 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>… |
 | **ServiceIncident** | 19 | ServiceDeployment、ServiceIncidentEvent、ServiceProject | 2 个文件<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-report-builder.ts` |
 | **ServiceIncidentEvent** | 7 | ServiceIncident | 1 个文件<br/>`first-order/first-order-incidents.service.ts` |
-| **ServiceOrder** | 37 | Terminal | 13 个文件<br/>`admin-ops/derived-service-return-alerts.ts`<br/>`invoices/invoice-requests.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
+| **ServiceOrder** | 37 | Terminal | 15 个文件<br/>`admin-ops/derived-service-return-alerts.ts`<br/>`invoices/invoice-requests.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **ServiceProject** | 15 | Organization、ServiceDeployment、ServiceIncident、ServiceReport | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
 | **ServiceReport** | 9 | ServiceProject | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
 | **StorageDeletion** | 6 | — | 2 个文件<br/>`files/closure-file-deletion.ts`<br/>`member-privacy/member-closure-redis.service.ts` |
@@ -183,7 +183,7 @@ flowchart TD
 | **UserAiConsent** | 8 | EndUser | 5 个文件<br/>`ai-access/ai-access.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserDataRequest** | 22 | EndUser | 10 个文件<br/>`admin-users/admin-user-closure-read.ts`<br/>`member-privacy/member-closure-requests.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **UserNotification** | 10 | — | 1 个文件<br/>`member-privacy/member-closure.service.ts` |
-| **VirtualPayOrder** | 20 | EndUser、MemberServiceCredit | 4 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`virtual-pay/virtual-pay-delivery.ts`<br/>`virtual-pay/virtual-pay-order.service.ts`<br/>… |
+| **VirtualPayOrder** | 20 | EndUser、MemberServiceCredit | 9 个文件<br/>`member-privacy/member-closure-retention.ts`<br/>`virtual-pay/virtual-pay-admin-orders.ts`<br/>`virtual-pay/virtual-pay-delivery.ts`<br/>… |
 
 ## 没有任何代码读写的模型（8）
 

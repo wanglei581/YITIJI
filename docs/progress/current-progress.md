@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-11-21：小程序虚拟支付二期财务安全收口返工 P2d2b（分支 `claude/miniapp-vpay-p2d2-1121`，接 `378e6b319`，0 新增迁移，未推送，未上线）
+
+- 来由：按 Codex 独立财务与安全复收发现的 4 项 P1 + 5 项必改 + 2 项协议偏差，一次性全部修净并通过双库真并发、真实浏览器安全断言与 3 条反向变异。
+- ① 修正微信 `query_order` 官方状态映射与 `req_from='1'`：`virtual-pay.contract.ts` / `virtual-pay-refund-reconcile.ts` / `virtual-pay-refund.service.ts` / `docs/api/miniapp-virtual-pay.md` 全线按微信官方文档修正——仅 `status === 8`（用户侧收款完成）收敛 `refunded`，彻底移除 `left_fee === 0` 提前判成功捷径；`status === 5`（商户侧扣款完成）即便 `left_fee === 0` 仍保持 `refunding`；`status === 6`（订单关闭）绝不标 `refunded`、写诊断告警留人工核查；`status === 7` 收敛 `refund_failed`；`req_from` 同步修正为官方人工客服/后台枚举 `'1'`。
+- ② 退回权益事务 CAS 补 `settledAt: null`：`virtual-pay-credit-redeem.ts` 恢复事务 `tx.serviceOrder.updateMany` 强制带 `settledAt: null`；已完成单直调 `executeServiceOrderRefund` 或迟到 `markServiceOrderNotMade` 均返回 `skipped` 且权益保持 `consumed`；PG 16 10 轮 `finishServiceOrder` vs 退回权益并发严格互斥。
+- ③ 退款超时/异常严禁凭旧支付态解锁权益 + 同单重试完整冻结请求参数：`refund_order` 超时/网络异常与 `268490014` 保持 `status = 'refunding'` 与权益锁定并告警；`syncOrder`/定时查单对已发过退款的订单见到旧支付态 `2/3/4` 严禁改回 `paid` 或解锁权益；首次落库冻结 `refundOrderId` 与带枚举码的 `refundReason`（`VirtualPayOrder.refundReason`），同单 `268490014`/超时重试复发逐字节一致请求体并补齐超时同步不解锁→晚到 `xpay_refund_notify` 正常收敛回归。
+- ④ 防双击与同会话并发双扣：前端 `useMiniappCreditFlow.ts` 增加同步 `redeemingRef` 防重入锁（同拍连点主按钮严格只发 1 次 `redeem-credit`）；后端 `virtual-pay-credit-redeem.service.ts` 在核销事务内原子校验 `KioskSession`（`endedAt IS NULL AND isExpired = false AND expiresAt > now`）并借 `KioskSession` 行锁串行化同会话并发请求，存在本会话待用 `miniapp_credit` 单时阻断扣第二张权益（`409 SERVICE_ORDER_IN_USE`），PG 16 同会话双权益 5 并发核销严格只扣 1 张、跨会话 20 并发抢同一权益严格 1 成功 19 拒。
+- ⑤ 切用户代次失效、离页晚到自动 `/close`、过期会话拦截与失败通知幂等：`usePayServiceFlow.ts` 将 `endUserId` 纳入代次生命周期与同步引用检查，切用户立即作废旧人查权益与核销；`useMiniappCreditFlow.ts` 晚到核销单在 `!isCurrent(gen)` 或换人后不落 `sessionStorage`、不跳转并当场调 `closeServiceOrder`（`POST /kiosk/service-orders/:id/close`）退回权益；`markVirtualPayRefundFailed` 条件收窄为仅从 `status: 'refunding'` 单次转入，重复失败推送严格只写 1 条审计；补齐 Kiosk Playwright 10/10（含同拍双击、离页晚到 `/close`、切用户）+ `pay-poll-guard.test.mjs` F5 Hook 沙箱回归（22/22）+ 既往 `pay-service.spec.ts` 26/26 + Admin 3/3。
+- ⑥ 全套静态门禁、0 error lint、全部业务源码 `< 500` 行、B1–B3 反向变异 0→1→0 逐字节还原复绿；所有代码提交后重生项目图谱并确认 `node scripts/generate-project-graph.mjs --check` 退出 0；隔离 PG 5674 / Redis 6674 / API 3374 已全部停止，未推送，未上线。
+
 ## 2026-11-21：小程序虚拟支付二期 P2d2（权益核销、失败退回与官方退款、后台页、一体机「手机上买过」，分支 `claude/miniapp-vpay-p2d2-1121`，未推送，未上线）
 
 - 来由：按任务包 P2d2 接在 `15f0b9e6c`（P2d1b3 + P2e-1c）之后完成小程序虚拟支付二期后端、管理员后台与一体机接线，保持所有开关默认关闭、仓库不放真实价格/道具 ID，且未触碰禁改目录与 `model ServiceOrder`。
