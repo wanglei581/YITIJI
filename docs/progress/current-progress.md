@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-11-21：用户自助开票第一包最终收口返工（分支 `claude/invoice-p2c-1119b`，接在 P2c1b `6be42a9cb` 后面，未推送）
+
+- 来由：补全线第三十任返工包 P2c1c，按独立收货报告 `agy-recv-p2c1b-reply.md` 实测复现的两项阻塞隐私问题与三项收口项返工。
+- 封堵注销后扫码开票会话迟到写入明文 PII（三层防线）：`MemberClosureRedisService.revoke` 扫描并吊销该会员的 `invoice_session:*`、`invoice_session_scene:*` 及 `invoice_session_lock:*`；`InvoiceRequestsService.submit` 写库前核验 `EndUser.status === 'active' && enabled === true`（否则 409 `ACCOUNT_UNAVAILABLE`，不落行），并识别库级触发器错误；SQLite 与 PostgreSQL 迁移 `20261119120000_add_invoice_request/migration.sql` 补挂同口径闭户写入触发器（PG 挂 `reject_closed_member_write()`，SQLite 挂 `InvoiceRequest_closed_member_insert` / `bind`）。`verify-member-closure`（真 Redis）、`verify-invoice-real-db` 与 `verify-first-order-migrations`（SQLite + PG）均补真库验证用例。
+- 封堵退回原因脱敏逃逸与仅单位发票注销残留：`invoice-masking.ts` 将 `CREDIT_CODE_IN_TEXT` 改为大小写不敏感匹配 18 位统一社会信用代码并覆盖 15/17/20 位旧税号（要求含数字、排除带连字符订单号、日期与普通短数字），单测与 `verify-invoice-http` 逐一验过；`deidentifyClosedMemberInvoices` 对已退回申请在注销时直接将 `returnReason` 清空为 `null`（已提交转已退回仍写「会员已注销」），根除管理员手写非账号姓名与旧税号残留。
+- 注销开票去标识补行级 CAS：`deidentifyClosedMemberInvoices` 将 `submitted -> returned` 改为行级条件更新 `updateMany({ where: { id, status: 'submitted' } })`，并发窗口里管理员抢先标已开或退回时绝不覆写 `status`/`invoiceNo`/`issuedAt`，只补做个人抬头与邮箱去标识；`verify-invoice-real-db` 补真库 `Read Committed` 探针验证。
+- 修掉 `verify-invoice-http.ts` 新增 1 处 `eslint --quiet` error（`Reply.json.data` 去掉 `any`），全分支改动文件直接运行 `eslint --quiet` 零新增 error；手机开票页 `phoneInvoiceCopy.ts` 无服务电话降级句改为「需要专用发票请在一体机上查看《隐私政策》里的联系方式」，同步补单测与 w5 浏览器用例。
+- 本机隔离 PostgreSQL 16.15（5675，UTC）+ SQLite + Redis 6675 + 共用锁 `blk.sh` 下全部正向门禁、两套 Playwright 浏览器套与 5 条反向变异均已跑通；图谱按本轮代码重生，未推送、未并主线、未上线。
+
 ## 2026-11-19：用户自助开票第一包返工（分支 `claude/invoice-p2c-1119b`，接在第一包 5b29d7a53 后面，未推送）
 
 - 来由：补全线第二十七任 P2c1b，按收货报告第 5 节和 agy 核对表返工。下面几条改的是同日第一包（下一条）的行为。
