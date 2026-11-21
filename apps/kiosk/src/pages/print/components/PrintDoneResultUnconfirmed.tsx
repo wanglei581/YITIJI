@@ -11,15 +11,26 @@
 import type { ReactNode } from 'react'
 import { QxTouchIcon } from '../../../components/qingxu/touch/QxTouchIcon'
 import { PrintTouchFrame, printAsk } from '../PrintTouchFrame'
+import { paymentFactOf } from '../printProgressModel'
 import { CONTACT_ENTRY_LABEL } from './printContactEntry'
 
 const ASK_LABEL = '问小青：取纸或异常怎么办'
 const ASK_DRAFT = '这次打印结果未确认。请说明取纸或遇到异常时怎么做。不要猜成功或失败，也不要让我重复打印。'
 
+const PAID_REFUND_TITLE = '核查之后才退'
+const PAID_REFUND_DESC = '核查确认没出纸后，钱自动退回原付款账户，到账时间以支付渠道为准。'
+
+/** 仅确认收过钱（amountCents > 0）才展示核查后退回提示；0 元免费机与金额未知严格不展示。 */
+export function isPaidUnconfirmedPrint(amountCents: number | null | undefined): boolean {
+  if (typeof amountCents !== 'number' || !Number.isFinite(amountCents) || amountCents <= 0) return false
+  return paymentFactOf(amountCents) === 'paid'
+}
+
 export interface PrintDoneResultUnconfirmedProps {
   orderNo: string | null
   fileName: string | null
   paramLine: string | null
+  amountCents: number | null
   helpLine: string
   canReportIssue: boolean
   isLoggedIn: boolean
@@ -37,6 +48,7 @@ export function PrintDoneResultUnconfirmed({
   orderNo,
   fileName,
   paramLine,
+  amountCents,
   helpLine,
   canReportIssue,
   isLoggedIn,
@@ -49,6 +61,7 @@ export function PrintDoneResultUnconfirmed({
   navbar,
   dialog,
 }: PrintDoneResultUnconfirmedProps) {
+  const showRefundBar = isPaidUnconfirmedPrint(amountCents)
   return (
     <PrintTouchFrame
       page="print-unconfirmed"
@@ -117,6 +130,12 @@ export function PrintDoneResultUnconfirmed({
         <p className="pft-unc-fine qxt-fine" data-testid="print-fulfill-fallback">
           这次结果已登记，等待人工核查；订单保留。
         </p>
+        {showRefundBar ? (
+          <div className="pft-unc-refund" data-testid="print-unconfirmed-refund-bar">
+            <b>{PAID_REFUND_TITLE}</b>
+            <span>{PAID_REFUND_DESC}</span>
+          </div>
+        ) : null}
       </div>
       {dialog}
     </PrintTouchFrame>

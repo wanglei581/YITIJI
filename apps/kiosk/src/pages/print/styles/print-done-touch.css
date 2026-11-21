@@ -259,6 +259,49 @@
   font-size: 28px;
 }
 
+/* 收费打印单结果未确认时的退回提示条（稿 pay-1113.js .py-bar.on）：仅收费单渲染，紧贴底栏之前。 */
+[data-qx-page='print-unconfirmed']:has(.pft-unc-refund) .qxt-body {
+  padding-top: 16px;
+  padding-bottom: 14px;
+}
+
+[data-qx-page='print-unconfirmed']:has(.pft-unc-refund) .qxt-body > .pft-unc {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+[data-qx-page='print-unconfirmed']:has(.pft-unc-refund) .pft-unc-steps {
+  gap: 12px;
+}
+
+[data-qx-page='print-unconfirmed']:has(.pft-unc-refund) .pft-unc-sum .qxt-sum-r {
+  min-height: 76px;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-refund {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0 0;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-refund b {
+  font: 800 26px/1.25 var(--qx-sans);
+  color: var(--qx-deep);
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-refund span {
+  font-size: 20px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+}
+
 @media (max-width: 700px) {
   [data-qx-page='print-done'] .pft-take { flex-basis: 400px; min-height: 400px; flex-direction: column; gap: 16px; }
   [data-qx-page='print-done'] .pft-take-tx { align-items: center; text-align: center; }
