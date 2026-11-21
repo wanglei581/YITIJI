@@ -82,6 +82,7 @@ export function useScanSessionCreate(
     quietPeriodRemaining, setQuietPeriodRemaining,
     quietPeriodBlocked, setQuietPeriodBlocked,
     setOrderInUse,
+    setCreateDispatched,
     setRescanRequested,
     setReplayingLostCreate,
     setLiveNotDurable,
@@ -262,6 +263,7 @@ export function useScanSessionCreate(
         shouldContinue: () => !scanCleanupInProgress(),
       })
       rememberPendingScanPromiseOrder(sessionPromiseRef.current, serviceHeaders?.['x-service-order-id'] ?? null)
+      setCreateDispatched(true)
       /* 把这一次创建交给收尾闸看着，连同身份快照。
        *
        * 清场发生在创建在飞的那一刻时，本机登记里还没有 live —— 闸从登记里读不到任何
@@ -410,6 +412,7 @@ export function useScanSessionCreate(
             markScanPanelOrderRejected(sentOrderId)
           }
           sessionPromiseRef.current = null
+          setCreateDispatched(false)
           navigate(payServicePath('scan', { next: 'settings', back: 'how' }), { replace: true })
           return
         }

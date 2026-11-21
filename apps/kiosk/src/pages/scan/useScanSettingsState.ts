@@ -78,6 +78,8 @@ export function useScanSettingsState(input: {
   const [quietPeriodRemaining, setQuietPeriodRemaining] = useState(0)
   const [quietPeriodBlocked, setQuietPeriodBlocked] = useState(false)
   const [orderInUse, setOrderInUse] = useState(false)
+  /** POST /scan/sessions 实际发出后才置 true：在付款/价目核验或终端换票阶段不提前宣称「正在创建扫描任务」。 */
+  const [createDispatched, setCreateDispatched] = useState(false)
   const [controlToken, setControlToken] = useState<string | null>(restoredLive?.controlToken ?? null)
   /**
    * 这一场的状态位（性质标注 / 进度 / fail-closed / 终端身份 / 收尾闸）连同推进后两位的
@@ -210,6 +212,7 @@ export function useScanSettingsState(input: {
     quietPeriodRemaining, setQuietPeriodRemaining,
     quietPeriodBlocked, setQuietPeriodBlocked,
     orderInUse, setOrderInUse,
+    createDispatched, setCreateDispatched,
     controlToken, setControlToken,
     // 状态位（scanSettingsFlags）
     rescanRequested, setRescanRequested,

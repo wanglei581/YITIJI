@@ -73,6 +73,7 @@ function ScanSettingsInner({
     quietPeriodRemaining,
     quietPeriodBlocked,
     orderInUse,
+    createDispatched,
     controlToken,
     rescanRequested,
     plainRestartChosen,
@@ -108,7 +109,7 @@ function ScanSettingsInner({
     return <ScanSettingsStatusView {...{
       phase, ackState, scanType, terminalSession, failure, replayingLostCreate,
       rescanRetryable, rescanCredentialsLost, rescanRefusedByServer, ackRefused, liveNotDurable,
-      cleanupHolding, quietPeriodRemaining, quietPeriodBlocked, orderInUse,
+      cleanupHolding, quietPeriodRemaining, quietPeriodBlocked, orderInUse, createDispatched,
       handleSafeReturn, handlePlainRestart, handleRescanRetry, handleAckRetry, handleQuietPeriodRetry,
       handleContinuePaidOrder: onContinuePaidOrder,
     }} />
