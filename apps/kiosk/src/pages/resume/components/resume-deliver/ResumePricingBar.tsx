@@ -5,6 +5,7 @@ export function ResumePricingBar(props: {
   pricing: ResumeExportPricing | null
   loading: boolean
   blockedReason: string | null
+  machineCharged?: boolean
 }) {
   if (props.loading && !props.pricing) {
     return <p className="qx-rd-price" role="status">正在读取导出价格…</p>
@@ -19,7 +20,7 @@ export function ResumePricingBar(props: {
   if (props.pricing.mode === 'free') {
     return (
       <p className="qx-rd-price" data-tone="ok" role="status">
-        {FREE_PRICING_COPY}
+        {props.machineCharged ? '导出不另收钱' : FREE_PRICING_COPY}
       </p>
     )
   }

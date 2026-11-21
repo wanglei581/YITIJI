@@ -1,5 +1,5 @@
 import { resumeUserReason } from '../../resumeUserCopy'
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { GeneratedResume, ResumeOptimizeModule, ResumeTemplate } from '@ai-job-print/shared'
 import { getResumeOptimize, type ResumeReadAccess } from '../../../../services/api'
 import { getResumeTemplates } from '../../../../services/api/jobMaterials'
@@ -19,6 +19,9 @@ export function useOptimizeLoad(opts: {
   taskId?: string
   existingOnly?: boolean
   access: ResumeReadAccess
+  serviceHeaders?: Record<string, string>
+  onPaymentRequired?: (code: string | null) => void
+  onLoadFailure?: () => void
   syntheticReady: boolean
   requested: OptimizeViewState | null
   consentChecking: boolean
@@ -36,7 +39,8 @@ export function useOptimizeLoad(opts: {
   setSelectedTemplateId: Dispatch<SetStateAction<string>>
 }) {
   const {
-    taskId, existingOnly = false, access, syntheticReady, requested, consentChecking, consentNeedsPrompt, consentReady, retryNonce,
+    taskId, existingOnly = false, access, serviceHeaders, onPaymentRequired, onLoadFailure,
+    syntheticReady, requested, consentChecking, consentNeedsPrompt, consentReady, retryNonce,
     setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume, setBaseResume,
     setTemplatesError, setResumeTemplates, setSelectedTemplateId,
   } = opts
@@ -44,6 +48,10 @@ export function useOptimizeLoad(opts: {
   useBusyLock(requestBusy)
   const token = access.token
   const accessToken = access.accessToken
+  const headersRef = useRef(serviceHeaders)
+  headersRef.current = serviceHeaders
+  const callbacksRef = useRef({ onPaymentRequired, onLoadFailure })
+  callbacksRef.current = { onPaymentRequired, onLoadFailure }
 
   useEffect(() => {
     let cancelled = false
@@ -79,12 +87,13 @@ export function useOptimizeLoad(opts: {
       setFailKind('retry')
       setFailMsg('等待时间较长，请重试。已生成的结果会保留。')
     }, OPTIMIZE_LOAD_LIMIT_MS)
+    let redirectedToPay = false
     setModules([])
     setOptimizedResume(null)
     setBaseResume?.(null)
     setLoading(true)
     setFailMsg(null)
-    getResumeOptimize(taskId, { token, accessToken }, existingOnly)
+    getResumeOptimize(taskId, { token, accessToken }, existingOnly, headersRef.current)
       .then((res) => {
         if (cancelled) return
         if (res.status === 'completed') {
@@ -94,6 +103,7 @@ export function useOptimizeLoad(opts: {
           if (!res.optimizedResume && (res.modules ?? []).length === 0) {
             setFailKind('retry')
             setFailMsg('暂无优化建议，可重试一次；若仍没有内容请返回重新解析')
+            callbacksRef.current.onLoadFailure?.()
           }
         } else if (typeof res.failCode === 'string' && AI_OUTAGE_CODES.has(res.failCode)) {
           setFailKind('outage')
@@ -104,14 +114,22 @@ export function useOptimizeLoad(opts: {
           const reason = resumeUserReason(res.failReason, '本次没有生成优化建议，可重试或返回重新解析')
           setFailKind(reason.includes('重新上传') ? 'expired' : 'retry')
           setFailMsg(reason)
+          callbacksRef.current.onLoadFailure?.()
         }
       })
       .catch((err: unknown) => {
         if (cancelled) return
+        const status = err && typeof err === 'object' && 'status' in err ? (err as { status?: unknown }).status : undefined
         const code = errorCodeOf(err)
+        if ((status === 402 || (code && code.startsWith('SERVICE_'))) && callbacksRef.current.onPaymentRequired) {
+          redirectedToPay = true
+          callbacksRef.current.onPaymentRequired(code ?? null)
+          return
+        }
         if (code === 'AI_TASK_NOT_FOUND') { setFailKind('reparse'); setFailMsg('这份结果已删除、已超过保存期限或不属于当前账号，无法打开。请返回记录列表选择其他简历，或重新上传。'); return }
         if (code === 'USER_AI_CONSENT_REQUIRED') { setFailKind('consent'); setFailMsg('请先确认简历 AI 服务授权后再生成优化建议'); return }
         if (isAiOutage(err)) { setFailKind('outage'); setFailMsg(userMessageOf(err, '简历优化当前不可用')); return }
+        callbacksRef.current.onLoadFailure?.()
         if (code && ['REQUEST_TIMEOUT', 'AI_BUSY', 'RATE_LIMITED', 'AI_RATE_LIMITED', 'AI_PUBLIC_QUOTA_UNAVAILABLE'].includes(code)) {
           setFailKind('retry')
           setFailMsg(userMessageOf(err, '优化请求超时或繁忙，请重试。已生成的结果不会重复扣次。'))
@@ -120,7 +138,7 @@ export function useOptimizeLoad(opts: {
         setFailKind('reparse')
         setFailMsg(userMessageOf(err, '优化结果读取失败，请返回重新解析'))
       })
-      .finally(() => { if (!cancelled) { clearTimeout(timer); setLoading(false); setRequestBusy(false) } })
+      .finally(() => { if (!cancelled) { clearTimeout(timer); if (!redirectedToPay) setLoading(false); setRequestBusy(false) } })
     return () => { cancelled = true; clearTimeout(timer); setRequestBusy(false) }
   }, [taskId, existingOnly, token, accessToken, consentChecking, consentNeedsPrompt, consentReady, retryNonce, syntheticReady, requested, setBaseResume, setFailKind, setFailMsg, setLoading, setModules, setOptimizedResume])
 }

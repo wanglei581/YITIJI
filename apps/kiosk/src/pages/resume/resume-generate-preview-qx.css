@@ -199,6 +199,13 @@
   line-height: 1.45;
   color: var(--qx-ink-2);
 }
+.qx-rg-export-price {
+  margin: 0;
+  font-size: var(--qx-fs-aux);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--qx-teal-d);
+}
 
 .qx-rg-lead,
 .qx-rg-note {

@@ -1,15 +1,11 @@
 import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicenseContext'
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { unattendedResumeCopy } from './touch/unattendedResumeCopy'
-import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
-import { OptimizeEditView } from './touch/OptimizeEditView'
-import { OptimizeExportView } from './touch/OptimizeExportView'
-import { OptimizeStateCard } from './touch/OptimizeStateCard'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { frameTextOf, saveInfoOf, type OptimizePane } from './touch/optimizeFrame'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
@@ -25,47 +21,36 @@ import {
 import { isAiOutage, useAiTask } from '../../ai'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { DEFAULT_RESUME_LAYOUT, useResumeLayout } from './hooks/useResumeLayout'
-import { readAiResumeSession } from './aiResumeSession'
+import { useResumeLayout } from './hooks/useResumeLayout'
+import { readAiResumeSession, saveAiResumeSession } from './aiResumeSession'
+import { forgetServiceTrip } from '../../services/serviceTrip'
+import { payServicePath } from '../pay/payServiceModel'
+import { RESUME_RETRY_COPY, shouldForgetTripOnPaymentError, useResumeTripCharge } from './useResumeTripCharge'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { RESUME_AI_CONSENT_NEEDED_COPY } from './resumeAiConsentPrompt'
 import { useInlineResumeAiConsent } from './useInlineResumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
-import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
-import { locateLockedCopy, optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
-import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
+import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
+import { OptimizeBodyPanes } from './components/resume-deliver/OptimizeBodyPanes'
+import { buildOptimizeDockControls } from './components/resume-deliver/optimizeDockModel'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
 import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOptimizeLeaveDialog'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
 import { useResumeDraftAutosave } from './components/resume-deliver/useResumeDraftAutosave'
 import { detectUnconfirmedAdditions, extractConfirmableFacts } from './components/resume-deliver/facts'
 import { parseOptimizeQuery, resolveOptimizeView } from './components/resume-deliver/optimizeQuery'
+import { useOptimizeDecisions } from './components/resume-deliver/useOptimizeDecisions'
+import { useOptimizeEditFocus } from './components/resume-deliver/useOptimizeEditFocus'
 import { useOptimizeLoad } from './components/resume-deliver/useOptimizeLoad'
 import { printFileSizeLabel, useOptimizeSession } from './components/resume-deliver/useOptimizeSession'
-import {
-  applyDecisionChanges,
-  applyResumeDecisions,
-  defaultModuleDecision,
-  moduleKeyOf,
-  parseDecisionMap,
-  toggleModuleDecision,
-  isModuleSwitchable,
-  isNoActionModule,
-  moduleSwitchBlock,
-  type ResumeDecisionFailure,
-  type ResumeModuleDecision,
-} from './components/resume-deliver/resumeDecisions'
+import { moduleKeyOf, type ResumeDecisionFailure, type ResumeModuleDecision } from './components/resume-deliver/resumeDecisions'
 import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
-import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
-import { findResumeOriginalField, focusResumeOriginalField, focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
+import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-optimize-qx.css'
 import './touch/optimize.css'
 
 type LeaveAction = () => void
-const OPTIMIZE_AI_DRAFT = '我想把简历中的一句经历换个改法。请先让我提供原句，只整理真实内容，不添加数字或成果。'
-const EDIT_AI_DRAFT = '我想知道这份简历的版式、模板和主色怎么选更清楚。请只讲排版，不要改动我的内容。'
-const EXPORT_AI_DRAFT = '我想知道这份简历导出成 PDF、Word、TXT 还是 Markdown 更合适。请只讲格式的区别，不要改动我的内容。'
 
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
@@ -89,6 +74,7 @@ export function ResumeOptimizePage() {
   const token = getToken()
   const access = { token, accessToken }
   const pricing = useResumeExportPricing(access, token)
+  const tripCharge = useResumeTripCharge()
   const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
   const {
     modules, setModules, optimizedResume, setOptimizedResume, loading, setLoading,
@@ -107,28 +93,24 @@ export function ResumeOptimizePage() {
     setAdjustError(RESUME_AI_CONSENT_NEEDED_COPY)
   })
   const [adjustOutage, setAdjustOutage] = useState(false)
-  const [clearedChoices, setClearedChoices] = useState<ReadonlySet<string>>(new Set())
-  const [decisionIssues, setDecisionIssues] = useState<Record<string, string>>({})
   const [baseResume, setBaseResume] = useState<GeneratedResume | null>(null)
   /** 核对事实的时刻与当时那份稿的指纹；稿一改指纹对不上，就得重新核对。 */
   const [factsConfirmed, setFactsConfirmed] = useState<{ at: string; sig: string } | null>(null)
-  const editOriginalRef = useRef<string | null>(typeof state?.editOriginal === 'string' ? state.editOriginal : null)
-  const [editFocusNonce, setEditFocusNonce] = useState(0)
-  const [lockedNote, setLockedNote] = useState<string | null>(null)
-  const openEditorAtOriginal = (original: string) => {
-    if (viewOnly) return
-    editOriginalRef.current = original
-    setEditFocusNonce((n) => n + 1)
-    // 草稿还没选「继续上次」或「重新开始」时，编辑区还没挂上。只记下这一句，选完再定位。
-    if (!draftAccepted) return
-    setWorkView('editor')
-  }
 
   useBusyLock(exporting || printNavigating || Boolean(adjusting))
   const syntheticReady = query.capture || query.debug
   useOptimizeLoad({
     taskId, access, syntheticReady, requested: query.requested,
     existingOnly,
+    serviceHeaders: existingOnly ? undefined : tripCharge.headers,
+    onPaymentRequired: (code) => {
+      if (shouldForgetTripOnPaymentError(code) && tripCharge.trip) {
+        forgetServiceTrip('resume_optimize', tripCharge.trip.orderId)
+      }
+      if (taskId) saveAiResumeSession({ taskId, accessToken })
+      navigate(payServicePath('resume', { next: 'optimize', back: 'report' }), { replace: true })
+    },
+    onLoadFailure: () => { void tripCharge.refreshOrder() },
     consentChecking: consent.checking, consentNeedsPrompt: consent.needsPrompt, consentReady: consent.ready, retryNonce,
     setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume, setBaseResume,
     setTemplatesError, setResumeTemplates, setSelectedTemplateId,
@@ -184,6 +166,19 @@ export function ResumeOptimizePage() {
     return () => { active = false }
   }, [exported, exportKind, token, setSavedToDocuments])
 
+  // 稿：总览、编辑、导出是同一页的三屏，用按钮切换。没有可对照的条目时直接进编辑区。
+  const showOverview = workView === 'overview' && modules.length > 0
+  const pane: OptimizePane = view !== 'ready' ? 'overview' : workView === 'export' ? 'export' : showOverview ? 'overview' : 'editor'
+  const { lockedNote, openEditorAtOriginal, hasPendingEditOriginal } = useOptimizeEditFocus({
+    initialEditOriginal: typeof state?.editOriginal === 'string' ? state.editOriginal : null,
+    viewOnly,
+    draftAccepted,
+    editorOpen,
+    pane,
+    resume,
+    onOpenEditor: () => setWorkView('editor'),
+  })
+
   const markEdited = () => { setIsDirty(true); setPreviewOpen(false); if (exported) setExported(null) }
   const issueMessage = (failure: ResumeDecisionFailure, attempted?: ResumeModuleDecision) => {
     const index = modules.findIndex((module, i) => moduleKeyOf(module, i) === failure.key)
@@ -197,12 +192,6 @@ export function ResumeOptimizePage() {
       ? `第 ${number} 条是新加的一句，原文里没有对应的句子，这里没法替你换，请在编辑区里对照着改。`
       : `第 ${number} 条那段文字在编辑区里已经变了，没法自动换，请在编辑区里对照着改。`
   }
-  const setDecisionFailures = (failures: ResumeDecisionFailure[], attempted?: ResumeModuleDecision | Record<string, ResumeModuleDecision>) => {
-    setDecisionIssues(Object.fromEntries(failures.map((failure) => {
-      const choice = typeof attempted === 'string' ? attempted : attempted?.[failure.key]
-      return [failure.key, issueMessage(failure, choice)]
-    })))
-  }
   const requestLeave = (action: LeaveAction) => {
     if (draft.unsaved || (isDirty && !exported && !token)) { setConfirmLeave(() => action); return }
     action()
@@ -210,71 +199,20 @@ export function ResumeOptimizePage() {
   const handleLayoutChange = (next: typeof layout) => { setLayout(next); markEdited() }
   const handleTemplateChange = (id: string) => { setSelectedTemplateId(id); setExportError(null); if (exported) setExported(null) }
   const handleExportFormatChange = (format: ResumeExportFormat) => { setExportFormat(format); setPreviewOpen(false); if (exported) setExported(null) }
-  const handleDecisionChange = (key: string, next: ResumeModuleDecision) => {
-    if (viewOnly) return
-    const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
-    if (index < 0 || !optimizedResume) return
-    const result = toggleModuleDecision(
-      optimizedResume, modules[index], decisions[key] ?? defaultModuleDecision(baseResume, modules[index]), next, baseResume,
-      { modules, decisions, index },
-    )
-    if (!result.applied) {
-      setDecisionFailures(result.reason ? [{ key, reason: result.reason }] : [], next)
-      return
-    }
-    setClearedChoices((previous) => { const nextSet = new Set(previous); nextSet.delete(key); return nextSet })
-    setOptimizedResume(result.resume)
-    setDecisions((prev) => ({ ...prev, [key]: next }))
-    setDecisionIssues((prev) => { const nextIssues = { ...prev }; delete nextIssues[key]; return nextIssues })
-    markEdited()
-  }
-  /** 总览的两个批量动作：全部用改写 / 全部保留原文。与逐条切换走同一个替换函数，结果一致。 */
-  const handleBatch = (next: ResumeModuleDecision) => {
-    if (viewOnly || !optimizedResume) return
-    const changes = modules.flatMap((module, index): Array<[string, ResumeModuleDecision]> => {
-      if (isNoActionModule(module)) return []
-      if (!isModuleSwitchable(baseResume, module, decisions[moduleKeyOf(module, index)])) return []
-      return [[moduleKeyOf(module, index), next]]
-    })
-    const applied = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
-    setClearedChoices((previous) => {
-      const nextSet = new Set(previous)
-      const failedKeys = new Set(applied.failures.map((failure) => failure.key))
-      changes.forEach(([key]) => { if (!failedKeys.has(key)) nextSet.delete(key) })
-      return nextSet
-    })
-    setOptimizedResume(applied.resume)
-    setDecisions(applied.decisions)
-    setDecisionFailures(applied.failures, next)
-    if (applied.failures.length < changes.length) markEdited()
-  }
+  const {
+    clearedChoices, setClearedChoices, decisionIssues, handleDecisionChange,
+    handleBatch, compareReturn, handleContinueDraft, handleRestartDraft,
+  } = useOptimizeDecisions({
+    state, viewOnly, editorOpen, modules, optimizedResume, baseResume, decisions,
+    remoteDraft: draft.remoteDraft, hasPendingEditOriginal, formatIssue: issueMessage,
+    setOptimizedResume, setDecisions, setLayout, setIsDirty, setDraftAccepted,
+    setWorkView, requestOverwriteDraft: draft.requestOverwrite, markEdited,
+  })
   const openCompare = (focusIndex?: number) => {
     if (viewOnly) return
     requestLeave(() => navigate('/resume/optimize/compare', {
       state: { taskId, accessToken, decisions, existingOnly, ...(typeof focusIndex === 'number' ? { focusIndex } : {}) },
     }))
-  }
-  const compareReturn = useCompareDecisionsReturn({
-    state, modules, optimizedResume, baseResume, decisions, ready: editorOpen,
-    apply: (changes) => {
-      if (!optimizedResume) return
-      const next = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
-      setOptimizedResume(next.resume); setDecisions(next.decisions); setDecisionFailures(next.failures, Object.fromEntries(changes))
-      if (next.failures.length < changes.length) markEdited()
-    },
-  })
-  const handleContinueDraft = () => {
-    const payload = draft.remoteDraft
-    // 草稿没有生成稿下标。优化页按各字段全文和原文比，不读下标，也不按名称、相似度或同名序号配对，所以续上时不盖下标。
-    if (payload?.resume) {
-      const nextDecisions = parseDecisionMap(payload.decisions)
-      setDecisions(nextDecisions)
-      setOptimizedResume(applyResumeDecisions(payload.resume, modules, nextDecisions))
-      if (payload.layout) setLayout({ ...DEFAULT_RESUME_LAYOUT, ...payload.layout })
-    }
-    setIsDirty(false)
-    setDraftAccepted(true)
-    setWorkView('editor')
   }
 
   /** 编辑页「去导出」：标题有问题先带到那一栏；核对过事实且稿没变就直接去，否则先核对。 */
@@ -334,7 +272,7 @@ export function ResumeOptimizePage() {
     if (viewOnly || !taskId || !resume || adjustOutage || (failKind === 'outage' && failMsg)) return
     const before = resume; setAdjusting(action); setAdjustError(null)
     try {
-      const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access)
+      const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access, tripCharge.headers)
       setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings?.length ? ['调整后的内容仍需你逐项核对，确认事实无误。'] : []); setExported(null); setIsDirty(true)
     } catch (err) {
       if (resumeAiConsent.promptIfNeeded(err, Boolean(token), () => { void handleAiAdjust(action) })) return
@@ -349,72 +287,36 @@ export function ResumeOptimizePage() {
     navigate(`/resume/report${search}`, { state: { ...state, taskId, accessToken, ...(aiDown ? { aiDown: true } : {}), ...(licenseViewOnly ? { licenseViewOnly: true } : {}) } })
   }
 
-  // 稿：总览、编辑、导出是同一页的三屏，用按钮切换。没有可对照的条目时直接进编辑区。
-  const showOverview = workView === 'overview' && modules.length > 0
-  const pane: OptimizePane = view !== 'ready' ? 'overview' : workView === 'export' ? 'export' : showOverview ? 'overview' : 'editor'
-  useEffect(() => {
-    if (!editorOpen || pane !== 'editor' || !resume || editOriginalRef.current == null) return
-    const text = editOriginalRef.current
-    let frame = 0
-    let handle = 0
-    const tick = () => {
-      if (editOriginalRef.current !== text) return
-      if (focusResumeOriginalField(resume, text)) {
-        const hit = findResumeOriginalField(resume, text)
-        setLockedNote(hit ? locateLockedCopy(hit.fieldId) : null)
-        editOriginalRef.current = null
-        return
-      }
-      frame += 1
-      if (frame < 60) handle = window.requestAnimationFrame(tick)
-    }
-    handle = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(handle)
-  }, [editorOpen, pane, resume, editFocusNonce])
-  useEffect(() => {
-    if (pane !== 'editor') return
-    const editor = document.querySelector('[data-resume-editor]')
-    if (!(editor instanceof HTMLElement)) return
-    const onFocus = (event: FocusEvent) => {
-      const target = event.target
-      if (!(target instanceof HTMLElement)) return
-      const field = target.closest('[data-entry-field]')
-      setLockedNote(locateLockedCopy(field?.getAttribute('data-entry-field') ?? ''))
-    }
-    editor.addEventListener('focusin', onFocus)
-    return () => editor.removeEventListener('focusin', onFocus)
-  }, [pane, resume])
   const qxPage = pane === 'export' ? 'resume-export' : pane === 'editor' ? 'resume-edit' : 'optimize'
   const leaveDirty = draft.unsaved || (isDirty && !exported && !token)
-  const askFor = (label: string, text: string) => ({
-    label,
-    draft: text,
-    beforeAsk: () => {
-      if (!leaveDirty) return true
-      requestLeave(() => { rememberAssistantDraft(text); navigate('/assistant') })
-      return false
-    },
-  })
   const aiDown = adjustOutage || (failKind === 'outage' && Boolean(failMsg))
   const aiTask = useAiTask({ availability: aiDown ? 'unavailable' : optimizedResume && !syntheticReady ? 'available' : 'unknown', pending: false, failed: Boolean(failMsg || adjustError), hasResult: Boolean(optimizedResume) })
-  const ask = aiDown ? { label: pane === 'export' ? '小青暂时不可用，先自行选择格式' : '小青暂时不可用，先手动编辑', disabled: true as const } : pane === 'export' ? askFor('问小青：导出成哪种', EXPORT_AI_DRAFT)
-    : pane === 'editor' && view === 'ready' ? askFor('问小青：版式怎么排', EDIT_AI_DRAFT)
-    : askFor('问小青：这句还能怎么改 →', OPTIMIZE_AI_DRAFT)
   const navTestIds = { home: 'resume-optimize-nav-home', advisor: 'resume-optimize-nav-advisor', profile: 'resume-optimize-nav-profile' }
   const saveInfo = saveInfoOf(Boolean(token), draft.status, draft.savedAt)
   const exportIsPdf = exportKind === 'change_list' || exportFormat === 'pdf'
   const canPrint = Boolean(exported?.printFileUrl) && exportIsPdf
-  const dockPrimary = !editorOpen ? undefined
-    : pane === 'overview' && showOverview
-      ? { label: '逐条看（从第 1 条）', onClick: () => openCompare(), testId: 'resume-optimize-primary' }
-      : pane === 'editor' && assembled
-        ? { label: '去导出', onClick: requestResumeExport, ariaDisabled: titleBlocked, testId: 'resume-optimize-to-export' }
-        : pane === 'export' && assembled
-          ? exporting ? { label: '正在生成文件…', onClick: () => undefined, disabled: true, noArrow: true as const }
-            : !exported ? { label: '导出', onClick: () => { void runResumeExport() }, ariaDisabled: exportBlocked || titleBlocked || !factsValid, testId: 'resume-optimize-export' }
-            : canPrint ? { label: '去打印这一份', onClick: handlePrint, ariaDisabled: printNavigating || titleBlocked, testId: 'resume-optimize-print' }
-            : { label: '扫码带走', onClick: () => setPreviewOpen(true), ariaDisabled: !exported.signedUrl }
-          : undefined
+  const retryable = failKind !== 'outage' && (tripCharge.canFreeRetry || view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent')
+  const showFreeRetry = view !== 'ready' && view !== 'loading' && retryable && tripCharge.canFreeRetry
+  const reupload = () => navigate('/resume/source?intent=optimize')
+  const retry = () => { setFailMsg(null); setRetryNonce((n) => n + 1) }
+  const { ask, back, statePrimary, primary } = buildOptimizeDockControls({
+    view, pane, editorOpen, showOverview, hasAssembled: Boolean(assembled), hasModules: modules.length > 0,
+    aiDown, viewOnly, leaveDirty, exporting, exported, canPrint, exportBlocked, titleBlocked, factsValid,
+    printNavigating, retryable,
+    retryLabel: showFreeRetry ? '免费再试一次' : '重试',
+    onRequestLeaveToAssistant: (text) => requestLeave(() => { rememberAssistantDraft(text); navigate('/assistant') }),
+    onOpenCompare: () => openCompare(),
+    onRequestResumeExport: requestResumeExport,
+    onRunResumeExport: () => { void runResumeExport() },
+    onPrint: handlePrint,
+    onOpenPreview: () => setPreviewOpen(true),
+    onBackToEditor: () => setWorkView('editor'),
+    onBackToOverview: () => setWorkView('overview'),
+    onBackToReport: () => requestLeave(goToReport),
+    onRetry: retry,
+    onManualGenerate: () => navigate('/resume/generate'),
+    onReupload: reupload,
+  })
 
   if (consent.needsPrompt && !syntheticReady) {
     return (
@@ -433,19 +335,6 @@ export function ResumeOptimizePage() {
   }
 
   const frame = frameTextOf({ view, pane, moduleCount: showOverview ? modules.length : 0, exported: Boolean(exported), save: saveInfo })
-  const back = view === 'ready' && pane === 'export' ? { label: '返回编辑', onBack: () => setWorkView('editor') }
-    : view === 'ready' && pane === 'editor' && modules.length > 0 ? { label: '返回建议总览', onBack: () => setWorkView('overview') }
-    : { label: '返回诊断报告', onBack: () => requestLeave(goToReport) }
-  const retryable = failKind !== 'outage' && (view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent')
-  const reupload = () => navigate('/resume/source?intent=optimize')
-  const retry = () => { setFailMsg(null); setRetryNonce((n) => n + 1) }
-  const statePrimary = view === 'ready' || view === 'loading' ? undefined
-    : retryable ? { label: '重试', onClick: retry }
-    : aiDown ? { label: '手动填写简历', onClick: () => navigate('/resume/generate') } : { label: '重新上传简历', onClick: reupload }
-  const rawPrimary = dockPrimary ?? statePrimary
-  const primary = viewOnly && rawPrimary && rawPrimary.label !== '重试' && rawPrimary.label !== '扫码带走'
-    ? { ...rawPrimary, disabled: true, ariaDisabled: undefined, title: LICENSE_NO_NEW_TASK_REASON }
-    : rawPrimary
   const dialogs = resumeAiConsent.dialog ?? (confirmLeave ? (
     <ResumeOptimizeLeaveDialog guest={!token} onStay={() => setConfirmLeave(null)} onLeave={() => { const action = confirmLeave; setConfirmLeave(null); action() }} />
   ) : factOpen && assembled ? (
@@ -485,124 +374,84 @@ export function ResumeOptimizePage() {
         {pane === 'editor' && Object.values(decisionIssues).length > 0 && (
           <div className="qxt-note" role="status">{Object.values(decisionIssues).map((message) => <p key={message}>{message}</p>)}</div>
         )}
-        {view !== 'ready' && (
-          <OptimizeStateCard
-            tone={view === 'loading' ? 'info' : view === 'empty' || view === 'no-context' ? 'empty' : 'error'}
-            title={optimizeStateTitle(view)}
-            description={unattendedResumeCopy(optimizeStateDescription(view, failMsg), contact)}
-            synthetic={resolved.synthetic}
-            actions={statePrimary && retryable ? <button type="button" className="qxt-btn-line" disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={reupload}>重新上传简历</button> : undefined}
-          />
-        )}
-        {view !== 'ready' && (
-          <OptimizeEmptyState
-            onReport={goToReport}
-            onManualEdit={() => { if (!viewOnly) navigate('/resume/generate') }}
-            onMyResumes={() => navigate('/me/resumes')}
-            manualLocked={viewOnly}
-          />
-        )}
-        {view === 'ready' && (choicePending || Boolean(token && draft.loading)) && (
-          <ResumeDraftBanner
-            loading={Boolean(token && draft.loading)}
-            choicePending={choicePending}
-            draftUpdatedAt={draft.remoteDraft?.updatedAt}
-            onContinue={handleContinueDraft}
-            onRestart={() => {
-              setDecisions({})
-              setDecisionIssues({})
-              setClearedChoices(new Set())
-              if (baseResume) setOptimizedResume(structuredClone(baseResume))
-              draft.requestOverwrite()
-              setDraftAccepted(true)
-              setWorkView(editOriginalRef.current != null ? 'editor' : 'overview')
-            }}
-          />
-        )}
-        {editorOpen && pane === 'overview' && (
-          <OptimizeOverview
-            modules={modules}
-            decisions={decisions}
-            defaultDecisions={Object.fromEntries(modules.map((module, index) => [moduleKeyOf(module, index), defaultModuleDecision(baseResume, module)]))}
-            switchBlocks={Object.fromEntries(modules.map((module, index) => [moduleKeyOf(module, index), moduleSwitchBlock(baseResume, module, decisions[moduleKeyOf(module, index)])]))}
-            synthetic={resolved.synthetic}
-            disabled={viewOnly || loading || exporting || Boolean(adjusting)}
-            clearedChoices={clearedChoices}
-            onClear={() => setClearedChoices(new Set(modules.flatMap((module, index) => {
-              if (isNoActionModule(module)) return []
-              const key = moduleKeyOf(module, index)
-              if (!isModuleSwitchable(baseResume, module, decisions[key])) return []
-              return [key]
-            })))}
-            decisionIssues={decisionIssues}
-            onDecisionChange={handleDecisionChange}
-            onBatch={handleBatch}
-            onCompare={openCompare}
-            onGoEdit={(index) => openEditorAtOriginal(modules[index]?.before ?? '')}
-            onEditor={() => { if (!viewOnly) setWorkView('editor') }}
-            onManual={() => { if (!viewOnly) requestLeave(() => navigate('/resume/generate')) }}
-            newTaskLocked={viewOnly}
-            onReport={() => requestLeave(goToReport)}
-          />
-        )}
-        {editorOpen && resume && assembled && pane === 'editor' && (
-          <OptimizeEditView
-            resume={resume}
-            lockedNote={lockedNote}
-            onResumeChange={(next) => { if (viewOnly) return; markEdited(); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setOptimizedResume(next) }}
-            unconfirmed={unconfirmed}
-            layout={layout}
-            onLayoutChange={(next) => { if (!viewOnly) handleLayoutChange(next) }}
-            previewClassName={previewClassName}
-            previewStyle={previewStyle}
-            templates={resumeTemplates}
-            templatesError={templatesError}
-            selectedTemplateId={selectedTemplateId}
-            onTemplateChange={(id) => { if (!viewOnly) handleTemplateChange(id) }}
-            loading={loading}
-            exporting={viewOnly || exporting}
-            adjusting={adjusting}
-            aiUnavailable={aiDown}
-            lastResumeBeforeAiAdjust={lastResumeBeforeAiAdjust}
-            adjustWarnings={adjustWarnings}
-            adjustError={adjustError ? unattendedResumeCopy(adjustError, contact) : adjustError}
-            onAiAdjust={(action) => { void handleAiAdjust(action) }}
-            onUndoAi={() => { if (viewOnly) return; setOptimizedResume(lastResumeBeforeAiAdjust!); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setExported(null); setIsDirty(true) }}
-            estimatedPagesLabel={estimatedPagesLabel}
-            saveText={saveInfo.text}
-            saveTone={saveInfo.bad ? 'bad' : 'plain'}
-            hasModules={modules.length > 0}
-            onBackToOverview={() => setWorkView('overview')}
-            token={token}
-            taskId={taskId}
-            exportVersion={exportVersion}
-          />
-        )}
-        {editorOpen && assembled && pane === 'export' && (
-          <OptimizeExportView
-            format={exportFormat}
-            onFormat={(format) => { if (!viewOnly) handleExportFormatChange(format) }}
-            busy={viewOnly || exporting}
-            exported={exported}
-            exportKind={exportKind}
-            exportVersion={exportVersion}
-            exportError={exportError ? unattendedResumeCopy(exportError, contact) : exportError}
-            pricing={pricing.pricing}
-            pricingLoading={pricing.loading}
-            blockedReason={pricing.blockedReason}
-            guest={!token}
-            savedToDocuments={savedToDocuments}
-            printNavigating={printNavigating}
-            contentBlocked={viewOnly || titleBlocked}
-            onContentBlocked={() => { if (!viewOnly) setWorkView('editor') }}
-            onPrint={handlePrint}
-            onOpenPreview={() => setPreviewOpen(true)}
-            showChangeList={Boolean(taskId)}
-            changeListBusy={exporting && factOpen === 'change_list'}
-            changeListBlocked={viewOnly || exportBlocked}
-            onChangeList={() => { if (!viewOnly) setFactOpen('change_list') }}
-          />
-        )}
+        <OptimizeBodyPanes
+          view={view}
+          pane={pane}
+          editorOpen={editorOpen}
+          synthetic={resolved.synthetic}
+          viewOnly={viewOnly}
+          loading={loading}
+          exporting={exporting}
+          adjusting={adjusting}
+          aiDown={aiDown}
+          token={token}
+          taskId={taskId}
+          modules={modules}
+          decisions={decisions}
+          baseResume={baseResume}
+          resume={resume}
+          assembled={assembled}
+          unconfirmed={unconfirmed}
+          clearedChoices={clearedChoices}
+          decisionIssues={decisionIssues}
+          lockedNote={lockedNote}
+          layout={layout}
+          previewClassName={previewClassName}
+          previewStyle={previewStyle}
+          resumeTemplates={resumeTemplates}
+          templatesError={templatesError}
+          selectedTemplateId={selectedTemplateId}
+          lastResumeBeforeAiAdjust={lastResumeBeforeAiAdjust}
+          adjustWarnings={adjustWarnings}
+          adjustError={adjustError ? unattendedResumeCopy(adjustError, contact) : adjustError}
+          estimatedPagesLabel={estimatedPagesLabel}
+          saveText={saveInfo.text}
+          saveTone={saveInfo.bad ? 'bad' : 'plain'}
+          exportFormat={exportFormat}
+          exported={exported}
+          exportKind={exportKind}
+          exportVersion={exportVersion}
+          exportError={exportError ? unattendedResumeCopy(exportError, contact) : exportError}
+          pricing={pricing.pricing}
+          pricingLoading={pricing.loading}
+          blockedReason={pricing.blockedReason}
+          machineCharged={tripCharge.machineCharged}
+          savedToDocuments={savedToDocuments}
+          printNavigating={printNavigating}
+          titleBlocked={titleBlocked}
+          exportBlocked={exportBlocked}
+          changeListBusy={exporting && factOpen === 'change_list'}
+          stateTitle={optimizeStateTitle(view)}
+          stateDescription={showFreeRetry ? RESUME_RETRY_COPY : unattendedResumeCopy(optimizeStateDescription(view, failMsg), contact)}
+          stateActions={statePrimary && retryable ? <button type="button" className="qxt-btn-line" disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={reupload}>重新上传简历</button> : undefined}
+          showDraftBanner={view === 'ready' && (choicePending || Boolean(token && draft.loading))}
+          draftLoading={Boolean(token && draft.loading)}
+          choicePending={choicePending}
+          draftUpdatedAt={draft.remoteDraft?.updatedAt}
+          onContinueDraft={handleContinueDraft}
+          onRestartDraft={handleRestartDraft}
+          onClearChoices={setClearedChoices}
+          onDecisionChange={handleDecisionChange}
+          onBatch={handleBatch}
+          onCompare={openCompare}
+          onGoEdit={(index) => openEditorAtOriginal(modules[index]?.before ?? '')}
+          onOpenEditor={() => { if (!viewOnly) setWorkView('editor') }}
+          onManual={() => { if (!viewOnly) requestLeave(() => navigate('/resume/generate')) }}
+          onReportFromEmpty={goToReport}
+          onReportFromOverview={() => requestLeave(goToReport)}
+          onMyResumes={() => navigate('/me/resumes')}
+          onManualEditFromEmpty={() => { if (!viewOnly) navigate('/resume/generate') }}
+          onResumeChange={(next) => { if (viewOnly) return; markEdited(); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setOptimizedResume(next) }}
+          onLayoutChange={(next) => { if (!viewOnly) handleLayoutChange(next) }}
+          onTemplateChange={(id) => { if (!viewOnly) handleTemplateChange(id) }}
+          onAiAdjust={(action) => { void handleAiAdjust(action) }}
+          onUndoAi={() => { if (viewOnly) return; setOptimizedResume(lastResumeBeforeAiAdjust!); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setExported(null); setIsDirty(true) }}
+          onBackToOverview={() => setWorkView('overview')}
+          onExportFormatChange={(format) => { if (!viewOnly) handleExportFormatChange(format) }}
+          onPrint={handlePrint}
+          onOpenPreview={() => setPreviewOpen(true)}
+          onChangeList={() => { if (!viewOnly) setFactOpen('change_list') }}
+        />
         {previewOpen && exported?.signedUrl && (
           <FilePreviewDialog fileUrl={(exportKind === 'change_list' || exportFormat === 'pdf') && exported.printFileUrl ? exported.printFileUrl : exported.signedUrl} fileName={exported.filename} format={exportKind === 'change_list' ? 'pdf' : exportFormat} mimeType={exportKind === 'change_list' ? 'application/pdf' : undefined} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && (exportKind === 'change_list' || exportFormat === 'pdf') ? { label: '去打印这一份', onClick: handlePrint, disabled: viewOnly || printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
         )}

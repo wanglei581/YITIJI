@@ -1,5 +1,22 @@
 # 当前开发进度
 
+## 2026-11-21：一体机简历按次付款接线（P2e-2，分支 `claude/kiosk-pay-resume-p2e2`，未推送）
+
+- 来由：补全线第三十任派发的收费第 7 项第二包，接在 P2e-1c 过审头 `588e46904` 之上按条目逐步提交，只复用 P2e-1 导出的地基函数（`serviceOrders.ts`、`serviceTrip.ts`、`pages/pay/`），未修改 P2e-1 地基行为，未碰面试/扫描/打印页、`apps/miniapp/**`、`apps/admin/**`、`apps/partner/**`、`services/api/**`、生产配置与 `docs/design/**`。
+- 拆分先于加功能：`ResumeOptimizePage.tsx`（612→445→加功能后 461 行，拆出 `OptimizeBodyPanes.tsx`、`useOptimizeEditFocus.ts`、`useOptimizeDecisions.ts`、`optimizeDockModel.ts`）与 `ResumeGeneratePreviewPage.tsx`（536→457→加功能后 463 行，拆出 `generatePreviewViewModel.ts`）均先独立提交拆至 500 行内不改行为，再接入收费逻辑。
+- 六屏接线：
+  - 诊断页 `diagnosis`（新增 `useResumeTripCharge.ts` 240 行，改 `ResumeReportPage.tsx`、`ResumeReportActions.tsx`、`ResumeReportTakeaway.tsx`、`touch/report.css`）：仅当本机简历优化生效价 > 0 且这一趟未付时，主按钮换「付 X.XX 元并开始」进 `/pay/resume?next=optimize&back=report`，「带走这份报告」卡内显示价格说明；已付（`paid` / 可免费再试）直接进优化；价 0 / 读不到价 / 公共点位照原样不画任何价格字样。
+  - 优化页 `optimize`（`ai.ts`、`aiHttpAdapter.ts`、`aiMockAdapter.ts`、`useOptimizeLoad.ts`、`ResumeOptimizePage.tsx`）：`getResumeOptimize` 与 `adjustResumeLayoutDraft` 均带 `serviceOrderHeaders(trip)`；首次失败且订单仍在 10 分钟免费再试窗内给「免费再试一次」并沿用同一订单号；402 / `SERVICE_*` 回付款屏重新建单且不落入「优化结果读取失败」；排版失败照原样不写退款句。
+  - 对照页 `compare`（`ResumeOptimizeComparePage.tsx`）：自带服务单头、402 / `SERVICE_*` 回付款屏，首次失败且可免费再试时主按钮写「免费再试一次」并展示通用 `RETRY` 句，不画稿 394–395 两句。
+  - 没诊断出来 `st-ai-down`（`ResumeReportPage.tsx`）：核实后端会话结束与 30 秒清扫自动退款触发点后，收费机器按是否已付可退（`paid | retry_free | retry_expired | refunding`）分别展示未付句与自动退款句；不收费机器照原样。
+  - 导出与从零生成（`ResumePricingBar.tsx`、`OptimizeExportView.tsx`、`ResumeFormatChooser.tsx`、`ResumeReportTakeaway.tsx`、`ResumeGeneratePreviewPage.tsx`、`resume-generate-preview-qx.css`）：收费机器上「免费试运营」「免费试运营，本单 0 元」一律改「导出不另收钱」，从零生成核对屏另起一行标「导出不另收钱」且不加付款入口；不收费机器照原样。
+- 验证：扩充 `tests/fixtures/machine-pricing.ts`、`tests/fixtures/service-orders.ts` 并新增 `tests/visual/pay-resume.spec.ts`（9 条 `@kiosk` 用例挂进 `test:browser:truth`），未改任何既有免费机用例期望（`pay-resume.spec.ts` 9/9、`pay-service.spec.ts` 26/26、`fusion-w3.spec.ts` + `resume-usb-compare-1104.spec.ts` 简历回归 40/40 均通过）；本机真服务（Redis 6670 + 真实 NestJS API 3370 + 隔离 SQLite `/tmp/p2e2-verify.db` + 沙箱通道 + 本地假模型）走通收费全链路、首次失败免费再试同单号与改回 0 元恢复原样三遍并留截图 `/tmp/p2e2-evidence/`；照稿 1080×1920 并排核图 8 张（`/tmp/p2e2-sbs/`），补收紧诊断页收费说明卡间距避免首屏折行裁切；4 条反向检查均在临时提交上变红并回滚；36 项图谱关联门禁、`kiosk typecheck`、`eslint --quiet`、全仓 `pnpm lint`（0 errors）与 `generate-project-graph --check` 全通过。未推送，未上线。
+- P2e-2b 极小收口返工（接 `75454665c`，针对 Codex 独立收货复现的 3 处边界缺陷，未动 P2e-1 地基与后端）：
+  - 重试窗口过期实时重判（`useResumeTripCharge.ts`，317 行）：去除存进 state 的过期 `phase`，改由当前渲染时刻 `nowMs = Date.now()` 实时计算 `phase` 与 `canFreeRetry`，并在 `order.status === 'paid' && order.attemptsUsed >= 1 && order.retryUntil` 时装精准到期定时器（含早醒 1ms 重排、32 位延时封顶、卸载/换单清理），跨过 `retryUntil` 瞬间自动重算为 `phase='retry_expired'`、`alreadyPaidForOptimize=false`，诊断页无需刷新即恢复付款入口与价格说明。
+  - `refreshOrder()` 与初始化查单代次及归属/单号双重隔离（`useResumeTripCharge.ts`）：维护 `endUserIdRef`、`ownerRef`、`genRef`、`mountedRef`，订阅 `onServiceTripsCleared` 并在 `endUserId` 变化、清场事件、卸载、新查单及 effect 清理时自增 `genRef`；查单返回/报错后核对 `mountedRef.current && gen === genRef.current`、归属匹配与 `readServiceTrip('resume_optimize', { owner })` 的 `orderId`/`kioskSessionId` 一致性，任一不符直接丢弃晚到响应且不误改 `checkingOrder` 或误清新用户单号。
+  - HTTP 返回 `providerName === 'mock'` 演示报告隔离付款入口（`ResumeReportPage.tsx`，422 行）：将 `isDemoReport = isFixture || providerName === 'mock'` 提前并纳入 `needsPay`，同步隔离底栏付款按钮与「带走这份报告」价格说明。
+  - 收口验证：新增 Node 单测 `apps/kiosk/scripts/tests/resume-trip-charge.test.mjs`（4 组全覆盖并挂入 CI 闭包的 `verify:resume-diagnosis-flow-ui`），`pay-resume.spec.ts` 扩至 12 条（补齐到点实时过期、旧用户查单在途切会员不污染、HTTP `providerName=mock` 隔离）；本机 `blk.sh` 锁下实跑 `pay-resume.spec.ts`（12/12）、`pay-service.spec.ts`（26/26）、`fusion-w3.spec.ts` + `resume-usb-compare-1104.spec.ts`（95/95，0 改既有期望）；3 条反向变异均严格 0→1→0 并逐字节复原；`kiosk typecheck`、改动文件 `eslint --quiet`、全部关联静态门禁、`generate-project-graph --check`、`verify-ci-gate-coverage` 与 `verify-repository-integrity` 全通过。未推送，未上线。
+
 ## 2026-11-21：小程序微信虚拟支付后端极小收口返工 P2d1b3（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
 
 - 来由：按 Codex 独立复收 `P2d1b2`（`f61d17b23`）复现出的 4 处阻塞/并发缺陷 + 1 处 XML 重复键收紧，接在 `f61d17b23` 之后逐项完成极小收口并提交（零新增数据库迁移）。

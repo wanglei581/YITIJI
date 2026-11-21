@@ -17,7 +17,9 @@ import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import './touch/report.css'
 import { ResumeDiagnosisFailExits } from './components/ResumeDiagnosisFailExits'
-import { readAiResumeSession } from './aiResumeSession'
+import { readAiResumeSession, saveAiResumeSession } from './aiResumeSession'
+import { payServicePath } from '../pay/payServiceModel'
+import { diagnosisPayButtonLabel, diagnosisPriceNote, useResumeTripCharge } from './useResumeTripCharge'
 import {
   deriveViewState,
   isExportCaptureState,
@@ -218,6 +220,7 @@ export function ResumeReportPage() {
     ? reportBlocksSubtitle(displayReport?.contentBlocks?.length ?? 0)
     : REPORT_HEAD[viewState].sub
   const isFixture = Boolean(fixtureKind)
+  const isDemoReport = isFixture || providerName === 'mock'
   const direction = targetContext ?? state.targetContext
   const summary = targetSummary(direction)
 
@@ -255,7 +258,14 @@ export function ResumeReportPage() {
     setReloadKey((n) => n + 1)
     if (parsed.tech) setSearch({ state: 'loading' })
   }
+  const tripCharge = useResumeTripCharge({ inspectOrder: true })
+  const needsPay = !isDemoReport && !viewOnly && canOptimize
+    && tripCharge.resumePriceCents > 0 && !tripCharge.alreadyPaidForOptimize && !tripCharge.checkingOrder
   const openOptimize = () => navigate('/resume/optimize', { state: { ...state, taskId, accessToken, targetContext: state.targetContext ?? targetContext } })
+  const openPay = () => {
+    if (taskId) saveAiResumeSession({ taskId, accessToken })
+    navigate(payServicePath('resume', { next: 'optimize', back: 'report' }))
+  }
   const dockPrimary = useReportDockPrimary({
     viewState,
     canOptimize,
@@ -263,16 +273,23 @@ export function ResumeReportPage() {
     onRetry: retryLoad,
     onOptimize: openOptimize,
     issueCount: displayIssues.length,
+    payLabel: needsPay ? diagnosisPayButtonLabel(tripCharge.resumePriceCents) : null,
+    onPay: openPay,
   })
   const [exportedNow, setExportedNow] = useState(false)
 
-  const failView = (failReason: string) => {
+  const failView = (failReason: string, failCharge?: { charged: boolean; paid: boolean }) => {
     const sourceState = state.aiDown ? { aiDown: true } : undefined
     const printable = Boolean(state.file?.fileUrl && state.fileId)
     const strippedReason = resumeUserReason(failReason, '这次未能完成解析，请重试或换一份清晰的简历。').replace(/(?:请|或)?(?:联系|找)(?:现场)?工作人员/g, '').replace(/[，,、]\s*(?=[。.!！]|$)/g, '').trim()
     const shownReason = supportPhone && !strippedReason.includes(supportPhone)
       ? `${strippedReason}${/[。！]$/.test(strippedReason) ? '' : '。'}需要帮助？拨打服务电话 ${supportPhone}`
       : strippedReason
+    const aiDownSubtitle = failCharge?.charged
+      ? (failCharge.paid
+        ? '这次没有生成诊断结论。付过的钱会自动退回原付款账户，到账时间以支付渠道为准。可以先打印原件。'
+        : '这次没有生成诊断结论，可以先打印原件。')
+      : '再解析一次也不会变好。下面这些不需要 AI，现在就能做。'
     const failurePrimary = encryptedPdf
       ? { label: '重新选择文件', onClick: () => navigate(intent === 'optimize' ? '/resume/source?intent=optimize' : '/resume/source', { replace: true, ...(state.aiDown ? { state: { aiDown: true } } : {}) }), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true }
       : checkingPassword
@@ -287,7 +304,7 @@ export function ResumeReportPage() {
       <ResumeTouchPage
         eyebrow="简历诊断报告"
         title={state.aiDown ? '这次没诊断出来' : '简历诊断报告'}
-        subtitle={state.aiDown ? '再解析一次也不会变好。下面这些不需要 AI，现在就能做。' : '解析中断，你上传的文件没有丢。'}
+        subtitle={state.aiDown ? aiDownSubtitle : '解析中断，你上传的文件没有丢。'}
         back={{ label: '返回简历来源', onBack: () => navigate('/resume/source', { state: sourceState }) }}
         dockBackLabel="返回"
         status={REPORT_STATUS['diagnose-failed']}
@@ -320,11 +337,11 @@ export function ResumeReportPage() {
     )
   }
 
-  if (!success) return failView(reason ?? '简历解析未能完成，请重试')
-  if (recoveredFail && viewState === 'diagnose-failed' && !parsed.tech) return failView(recoveredFail)
-  if (viewState === 'diagnose-failed') return failView(reason ?? recoveredFail ?? '简历解析未能完成，请重试')
+  const failCharge = { charged: tripCharge.machineCharged, paid: tripCharge.refundablePaid }
+  if (!success) return failView(reason ?? '简历解析未能完成，请重试', failCharge)
+  if (recoveredFail && viewState === 'diagnose-failed' && !parsed.tech) return failView(recoveredFail, failCharge)
+  if (viewState === 'diagnose-failed') return failView(reason ?? recoveredFail ?? '简历解析未能完成，请重试', failCharge)
 
-  const isDemoReport = isFixture || providerName === 'mock'
   const why =
     viewState === 'loading' ? '读取还没有结束，现在还不知道有没有报告，所以下一步先不给出口。'
     : viewState === 'unavailable' ? 'AI 暂时不可用，可以先查政策、查看官方渠道或打印材料。'
@@ -380,7 +397,17 @@ export function ResumeReportPage() {
               accessToken={accessToken}
               capture={isExportCaptureState(viewState) ? viewState : null}
               onExportedChange={setExportedNow}
-            /></LicenseLock> : <ResumeReportTakeaway key={`${viewState}:${taskId ?? ''}`} show taskId={taskId} accessToken={accessToken} capture={isExportCaptureState(viewState) ? viewState : null} onExportedChange={setExportedNow} />}
+              machineCharged={tripCharge.machineCharged}
+            /></LicenseLock> : <ResumeReportTakeaway
+              key={`${viewState}:${taskId ?? ''}`}
+              show
+              taskId={taskId}
+              accessToken={accessToken}
+              capture={isExportCaptureState(viewState) ? viewState : null}
+              onExportedChange={setExportedNow}
+              optimizePriceNote={needsPay ? diagnosisPriceNote(tripCharge.resumePriceCents) : null}
+              machineCharged={tripCharge.machineCharged}
+            />}
             <p className="qxt-fine" id="resume-report-why">{why}</p>
           </>
         ) : viewState === 'report-empty' ? (

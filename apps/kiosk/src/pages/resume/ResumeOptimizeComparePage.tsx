@@ -8,9 +8,17 @@ import { useKioskLicense, useWindDownViewOnly } from '../../layouts/KioskLicense
 import { LICENSE_NO_NEW_TASK_REASON } from '../../copy/unattendedCopy'
 import { useAuth } from '../../auth/useAuth'
 import { aiErrorMessageOf, isAiOutage, useAiTask } from '../../ai'
-import { AI_QUOTA_EXHAUSTED_RESUME_COPY } from '../../services/api/userErrorMessage'
+import { AI_QUOTA_EXHAUSTED_RESUME_COPY, errorCodeOf } from '../../services/api/userErrorMessage'
 import { getResumeOptimize } from '../../services/api'
-import { readAiResumeSession } from './aiResumeSession'
+import { forgetServiceTrip } from '../../services/serviceTrip'
+import { payServicePath } from '../pay/payServiceModel'
+import { readAiResumeSession, saveAiResumeSession } from './aiResumeSession'
+import {
+  isServicePaymentRedirectError,
+  RESUME_RETRY_COPY,
+  shouldForgetTripOnPaymentError,
+  useResumeTripCharge,
+} from './useResumeTripCharge'
 import { ResumeCompareBatchBar } from './components/resume-compare/ResumeCompareBatchBar'
 import { ResumeCompareCard } from './components/resume-compare/ResumeCompareCard'
 import { ResumeCompareManual } from './components/resume-compare/ResumeCompareManual'
@@ -81,6 +89,9 @@ export function ResumeOptimizeComparePage() {
   const windDownViewOnly = useWindDownViewOnly('resume')
   const licenseFlagViewOnly = useKioskLicense().mode === 'winding-down' && state?.licenseViewOnly === true
   const viewOnly = windDownViewOnly || licenseFlagViewOnly
+  const tripCharge = useResumeTripCharge()
+  const tripChargeRef = useRef(tripCharge)
+  tripChargeRef.current = tripCharge
 
   useEffect(() => {
     if (!taskId) {
@@ -88,6 +99,7 @@ export function ResumeOptimizeComparePage() {
       return
     }
     let cancelled = false
+    let redirectedToPay = false
     const entryToken = `${taskId}|${accessToken ?? ''}|${existingOnly ? '1' : '0'}|${retryNonce}`
     const keepEntrySelection = appliedEntryRef.current === entryToken
     setLoading(true)
@@ -111,7 +123,12 @@ export function ResumeOptimizeComparePage() {
     }
     // 引用要等这一次读取真正返回再记下。请求还在飞时 effect 重放，仍按第一次进入处理，
     // 否则焦点还停在原序号，过滤掉无需操作条目后会停错条。
-    getResumeOptimize(taskId, { token: getToken(), accessToken }, existingOnly)
+    getResumeOptimize(
+      taskId,
+      { token: getToken(), accessToken },
+      existingOnly,
+      existingOnly ? undefined : tripChargeRef.current.headers,
+    )
       .then((response) => {
         if (cancelled) return
         appliedEntryRef.current = entryToken
@@ -121,6 +138,7 @@ export function ResumeOptimizeComparePage() {
             setOutage(response.failCode === 'AI_QUOTA_EXHAUSTED' ? AI_QUOTA_EXHAUSTED_RESUME_COPY : 'AI 服务当前不可用')
             return
           }
+          void tripChargeRef.current.refreshOrder()
           setFailure(resumeUserReason(response.failReason, '这次没有生成逐条改写候选。'))
           return
         }
@@ -130,22 +148,36 @@ export function ResumeOptimizeComparePage() {
         setLoadedTaskId(taskId)
         const rawFocus = typeof state?.focusIndex === 'number' ? Math.floor(state.focusIndex) : 0
         if (!keepEntrySelection) setCurrentIndex(focusToVisiblePosition(nextModules, rawFocus > 0 ? rawFocus : 0))
-        if (nextModules.length === 0) setFailure('这次没有生成逐条改写候选。')
+        if (nextModules.length === 0) {
+          void tripChargeRef.current.refreshOrder()
+          setFailure('这次没有生成逐条改写候选。')
+        }
       })
       .catch((error: unknown) => {
         if (cancelled) return
+        if (isServicePaymentRedirectError(error)) {
+          redirectedToPay = true
+          const code = errorCodeOf(error) ?? null
+          if (shouldForgetTripOnPaymentError(code) && tripChargeRef.current.trip) {
+            forgetServiceTrip('resume_optimize', tripChargeRef.current.trip.orderId)
+          }
+          saveAiResumeSession({ taskId, accessToken })
+          navigate(payServicePath('resume', { next: 'compare', back: 'report' }), { replace: true })
+          return
+        }
         appliedEntryRef.current = entryToken
         if (isAiOutage(error)) {
           setOutage(aiErrorMessageOf(error, 'AI 服务当前不可用'))
         } else {
+          void tripChargeRef.current.refreshOrder()
           setFailure(aiErrorMessageOf(error, '优化结果读取失败'))
         }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled && !redirectedToPay) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [taskId, accessToken, getToken, retryNonce, existingOnly, state])
+  }, [taskId, accessToken, getToken, retryNonce, existingOnly, state, navigate])
 
   const items = useMemo(
     () => (loadedTaskId === taskId ? buildCompareItems(modules).filter((item) => !isNoActionModule(item)) : []),
@@ -242,7 +274,12 @@ export function ResumeOptimizeComparePage() {
           </>
         ) : failure || !current ? (
           <>
-            <ResumeCompareState title="本次没有可对照的改写" description={failure ?? '服务没有返回可选择的逐条候选。'} actionLabel="重新读取" onAction={retry} />
+            <ResumeCompareState
+              title="本次没有可对照的改写"
+              description={tripCharge.canFreeRetry ? RESUME_RETRY_COPY : (failure ?? '服务没有返回可选择的逐条候选。')}
+              actionLabel={tripCharge.canFreeRetry ? '免费再试一次' : '重新读取'}
+              onAction={retry}
+            />
             {fallbackExits}
           </>
         ) : (

@@ -89,13 +89,19 @@ export interface AiServiceInterface {
     intent?: ResumeParseIntentHeaders | null,
   ): Promise<ResumeParseResponse>
   getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse>
-  getResumeOptimize(taskId: string, access?: ResumeReadAccess, existingOnly?: boolean): Promise<ResumeOptimizeResponse>
+  getResumeOptimize(
+    taskId: string,
+    access?: ResumeReadAccess,
+    existingOnly?: boolean,
+    extraHeaders?: Record<string, string>,
+  ): Promise<ResumeOptimizeResponse>
   adjustResumeLayoutDraft(
     taskId: string,
     resume: GeneratedResume,
     action: ResumeLayoutAdjustAction,
     layout: ResumeLayoutSettings,
     access?: ResumeReadAccess,
+    extraHeaders?: Record<string, string>,
   ): Promise<ResumeLayoutAdjustResponse>
   chatWithAssistant(req: AssistantChatRequest, token?: string | null): Promise<AssistantChatResponse>
   // ── 阶段2A AI 简历生成(只润色用户提供的信息,不编造)──
@@ -168,9 +174,13 @@ export const submitResumeParse = (
 export const getResumeRecord = (taskId: string, access?: ResumeReadAccess) =>
   adapter.getResumeRecord(taskId, access)
 
-/** 通过 taskId 获取优化建议（登录会员传 token，匿名传 accessToken，见上） */
-export const getResumeOptimize = (taskId: string, access?: ResumeReadAccess, existingOnly = false) =>
-  adapter.getResumeOptimize(taskId, access, existingOnly)
+/** 通过 taskId 获取优化建议（登录会员传 token，匿名传 accessToken，见上；收费机器需带这一趟服务单头） */
+export const getResumeOptimize = (
+  taskId: string,
+  access?: ResumeReadAccess,
+  existingOnly = false,
+  extraHeaders?: Record<string, string>,
+) => adapter.getResumeOptimize(taskId, access, existingOnly, extraHeaders)
 
 /** Wave 2:AI 一键精简 / 调整排版（不新增事实，后端按 taskId 重新提取原文校验）。 */
 export const adjustResumeLayoutDraft = (
@@ -179,7 +189,8 @@ export const adjustResumeLayoutDraft = (
   action: ResumeLayoutAdjustAction,
   layout: ResumeLayoutSettings,
   access?: ResumeReadAccess,
-) => adapter.adjustResumeLayoutDraft(taskId, resume, action, layout, access)
+  extraHeaders?: Record<string, string>,
+) => adapter.adjustResumeLayoutDraft(taskId, resume, action, layout, access, extraHeaders)
 
 /** 向 AI 助手发送消息（意图分类 + 引导跳转）。登录时带 token，便于保存本次要点。 */
 export const chatWithAssistant = (req: AssistantChatRequest, token?: string | null) =>
