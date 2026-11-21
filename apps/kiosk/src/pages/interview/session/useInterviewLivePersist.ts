@@ -12,10 +12,12 @@ export function useInterviewLivePersist(args: {
   deadlineSource: 'server' | 'local'
   omitPrintAnswers: boolean
   answersRecorded: boolean
+  paidOrderId?: string
+  paidKioskSessionId?: string
 }): void {
   const {
     state, messages, questionIndex, remainingSec, deadlineAtLocalMs, deadlineSource,
-    omitPrintAnswers, answersRecorded,
+    omitPrintAnswers, answersRecorded, paidOrderId, paidKioskSessionId,
   } = args
   useEffect(() => {
     if (!state?.sessionId) return
@@ -36,7 +38,8 @@ export function useInterviewLivePersist(args: {
         deadlineSource,
         omitPrintAnswers,
         answersRecorded,
+        ...(paidOrderId && paidKioskSessionId ? { paidOrderId, paidKioskSessionId } : {}),
       },
     })
-  }, [state, messages, questionIndex, remainingSec, deadlineAtLocalMs, deadlineSource, omitPrintAnswers, answersRecorded])
+  }, [state, messages, questionIndex, remainingSec, deadlineAtLocalMs, deadlineSource, omitPrintAnswers, answersRecorded, paidOrderId, paidKioskSessionId])
 }

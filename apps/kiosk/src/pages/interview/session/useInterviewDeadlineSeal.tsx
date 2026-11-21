@@ -50,6 +50,10 @@ export function useInterviewDeadlineSeal(args: {
   setRecordSec: Dispatch<SetStateAction<number>>
   setPhase: Dispatch<SetStateAction<InterviewSessionPhase>>
   setAssistantDown: Dispatch<SetStateAction<boolean>>
+  paidReportError?: string | null
+  paidReportRetryFree?: boolean
+  onReportSucceeded?: () => void
+  onReportFailed?: () => Promise<boolean>
 }) {
   const [deadline, setDeadline] = useState(() => initialDeadline(args.state, args.live))
   const [remainingSec, setRemainingSec] = useState(() => remainingSecAt(deadline.deadlineAtLocalMs, Date.now()))
@@ -112,6 +116,8 @@ export function useInterviewDeadlineSeal(args: {
       onGoStage: args.onGoStage,
       navigate: args.navigate,
       setAssistantDown: args.setAssistantDown,
+      onReportSucceeded: args.onReportSucceeded,
+      onReportFailed: args.onReportFailed,
     }).then((result) => {
       setReportBusy(false)
       if (result !== 'reported') setTimeUpStop(result)
@@ -145,6 +151,8 @@ export function useInterviewDeadlineSeal(args: {
       getAccess={() => ({ token: getTokenRef.current(), accessToken: args.state?.accessToken ?? null })}
       answersRecorded={args.answersRecorded}
       busy={reportBusy}
+      paidReportError={args.paidReportError}
+      paidReportRetryFree={args.paidReportRetryFree}
       onLeave={() => args.navigate('/interview-service')}
       onRestart={() => (args.onGoStage ? args.onGoStage('setup') : args.navigate('/interview/setup'))}
       onRetry={() => {

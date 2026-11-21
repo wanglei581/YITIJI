@@ -130,6 +130,8 @@ export async function finishInterview(ctx: {
   setMicError: Dispatch<SetStateAction<boolean>>
   setFinishRecovery: Dispatch<SetStateAction<InterviewFinishRecovery | null>>
   setAssistantDown: Dispatch<SetStateAction<boolean>>
+  onReportSucceeded?: () => void
+  onReportFailed?: () => Promise<boolean>
 }): Promise<void> {
   const {
     state, access, omitPrintAnswers, onGoStage, navigate, stopPlayback, resetVoiceState,
@@ -146,6 +148,7 @@ export async function finishInterview(ctx: {
     const report = await endInterview(state.sessionId, access, {
       includeAnswersInPrint: !omitPrintAnswers,
     })
+    ctx.onReportSucceeded?.()
     patchInterviewWorkbenchSession({
       stage: 'report',
       report: { sessionId: state.sessionId, accessToken: state.accessToken },
@@ -155,8 +158,15 @@ export async function finishInterview(ctx: {
   } catch (err) {
     ctx.setAssistantDown(isAiGateDown(err))
     const declined = aiDeclarationDeclineMessage(err)
+    const code = errorCodeOf(err)
+    if (!declined && code !== 'INTERVIEW_NO_ANSWERS' && code !== 'RESUME_AI_CONSENT_REQUIRED' && ctx.onReportFailed) {
+      if (await ctx.onReportFailed()) {
+        ctx.setPhase(hasNonSkippedCandidate(ctx.messages) ? 'done_suggest' : 'answering')
+        return
+      }
+    }
     const classified = classifyInterviewFinishFailure({
-      code: errorCodeOf(err),
+      code,
       outage: isAiOutage(err),
       declined,
       answersRecorded: ctx.answersRecorded,
@@ -181,6 +191,8 @@ export async function endInterviewAtDeadline(ctx: {
   onGoStage?: (stage: InterviewStage) => void
   navigate: NavigateFunction
   setAssistantDown: Dispatch<SetStateAction<boolean>>
+  onReportSucceeded?: () => void
+  onReportFailed?: () => Promise<boolean>
 }): Promise<'reported' | 'no-answers' | 'report-failed'> {
   if (ctx.pendingAnswer) {
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -197,6 +209,7 @@ export async function endInterviewAtDeadline(ctx: {
     const report = await endInterview(ctx.state.sessionId, ctx.access, {
       includeAnswersInPrint: !ctx.omitPrintAnswers,
     })
+    ctx.onReportSucceeded?.()
     patchInterviewWorkbenchSession({
       stage: 'report',
       report: { sessionId: ctx.state.sessionId, accessToken: ctx.state.accessToken },
@@ -207,6 +220,7 @@ export async function endInterviewAtDeadline(ctx: {
   } catch (err) {
     ctx.setAssistantDown(isAiGateDown(err))
     if (errorCodeOf(err) === 'INTERVIEW_NO_ANSWERS') return 'no-answers'
+    if (ctx.onReportFailed) await ctx.onReportFailed()
     return 'report-failed'
   }
 }

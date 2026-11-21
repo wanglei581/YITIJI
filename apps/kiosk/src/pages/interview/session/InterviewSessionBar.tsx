@@ -15,6 +15,7 @@ export function InterviewSessionBar({
   phase,
   voiceKind,
   busy,
+  reportRetryFree,
   onFinish,
   onSubmit,
   onStart,
@@ -26,6 +27,7 @@ export function InterviewSessionBar({
   phase: InterviewSessionPhase
   voiceKind: InterviewVoiceState['kind']
   busy: boolean
+  reportRetryFree?: boolean
   onFinish: () => void
   onSubmit: () => void
   onStart: () => void
@@ -42,6 +44,9 @@ export function InterviewSessionBar({
   } else if (phase === 'thinking') {
     label = '正在分析你的回答…'
     disabled = true
+  } else if (reportRetryFree) {
+    label = '免费再试一次'
+    run = 'finish'
   } else if (phase === 'done_suggest') {
     label = '结束并生成练习报告'
     run = 'finish'
