@@ -27,6 +27,7 @@ import {
 } from '../../services/serviceTrip'
 import {
   readScanEffectiveCents,
+  scanOrderIsEndedForNewTrip,
   scanOrderNeedsSettlePoll,
   scanTripAllowsStartWithoutPay,
 } from './scanPayModel'
@@ -60,8 +61,28 @@ export function consumeScanDeviceAutoStartAfterPay(): boolean {
   return armed
 }
 
-subscribeKioskSensitiveSessionClear(clearScanDeviceAutoStartAfterPay)
-onServiceTripsCleared(clearScanDeviceAutoStartAfterPay)
+/** 面板路径上已被 POST /scan/sessions 以 402 明确拒过的“看似已付”旧单号，防止付款屏 ok ↔ 设置页 402 死循环。 */
+const panelRejectedOrderIds = new Set<string>()
+
+export function markScanPanelOrderRejected(orderId: string | null | undefined): void {
+  if (orderId) panelRejectedOrderIds.add(orderId)
+}
+
+export function wasScanPanelOrderRejected(orderId: string | null | undefined): boolean {
+  return Boolean(orderId && panelRejectedOrderIds.has(orderId))
+}
+
+function resetScanPayMemory(): void {
+  clearScanDeviceAutoStartAfterPay()
+  panelRejectedOrderIds.clear()
+}
+
+subscribeKioskSensitiveSessionClear(resetScanPayMemory)
+onServiceTripsCleared(resetScanPayMemory)
+
+function safeForgetScanTripById(orderId?: string): void {
+  if (typeof forgetServiceTrip === 'function') forgetServiceTrip('scan', orderId)
+}
 
 /** 读取当前这一趟扫描服务单要带的两个头；无单时返回 undefined（免费机或未付）。 */
 export function readScanServiceHeaders(endUserId: string | null | undefined): Record<string, string> | undefined {
@@ -70,10 +91,20 @@ export function readScanServiceHeaders(endUserId: string | null | undefined): Re
   return serviceOrderHeaders(trip)
 }
 
-/** 忘掉当前扫描服务单（仅在完成页离场或服务端明确 404 时调用）。 */
+/** 忘掉当前扫描服务单（完成页离场、旧单终结或服务端明确不可复用时调用）。 */
 export function forgetScanServiceTrip(endUserId: string | null | undefined): void {
   const trip = readServiceTrip('scan', { owner: serviceTripOwnerFor(endUserId) })
-  if (trip) forgetServiceTrip('scan', trip.orderId)
+  if (trip) safeForgetScanTripById(trip.orderId)
+}
+
+/** 进付款屏前兜底清掉已终结旧单（pending 待付单仍留给付款屏继续展示/关单）。 */
+export function forgetEndedScanTrip(
+  trip: ServiceTrip | null | undefined,
+  order: ServiceOrderView | null | undefined,
+): void {
+  if (!trip || !order) return
+  if (order.id !== trip.orderId) return
+  if (scanOrderIsEndedForNewTrip(order, Date.now())) safeForgetScanTripById(trip.orderId)
 }
 
 export interface ScanPayGateState {
@@ -88,32 +119,43 @@ export interface ScanPayGateState {
   readyToCreate: boolean
 }
 
-function syncInitialCents(): number | null {
-  if (API_MODE !== 'http') return null
+function syncInitialConfig(enabled: boolean): { loaded: boolean; cents: number | null } {
+  if (!enabled) return { loaded: false, cents: null }
+  if (API_MODE !== 'http') return { loaded: true, cents: null }
   const terminalId = getTerminalId()
-  if (!terminalId) return null
-  return readScanEffectiveCents(peekCachedKioskTerminalConfig(terminalId))
+  if (!terminalId) return { loaded: true, cents: null }
+  const cached = peekCachedKioskTerminalConfig(terminalId)
+  if (!cached) return { loaded: false, cents: null }
+  return { loaded: true, cents: readScanEffectiveCents(cached) }
 }
 
 /**
- * 怎么扫 / 放纸设置两屏共用：读本机扫描价目 + 本趟已记服务单状态。
- * 价 0 / 读不到价 / 公共点位 / 演示模式：needsPayment 为 false，界面照原样。
+ * 怎么扫 / 放纸设置 / 面板建会话前置核验共用：读本机扫描价目 + 本趟已记服务单状态。
+ * 价 0 / 读不到价 / 公共点位 / 演示模式：needsPayment 为 false，界面与建会话照原样。
+ * 查单发现已结案或已终结旧单时当场忘掉，避免污染新一趟或被付款屏复用。
  */
-export function useScanPayState(): ScanPayGateState {
+export function useScanPayState(options?: { enabled?: boolean }): ScanPayGateState {
+  const enabled = options?.enabled !== false
   const { user } = useAuth()
   const endUserId = user?.id ?? null
-  const [chargeCents, setChargeCents] = useState<number | null>(() => syncInitialCents())
-  const [configLoaded, setConfigLoaded] = useState<boolean>(() => syncInitialCents() !== null || API_MODE !== 'http' || !getTerminalId())
+  const initialConfig = syncInitialConfig(enabled)
+  const [chargeCents, setChargeCents] = useState<number | null>(initialConfig.cents)
+  const [configLoaded, setConfigLoaded] = useState<boolean>(initialConfig.loaded)
   const [trip, setTrip] = useState<ServiceTrip | null>(() => (
-    API_MODE === 'http' && getTerminalId()
+    enabled && API_MODE === 'http' && getTerminalId()
       ? readServiceTrip('scan', { owner: serviceTripOwnerFor(endUserId) })
       : null
   ))
   const [order, setOrder] = useState<ServiceOrderView | null>(null)
-  const [orderLoaded, setOrderLoaded] = useState<boolean>(() => trip === null)
+  const [orderLoaded, setOrderLoaded] = useState<boolean>(() => enabled && trip === null)
   const [orderLookupFailed, setOrderLookupFailed] = useState(false)
 
   useEffect(() => {
+    if (!enabled) {
+      setConfigLoaded(false)
+      setOrderLoaded(false)
+      return undefined
+    }
     const terminalId = getTerminalId()
     if (API_MODE !== 'http' || !terminalId) {
       setChargeCents(null)
@@ -156,13 +198,19 @@ export function useScanPayState(): ScanPayGateState {
       void getServiceOrder(currentTrip.orderId, currentTrip.kioskSessionId)
         .then((view) => {
           if (stale) return
-          setOrder(view)
+          if (scanOrderIsEndedForNewTrip(view, Date.now())) {
+            safeForgetScanTripById(currentTrip.orderId)
+            setTrip(null)
+            setOrder(null)
+          } else {
+            setOrder(view)
+          }
           setOrderLoaded(true)
         })
         .catch((error) => {
           if (stale) return
           if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
-            forgetServiceTrip('scan', currentTrip.orderId)
+            safeForgetScanTripById(currentTrip.orderId)
             setTrip(null)
             setOrder(null)
           } else {
@@ -173,9 +221,9 @@ export function useScanPayState(): ScanPayGateState {
     }
 
     return () => { stale = true }
-  }, [endUserId])
+  }, [enabled, endUserId])
 
-  const loading = !configLoaded || !orderLoaded
+  const loading = !enabled || !configLoaded || !orderLoaded
   const charged = typeof chargeCents === 'number' && chargeCents > 0
   const hasUsableOrder = order !== null && scanTripAllowsStartWithoutPay(order, Date.now())
   // 有本地单号却查单网络失败时，不误出第二次付款按钮；点开始由服务端按原单号判定。

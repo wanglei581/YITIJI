@@ -74,6 +74,33 @@ export function scanTripAllowsStartWithoutPay(view: ServiceOrderView | null, now
   return phase === 'in_use' && view.attemptsUsed < 2
 }
 
+/**
+ * 在准备开始新一趟扫描（怎么扫 / 放纸设置 / 面板建会话前置核验）时，
+ * 本地留存的服务单是否已经终结或彻底耗尽、绝不可再用于新一趟：
+ * - done（consumed && settledAt，上一趟已结案）
+ * - refunded / refund_failed / refunding / closed / timed_out / retry_expired
+ * - not_paid 且服务端已关单（非 pending）
+ * - in_use 且 attemptsUsed >= 2（两次机会均已用完，等后台清扫退款）
+ * 这些旧单必须及时清掉，避免新一趟进付款屏被 done/in_use 误判为 ok 或污染新结果页。
+ */
+export function scanOrderIsEndedForNewTrip(view: ServiceOrderView | null, nowMs: number): boolean {
+  if (!view) return false
+  const phase = serviceOrderPhase(view, nowMs)
+  if (
+    phase === 'done'
+    || phase === 'refunded'
+    || phase === 'refund_failed'
+    || phase === 'refunding'
+    || phase === 'closed'
+    || phase === 'timed_out'
+    || phase === 'retry_expired'
+  ) {
+    return true
+  }
+  if (phase === 'not_paid') return view.status !== 'pending'
+  return phase === 'in_use' && view.attemptsUsed >= 2
+}
+
 export type ScanFailedOrderNoticeKind =
   | 'none'
   | 'retry_free'
@@ -165,4 +192,18 @@ export function shouldReturnToScanPay(error: unknown): boolean {
   if (error instanceof ApiHttpError && error.status === 402) return true
   const code = errorCodeOf(error)
   return Boolean(code && code.startsWith('SERVICE_'))
+}
+
+/** 服务端拒单时明确不可再复用的错误码：回付款屏前先忘掉旧单号，保证建新单。 */
+export const SCAN_UNUSABLE_ORDER_ERROR_CODES: ReadonlySet<string> = new Set([
+  'SERVICE_ORDER_NOT_FOUND',
+  'SERVICE_ORDER_EXPIRED',
+  'SERVICE_ORDER_REFUNDED',
+  'SERVICE_ORDER_USED',
+  'SERVICE_ORDER_REF_OCCUPIED',
+])
+
+export function shouldForgetScanTripOnPayError(error: unknown): boolean {
+  const code = errorCodeOf(error)
+  return Boolean(code && SCAN_UNUSABLE_ORDER_ERROR_CODES.has(code))
 }
