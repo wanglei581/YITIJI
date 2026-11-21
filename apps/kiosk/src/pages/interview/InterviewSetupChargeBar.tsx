@@ -1,4 +1,5 @@
 import { PAY_BACK, formatYuan } from '../pay/payServiceModel'
+import './styles/interview-pay.css'
 
 /** 稿 pay-1113.js 329 行：iv-3 收费说明条，金额取终端生效价。 */
 export function InterviewSetupChargeBar({ priceCents }: { priceCents: number }) {

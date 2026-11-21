@@ -335,12 +335,13 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           primary={{
             label: step < 3 ? '下一步' : creating ? '正在为你准备面试官…' : charge.primaryLabel(aiOutage && pendingSession ? '打印通用题目与答案单' : control.mode === 'sheet' ? '打印通用题目单' : '创建并开始练习'),
             testId: step === 3 ? 'interview-primary' : undefined,
-            disabled: step === 3 && (creating || uploading || printingSheet || charge.checkingPay || (control.mode === 'wait' && !(aiOutage && pendingSession) && !charge.isRetryFree)),
+            disabled: step === 3 && (creating || uploading || printingSheet || charge.checkingPay || (!charge.chargeReady && control.mode !== 'sheet' && !(aiOutage && pendingSession)) || (control.mode === 'wait' && !(aiOutage && pendingSession) && !charge.isRetryFree)),
             onClick: () => {
               if (step < 3) goNext()
               else if (charge.isRetryFree && charge.paidTrip) void handleStart(false, charge.paidTrip)
               else if (aiOutage && pendingSession) void handlePracticeSheet()
               else if (control.mode === 'sheet') void handleOpenSheet()
+              else if (!charge.chargeReady) return
               else if (control.mode === 'start' && charge.needsPay) void charge.startPay()
               else if (control.mode === 'start' && charge.paidTrip) void handleStart(false, charge.paidTrip)
               else if (control.mode === 'start') void handleStart()
@@ -455,7 +456,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 )}
               </div>
               {offerStartWithoutResume ? (
-                <button type="button" className="qxt-iv-wide" onClick={() => { setOfferStartWithoutResume(false); void handleStart(true, charge.paidTrip ?? undefined) }}>
+                <button type="button" className="qxt-iv-wide" disabled={creating || !charge.chargeReady} onClick={() => { if (!charge.chargeReady) return; setOfferStartWithoutResume(false); void handleStart(true, charge.paidTrip ?? undefined) }}>
                   <b>不上传也能开始</b>
                   <small>没有简历时按通用问题练习，不会因此少一道题。</small>
                 </button>

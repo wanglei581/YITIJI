@@ -479,27 +479,3 @@
   background: var(--qxt-well);
   color: var(--qxt-ink-2);
 }
-
-/* 收费机器 iv-3 底部说明条（稿 pay-1113.js:86-88 .py-bar.on） */
-[data-qx-page="interview"] .qxt-iv-paybar {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 2px;
-  margin: 8px 0 0;
-  padding: 8px 18px;
-  border: 1.5px solid var(--qxt-edge);
-  border-radius: 20px;
-  background: var(--qxt-card);
-}
-
-[data-qx-page="interview"] .qxt-iv-paybar b {
-  color: var(--qx-deep);
-  font: 800 26px/1.25 var(--qx-sans);
-}
-
-[data-qx-page="interview"] .qxt-iv-paybar span {
-  color: var(--qxt-ink-2);
-  font-size: 20px;
-  line-height: 1.35;
-}
