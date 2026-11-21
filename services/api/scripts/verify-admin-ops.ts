@@ -91,7 +91,8 @@ function mockOpsPrisma(
     terminalCapability: { findMany: async () => [] },
     platformSetting: { findMany: async () => [] },
     order: { findMany: async () => [] },
-    orderItem: { findMany: async () => [] },
+    orderItem: { findMany: async () => [], groupBy: async () => [] },
+    auditLog: { findMany: async () => [] },
     printTask: {
       findMany: async (args?: { where?: { status?: string } }) => args?.where?.status === 'pending' ? unavailableRows : printRows,
       count: async (args?: { where?: { status?: string } }) => args?.where?.status === 'pending' ? unavailableRows.length : printRows.length,
@@ -108,6 +109,11 @@ function mockOpsPrisma(
     },
     // 服务单退款待人工处理会查 ServiceOrder。这组夹具没有这种单，空结果不能把整份列表打崩。
     serviceOrder: {
+      findMany: async () => [],
+      findFirst: async () => null,
+    },
+    // 打印没出纸的自动退失败会查 Refund。这组夹具没有这种单。
+    refund: {
       findMany: async () => [],
       findFirst: async () => null,
     },

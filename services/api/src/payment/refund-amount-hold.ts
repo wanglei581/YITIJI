@@ -15,14 +15,21 @@ export function wholeOrderPayableCents(order: { amountCents: number; discountCen
   return Math.max(0, order.amountCents - order.discountCents)
 }
 
-/** 渠道金额与本地退款行都必须等于整单实付。任一不等即不是整单退。 */
+/**
+ * 渠道金额与本地退款行必须一致。
+ * - 首笔整单退款：两者都必须等于整单实付；
+ * - 部分退款后的续退（订单处于 partial_refunded 或已有实退金额）：两者必须严格相等且大于 0，
+ *   累计是否超应付及订单状态收口交由 convergeNotifiedRefundSuccess / settlementAfterSuccess 统一裁定。
+ */
 export function isWholeOrderRefundAmount(
-  order: { amountCents: number; discountCents: number },
+  order: { amountCents: number; discountCents: number; payStatus?: string; refundedAmountCents?: number },
   channelAmountCents: number,
   recordedRefundAmountCents: number,
 ): boolean {
   const whole = wholeOrderPayableCents(order)
-  return channelAmountCents === whole && recordedRefundAmountCents === whole
+  if (channelAmountCents === whole && recordedRefundAmountCents === whole) return true
+  const isPartialContinuation = order.payStatus === 'partial_refunded' || (order.refundedAmountCents ?? 0) > 0
+  return isPartialContinuation && channelAmountCents > 0 && channelAmountCents === recordedRefundAmountCents
 }
 
 export async function holdMismatchedChannelRefund(

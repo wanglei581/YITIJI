@@ -67,8 +67,9 @@ const assert = (c: unknown, m: string): void => { if (c) pass(m); else fail(m) }
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
   try { await fn() } catch (e) {
     const msg = (e as Error)?.message ?? String(e)
-    if (msg.includes(code)) return pass(label)
-    return fail(`${label} — 期望 ${code}，实际: ${msg}`)
+    const nested = nestErrorCode(e)
+    if (msg.includes(code) || nested === code) return pass(label)
+    return fail(`${label} — 期望 ${code}，实际: ${nested ?? msg}`)
   }
   fail(`${label} — 期望 ${code}，但未抛`)
 }
@@ -293,7 +294,7 @@ async function main(): Promise<void> {
     const oClaimed = await makeOrder(50)
     await paySandbox(oClaimed)
     await prisma.order.update({ where: { id: oClaimed }, data: { taskStatus: 'claimed' } })
-    await expectCode('6d. 已领取订单不可开始退款 → ORDER_TASK_IN_PROGRESS', 'ORDER_TASK_IN_PROGRESS',
+    await expectCode('6d. 已领取订单不可开始普通退款 → PAPER_ALREADY_RELEASED', 'PAPER_ALREADY_RELEASED',
       () => refundService.refund(oClaimed, { reason: '已领取退款拒绝' }))
 
     // failed 的真实渠道退款同号重开也必须遵循相同的任务状态守卫。
@@ -304,7 +305,7 @@ async function main(): Promise<void> {
     await prisma.refund.create({
       data: { orderId: oPrinting, refundNo: failedRefundNo, amountCents: 50, status: 'failed', reason: '渠道明确拒绝', channel: 'wechat' },
     })
-    await expectCode('6e. 出纸中订单不可重开 failed 退款 → ORDER_TASK_IN_PROGRESS', 'ORDER_TASK_IN_PROGRESS',
+    await expectCode('6e. 出纸中订单不可重开 failed 退款 → PAPER_ALREADY_RELEASED', 'PAPER_ALREADY_RELEASED',
       () => refundService.refund(oPrinting, { refundNo: failedRefundNo, reason: '同号重开' }))
 
     // ── (7) retry ↔ refund 竞态：Order 是共同状态序列点，退款态不可出纸 ─────

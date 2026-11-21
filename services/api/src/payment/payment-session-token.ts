@@ -129,9 +129,9 @@ export function createPaymentSessionToken(input: PaymentSessionSubject): string 
   return `${TOKEN_VERSION}.${payload}.${sign(payload)}`
 }
 
-export function verifyPaymentSessionToken(
+/** 只核对签名和有效期，不核对订单主体。出码前要用票里的终端号占住订单。 */
+export function readPaymentSessionClaims(
   token: string | undefined,
-  expected: PaymentSessionSubject,
   nowMs = Date.now(),
 ): PaymentSessionVerifyResult {
   if (!token?.trim()) return { ok: false, code: 'PAYMENT_SESSION_REQUIRED' }
@@ -145,7 +145,16 @@ export function verifyPaymentSessionToken(
   const claims = decodeClaims(payload)
   if (!claims) return { ok: false, code: 'PAYMENT_SESSION_INVALID' }
   if (claims.exp <= nowMs) return { ok: false, code: 'PAYMENT_SESSION_EXPIRED' }
-  if (!sameSubject(claims, expected)) return { ok: false, code: 'PAYMENT_SESSION_MISMATCH' }
-
   return { ok: true, claims }
+}
+
+export function verifyPaymentSessionToken(
+  token: string | undefined,
+  expected: PaymentSessionSubject,
+  nowMs = Date.now(),
+): PaymentSessionVerifyResult {
+  const read = readPaymentSessionClaims(token, nowMs)
+  if (!read.ok) return read
+  if (!sameSubject(read.claims, expected)) return { ok: false, code: 'PAYMENT_SESSION_MISMATCH' }
+  return read
 }

@@ -131,6 +131,11 @@ export interface RefundExecuteResult {
   status: 'success' | 'failed' | 'processing'
   /** 渠道确认的本次退款额（分）。有值且不等于整单实付时不得完成退款。 */
   refundAmountCents?: number | null
+  /**
+   * 渠道原文状态。微信 ABNORMAL 归一化成 failed（服务单沿用），但它是退款异常、钱停在渠道中间账户，
+   * 不是没退出去。打印退款按原文判，见 refund-abnormal.ts。
+   */
+  refundState?: string | null
 }
 
 /** 账单描述：不写价格。空的、超过 32 字的、或带数字和货币符号的，都改成「打印」。 */
@@ -146,6 +151,11 @@ export interface RefundQueryResult {
   channelRefundNo: string | null
   /** 渠道确认的本次退款额（分）。有值且不等于整单实付时不得完成退款。缺省不代表金额正确。 */
   refundAmountCents?: number | null
+  /**
+   * 渠道原文状态。退款收敛仍只看 status。
+   * 三步处置另按官方文档判断这笔钱有没有退成，见 classifyChannelRefundStatus。
+   */
+  refundState?: string | null
 }
 
 /** 退款结果异步通知归一化事件（wechat REFUND.SUCCESS/CLOSED/ABNORMAL 通知解析后）。 */
@@ -157,8 +167,10 @@ export interface RefundNotifyEvent {
   outTradeNo: string
   /** 渠道退款流水号 refund_id。 */
   channelRefundNo: string | null
-  /** SUCCESS→success；CLOSED/ABNORMAL→failed（渠道明确不会再退）。 */
+  /** SUCCESS→success；CLOSED/ABNORMAL→failed。ABNORMAL 不是没退出去，打印退款看 refundState。 */
   status: 'success' | 'failed'
+  /** 渠道原文 refund_status（SUCCESS / CLOSED / ABNORMAL）。 */
+  refundState?: string | null
   /** 本次退款额（分）；业务层必须与 Refund.amountCents 比对，不符拒绝。 */
   refundAmountCents: number | null
   /** 防重放 nonce（签名头 nonce）。 */

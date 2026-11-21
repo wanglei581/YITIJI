@@ -8,6 +8,7 @@ import { collectAiDerivedAlerts, resolveAiDerivedAlert } from './derived-ai-aler
 import { collectScanDeviceAlerts, resolveScanDeviceAlert } from './derived-scan-device-alerts'
 import { collectPartnerIncidents, resolvePartnerIncident } from './derived-partner-incidents'
 import { collectServiceReturnAlerts, resolveServiceReturnAlert } from './derived-service-return-alerts'
+import { collectPrintReturnAlerts, resolvePrintReturnAlert } from './derived-print-return-alerts'
 import {
   buildSubjectKey,
   offlineEpisodeToken,
@@ -517,6 +518,8 @@ export async function collectDerivedAlerts(
   alerts.push(...partnerIncidents)
   const serviceReturns = await collectServiceReturnAlerts(prisma)
   alerts.push(...serviceReturns)
+  const printReturns = await collectPrintReturnAlerts(prisma)
+  alerts.push(...printReturns)
 
   alerts.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
   // count() 与 findMany 之间可能有新失败写入,omitted 用 max(0,…) 兜底,不出现负数。
@@ -525,7 +528,7 @@ export async function collectDerivedAlerts(
     alerts,
     firingTotal: terminalAlertCount + Math.max(failedTotal, failedTasks.length) + unavailableTasks.reduce((count, task) => (
       count + (buildPaidPendingFileUnavailableAlert(task, nowMs) ? 1 : 0)
-    ), 0) + (feedbackAlert ? 1 : 0) + alerts.filter((alert) => alert.type === 'print_terminal_quota_high').length + aiAlerts.length + scanDeviceAlerts.length + partnerIncidents.length + serviceReturns.length,
+    ), 0) + (feedbackAlert ? 1 : 0) + alerts.filter((alert) => alert.type === 'print_terminal_quota_high').length + aiAlerts.length + scanDeviceAlerts.length + partnerIncidents.length + serviceReturns.length + printReturns.length,
     omitted,
     cap: PRINT_FAILED_LIST_CAP,
     terminalSubjectKeysInScope: [...terminals.flatMap((t) => [
@@ -590,6 +593,10 @@ export async function resolveDerivedAlert(
 
   if (type === 'service_return_manual') {
     return resolveServiceReturnAlert(prisma, subjectId)
+  }
+
+  if (type === 'print_return_manual') {
+    return resolvePrintReturnAlert(prisma, subjectId)
   }
 
   const terminal = (await prisma.terminal.findUnique({

@@ -67,6 +67,20 @@ export async function createPayAttempt(input: PaymentSessionInput & { channel?: 
   return res.json() as Promise<PayAttemptView>
 }
 
+/** 用户离开收银台或返回核码。过期这次付款并放开机器。请求失败也不拦住离开。 */
+export async function abandonPayAttempt(input: PaymentSessionInput): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay/abandon`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res)
+}
+
 /** 商户扫用户付款码。付款码不会在前端服务层缓存、拼入 URL 或写入错误信息。 */
 export async function createCodePayAttempt(
   input: PaymentSessionInput & { channel?: string; authCode: string },

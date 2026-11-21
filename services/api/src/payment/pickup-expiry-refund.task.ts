@@ -20,14 +20,22 @@ export class PickupExpiryRefundTask {
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async handle(): Promise<void> {
-    if (!this.enabled() || this.running) return
+    if (this.running) return
     this.running = true
     try {
-      const result = await this.sweep.sweep({ limit: 50 })
-      if (result.scanned > 0) {
-        this.logger.log(
-          `pickup expiry auto-refund: scanned=${result.scanned} refunded=${result.refunded} idempotent=${result.idempotent} skipped=${result.skipped} failed=${result.failed}`,
-        )
+      if (this.enabled()) {
+        const result = await this.sweep.sweep({ limit: 50 })
+        if (result.scanned > 0) {
+          this.logger.log(
+            `pickup expiry auto-refund: scanned=${result.scanned} refunded=${result.refunded} idempotent=${result.idempotent} skipped=${result.skipped} failed=${result.failed}`,
+          )
+        }
+        return
+      }
+      // 开关默认关着。关着也不许没去向：窗口关闭、没出纸的已付单进待人工。
+      const parked = await this.sweep.parkClosedWindowWhenAutoRefundOff({ limit: 50 })
+      if (parked.parked > 0) {
+        this.logger.log(`pickup window closed without auto-refund: parked=${parked.parked} skipped=${parked.skipped}`)
       }
     } catch (error) {
       this.logger.error(`pickup expiry auto-refund failed: ${(error as Error).message}`)

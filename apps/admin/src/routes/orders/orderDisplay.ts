@@ -69,6 +69,17 @@ export const OWNER_LABELS: Record<string, string> = { member: '会员', anonymou
 export const REFUND_REASON_LABELS: Record<string, string> = {
   PAID_UNFULFILLED_PENDING_REFUND: '已付款未出纸',
   ONLINE_PAID_PENDING_REFUND: '渠道已收款，但取件窗口已关、订单未转已支付',
+  paid_no_paper_auto: '已付款没出纸，自动原路退',
+}
+
+export function autoRefundStatusText(status: string | null): string {
+  if (status === 'success') return '已原路退回'
+  if (status === 'failed') return '没有成功'
+  if (status === 'pending') return '处理中'
+  if (status === 'manual_review') return '待人工核对'
+  if (status === 'withdrawn') return '已改为出纸，钱不记成已退回'
+  if (status === 'closed') return '已关闭，钱不记成已退回'
+  return status ?? '—'
 }
 
 // 收款入账来源：后端 AdminMarkPaidDto 只放行这两个（free 由 0 元建单自动产生，
@@ -115,6 +126,18 @@ export function pickupText(order: { pickupStatus: string; channel: string | null
 
 export function fmt(iso: string | null): string {
   return formatDateTime(iso)
+}
+
+/** 任务已领取、打印中、已完成，或订单已标成领取中、打印中，或已经核对为出纸。 */
+export function orderPaperReleased(detail: {
+  printOutcome: string | null
+  taskStatus: string
+  print: { status: string } | null
+}): boolean {
+  if (detail.printOutcome === 'printed') return true
+  if (detail.taskStatus === 'claimed' || detail.taskStatus === 'printing') return true
+  const status = detail.print?.status
+  return status === 'claimed' || status === 'printing' || status === 'completed'
 }
 
 export function amountText(amountCents: number, currency: string): string {

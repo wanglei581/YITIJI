@@ -1,0 +1,268 @@
+/**
+ * 已付款、终端明确没出纸时，按个人收费总开关决定是否自动原路退一次。
+ *
+ * 开关跟着个人收费总开关，不另开一列：默认关，关时只落待退款信号，和今天一样不调渠道；
+ * 打开个人收费，就是同意向个人收打印费，没出纸就要把这笔钱退回去。
+ * 公共就业点位生效价永远是 0，应付为 0，不会进到退款。
+ *
+ * 自动原路退只认「确定没交给打印机」的允许名单。终端状态上报没有阶段字段，
+ * 同一个码若在交给打印机前后都会出现，就不能整码放进名单。
+ * PRINT_COMMAND_FAILED 作为上报码只出现在调用 print() 之前（下载失败、队列还没送去打印）。
+ * print() 已经调用之后的命令失败会被改写成 PRINT_JOB_UNCONFIRMED，不在名单里。
+ * 名单外、以后新出现的码一律不自动退。缺纸即使发生在预检、文件还没交出去，也不自动退。
+ * PRINT_QUEUE_TIMEOUT 是服务端排队超时未领取，不是终端上报码，原文写明没有出纸，留在名单里。
+ * 已按大于 0 付过、又明确没出纸，才走这里。退款失败复用第 2 期 a 的告警，类型单独一条。
+ */
+import { BadRequestException } from '@nestjs/common'
+import type { PrismaService } from '../prisma/prisma.service'
+import { AuditService } from '../audit/audit.service'
+import { readPersonalChargeEnabled } from './effective-user-prices'
+import { resolvePaymentProviders } from './payment-provider.factory'
+import { markPaidUnfulfilledRefundRequired, payableCents } from './pending-refund-signal'
+import { PAID_NO_PAPER_AUTO_REASON } from './print-no-paper-refund.constants'
+import { notifyPrintReturnHold } from './print-return-alert'
+import {
+  CHANNEL_UNCONFIRMED_REFUND_REASON,
+  PRINT_NO_PAPER_AUTO_FAILED_AUDIT,
+  PRINT_NO_PAPER_MANUAL_AUDIT,
+  manualHoldReason,
+  switchOffRefundReason,
+} from './print-return-disposition'
+import { RefundService } from './refund.service'
+
+export type NoPaperRefundOutcome = 'ignored' | 'signaled' | 'manual' | 'refunded' | 'idempotent' | 'failed'
+
+export interface NoPaperRefundDeps {
+  refund?: Pick<RefundService, 'refund'>
+}
+
+/**
+ * 确定没交给打印机，才自动原路退。
+ * 出处都在终端程序：下载失败与队列准备失败是 task-runner 在 print() 之前上报的
+ * PRINT_COMMAND_FAILED；校验失败是 DOWNLOAD_HASH_MISMATCH；预检失败是
+ * PRINTER_NOT_FOUND / PRINTER_OFFLINE / PRINTER_ERROR；本地状态写不下去是
+ * LOCAL_TASK_STATE_PERSIST_FAILED；文件不存在与不支持的格式在 print() 里、
+ * 派发开始前返回，并原样上报。PRINT_QUEUE_TIMEOUT 由服务端在领取前写成失败。
+ */
+const EXPLICIT_NO_PAPER_ERROR_CODES = new Set<string>([
+  'PRINT_COMMAND_FAILED',
+  'DOWNLOAD_HASH_MISMATCH',
+  'PRINTER_NOT_FOUND',
+  'PRINTER_OFFLINE',
+  'PRINTER_ERROR',
+  'LOCAL_TASK_STATE_PERSIST_FAILED',
+  'FILE_NOT_FOUND',
+  'UNSUPPORTED_FILE_TYPE',
+  'PRINT_QUEUE_TIMEOUT',
+])
+
+function exceptionCode(error: unknown): string | null {
+  if (!(error instanceof BadRequestException)) return null
+  const response = error.getResponse()
+  if (typeof response === 'string') return response
+  if (response && typeof response === 'object' && 'message' in response) {
+    const message = (response as { message?: unknown }).message
+    if (typeof message === 'string') return message
+  }
+  return null
+}
+
+/** 只有失败，且错误码在「确定没交给打印机」的允许名单里，才自动退。 */
+function isExplicitNoPaper(status: string, errorCode: string | null): boolean {
+  if (status !== 'failed') return false
+  if (!errorCode) return false
+  return EXPLICIT_NO_PAPER_ERROR_CODES.has(errorCode)
+}
+
+async function pushPrintReturnAlert(db: PrismaService, orderId: string): Promise<void> {
+  await notifyPrintReturnHold(db, orderId)
+}
+
+async function rememberOnce(
+  db: PrismaService,
+  orderId: string,
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const existing = await db.auditLog.findFirst({
+    where: { targetId: orderId, action },
+    select: { id: true },
+  })
+  if (existing) return
+  await new AuditService(db).write({
+    actorId: null,
+    actorRole: 'system',
+    action,
+    targetType: 'order',
+    targetId: orderId,
+    payload,
+  })
+}
+
+/**
+ * 明确没出纸的一单。调用方传入的 taskStatus / errorCode 是打印任务的，不是订单的。
+ * 已有同原因退款则直接返回，重复回调不再进 RefundService。
+ */
+export async function settleExplicitNoPaper(
+  db: PrismaService,
+  input: {
+    orderId: string
+    taskStatus: string
+    errorCode: string | null
+    printOutcome: string | null
+    completedItemCount: number
+  },
+  deps?: NoPaperRefundDeps,
+): Promise<NoPaperRefundOutcome> {
+  if (input.printOutcome === 'printed') return 'ignored'
+  if (input.taskStatus !== 'failed') return 'ignored'
+
+  const order = await db.order.findUnique({ where: { id: input.orderId } })
+  if (!order) return 'ignored'
+  if (order.taskStatus === 'claimed' || order.taskStatus === 'printing') return 'ignored'
+  if (order.payStatus !== 'paid' || payableCents(order) <= 0) return 'ignored'
+
+  const partial = input.completedItemCount > 0
+  const explicit = !partial && isExplicitNoPaper(input.taskStatus, input.errorCode)
+
+  if (!explicit) {
+    // 缺纸、说不准、部分出纸不写「文件失效待退款」。那条信号只留给开关关着的明确没出纸，
+    // 以及文件确实不能再打的旧路径。这里只记待人工。
+    await holdForManualReview(db, order.id, input)
+    return 'manual'
+  }
+
+  const enabled = await readPersonalChargeEnabled(db)
+  if (!enabled) {
+    await markPaidUnfulfilledRefundRequired(db, order)
+    await rememberOnce(db, order.id, PRINT_NO_PAPER_MANUAL_AUDIT, {
+      detail: switchOffRefundReason(),
+      errorCode: input.errorCode,
+      switchOff: true,
+    })
+    await pushPrintReturnAlert(db, order.id)
+    return 'signaled'
+  }
+
+  const existing = await db.refund.findFirst({
+    where: { orderId: order.id, reason: PAID_NO_PAPER_AUTO_REASON },
+    select: { id: true },
+  })
+  if (existing) return 'idempotent'
+
+  const refundApi = deps?.refund ?? new RefundService(db, new AuditService(db), resolvePaymentProviders(process.env))
+  try {
+    const view = await refundApi.refund(order.id, {
+      refundNo: `RFD-${order.orderNo}`,
+      reason: PAID_NO_PAPER_AUTO_REASON,
+    })
+    if (view.refund.status === 'failed') {
+      await rememberOnce(db, order.id, PRINT_NO_PAPER_AUTO_FAILED_AUDIT, {
+        code: 'REFUND_CHANNEL_FAILED',
+        refundNo: view.refund.refundNo,
+        channel: view.refund.channel,
+        channelReason: view.refund.status,
+      })
+      await pushPrintReturnAlert(db, order.id)
+      return 'failed'
+    }
+    if (view.refund.status !== 'success') {
+      await rememberOnce(db, order.id, PRINT_NO_PAPER_MANUAL_AUDIT, {
+        detail: CHANNEL_UNCONFIRMED_REFUND_REASON,
+        refundNo: view.refund.refundNo,
+        refundStatus: view.refund.status,
+      })
+      await pushPrintReturnAlert(db, order.id)
+      return 'manual'
+    }
+    await rememberOnce(db, order.id, 'print_order.auto_return', {
+      refundNo: view.refund.refundNo,
+      channel: view.refund.channel,
+      channelRefundNo: view.refund.channelRefundNo,
+      channelReason: view.refund.status,
+      amountCents: view.refund.amountCents,
+    })
+    return view.idempotent ? 'idempotent' : 'refunded'
+  } catch (error) {
+    const code = exceptionCode(error)
+    if (code === 'ORDER_ALREADY_REFUNDED' || code === 'ORDER_TASK_IN_PROGRESS') return 'signaled'
+    if (code) {
+      const refundRow = await db.refund.findFirst({
+        where: { orderId: order.id, reason: PAID_NO_PAPER_AUTO_REASON },
+        select: { refundNo: true, channel: true },
+      })
+      await rememberOnce(db, order.id, PRINT_NO_PAPER_AUTO_FAILED_AUDIT, {
+        code,
+        refundNo: refundRow?.refundNo ?? null,
+        channel: refundRow?.channel ?? null,
+        channelReason: code,
+      })
+      await pushPrintReturnAlert(db, order.id)
+      return 'failed'
+    }
+    throw error
+  }
+}
+
+async function holdForManualReview(
+  db: PrismaService,
+  orderId: string,
+  input: { errorCode: string | null; completedItemCount: number },
+): Promise<void> {
+  const itemCount = await db.orderItem.count({ where: { orderId } })
+  await rememberOnce(db, orderId, PRINT_NO_PAPER_MANUAL_AUDIT, {
+    detail: manualHoldReason({
+      errorCode: input.errorCode,
+      completedItemCount: input.completedItemCount,
+      itemCount,
+    }),
+    errorCode: input.errorCode,
+    completedItemCount: input.completedItemCount,
+    itemCount,
+    switchOff: false,
+  })
+  await pushPrintReturnAlert(db, orderId)
+}
+
+/** 按任务号读失败原因，再决定退不退。队列超时和终端失败上报都走这里。 */
+export async function settleExplicitNoPaperFromReportedFailure(
+  db: PrismaService,
+  taskId: string,
+  deps?: NoPaperRefundDeps,
+): Promise<NoPaperRefundOutcome> {
+  const task = await db.printTask.findUnique({
+    where: { id: taskId },
+    select: { id: true, status: true, errorCode: true, printOutcome: true, orderId: true },
+  })
+  if (!task) return 'ignored'
+  const order = await db.order.findFirst({
+    where: task.orderId
+      ? { OR: [{ printTaskId: task.id }, { id: task.orderId }] }
+      : { printTaskId: task.id },
+    select: { id: true },
+  })
+  if (!order) return 'ignored'
+  const completedItemCount = await db.orderItem.count({
+    where: { orderId: order.id, status: 'completed' },
+  })
+  return settleExplicitNoPaper(db, {
+    orderId: order.id,
+    taskStatus: task.status,
+    errorCode: task.errorCode,
+    printOutcome: task.printOutcome,
+    completedItemCount,
+  }, deps)
+}
+
+/** 超时未确认等批量失败。退款决定失败不打断调用方已经写好的失败状态。 */
+export async function settleReportedTaskFailures(
+  db: PrismaService,
+  taskIds: string[],
+  onError?: (taskId: string, error: unknown) => void,
+): Promise<void> {
+  for (const taskId of taskIds) {
+    await settleExplicitNoPaperFromReportedFailure(db, taskId).catch((error: unknown) => {
+      onError?.(taskId, error)
+    })
+  }
+}

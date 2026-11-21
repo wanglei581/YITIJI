@@ -43,8 +43,8 @@ export function recordedCentsText(cents: number | null | undefined, currency: st
 }
 
 /**
- * 运营关注角标文案。三个码的唯一来源是后端
- * `admin-orders-readonly.service.ts` 的互斥推导，前端不新增第四类。
+ * 运营关注角标文案。码的唯一来源是后端
+ * `admin-orders-readonly.service.ts` 的互斥推导，前端不另造一类。
  *
  * 返回 null 有两种情况，都必须什么都不显示：
  *   - 后端没返回该字段（存量部署）—— 不知道就不说，绝不默认「无异常」；
@@ -54,10 +54,13 @@ export function recordedCentsText(cents: number | null | undefined, currency: st
  * 渠道收了钱而本地没转账，写「已支付」会在管理端摆一个与支付状态相反的结论。
  */
 export function opsAttentionText(
-  code: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | null | undefined,
+  code: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'partial_refunded' | 'paper_refund_failed' | 'print_return_manual' | null | undefined,
 ): string | null {
   if (code === 'refund_required') return '待退款'
   if (code === 'refunding') return '退款中'
   if (code === 'channel_accepted_unconfirmed') return '渠道已受理未确认'
+  if (code === 'partial_refunded') return '部分退款'
+  if (code === 'paper_refund_failed') return '已出纸退款失败'
+  if (code === 'print_return_manual') return '待人工'
   return null
 }

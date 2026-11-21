@@ -174,6 +174,7 @@ const ACTION_LABELS: Record<string, string> = {
   'order.paid_output_anomaly_auto_refund': '付费出纸异常自动退款',
   'order.paid_output_anomaly_auto_refund_skipped': '跳过付费出纸异常自动退款',
   'order.refund': '订单退款',
+  'order.stale_attempt_collection': '过期付款尝试入账后退回',
   'org.account.action_cancelled': '取消机构账号敏感操作',
   'org.account.action_challenge_started': '发送机构账号操作验证码',
   'org.account.action_verification_failed': '机构账号操作验证失败',
@@ -217,6 +218,8 @@ const ACTION_LABELS: Record<string, string> = {
   'print_job.retry': '重试打印任务',
   'print_job.takeaway_url': '获取打印文件带走链接',
   'print_job.timeout_unconfirmed': '打印超时且出纸未确认',
+  'print_order.auto_return_failed': '没出纸自动退款失败',
+  'print_order.no_paper_manual': '没出纸待人工退款',
   'print_order.pickup_claim': '领取打印订单',
   'print_order.pickup_claim_rejected': '打印订单领取被拒绝',
   'print_order.pickup_code_reissued': '重新签发打印取件码',
@@ -231,10 +234,18 @@ const ACTION_LABELS: Record<string, string> = {
   'recruitment.emergency_takedown': '紧急下架招聘展示内容',
   'recruitment.qualification_evidence_access': '查看招聘资质证据',
   'refund.blocked': '退款被拦截',
+  'refund.channel_abnormal': '退款渠道异常，钱停在渠道中间账户',
   'refund.channel_ambiguous': '退款渠道结果待确认',
+  'refund.channel_answer': '按渠道答复记下退款结果',
+  'refund.channel_result_registered': '按商户平台核实结果登记退款',
+  'refund.channel_success_conflict': '渠道退款已成功，但与订单状态冲突，待人工核对',
   'refund.channel_error': '退款渠道异常',
   'refund.created': '创建退款申请',
+  'refund.hold_rejected': '拒绝这笔待人工处置',
+  'refund.hold_resolved': '处置没出纸的退款待办',
   'refund.notify_amount_mismatch': '退款通知金额不符',
+  'refund.notify_paper_already_released': '退款通知时已经出纸，渠道退成已记账，待人工核对',
+  'refund.paper_checked': '核对后仍退款',
   'refund.processing': '退款处理中',
   'refund.retried': '重试退款',
   'resume.career_plan': '生成职业规划',
@@ -375,12 +386,13 @@ const ACTION_LABELS: Record<string, string> = {
   'service_order.channel_close_failed': '服务单关码失败，稍后重试',
   'service_order.layout_only': '排版失败，这一单不退款',
   'service_order.paid': '服务单已付款',
+  'service_order.refund_abnormal': '服务单退款渠道异常，钱停在渠道中间账户',
   'service_order.refund_retry': '再试一次服务单退款',
   'service_order.refunded': '服务单已原路退款',
   'service_order.admin_refund': '管理员发起服务单原路退款',
 }
 
-const ROLE_LABELS: Record<string, string> = {
+export const ROLE_LABELS: Record<string, string> = {
   admin: '管理员',
   partner: '合作机构',
   kiosk: '一体机',
@@ -433,17 +445,6 @@ const TARGET_LABELS: Record<string, string> = {
   ad_playlist: '播放方案',
 }
 
-const ACTOR_NAME_KEYS = ['actorName', 'operatorName', 'userName', 'username', 'displayName', 'realName']
-
-export interface AuditActorInput {
-  actorRole: string
-  actorId: string | null
-  payloadJson?: string | null
-  currentUser?: { id: string; name: string } | null
-  /** 列表记录上若多带了姓名字段，从这里读；没有就只显示角色。 */
-  record?: object | null
-}
-
 export function getAuditActionLabel(action: string): string {
   return ACTION_LABELS[action] ?? '其他操作'
 }
@@ -455,54 +456,4 @@ export function getAuditTargetLabel(targetType: string | null | undefined): stri
 
 export function getAuditRoleLabel(role: string): string {
   return ROLE_LABELS[role] ?? '其他角色'
-}
-
-function looksLikeOpaqueId(value: string): boolean {
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) return true
-  if (/^c[a-z0-9]{20,}$/i.test(value)) return true
-  if (/^[0-9a-f]{24,}$/i.test(value)) return true
-  return value.length >= 16 && /^[A-Za-z0-9_-]+$/.test(value)
-}
-
-function readablePersonName(value: unknown, actorId: string | null): string | null {
-  if (typeof value !== 'string') return null
-  const text = value.trim()
-  if (!text || text.length > 40) return null
-  if (actorId && text === actorId) return null
-  if (looksLikeOpaqueId(text)) return null
-  return text
-}
-
-function nameFromRecord(record: object | null | undefined, actorId: string | null): string | null {
-  if (!record) return null
-  const bag = record as Record<string, unknown>
-  for (const key of ACTOR_NAME_KEYS) {
-    const name = readablePersonName(bag[key], actorId)
-    if (name) return name
-  }
-  return null
-}
-
-function nameFromPayload(payloadJson: string | null | undefined, actorId: string | null): string | null {
-  if (!payloadJson) return null
-  try {
-    const parsed = JSON.parse(payloadJson) as unknown
-    if (!parsed || typeof parsed !== 'object') return null
-    return nameFromRecord(parsed, actorId)
-  } catch {
-    return null
-  }
-}
-
-export function getAuditActorLabel(input: AuditActorInput): string {
-  const fromRecord = nameFromRecord(input.record, input.actorId)
-  if (fromRecord) return fromRecord
-  const fromPayload = nameFromPayload(input.payloadJson, input.actorId)
-  if (fromPayload) return fromPayload
-  const me = input.currentUser
-  if (me && input.actorId && me.id === input.actorId) {
-    const mine = readablePersonName(me.name, input.actorId)
-    if (mine) return mine
-  }
-  return ROLE_LABELS[input.actorRole] ?? '其他'
 }

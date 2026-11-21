@@ -1,6 +1,6 @@
 import type { ElementType } from 'react'
 import { formatCount, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
-import { BotIcon, Building2Icon, FolderIcon, MonitorIcon, PrinterIcon, FileWarningIcon, MessageSquareWarningIcon, ScanLineIcon } from 'lucide-react'
+import { AlertTriangleIcon, BotIcon, Building2Icon, FolderIcon, MonitorIcon, PrinterIcon, FileWarningIcon, MessageSquareWarningIcon, ScanLineIcon } from 'lucide-react'
 import type { AdminFileRecord } from '../../services/api'
 import type { AdminAlertItem } from '../../services/api/adminOps'
 import type { StockTodo } from './recruitmentStock'
@@ -64,6 +64,7 @@ const ALERT_ROW_ICON: Record<AdminAlertItem['type'], ElementType> = {
   scan_device_issue: ScanLineIcon,
   partner_incident: Building2Icon,
   service_return_manual: FileWarningIcon,
+  print_return_manual: AlertTriangleIcon,
 }
 
 /**

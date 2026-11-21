@@ -69,6 +69,8 @@ export const PICKUP_CLOSED_CODES: ReadonlySet<string> = new Set([
   'PRINT_RETRY_FILE_UNAVAILABLE',
   'PRINT_RETRY_AGENT_VERSION',
   'PICKUP_RESUME_REFUND_PENDING',
+  // 还有可能变成成功的退款时拒绝出纸。再输同一个码也不会放行。
+  'ORDER_REFUND_UNRESOLVED',
 ])
 
 /**
@@ -95,6 +97,7 @@ export const PICKUP_SAME_CODE_RESUME_NOTE =
  */
 export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   PRINT_TERMINAL_QUEUE_HALTED: `这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
+  ARRIVAL_PRICE_UNAVAILABLE: `这台机器的打印价格暂时算不出来，你的到机码没有作废，请稍后再来这台机器输码。${helpNeededLine()}`,
   PRINTER_UNAVAILABLE: `这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
   PICKUP_CODE_INVALID: PICKUP_CODE_REJECTED_COPY,
   PICKUP_CODE_EXPIRED: PICKUP_CODE_REJECTED_COPY,
@@ -106,6 +109,7 @@ export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认。请过 5 分钟后回到这台机器，再输一次同一个到机码，按屏幕提示办理；符合条件时可以整份重打。',
   PICKUP_RESUME_PARTIAL_OUTPUT: '这单已经出了一部分纸，不能整单重打',
   PICKUP_RESUME_REFUND_PENDING: PICKUP_RESUME_REFUND_PENDING_COPY,
+  ORDER_REFUND_UNRESOLVED: '这单的退款还没结清，现在不能出纸。请不要再输这个到机码；需要帮助请查看《隐私政策》里的联系方式。',
   PRINT_RETRY_FILE_UNAVAILABLE: '这笔订单的文件现在无法用于打印。请在手机上重新上传文件、重新下单。',
   // 后端那句带版本号，是给维护看的，不上屏。
   PRINT_RETRY_AGENT_VERSION: '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。',
@@ -228,6 +232,21 @@ const FINISHED_PRINT_STATUSES = new Set(['completed', 'failed', 'cancelled', 'ab
  * released=true 且已经打完 —— 如实说完成，给出路；
  * 其余已放行 —— 还在队列或正在出纸，请留在出纸口旁。
  */
+/** 金额用「2.00 元」，不带货币符号。设计句见青序流光触屏稿 pay-1113。 */
+export function arrivalChargeYuan(amountCents: number): string {
+  const yuan = Math.abs(amountCents) / 100
+  const text = yuan.toFixed(2)
+  return amountCents < 0 ? `-${text}` : text
+}
+
+export function arrivalChargeNoticeCopy(amountCents: number): { headline: string; next: string; ifUnpaid: string } {
+  return {
+    headline: `这台机器打印收费，本单 ${arrivalChargeYuan(amountCents)} 元，付完就出纸`,
+    next: '下一步进收银台。付好了才开始打印。核查确认没出纸后，钱自动退回原付款账户，到账时间以支付渠道为准。',
+    ifUnpaid: '付不成可以返回，订单还在，可以再来付款。',
+  }
+}
+
 export function claimSuccessCopy(released: boolean, printTaskStatus?: string | null): ClaimSuccessCopy {
   if (!released) {
     return {

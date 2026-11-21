@@ -1,11 +1,12 @@
 import { Drawer, LoadingState, ErrorState } from '@ai-job-print/ui'
 import type { OrderDetailControls } from './useOrderDetail'
-import { amountText, billablePagesText, channelText, pageRangeText, fmt, orderUserText, payStatusPresentation, pickupText, REFUND_REASON_LABELS, STATUS_MAP } from './orderDisplay'
+import { amountText, autoRefundStatusText, billablePagesText, channelText, pageRangeText, fmt, orderUserText, payStatusPresentation, pickupText, REFUND_REASON_LABELS, STATUS_MAP } from './orderDisplay'
 import { colorModeText, copiesText, duplexText, NET_PAID_UNRECORDED, recordedCentsText } from './orderHonestyCopy'
 import { printErrorText } from '../../lib/printErrorText'
 import { OrderAftercare } from './OrderAftercare'
 import { OrderInvoiceSection } from './OrderInvoiceSection'
 import { OrderPaymentActions } from './OrderPaymentActions'
+import { PrintReturnHoldActions } from './PrintReturnHoldActions'
 
 function Info({ label, value, title }: { label: string; value: string; title?: string }) {
   return <div><p className="text-xs font-bold text-neutral-500">{label}</p><p title={title} className="mt-1 break-words text-sm font-semibold text-neutral-900">{value}</p></div>
@@ -47,6 +48,40 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               {detail.refundReason && detail.payStatus !== 'paid' ? (
                 <Info label="退款原因" value={REFUND_REASON_LABELS[detail.refundReason] ?? detail.refundReason} />
               ) : null}
+              {detail.printRefundDisposition === 'auto_success' ? (
+                <>
+                  <Info label="退款方式" value="自动原路退" />
+                  <Info label="退款状态" value={autoRefundStatusText(detail.refundStatus)} />
+                  {detail.printRefundReason ? <Info label="说明" value={detail.printRefundReason} /> : null}
+                  <Info label="退款单号" value={detail.refundLedgerNo ?? '—'} />
+                  <Info label="退款金额" value={recordedCentsText(detail.refundLedgerCents, detail.currency)} />
+                </>
+              ) : null}
+              {detail.printRefundDisposition === 'auto_failed' ? (
+                <>
+                  <Info label="退款方式" value="自动原路退" />
+                  <Info label="退款状态" value={autoRefundStatusText(detail.refundStatus)} />
+                  <Info label="失败原因" value={detail.printRefundReason ?? detail.refundFailureReason ?? '—'} />
+                  <Info label="退款单号" value={detail.refundLedgerNo ?? '—'} />
+                  <Info label="退款金额" value={recordedCentsText(detail.refundLedgerCents, detail.currency)} />
+                </>
+              ) : null}
+              {detail.printRefundDisposition === 'manual' ? (
+                <>
+                  <Info label="退款方式" value="待人工退款" />
+                  <Info label="退款状态" value={autoRefundStatusText(detail.refundStatus)} />
+                  <Info label="原因" value={detail.printRefundReason ?? '—'} />
+                  <Info label="退款单号" value={detail.refundLedgerNo ?? '—'} />
+                  <Info label="退款金额" value={recordedCentsText(detail.refundLedgerCents, detail.currency)} />
+                  {detail.refundLedgerNo ? (
+                    detail.payStatus === 'partial_refunded' && detail.refundStatus === 'success' ? (
+                      <p className="col-span-2 text-xs font-semibold text-neutral-600">只退了一部分。请用下面的「退还剩余」，不要再点确认退成、改为出纸或关单。</p>
+                    ) : (
+                      <p className="col-span-2 text-xs font-semibold text-neutral-600">这笔待人工处理。可以确认已经退成、改为出纸，或关闭这张单。做完只剩一种状态。</p>
+                    )
+                  ) : null}
+                </>
+              ) : null}
             </div>
 
       <OrderAftercare controls={controls} />
@@ -74,6 +109,7 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
 
       <OrderInvoiceSection orderId={detail.id} orderKind={detail.recordKind === 'service' ? 'service' : 'print'} />
       <OrderPaymentActions controls={controls} />
+      <PrintReturnHoldActions controls={controls} />
       </>)}
     </Drawer>
   )

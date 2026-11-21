@@ -266,7 +266,7 @@ if (
 // channel_accepted_unconfirmed（含渠道已受理但本地回填失败——渠道可能已扣款）。
 // 管理端此前只接了 refundRequired 一支，「退款中」与「渠道已受理未确认」
 // 在列表上完全不可见，运营只能人肉翻页。接线必须同时满足四点：
-//   a. 前端类型与后端字段同名同取值，不新增第四类；
+//   a. 前端类型与后端字段同名。原有三类保留；部分退款、已出纸且退款失败是后加的两类，取值仍只来自后端；
 //   b. 请求装配能发出 opsAttention=true；
 //   c. 「需运营关注」chip 清空 payStatus 与 statusFilter —— 与 M-2 同一类坑：
 //      channel_accepted_unconfirmed 的 payStatus 是 paying/closed 而不是 paid，
@@ -276,7 +276,7 @@ if (
 if (
   service.includes('opsAttention?: boolean') &&
   service.includes('opsAttentionCode?:') &&
-  service.includes("'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | null") &&
+  service.includes("'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'partial_refunded' | 'paper_refund_failed' | 'print_return_manual' | null") &&
   service.includes("opsAttention: params.opsAttention ? 'true' : undefined")
 ) {
   pass('admin orders service carries opsAttention/opsAttentionCode fields and query mapping')
@@ -319,11 +319,14 @@ if (
   honestyCopy.includes("'channel_accepted_unconfirmed'") &&
   honestyCopy.includes("return '待退款'") &&
   honestyCopy.includes("return '退款中'") &&
-  honestyCopy.includes("return '渠道已受理未确认'")
+  honestyCopy.includes("return '渠道已受理未确认'") &&
+  honestyCopy.includes("return '部分退款'") &&
+  honestyCopy.includes("return '已出纸退款失败'") &&
+  honestyCopy.includes("return '待人工'")
 ) {
-  pass('opsAttentionText covers all three server codes with Chinese labels and returns null otherwise')
+  pass('opsAttentionText covers the server codes with Chinese labels and returns null otherwise')
 } else {
-  fail('opsAttentionText must map refund_required/refunding/channel_accepted_unconfirmed to Chinese and null for unknown')
+  fail('opsAttentionText must map refund_required/refunding/channel_accepted_unconfirmed/partial_refunded/paper_refund_failed/print_return_manual to Chinese and null for unknown')
 }
 
 // API-20 人工发起退款：待退款信号单必须二次确认后才走 canonical refundOrder。
