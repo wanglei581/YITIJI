@@ -9,6 +9,7 @@ import {
   VIRTUAL_PAY_QUERY_MIN_AGE_MS,
   VirtualPayReconcileService,
 } from '../../src/virtual-pay/virtual-pay-reconcile.service'
+import { VIRTUAL_PAY_HTTP_TIMEOUT_MS } from '../../src/virtual-pay/virtual-pay-xpay-client'
 
 const MEMBER = 'vpay-notify-member'
 const OPEN_ID = 'openid-notify-member'
@@ -146,7 +147,80 @@ export async function assertVirtualPayNotifyProvideGoods(options: {
       orderBy: { createdAt: 'desc' },
     })
     assert.equal(JSON.parse(failDiag.payloadJson).reason, 'notify_provide_goods_failed')
-    console.log('PASS 查单补记(2/3)后按官方规范幂等调用 notify_provide_goods；状态 4 不重复调；通知失败不回滚权益')
+
+    // 7d: 首单 notify_provide_goods / query_order 挂起必须触发 AbortSignal.timeout，不阻塞同批第二单
+    assert.equal(VIRTUAL_PAY_HTTP_TIMEOUT_MS, 10_000)
+    await createOrder(prisma, 'vpntfhang001a', dueAt + 6000, 0, 'pending')
+    await createOrder(prisma, 'vpntfhang002b', dueAt + 7000, 0, 'pending')
+    await createOrder(prisma, 'vpqryhang001a', dueAt + 8000, 0, 'pending')
+    await createOrder(prisma, 'vpqryhang002b', dueAt + 9000, 0, 'pending')
+
+    const hangNotified: string[] = []
+    const hangQueried: string[] = []
+    const hangFetch: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('stable_token')) return json({ access_token: TOKEN, expires_in: 7200 })
+      const parsedBody = JSON.parse(String(init?.body ?? '{}')) as { order_id: string; env: number }
+      if (url.includes('/xpay/notify_provide_goods')) {
+        if (parsedBody.order_id === 'vpntfhang001a') {
+          return waitForAbortSignal(init?.signal)
+        }
+        hangNotified.push(parsedBody.order_id)
+        return new Response('', { status: 200 })
+      }
+      if (!url.includes('/xpay/query_order')) throw new Error(`unexpected url ${url.split('?')[0]}`)
+      hangQueried.push(parsedBody.order_id)
+      if (parsedBody.order_id === 'vpqryhang001a') {
+        return waitForAbortSignal(init?.signal)
+      }
+      return json({
+        errcode: 0,
+        errmsg: 'ok',
+        order: {
+          order_id: parsedBody.order_id,
+          status: 2,
+          paid_fee: PRICE,
+          env_type: 1,
+          wx_order_id: `WX_${parsedBody.order_id}`,
+          paid_time: Math.floor(now.getTime() / 1000),
+        },
+      })
+    }) as typeof fetch
+
+    const startedAt = Date.now()
+    await withTimeoutGuard(
+      svc.reconcileOnce(now, hangFetch, { httpTimeoutMs: 80 }),
+      2000,
+      '首单 notify_provide_goods/query_order 挂起超时保护触发：请求未设置 AbortSignal.timeout 阻塞了同批后续单',
+    )
+    const elapsedMs = Date.now() - startedAt
+    assert.ok(elapsedMs < 1500, `带 80ms 超时的挂起批次应迅速返回，实际=${elapsedMs}ms`)
+
+    assert.equal(await statusOf(prisma, 'vpntfhang001a'), 'paid', '首单 notify 超时不得回滚 paid')
+    assert.equal(await creditsOf(prisma, 'vpntfhang001a'), 1, '首单 notify 超时不得回滚权益')
+    const hangNotifyDiag = await prisma.auditLog.findFirstOrThrow({
+      where: { action: VIRTUAL_PAY_DIAGNOSTIC_ACTION, targetId: 'vpntfhang001a' },
+      orderBy: { createdAt: 'desc' },
+    })
+    assert.equal(JSON.parse(hangNotifyDiag.payloadJson).reason, 'notify_provide_goods_failed')
+    assert.equal(await statusOf(prisma, 'vpntfhang002b'), 'paid', '首单 notify 挂起超时后同批第二单必须正常查单补记')
+    assert.equal(await creditsOf(prisma, 'vpntfhang002b'), 1)
+    assert.equal(hangNotified.includes('vpntfhang002b'), true)
+
+    const qryHangRow = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { outTradeNo: 'vpqryhang001a' } })
+    assert.equal(qryHangRow.status, 'pending')
+    assert.equal(qryHangRow.queryFailCount, 1, 'query_order 挂起超时应记失败 1 次')
+    const qryHangDiag = await prisma.auditLog.findFirstOrThrow({
+      where: { action: VIRTUAL_PAY_DIAGNOSTIC_ACTION, targetId: 'vpqryhang001a' },
+      orderBy: { createdAt: 'desc' },
+    })
+    assert.equal(JSON.parse(qryHangDiag.payloadJson).reason, 'query_failed')
+    assert.equal(await statusOf(prisma, 'vpqryhang002b'), 'paid', 'query_order 挂起超时后同批后续单必须正常补记')
+    assert.equal(await creditsOf(prisma, 'vpqryhang002b'), 1)
+    assert.equal(hangQueried.includes('vpqryhang002b'), true)
+    await prisma.virtualPayOrder.update({ where: { outTradeNo: 'vpqryhang001a' }, data: { status: 'closed' } })
+
+    console.log('PASS 查单补记(2/3)后按官方规范幂等调用 notify_provide_goods；状态 4 不重复调；通知与查单挂起超时均不阻塞同批后续单')
   } finally {
     restoreEnv(saved)
   }
@@ -181,6 +255,36 @@ async function statusOf(prisma: PrismaService, outTradeNo: string): Promise<stri
 async function creditsOf(prisma: PrismaService, outTradeNo: string): Promise<number> {
   const row = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { outTradeNo } })
   return prisma.memberServiceCredit.count({ where: { sourceOrderId: row.id } })
+}
+
+function waitForAbortSignal(signal: AbortSignal | null | undefined): Promise<Response> {
+  return new Promise<Response>((_resolve, reject) => {
+    if (!signal) return
+    if (signal.aborted) {
+      reject(signal.reason ?? new DOMException('Aborted', 'TimeoutError'))
+      return
+    }
+    signal.addEventListener(
+      'abort',
+      () => reject(signal.reason ?? new DOMException('Aborted', 'TimeoutError')),
+      { once: true },
+    )
+  })
+}
+
+async function withTimeoutGuard<T>(task: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      task,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs)
+        timer.unref()
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 function json(body: unknown): Response {

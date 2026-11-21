@@ -2,6 +2,7 @@ import { calcPaySig } from './virtual-pay-sign'
 
 const QUERY_URI = '/xpay/query_order'
 const NOTIFY_PROVIDE_GOODS_URL = 'https://api.weixin.qq.com/xpay/notify_provide_goods'
+export const VIRTUAL_PAY_HTTP_TIMEOUT_MS = 10_000
 
 export interface WechatQueryOrderResponse {
   errcode?: number
@@ -25,7 +26,9 @@ export async function queryWechatVirtualPayOrder(input: {
   appKey: string
   token: string
   fetchImpl: typeof fetch
+  timeoutMs?: number
 }): Promise<WechatQueryOrderResponse> {
+  const timeoutMs = input.timeoutMs ?? VIRTUAL_PAY_HTTP_TIMEOUT_MS
   const body = JSON.stringify({ openid: input.openId, env: input.env, order_id: input.orderId })
   const paySig = calcPaySig(QUERY_URI, body, input.appKey)
   const url =
@@ -36,6 +39,7 @@ export async function queryWechatVirtualPayOrder(input: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,
+    signal: AbortSignal.timeout(timeoutMs),
   })
   if (!response.ok) throw new Error('VPAY_QUERY_HTTP')
   return (await response.json()) as WechatQueryOrderResponse
@@ -50,7 +54,9 @@ export async function notifyWechatProvideGoods(input: {
   env: number
   token: string
   fetchImpl: typeof fetch
+  timeoutMs?: number
 }): Promise<boolean> {
+  const timeoutMs = input.timeoutMs ?? VIRTUAL_PAY_HTTP_TIMEOUT_MS
   const body = JSON.stringify({ order_id: input.orderId, env: input.env })
   const url = `${NOTIFY_PROVIDE_GOODS_URL}?access_token=${encodeURIComponent(input.token)}`
   try {
@@ -58,6 +64,7 @@ export async function notifyWechatProvideGoods(input: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!response.ok) return false
     const text = (await response.text()).trim()

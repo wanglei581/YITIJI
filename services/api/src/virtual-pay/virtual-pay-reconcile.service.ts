@@ -68,7 +68,11 @@ export class VirtualPayReconcileService {
     return this.reconcileOnce(new Date())
   }
 
-  async reconcileOnce(now: Date, fetchImpl: typeof fetch = fetch): Promise<void> {
+  async reconcileOnce(
+    now: Date,
+    fetchImpl: typeof fetch = fetch,
+    options?: { httpTimeoutMs?: number },
+  ): Promise<void> {
     const runtime = evaluateMiniappVirtualPayRuntime()
     if (!runtime.ready || !runtime.appKey) {
       const pendingCount = await this.prisma.virtualPayOrder.count({ where: { status: 'pending' } })
@@ -104,10 +108,10 @@ export class VirtualPayReconcileService {
     }
     this.lastGlobalDiagnostic = null
     for (const order of due) {
-      await this.reconcileOrder(order, token, false, now, fetchImpl)
+      await this.reconcileOrder(order, token, false, now, fetchImpl, options?.httpTimeoutMs)
     }
     for (const order of expired) {
-      await this.reconcileOrder(order, token, true, now, fetchImpl)
+      await this.reconcileOrder(order, token, true, now, fetchImpl, options?.httpTimeoutMs)
     }
   }
 
@@ -117,6 +121,7 @@ export class VirtualPayReconcileService {
     expired: boolean,
     now: Date,
     fetchImpl: typeof fetch,
+    httpTimeoutMs?: number,
   ): Promise<void> {
     if (!order.openId) {
       await this.diagnoseOrder(order, 'openid_mismatch')
@@ -130,7 +135,7 @@ export class VirtualPayReconcileService {
     }
     let outcome: QueryOutcome
     try {
-      outcome = await this.queryOne({ ...order, openId: order.openId }, orderAppKey, token, fetchImpl)
+      outcome = await this.queryOne({ ...order, openId: order.openId }, orderAppKey, token, fetchImpl, httpTimeoutMs)
     } catch {
       await this.recordQueryFailure(order, now, 'query_failed', fetchImpl)
       return
@@ -158,6 +163,7 @@ export class VirtualPayReconcileService {
     appKey: string,
     token: string,
     fetchImpl: typeof fetch,
+    httpTimeoutMs?: number,
   ): Promise<QueryOutcome> {
     const data = await queryWechatVirtualPayOrder({
       openId: order.openId,
@@ -166,6 +172,7 @@ export class VirtualPayReconcileService {
       appKey,
       token,
       fetchImpl,
+      timeoutMs: httpTimeoutMs,
     })
     if (data.errcode !== 0 || !data.order || typeof data.order.status !== 'number') {
       return { kind: 'error', reason: 'query_failed' }
@@ -205,6 +212,7 @@ export class VirtualPayReconcileService {
         env: order.env,
         token,
         fetchImpl,
+        timeoutMs: httpTimeoutMs,
       })
       if (!notified) {
         await this.diagnoseOrder(order, 'notify_provide_goods_failed')
