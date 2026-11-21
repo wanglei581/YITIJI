@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-21：一体机付款屏到点核实端到端闭合与统一节流退避（P2e-1c，分支 `claude/kiosk-pay-service-p2e1`，未推送）
+
+- 来由：补全线第三十任依据 Codex 独立复收 `6819fb0c8` 暴露的 2 处精确缺陷派发的极小范围收口返工，从 `6819fb0c8` 继续按 2 项逐项提交，所有改动/新增业务源码保持 `< 500` 行，未新增数据库迁移、未触碰 P2e-2/3/4 业务页与生产配置。
+- 到点核实端到端闭合（必改 1）：
+  - 后端 `services/api/src/payment/service-order.service.ts`：`getForSession` 在 `refresh && row.status === 'pending'` 时不再被 `row.expiresAt.getTime() > Date.now()` 阻断，有 `provider.queryPayment` 时照常查渠道——`paid`（流水/金额匹配）走 `markServiceOrderPaid` 且 `checking: false`、`failed` 标 `paymentFailed: true` 且 `checking: false`、`closed` 设 `checking: false`、`pending` 仅未过期时保持 `checking: true`（已过期确认未付设 `checking: false`）、`unknown` 或查询抛异常保持 `checking: true`；无 `queryPayment`（`sandbox`）则未过期保持 `checking: true`、已过期设 `checking: false`。`verify-service-order-sandbox-simulate.ts` 补齐已过 `expiresAt` 待付单 `refresh=1` 的真 HTTP 回归（`paid` / 抛错 / `unknown` / `pending` / `closed` / `failed` / 沙箱过期）。
+  - 前端 `apps/kiosk/src/services/api/serviceOrders.ts` + `usePayServiceFlow.ts`：`serviceOrderPhase` 在 `pending` 下调整为 `paymentFailed` → `checking` → `serviceOrderExpiredLocally`，不再把服务端 `200 + pending + checking: true` 抢判成 `timed_out`；`usePayServiceFlow.ts` 增加 `postExpiryChecking` 续查态，到点 `refresh=1` 返回 `checking: true` 后保持轮询激活并每 `>= 10s` 自动续查 `refresh=1`，续查期间普通 GET 返回 `checking: false` 不抢判 `timeout`，仅在 `fromRefresh === true && checking === false` 或 `status !== 'pending'` 时收口；未过期期间普通查单 `checking: false` 仍立即复位回 `wait`。
+- 统一节流、每分钟上限与 429 退避（必改 2）：
+  - 抽出零运行时依赖的 `apps/kiosk/src/pages/pay/payPollGuard.ts`（150 行），让常规轮询、手动刷新、到点自动核实、`lookup`/`close_failed`「再查一次」四条路径（及重载恢复 `enter`）共用同一份 `lastRefreshAt`、`getLog`（60 秒窗口 28 次封顶）、`rateLimitHits`、`backoffUntil`；到点核实若距上次刷新不足 10 秒、处于退避期或满 28 次则通过定时器推迟至允许时刻发送（卸载/换单/离页自动清理）；`lookup`/`close_failed`「再查一次」与到点核实遇 `429 / RATE_LIMITED / RECONCILE_TOO_FREQUENT` 均走 `recordRateLimit` 尊重 `Retry-After` 并置 `rateLimited: true`，`PayServicePage.tsx` 同步在 `lookup`/`close_failed` 渲染限流温和提示。
+  - 新增 `apps/kiosk/scripts/tests/pay-poll-guard.test.mjs`（6 条单测与源码流程回归，挂入 `verify:kiosk-session-reporting`），`apps/kiosk/tests/visual/pay-service.spec.ts` 扩至 26 条（补齐到点 `checking: true` 12 秒后承接晚到 `paid`、到点前 1 秒手动核实推迟到 `>= 10000ms`、`lookup` 429 `Retry-After: 15` 退避期内连点 3 次发 0 次并过期后恢复 3 条精确回归）。
+- 验证：本机跑通 API `verify:service-orders`（38 PASS）、`verify:service-orders-concurrency`（21 PASS）、`verify:service-order-sandbox-simulate`（8 PASS）；`kiosk`/`api` `tsc --noEmit`、改动文件 `eslint --quiet`、`verify:kiosk-session-reporting`（21/21）、`verify:backend-error-copy-coverage`、`verify:fusion-w6`、`verify:kiosk-frontend-debt`、`verify:kiosk-unattended-copy`、`verify:kiosk-ai-declaration`、`blk.sh` 锁下 Playwright `pay-service.spec.ts`（26/26）与 W6 `/pay/`（3/3）、3 条反向变异 M1–M3 红绿复核、`generate-project-graph --check`、`verify-ci-gate-coverage` 与 `verify-repository-integrity`。未推送，未上线。
+
 ## 2026-11-21：一体机按次付款屏地基返工（P2e-1b，分支 `claude/kiosk-pay-service-p2e1`，未推送）
 
 - 来由：补全线第三十任依据 Codex 独立收货结论（针对 `a22cbb25d`）派发的 P2e-1b 返工，从 `a22cbb25d` 继续小步提交，手写修改 14 个文件。未碰 `apps/admin/`、`apps/partner/`、`apps/miniapp/`、数据库 schema/迁移与生产配置。

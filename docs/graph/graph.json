@@ -15370,7 +15370,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 854,
+      "reachableFileCount": 855,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -18562,7 +18562,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1043
+      "sourceFileCount": 1044
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -31100,6 +31100,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-service-order-sandbox-simulate.ts",
       "services/api/scripts/verify-service-orders-concurrency.ts"
     ],
     "services/api/src/payment/payment-session-token.ts": [
@@ -50306,6 +50307,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/service-order-verify-fixture.ts",
+          "services/api/src/payment/payment-provider.types.ts",
           "services/api/src/payment/service-order.payment.ts"
         ],
         "missing": []
