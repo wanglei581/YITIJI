@@ -22,7 +22,7 @@ import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeV6ActionId } from '../homeV6Domains'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
-import { campusCopy, greetingWord, jobCopy } from '../homeTouchCopy'
+import { campusCopy, greetingWord, homePriceLines, jobCopy } from '../homeTouchCopy'
 import '../styles/home-touch.css'
 import { HomeFreeBadge } from './HomeFreeBadge'
 import { HomeIdentityActions } from './HomeIdentityActions'
@@ -81,6 +81,8 @@ export function HomeTouchView({
   const priceSnapshot = useKioskHomePriceSnapshot()
   const showFreeBadge = priceSnapshot.badge
   const priceNotice = priceSnapshot.charged ? '收费以现场公示为准' : null
+  // 三张收费入口卡的短价：同一轮五个价都读到、并且这台机器在收费才画；读不齐一行不画。
+  const cardPrice = homePriceLines(priceSnapshot.prices)
   const [now, setNow] = useState(() => new Date())
   const [introDone, setIntroDone] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -204,13 +206,14 @@ export function HomeTouchView({
       {winding ? <p className="qxt-remind" role="status">{machineUnusableLine(contact)}</p> : null}
       <div className="qxt-home-go" data-testid="home-context-region">{continueSlot}</div>
       <div className="qxt-home-tasks">
-        <QxTouchTask held={winding} note={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} actionId="resume-hub" icon="file" title="改简历" desc="上传或扫描，诊断、优化或生成新简历，改不改你定" chip="AI 诊断改写" chipAi take="带走：新简历" takeIcon="check" visual={<QxTouchArtResume />} index={1} onClick={() => onAction('resume-hub')} />
-        <QxTouchTask held={winding} note={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} actionId="interview-hub" icon="mic" title="练面试" desc="回答常见问题，当场看反馈，不做录用判断" chip="AI 模拟面试" chipAi take="带走：面试反馈" takeIcon="check" visual={<QxTouchArtReport />} index={2} onClick={() => onAction('interview-hub')} />
+        <QxTouchTask held={winding} note={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} actionId="resume-hub" icon="file" title="改简历" priceLines={cardPrice?.resume} desc="上传或扫描，诊断、优化或生成新简历，改不改你定" chip="AI 诊断改写" chipAi take="带走：新简历" takeIcon="check" visual={<QxTouchArtResume />} index={1} onClick={() => onAction('resume-hub')} />
+        <QxTouchTask held={winding} note={winding ? LICENSE_NO_NEW_TASK_REASON : undefined} actionId="interview-hub" icon="mic" title="练面试" priceLines={cardPrice?.interview} desc="回答常见问题，当场看反馈，不做录用判断" chip="AI 模拟面试" chipAi take="带走：面试反馈" takeIcon="check" visual={<QxTouchArtReport />} index={2} onClick={() => onAction('interview-hub')} />
         <QxTouchTask
           held={winding}
           actionId="print-hub"
           icon="printer"
           title="打印 · 扫描"
+          priceLines={cardPrice?.print}
           desc="手机扫码传文件、插 U 盘，或扫描原件"
           chip={printChip}
           chipTone={device.printerReady && !device.loading ? 'ghost' : 'clay'}
@@ -252,8 +255,9 @@ export function HomeTouchView({
         <p>
           <span data-testid="home-recruitment-boundary">{boundary}</span>
           {' · 本机不替你投递 · AI 生成的内容都会标明，仅供参考'}
-          {priceNotice ? ` · ${priceNotice}` : ''}
           {` · 离开 ${publicIdleLogoutLabel()} 无操作自动退出登录`}
+          {/* 稿 pay-1113.js：收费句接在自动退出登录后面，整句不拆到两行。 */}
+          {priceNotice ? <>{' · '}<span className="qxt-home-keep">{priceNotice}</span></> : null}
           {' · 打开本人文档、诊断报告或优化结果后 '}
           {resultIdleLogoutLabel()}
           {' 无操作自动退出'}

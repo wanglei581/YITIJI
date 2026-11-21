@@ -58,6 +58,7 @@
 | 37 | 审计日志 | 同意、删除、管理员访问文件等动作 | 可能含会员关联和 IP；个人信息属性由字段决定 | 待律师确认（项目标签） | 关键动作写审计 | 两份期限文件未写天数。`services/api/src` 内未找到 `auditLog.delete` | 未发现定时删除 | `AuditLog`（`schema.prisma:2298`） | 审计人员。角色清单未在本表重列；不以此表替代网络日志判断 |
 | 38 | 本机未领取扫描件 | 扫描后尚未被本次办理取走的文件 | 扫描件通常是个人信息，可能是敏感个人信息 | 待律师确认 | 一体机扫描 | 最多 24 小时（`UNCLAIMED_MAX_AGE_MS`，`apps/terminal-agent/src/agent/scan-watcher.ts:122`） | 终端本机清扫。不是云上 cron | 终端本机目录，不在对象存储前缀表内 | 能接触那台机器的人。云上账号权限管不到这批文件 |
 | 39 | 本人自填的求职进度 | 公司名、岗位名、自述状态、备注 | 个人信息。状态由本人填写，不是企业回传。是否敏感：工作判断为否 | 一般。待律师确认 | 会员自己记一笔站外进展 | 未发现到期天数。账号存在期间，本人可删 | 未发现定时删除。本人删除走 `jobApplication.deleteMany`（`job-applications.service.ts:259`）。创建在同文件 `:173` | `JobApplication`（`schema.prisma:2138`–`:2176`）。`channel` 默认 `external_self_reported`，`statusSource` 默认 `self_reported`。代码注释写 `resumeFileId`、`consentId` 默认为空，实际数据仍需按接口核对 | 本人。导出映射会读出摘要（`member-data-export.mapper.ts:175`）。字段设计不等于已完成接口隔离，本次未逐个查询接口 |
+| 40 | 发票信息（抬头、税号、邮箱） | 个人写姓名，单位写单位名称和统一社会信用代码，加上接收邮箱；另有实付金额快照和状态 | 姓名抬头和邮箱能对应到本人，属个人信息。统一社会信用代码指向单位。个人不收集身份证号。是否敏感：工作判断为否 | 一般 | 本人在手机网页或会员接口提交开票申请，用来开电子发票（普通发票）并把发票发到所填邮箱 | 申请行随订单留存，未发现按天删除整行。邮箱：已开或已退回默认 90 天（`readInvoiceEmailRetentionDays`，环境变量 `INVOICE_EMAIL_RETENTION_DAYS`，单独设，不跟第 25 行 AI 服务日志的天数走）。已提交、尚未开出或退回的邮箱不按这 90 天清除 | 注销时个人抬头改为去标识、邮箱清空；退回原因里本人在任何一份申请填过的姓名抬头和邮箱、以及其余像邮箱的串一并擦掉；已提交未处理的申请转已退回，原因只写「会员已注销」（`deidentifyClosedMemberInvoices`，`member-closure-retention.ts`）。退回的审计只记原因长度和「原因见申请」，不写原文（`admin-invoice.service.ts`）。已开或已退回满期由 `InvoiceEmailCleanupTask` 每小时清空邮箱（`invoice-email-cleanup.task.ts`）。单位名称和税号不在这两步删除 | `InvoiceRequest`（`schema.prisma` 开票申请，约 `:1104`） | 本人查自己的申请（会员接口与会员数据导出里的税号、邮箱都只给打码后的样子，见 `docs/api/member-invoice-requests.md`）。管理员在订单详情看这一单的完整值。一体机轮询不返回税号和邮箱 |
 
 已批准、矩阵写明未实施的两类，不放入上表，也不写成正在收集：简历智能上下文会话建议、`ResumeProfileSnapshot`。矩阵要求实现前不得描述为已上线。本次未再搜索同名模型。
 
@@ -69,6 +70,7 @@
 | --- | --- | --- |
 | 24 小时 | `AI_RESUME_RESULT_TTL_HOURS` | AI 简历结果、自我探索结果、岗位 AI 会话 |
 | 90 天 | `AI_SERVICE_LOG_RETENTION_DAYS` | AI 服务日志、AI 用量明细 |
+| 90 天 | `INVOICE_EMAIL_RETENTION_DAYS` | 已开或已退回的开票邮箱 |
 | 24 小时 | `ADVISOR_SESSION_TTL_HOURS` | 顾问会话 |
 | 24 小时 | `ADVISOR_ARTIFACT_TTL_HOURS` | 顾问产物 |
 | 30 天 | `ACTIVITY_LOG_TTL_DAYS` | 浏览、外部跳转记录 |
@@ -103,12 +105,13 @@
 9. 会员矩阵脚注仍写：AI 助手对话与模拟面试转写送模型仍是原文。候选版本里，小青文字和模拟面试文字路径已有遮盖调用；语音对话不经我方遮盖。脚注与代码不再同一句话。遮盖细节写在个人信息保护影响评估里，本表只标这个差异。
 10. 第 4、5、6、7、8、9、18、33、34、35、36、37、38、39 行，两份主表没有单独列出，或只被更大的一行盖住。期限来自代码默认值，或写明未发现定时删除。
 11. 模拟面试回合和报告在 schema 里声明级联删除。生产 PostgreSQL 是否建成此外键，未验证。也未逐行对照 Postgres schema 文件。
-12. 下列默认值都能被环境变量覆盖：`AI_RESUME_RESULT_TTL_HOURS`、`AI_SERVICE_LOG_RETENTION_DAYS`、`ADVISOR_SESSION_TTL_HOURS`、`ADVISOR_ARTIFACT_TTL_HOURS`、`ACTIVITY_LOG_TTL_DAYS`、`KIOSK_SESSION_RETENTION_DAYS`、`TERMINAL_HEARTBEAT_RETENTION_DAYS`、`MEMBER_EXPORT_TICKET_TTL_SECONDS`、`MEMBER_EXPORT_CLAIM_TTL_SECONDS`。生产现值未读；会员会话还存在代码常量与 guard 配置差异，需按运行路径核对。
+12. 下列默认值都能被环境变量覆盖：`AI_RESUME_RESULT_TTL_HOURS`、`AI_SERVICE_LOG_RETENTION_DAYS`、`INVOICE_EMAIL_RETENTION_DAYS`、`ADVISOR_SESSION_TTL_HOURS`、`ADVISOR_ARTIFACT_TTL_HOURS`、`ACTIVITY_LOG_TTL_DAYS`、`KIOSK_SESSION_RETENTION_DAYS`、`TERMINAL_HEARTBEAT_RETENTION_DAYS`、`MEMBER_EXPORT_TICKET_TTL_SECONDS`、`MEMBER_EXPORT_CLAIM_TTL_SECONDS`。生产现值未读；会员会话还存在代码常量与 guard 配置差异，需按运行路径核对。
 13. 账号注销线上返回 `ACCOUNT_CLOSURE_NOT_AVAILABLE` /“账号注销暂未开放”。隐私政策应写“目前由我们人工处理”；本次未找到可执行的会员人工注销后台或脚本，因此“随账号删除”在当前试点尚未形成可执行闭环，C1 已列为第一优先改进。
 14. 矩阵里的简历智能上下文、`ResumeProfileSnapshot` 仍是未实施。代码侧本次未把它们列入正在收集。
 15. 网络安全日志「不少于 6 个月」对应现行《网络安全法》第二十三条第三项，不是第二十一条。它写在试点制度第 1 条，不是这两份期限文件的一行，也没有对应到 `AuditLog` 的清理任务。Nginx、API、Windows/主机系统日志的实际保留均未核实，不能用其中一类推定其他类。
 16. 改保存期限时，不需要同意的策略会把同意字段写成空（`retention-policy.ts:170`–`:171`）。是否另写审计，未核实。同意没有历史表。
 17. 本人自填的求职进度已补为第 39 行。两份期限文件原先没有这一行。导出文案还提到权益（`packages/shared/src/types/memberPrivacy.ts:26`）。`BenefitGrant` 在 `schema.prisma:2201`。它的字段和保存期本次未摘完，所以没有单独成行。
+18. 发票信息已补为第 40 行。邮箱的 90 天单独由 `INVOICE_EMAIL_RETENTION_DAYS` 设（`invoice-email-retention.ts` 的 `readInvoiceEmailRetentionDays`），不再借用第 25 行 AI 服务日志的天数：运维为压缩 AI 日志调小那个值时，不会连带提前清掉已开发票的邮箱。申请整行没有按天删除，和打印订单一样属于未发现定时删除的财务留痕；多出来的只是邮箱字段到期清空。退回原因由管理员手写，可能写到姓名或邮箱；审计按现有口径不改写（试点合规流程「注销」第 8 条把审计列为去标识后保留，注销代码不改写审计，注销门禁对历史审计只给精确字段豁免并写明「历史审计不改写，待合规裁定」，见 `scripts/support/member-closure-verification.ts`），所以从源头上不让原因原文进审计。曾把原因原文写进审计的只有开票第一包分支（`claude/invoice-p2c-1119`），它没有合并、没有上线，线上没有这类存量审计，不需要回头处理。
 
 ## 待律师确认的事项
 

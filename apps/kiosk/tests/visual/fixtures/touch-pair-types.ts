@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
 
-export type PairItem = '打印' | '简历' | '面试' | '政策' | '扫描' | '状态样式板'
+export type PairItem = '打印' | '简历' | '面试' | '政策' | '扫描' | '状态样式板' | '付款'
 export type PairStatus = 'paired' | 'runtime-missing' | 'draft-missing'
 
 export interface TouchPair {

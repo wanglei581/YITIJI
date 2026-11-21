@@ -1,12 +1,13 @@
 import { randomBytes } from 'node:crypto'
 import { BadRequestException, Logger } from '@nestjs/common'
-import { deliverOpsAlert } from '../admin-ops/admin-alert-push.service'
 import { AuditService } from '../audit/audit.service'
 import type { PrismaService } from '../prisma/prisma.service'
 import { getEffectiveUserPrices } from './effective-user-prices'
 import type { PaymentCallbackEvent, PaymentProvider } from './payment-provider.types'
 import type { PaymentProviderRegistry } from './payment-provider.factory'
 import type { RefundNotifyEvent, RefundQueryResult } from './payment-provider.types'
+import { isChannelAbnormal } from './refund-abnormal'
+import { deliverServiceRefundAlert, noteServiceRefundAbnormal } from './service-order-refund-abnormal'
 import {
   SERVICE_REFUND_BACKOFF_MS,
   SERVICE_REFUND_LEASE_MS,
@@ -255,6 +256,9 @@ export async function executeServiceOrderRefund(
       }
       return markRefunded(db, audit, existing, reason, refundNo, result.channelRefundNo)
     }
+    if (isChannelAbnormal(result)) {
+      return noteServiceRefundAbnormal(db, audit, redis, existing, { channelRefundNo: result.channelRefundNo, source: 'refund' })
+    }
     if (result.status === 'failed') return markRefundFailed(db, redis, existing.id, manual)
     await noteStillProcessing(db, redis, existing)
     return 'refunding'
@@ -279,6 +283,9 @@ async function applyRefundQuery(
   queried: RefundQueryResult,
   manual: boolean,
 ): Promise<'refunded' | 'refunding' | 'refund_failed' | 'skipped'> {
+  if (isChannelAbnormal(queried)) {
+    return noteServiceRefundAbnormal(db, audit, redis, existing, { channelRefundNo: queried.channelRefundNo, source: 'query' })
+  }
   if (queried.status === 'success') {
     if (amountMismatch(queried.refundAmountCents, existing.amountCents)) {
       return markRefundFailed(db, redis, existing.id, manual)
@@ -292,9 +299,11 @@ async function applyRefundQuery(
   return markRefundFailed(db, redis, existing.id, manual)
 }
 
-function serviceRefundNotifyKey(event: Pick<RefundNotifyEvent, 'refundNo' | 'status' | 'refundAmountCents' | 'channelRefundNo'>): string {
+function serviceRefundNotifyKey(
+  event: Pick<RefundNotifyEvent, 'refundNo' | 'status' | 'refundState' | 'refundAmountCents' | 'channelRefundNo'>,
+): string {
   const amount = event.refundAmountCents === null || event.refundAmountCents === undefined ? '' : String(event.refundAmountCents)
-  return `${event.refundNo}|${event.status}|${event.channelRefundNo ?? ''}|${amount}`
+  return `${event.refundNo}|${event.status}|${event.refundState ?? ''}|${event.channelRefundNo ?? ''}|${amount}`
 }
 
 /**
@@ -305,7 +314,7 @@ export async function settleServiceRefundNotify(
   db: PrismaService,
   audit: AuditService,
   redis: RefundRedis | null,
-  event: Pick<RefundNotifyEvent, 'refundNo' | 'status' | 'refundAmountCents' | 'channelRefundNo'>,
+  event: Pick<RefundNotifyEvent, 'refundNo' | 'status' | 'refundState' | 'refundAmountCents' | 'channelRefundNo'>,
 ): Promise<{ handled: true; idempotent?: boolean }> {
   const prefix = 'svc-rfd-'
   if (!event.refundNo.startsWith(prefix)) return { handled: true }
@@ -337,6 +346,12 @@ export async function settleServiceRefundNotify(
       db, audit, row, row.refundReason ?? SERVICE_REFUND_REASON_LATE_PAYMENT, event.refundNo, event.channelRefundNo,
     )
     return { handled: true, idempotent: updated !== 'refunded' }
+  }
+  if (isChannelAbnormal(event)) {
+    if (row.status === 'refunding' || row.status === 'refund_failed') {
+      await noteServiceRefundAbnormal(db, audit, redis, row, { channelRefundNo: event.channelRefundNo, source: 'notify' })
+    }
+    return { handled: true }
   }
   if (row.status === 'refunding' || row.status === 'refund_failed') {
     await markRefundFailed(db, redis, row.id, false)
@@ -425,7 +440,7 @@ async function noteStillProcessing(db: PrismaService, redis: RefundRedis | null,
     },
   })
   if (tries >= SERVICE_REFUND_BACKOFF_MS.length) {
-    await alertRefund(redis, existing.id, `processing-window-${existing.refundAttempts}`)
+    await deliverServiceRefundAlert(redis, existing.id, `processing-window-${existing.refundAttempts}`)
   }
 }
 
@@ -452,31 +467,9 @@ async function markRefundFailed(
       where: { id: orderId, status: 'refunding' },
       data: { status: 'refund_failed', nextRefundAt: null, refundLeaseUntil: null },
     })
-    await alertRefund(redis, orderId, `refund-failed-${attempts}`)
+    await deliverServiceRefundAlert(redis, orderId, `refund-failed-${attempts}`)
     return 'refund_failed'
   }
-  await alertRefund(redis, orderId, `refund-${attempts}`)
+  await deliverServiceRefundAlert(redis, orderId, `refund-${attempts}`)
   return 'refunding'
-}
-
-async function alertRefund(redis: RefundRedis | null, orderId: string, episodeToken: string): Promise<void> {
-  if (!redis) return
-  try {
-    await deliverOpsAlert({
-      redis,
-      webhook: process.env['ALERT_WEBHOOK_URL']?.trim() || null,
-      fetchImpl: fetch,
-      alert: {
-        subjectKey: `service-order:${orderId}`,
-        episodeToken,
-        type: 'service_order_refund_failed',
-        severity: 'error',
-        title: '服务单退款失败',
-        terminalCode: null,
-      },
-      state: 'firing',
-    })
-  } catch {
-    // 告警失败不改变退款状态。
-  }
 }

@@ -827,6 +827,7 @@ async function loadClearance() {
     .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)
     .replaceAll("from '../services/api/aiSessionForget'", `from '${toDataUrl('export function forgetAiSessions() {}\n')}'`)
+    .replaceAll("from '../services/serviceTrip'", `from '${leaf('src/services/serviceTrip.ts')}'`)
   const sensitive = await import(toDataUrl(sensitiveCode))
   const declaration = await import(sessionUrl)
   return { sensitive, declaration, session, resumeDraft: await import(resumeDraftUrl), draftHooks: await import(draftHooksUrl) }

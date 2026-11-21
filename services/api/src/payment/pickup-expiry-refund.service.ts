@@ -11,6 +11,7 @@ import {
   payableCents,
 } from './pending-refund-signal'
 import { PICKUP_VALIDITY_FROM_PAYMENT_MS } from './pickup-validity'
+import { parkClosedWindowUnprinted, settleClosedWindowUnprinted } from './closed-window-unprinted'
 import { RefundService } from './refund.service'
 
 /** 自动整单退的稳定原因。refundNo 仍是 `RFD-<orderNo>`，重复跑命中同一笔。 */
@@ -24,6 +25,42 @@ export const PICKUP_EXPIRED_UNPICKED_REFUND_REASON = 'pickup_expired_unpicked'
 export const PAID_OUTPUT_ANOMALY_REFUND_REASON = 'paid_output_anomaly'
 
 const STARTED_OR_PRINTED = ['claimed', 'printing', 'completed'] as const
+
+/**
+ * 已付、窗口已关、纸还没领走也没出去。
+ * 到机放行后会挂上打印任务，取件状态变成 used。卡纸、脱机、还没领走都不能因为有任务就被漏掉。
+ */
+export function closedWindowUnprintedWhere(now: Date) {
+  return {
+    payStatus: 'paid' as const,
+    amountCents: { gt: 0 },
+    taskStatus: { notIn: [...STARTED_OR_PRINTED] },
+    // 出纸结果为空时，不能写成「不是 printed」：SQL 里 NULL 比较不是真，整行会被漏掉。
+    OR: [
+      { printTaskId: null },
+      {
+        printTask: {
+          is: {
+            status: { notIn: [...STARTED_OR_PRINTED] },
+            OR: [
+              { printOutcome: null },
+              { printOutcome: { not: 'printed' } },
+            ],
+          },
+        },
+      },
+    ],
+    AND: [
+      {
+        OR: [
+          { pickupStatus: { in: ['expired', 'cancelled'] } },
+          { pickupStatus: 'pending', pickupCodeExpiresAt: { lte: now } },
+          { pickupStatus: 'used', pickupCodeExpiresAt: { lte: now } },
+        ],
+      },
+    ],
+  }
+}
 
 export interface PickupExpiryRefundSweepResult {
   scanned: number
@@ -128,6 +165,23 @@ export class PickupExpiryRefundService {
       }
     }
 
+    const closedWindowRows = await this.prisma.order.findMany({
+      where: closedWindowUnprintedWhere(now),
+      orderBy: { paidAt: 'asc' },
+      take: limit,
+      select: { id: true },
+    })
+    result.scanned += closedWindowRows.length
+    for (const row of closedWindowRows) {
+      try {
+        const settled = await settleClosedWindowUnprinted(this.prisma, this.refunds, row.id)
+        if (settled === 'refunded') result.refunded += 1
+        else result.skipped += 1
+      } catch {
+        result.failed += 1
+      }
+    }
+
     const anomalyRows = await this.prisma.order.findMany({
       where: {
         channel: { in: ['miniapp_cloud', 'kiosk'] },
@@ -207,6 +261,28 @@ export class PickupExpiryRefundService {
       }
     }
     return result
+  }
+
+  /**
+   * 自动退开关关着时仍要给出去向。只对待窗口已关、纸还没出的已付单，
+   * 已经挂上任务但纸还没领走的也算。不调用退款，不改支付状态。
+   */
+  async parkClosedWindowWhenAutoRefundOff(opts: { now?: Date; limit?: number } = {}): Promise<{ parked: number; skipped: number }> {
+    const now = opts.now ?? new Date()
+    const rows = await this.prisma.order.findMany({
+      where: closedWindowUnprintedWhere(now),
+      orderBy: { paidAt: 'asc' },
+      take: opts.limit ?? 50,
+      select: { id: true },
+    })
+    let parked = 0
+    let skipped = 0
+    for (const row of rows) {
+      const result = await parkClosedWindowUnprinted(this.prisma, row.id)
+      if (result === 'manual') parked += 1
+      else skipped += 1
+    }
+    return { parked, skipped }
   }
 
   /** 材料包行或关联任务已经开始打印 / 已出纸。 */

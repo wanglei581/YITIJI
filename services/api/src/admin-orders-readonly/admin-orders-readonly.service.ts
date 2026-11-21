@@ -6,124 +6,24 @@ import {
   isChannelAcceptedUnconfirmedAttempt,
 } from '../payment/channel-accepted-signal'
 import {
-  isAdminRefundRequired,
-  isOnlineCollectedPendingRefund,
   ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES,
   ONLINE_PAID_PENDING_REFUND_REASON,
   PAID_UNFULFILLED_PENDING_REFUND_REASON,
+  payableCents,
 } from '../payment/pending-refund-signal'
+import { explainPrintRefund } from '../payment/print-return-disposition'
+import { staleSuccessUnprintedAttentionWhere } from '../payment/stale-success-unprinted-attention'
+import { remainderAmountCents } from '../payment/refund-remainder'
+import { orderHasRefundAtChannel } from '../payment/refund-channel-acceptance'
+import { CHANNEL_SUCCESS_CONFLICT_AUDIT } from '../payment/refund-channel-answer'
+import { channelRegistrationEntry } from '../payment/refund-channel-registration'
 import type {
   AdminOrderReadonlyDetail,
   AdminOrderReadonlyItem,
   AdminOrderReadonlyPage,
-  AdminOrderReadonlyPrintSummary,
   AdminOrderStatusLogItem,
 } from './admin-orders-readonly.types'
-
-interface OrderRow {
-  id: string
-  orderNo: string
-  type: string
-  printTaskId: string | null
-  sourceFileId: string | null
-  sourceFileName: string | null
-  printParamsJson: string | null
-  endUserId: string | null
-  terminalId: string | null
-  amountCents: number
-  billablePages: number | null
-  currency: string
-  payStatus: string
-  taskStatus: string
-  channel: string | null
-  pickupStatus: string
-  pickupCodeExpiresAt: Date | null
-  refundReason: string | null
-  refundedAt: Date | null
-  discountCents: number
-  refundedAmountCents: number
-  createdAt: Date
-  updatedAt: Date
-  copyJob: { state: string; resultCode: string | null } | null
-  printTask: {
-    id: string
-    terminalId: string | null
-    paramsJson: string
-    status: string
-    errorCode: string | null
-    printOutcome: string | null
-    createdAt: Date
-    completedAt: Date | null
-  } | null
-}
-
-interface LabelMaps {
-  userLabels: Map<string, string | null>
-  terminalCodes: Map<string, string>
-}
-
-const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
-
-function parsePrintOutcome(value: string | null | undefined): AdminOrderReadonlyItem['printOutcome'] {
-  if (value === 'printed' || value === 'not_printed') return value
-  return null
-}
-
-function deriveAftercare(
-  row: OrderRow,
-  channelAcceptedUnconfirmed: boolean,
-): Pick<
-  AdminOrderReadonlyItem,
-  | 'aftercareStatus'
-  | 'refundEligible'
-  | 'retryForbidden'
-  | 'printOutcome'
-  | 'refundRequired'
-  | 'opsAttention'
-  | 'opsAttentionCode'
-> {
-  if (row.type === 'copy') {
-    const unconfirmed = row.copyJob?.state === 'unconfirmed'
-    return { printOutcome: null, aftercareStatus: unconfirmed ? 'manual_check_required' : null,
-      refundEligible: false, retryForbidden: true, refundRequired: false,
-      opsAttention: unconfirmed, opsAttentionCode: unconfirmed ? 'copy_result_unconfirmed' : null }
-  }
-  const printOutcome = parsePrintOutcome(row.printTask?.printOutcome)
-  const unconfirmedFailure =
-    row.type === 'print' &&
-    row.taskStatus === 'failed' &&
-    row.printTask?.status === 'failed' &&
-    row.printTask.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE
-  const manualCheckRequired =
-    unconfirmedFailure && row.payStatus === 'paid' && printOutcome === null
-
-  return {
-    printOutcome,
-    aftercareStatus: manualCheckRequired ? 'manual_check_required' : null,
-    // 已确认出纸禁止退款；RefundService 仍是最终写入门禁。迟到回调待退未转 paid，但可退。
-    refundEligible:
-      (row.payStatus === 'paid' || isOnlineCollectedPendingRefund(row)) && printOutcome !== 'printed',
-    // 未确认历史原因仍在时禁止重打，核查后同样禁止。
-    retryForbidden: unconfirmedFailure,
-    refundRequired: isAdminRefundRequired(row),
-    ...deriveOpsAttention(row, channelAcceptedUnconfirmed),
-  }
-}
-
-function deriveOpsAttention(
-  row: Pick<OrderRow, 'payStatus' | 'refundReason'>,
-  channelAcceptedUnconfirmed: boolean,
-): Pick<AdminOrderReadonlyItem, 'opsAttention' | 'opsAttentionCode'> {
-  const refundRequired = isAdminRefundRequired(row)
-  let opsAttentionCode: AdminOrderReadonlyItem['opsAttentionCode'] = null
-  if (channelAcceptedUnconfirmed) opsAttentionCode = 'channel_accepted_unconfirmed'
-  else if (refundRequired) opsAttentionCode = 'refund_required'
-  else if (row.payStatus === 'refunding') opsAttentionCode = 'refunding'
-  return {
-    opsAttention: opsAttentionCode !== null,
-    opsAttentionCode,
-  }
-}
+import { deriveAftercare, orderSelect, parseSafePrintSummary, type LabelMaps, type OrderRow } from './admin-orders-readonly.derive'
 
 export interface ListAdminOrdersReadonlyParams {
   type?: string
@@ -138,45 +38,6 @@ export interface ListAdminOrdersReadonlyParams {
   opsAttention?: boolean
   page: number
   pageSize: number
-}
-
-const DUPLEX_MODES = ['simplex', 'duplex_long_edge', 'duplex_short_edge'] as const
-
-const EMPTY_PRINT_SUMMARY: AdminOrderReadonlyPrintSummary = {
-  fileName: null,
-  copies: null,
-  colorMode: null,
-  duplex: null,
-  paperSize: null,
-  pageRange: null,
-}
-
-function parseSafePrintSummary(paramsJson: string | null | undefined): AdminOrderReadonlyPrintSummary {
-  if (!paramsJson) return { ...EMPTY_PRINT_SUMMARY }
-  let raw: unknown
-  try {
-    raw = JSON.parse(paramsJson)
-  } catch {
-    return { ...EMPTY_PRINT_SUMMARY }
-  }
-  if (typeof raw !== 'object' || raw === null) return { ...EMPTY_PRINT_SUMMARY }
-  const p = raw as Record<string, unknown>
-  const stringValue = (key: string): string | null =>
-    typeof p[key] === 'string' && (p[key] as string).trim().length > 0 ? (p[key] as string).trim() : null
-  const copies =
-    typeof p['copies'] === 'number' && Number.isInteger(p['copies']) && p['copies'] >= 1 && p['copies'] <= 99
-      ? p['copies']
-      : null
-  return {
-    fileName: stringValue('fileName'),
-    copies,
-    colorMode: p['colorMode'] === 'black_white' || p['colorMode'] === 'color' ? p['colorMode'] : null,
-    duplex: DUPLEX_MODES.includes(p['duplex'] as (typeof DUPLEX_MODES)[number])
-      ? (p['duplex'] as (typeof DUPLEX_MODES)[number])
-      : null,
-    paperSize: stringValue('paperSize'),
-    pageRange: stringValue('pageRange'),
-  }
 }
 
 @Injectable()
@@ -203,7 +64,10 @@ export class AdminOrdersReadonlyService {
     if (params.pickupStatus) where['pickupStatus'] = params.pickupStatus
     if (params.search && params.search.trim()) where['orderNo'] = { contains: params.search.trim() }
     if (params.opsAttention === true) {
-      const unconfirmedIds = await this.unconfirmedAttemptOrderIds()
+      const [unconfirmedIds, conflictIds] = await Promise.all([
+        this.unconfirmedAttemptOrderIds(),
+        this.successConflictOrderIds(),
+      ])
       where['OR'] = [
         {
           payStatus: 'paid',
@@ -214,8 +78,21 @@ export class AdminOrdersReadonlyService {
           refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
         },
         { payStatus: 'refunding' },
+        { payStatus: 'partial_refunded' },
+        {
+          payStatus: 'paid',
+          printTask: { is: { printOutcome: 'printed' } },
+          refunds: { some: { status: 'failed' } },
+        },
+        {
+          payStatus: 'paid',
+          refunds: { some: { status: 'manual_review' } },
+        },
+        staleSuccessUnprintedAttentionWhere(),
         { type: 'copy', copyJob: { is: { state: 'unconfirmed' } } },
         ...(unconfirmedIds.length > 0 ? [{ id: { in: unconfirmedIds } }] : []),
+        ...(conflictIds.channel.length > 0 ? [{ id: { in: conflictIds.channel } }] : []),
+        ...(conflictIds.paper.length > 0 ? [{ id: { in: conflictIds.paper }, payStatus: { notIn: ['refunded', 'closed'] } }] : []),
       ]
     } else if (params.refundRequired === true) {
       const collected = {
@@ -254,8 +131,17 @@ export class AdminOrdersReadonlyService {
     const orderRows = rows as unknown as OrderRow[]
     const labels = await this.lookupLabels(orderRows)
     const unconfirmed = await this.unconfirmedOrderIdSet(orderRows.map((row) => row.id))
+    const paperFailed = await this.paperRefundFailedIds(orderRows)
+    const manualReview = await this.manualReviewIds(orderRows)
+    const stalePaidFailed = await this.staleSuccessUnprintedIds(orderRows)
     return {
-      items: orderRows.map((row) => this.toItem(row, labels, unconfirmed.has(row.id))),
+      items: orderRows.map((row) => this.toItem(
+        row,
+        labels,
+        unconfirmed.has(row.id),
+        paperFailed.has(row.id),
+        manualReview.has(row.id) || stalePaidFailed.has(row.id),
+      )),
       pagination: {
         page: params.page,
         pageSize: params.pageSize,
@@ -276,7 +162,17 @@ export class AdminOrdersReadonlyService {
 
     const labels = await this.lookupLabels([row])
     const unconfirmed = await this.unconfirmedOrderIdSet([row.id])
-    const item = this.toItem(row, labels, unconfirmed.has(row.id))
+    const paperFailed = await this.paperRefundFailedIds([row])
+    const manualReview = await this.manualReviewIds([row])
+    const stalePaidFailed = await this.staleSuccessUnprintedIds([row])
+    const printRefund = await explainPrintRefund(this.prisma, row.id)
+    const item = this.toItem(
+      row,
+      labels,
+      unconfirmed.has(row.id),
+      paperFailed.has(row.id),
+      manualReview.has(row.id) || stalePaidFailed.has(row.id),
+    )
     const summary = row.type !== 'copy' && row.printTask ? parseSafePrintSummary(row.printTask.paramsJson) : null
     const statusLogs = row.type !== 'copy' && row.printTask
       ? await this.prisma.printTaskStatusLog.findMany({
@@ -286,11 +182,20 @@ export class AdminOrdersReadonlyService {
         })
       : []
 
+    const remainder = await remainderAmountCents(this.prisma, row)
+    const successCoversOrder = printRefund.refundStatus === 'success'
+      && (row.payStatus !== 'partial_refunded' || (remainder !== null && remainder <= 0))
+    const blocksAnotherRefund = printRefund.refundStatus === 'pending'
+      || printRefund.refundStatus === 'failed'
+      || printRefund.refundStatus === 'manual_review'
+      || successCoversOrder
     return {
       ...item,
+      refundEligible: item.refundEligible && !blocksAnotherRefund,
       refundedAt: row.refundedAt ? row.refundedAt.toISOString() : null,
       refundReason: row.refundReason,
       discountCents: row.discountCents,
+      payableCents: payableCents(row),
       refundedAmountCents: row.refundedAmountCents,
       printTaskId: row.type === 'copy' ? null : row.printTaskId ?? null,
       print: row.printTask && summary
@@ -308,6 +213,16 @@ export class AdminOrdersReadonlyService {
         errorCode: log.errorCode ?? null,
         createdAt: log.createdAt.toISOString(),
       })),
+      autoRefund: printRefund.disposition === 'auto_success' || printRefund.disposition === 'auto_failed',
+      refundStatus: printRefund.refundStatus,
+      refundFailureReason: printRefund.disposition === 'auto_failed' ? printRefund.reason : null,
+      printRefundDisposition: printRefund.disposition,
+      printRefundReason: printRefund.reason,
+      refundLedgerNo: printRefund.refundNo,
+      refundLedgerCents: printRefund.amountCents,
+      refundRemainderCents: remainder,
+      channelInFlight: await orderHasRefundAtChannel(this.prisma, row.id),
+      channelResultRegistration: await channelRegistrationEntry(this.prisma, row.id),
     }
   }
 
@@ -333,6 +248,77 @@ export class AdminOrdersReadonlyService {
     return {
       userLabels: new Map(users.map((user) => [user.id, user.nickname ?? null])),
       terminalCodes: new Map(terminals.map((terminal) => [terminal.id, terminal.terminalCode])),
+    }
+  }
+
+  private async paperRefundFailedIds(rows: OrderRow[]): Promise<Set<string>> {
+    const candidates = rows
+      .filter((row) => row.payStatus === 'paid' && row.printTask?.printOutcome === 'printed')
+      .map((row) => row.id)
+    if (candidates.length === 0) return new Set()
+    const refunds = await this.prisma.refund.findMany({
+      where: { orderId: { in: candidates }, status: 'failed' },
+      select: { orderId: true },
+    })
+    return new Set(refunds.map((refund) => refund.orderId))
+  }
+
+  private async staleSuccessUnprintedIds(rows: OrderRow[]): Promise<Set<string>> {
+    const candidates = rows
+      .filter((row) => row.payStatus === 'paid' && row.taskStatus === 'failed' && row.amountCents > 0 && row.printTask?.printOutcome !== 'printed')
+      .map((row) => row.id)
+    if (candidates.length === 0) return new Set()
+    const matched = await this.prisma.order.findMany({
+      where: { id: { in: candidates }, ...staleSuccessUnprintedAttentionWhere() },
+      select: { id: true },
+    })
+    return new Set(matched.map((row) => row.id))
+  }
+
+  private async manualReviewIds(rows: OrderRow[]): Promise<Set<string>> {
+    if (rows.length === 0) return new Set()
+    const allIds = rows.map((row) => row.id)
+    const paidIds = rows.filter((row) => row.payStatus === 'paid').map((row) => row.id)
+    const openPaperIds = rows.filter((row) => row.payStatus !== 'refunded' && row.payStatus !== 'closed').map((row) => row.id)
+    const [refunds, channelConflicts, paperConflicts] = await Promise.all([
+      paidIds.length > 0
+        ? this.prisma.refund.findMany({
+          where: { orderId: { in: paidIds }, status: 'manual_review' },
+          select: { orderId: true },
+        })
+        : Promise.resolve([]),
+      this.prisma.auditLog.findMany({
+        where: { targetId: { in: allIds }, action: CHANNEL_SUCCESS_CONFLICT_AUDIT },
+        select: { targetId: true },
+      }),
+      openPaperIds.length > 0
+        ? this.prisma.auditLog.findMany({
+          where: { targetId: { in: openPaperIds }, action: 'refund.notify_paper_already_released' },
+          select: { targetId: true },
+        })
+        : Promise.resolve([]),
+    ])
+    return new Set([
+      ...refunds.map((refund) => refund.orderId),
+      ...channelConflicts.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
+      ...paperConflicts.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
+    ])
+  }
+
+  private async successConflictOrderIds(): Promise<{ channel: string[]; paper: string[] }> {
+    const [channelRows, paperRows] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where: { action: CHANNEL_SUCCESS_CONFLICT_AUDIT },
+        select: { targetId: true },
+      }),
+      this.prisma.auditLog.findMany({
+        where: { action: 'refund.notify_paper_already_released' },
+        select: { targetId: true },
+      }),
+    ])
+    return {
+      channel: [...new Set(channelRows.map((row) => row.targetId).filter((id): id is string => Boolean(id)))],
+      paper: [...new Set(paperRows.map((row) => row.targetId).filter((id): id is string => Boolean(id)))],
     }
   }
 
@@ -369,7 +355,13 @@ export class AdminOrdersReadonlyService {
     return new Set(rows.filter((row) => isChannelAcceptedUnconfirmedAttempt(row)).map((row) => row.orderId))
   }
 
-  private toItem(row: OrderRow, labels: LabelMaps, channelAcceptedUnconfirmed = false): AdminOrderReadonlyItem {
+  private toItem(
+    row: OrderRow,
+    labels: LabelMaps,
+    channelAcceptedUnconfirmed = false,
+    paperRefundFailed = false,
+    printReturnManual = false,
+  ): AdminOrderReadonlyItem {
     // 手机单在到机放行前只有 Order：展示已确认的打印快照，不伪造 PrintTask。
     // 有真实任务时只认任务参数；材料包/历史现场单不套用单文件快照。
     const pendingSingle = !row.printTask && row.type === 'print' && row.sourceFileId !== null
@@ -406,50 +398,9 @@ export class AdminOrdersReadonlyService {
       paperSize: printSummary.paperSize,
       errorCode: row.type === 'copy' ? row.copyJob?.resultCode
         ?? (row.copyJob?.state === 'unconfirmed' ? 'COPY_RESULT_UNCONFIRMED' : null) : row.printTask?.errorCode ?? null,
-      ...deriveAftercare(row, channelAcceptedUnconfirmed),
+      ...deriveAftercare(row, channelAcceptedUnconfirmed, paperRefundFailed, printReturnManual),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }
   }
-}
-
-function orderSelect() {
-  return {
-    id: true,
-    orderNo: true,
-    type: true,
-    printTaskId: true,
-    sourceFileId: true,
-    sourceFileName: true,
-    printParamsJson: true,
-    endUserId: true,
-    terminalId: true,
-    amountCents: true,
-    billablePages: true,
-    currency: true,
-    payStatus: true,
-    taskStatus: true,
-    channel: true,
-    pickupStatus: true,
-    pickupCodeExpiresAt: true,
-    refundReason: true,
-    refundedAt: true,
-    discountCents: true,
-    refundedAmountCents: true,
-    createdAt: true,
-    updatedAt: true,
-    copyJob: { select: { state: true, resultCode: true } },
-    printTask: {
-      select: {
-        id: true,
-        terminalId: true,
-        paramsJson: true,
-        status: true,
-        errorCode: true,
-        printOutcome: true,
-        createdAt: true,
-        completedAt: true,
-      },
-    },
-  } as const
 }

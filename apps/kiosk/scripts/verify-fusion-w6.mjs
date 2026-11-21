@@ -193,6 +193,8 @@ const WAVE_ROUTES = new Map([
     '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
     '/print/cashier', '/print/progress', '/print/done', '/print/pickup-claim', '/scan', '/scan/start', '/scan/settings',
     '/scan/progress', '/scan/result',
+    // 按次付款屏样子照打印收银台，三种服务各一条，归在收银台这一波。
+    '/pay/resume', '/pay/interview', '/pay/scan',
   ]],
   ['W3', [
     '/resume', '/resume/upload', '/resume/source', '/resume/generate',
@@ -218,6 +220,8 @@ const WAVE_ROUTES = new Map([
     '/login', '/member/qr-login', '/upload/phone', '/legal/:doc', '/screensaver',
     // 2026-10-29 一体机手机码短链的网页中转，与上面两个手机辅助页同一口径（顶层、手机视口）。
     '/k/u/:scene', '/k/l/:ticketId',
+    // 2026-11-19 开票手机页与短链中转。
+    '/invoice/phone', '/k/i/:scene',
     '/session-timeout', '/error-offline', '/profile', '/me/resumes', '/me/print-orders',
     '/me/documents', '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity',
     '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
@@ -308,6 +312,8 @@ check('mobile routes', () => {
     '/upload/phone': 'src/pages/upload/PhoneUploadPage.tsx',
     '/k/u/:scene': 'src/pages/upload/KioskCodeEntryPage.tsx',
     '/k/l/:ticketId': 'src/pages/upload/KioskCodeEntryPage.tsx',
+    '/invoice/phone': 'src/pages/invoice/PhoneInvoicePages.tsx',
+    '/k/i/:scene': 'src/pages/invoice/PhoneInvoicePages.tsx',
   }
   const mobile = Object.keys(mobilePages)
   for (const path of mobile) {
@@ -317,7 +323,7 @@ check('mobile routes', () => {
   }
   assert.ok(!manifest.paths.includes('/login/mobile'), 'obsolete /login/mobile alias must not be introduced')
   const expectedFullScreen = [
-    '/login', '/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId', '/legal/:doc', '/resume/job-fit/*',
+    '/login', '/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId', '/invoice/phone', '/k/i/:scene', '/legal/:doc', '/resume/job-fit/*',
     '/resume/career-plan/*', '/interview/setup', '/interview/session', '/interview/report',
     '/interview/tips', '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
   ]
@@ -532,7 +538,7 @@ check('W6 route acceptance contract', () => {
     const object = element
     const pattern = directString(object, 'pattern')
     assert.ok(pattern, 'W6 route pattern must be a direct string')
-    const viewport = ['/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId'].includes(pattern) ? 'mobile' : 'kiosk'
+    const viewport = ['/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId', '/invoice/phone', '/k/i/:scene'].includes(pattern) ? 'mobile' : 'kiosk'
     const landmark = directString(object, 'landmark') ?? 'main'
     const requiresFusionRoot = directBoolean(object, 'requiresFusionRoot') ?? true
     const explicitTouchTargets = directBoolean(object, 'requiresTouchTargets')
@@ -550,7 +556,8 @@ check('W6 route acceptance contract', () => {
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
   const mobileCount = routes.filter(({ viewport }) => viewport === 'mobile').length
   // 2 → 4（2026-10-29）：扫码登录、手机上传，加两者的短链网页中转。
-  assert.equal(mobileCount, 4, 'W6 mobile allocation')
+  // 4 → 6（2026-11-19）：开票手机填写页 /invoice/phone 与短链中转 /k/i/:scene。
+  assert.equal(mobileCount, 6, 'W6 mobile allocation')
 })
 
 check('W6 browser collection contract', () => {

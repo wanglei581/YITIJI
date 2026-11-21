@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 675,
+    "endpointCount": 700,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -931,6 +931,63 @@
         ],
         "services": [
           "BenefitActivitiesService"
+        ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/virtual-pay-admin.controller.ts",
+        "handler": "VirtualPayAdminController.getSettings",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/billing/miniapp-virtual-pay",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-admin.service.ts"
+        ],
+        "services": [
+          "VirtualPayAdminService"
+        ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/virtual-pay-admin.controller.ts",
+        "handler": "VirtualPayAdminController.setEnabled",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/billing/miniapp-virtual-pay",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-admin.service.ts"
+        ],
+        "services": [
+          "VirtualPayAdminService"
+        ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/virtual-pay-admin.controller.ts",
+        "handler": "VirtualPayAdminController.setGoods",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/billing/miniapp-virtual-pay/goods/:serviceKind",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-admin.service.ts"
+        ],
+        "services": [
+          "VirtualPayAdminService"
         ]
       },
       {
@@ -2662,6 +2719,50 @@
         ]
       },
       {
+        "controller": "services/api/src/invoices/admin-invoice.controller.ts",
+        "handler": "AdminInvoiceController.issue",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/admin/invoice-requests/:id/issue",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/invoices/admin-invoice.service.ts"
+        ],
+        "services": [
+          "AdminInvoiceService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/admin-invoice.controller.ts",
+        "handler": "AdminInvoiceController.returnRequest",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/admin/invoice-requests/:id/return",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/invoices/admin-invoice.service.ts"
+        ],
+        "services": [
+          "AdminInvoiceService"
+        ]
+      },
+      {
         "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.getJobSources",
         "method": "GET",
@@ -3586,10 +3687,12 @@
         "handler": "AdminOrdersReadonlyController.list",
         "method": "GET",
         "models": [
+          "AuditLog",
           "EndUser",
           "Order",
           "PaymentAttempt",
           "PrintTaskStatusLog",
+          "Refund",
           "Terminal"
         ],
         "path": "/api/v1/admin/orders",
@@ -3608,10 +3711,12 @@
         "handler": "AdminOrdersReadonlyController.getById",
         "method": "GET",
         "models": [
+          "AuditLog",
           "EndUser",
           "Order",
           "PaymentAttempt",
           "PrintTaskStatusLog",
+          "Refund",
           "Terminal"
         ],
         "path": "/api/v1/admin/orders/:id",
@@ -3623,6 +3728,28 @@
         ],
         "services": [
           "AdminOrdersReadonlyService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/admin-invoice.controller.ts",
+        "handler": "AdminInvoiceController.getByOrder",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/admin/orders/:id/invoice",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/invoices/admin-invoice.service.ts"
+        ],
+        "services": [
+          "AdminInvoiceService"
         ]
       },
       {
@@ -3648,6 +3775,66 @@
       },
       {
         "controller": "services/api/src/payment/admin-order-actions.controller.ts",
+        "handler": "AdminOrderActionsController.closeHeldOrder",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/orders/:id/print-return/close",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/payment/admin-order-actions.controller.ts",
+        "handler": "AdminOrderActionsController.confirmRefunded",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/orders/:id/print-return/confirm-refunded",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/payment/admin-order-actions.controller.ts",
+        "handler": "AdminOrderActionsController.queryPrintReturnChannel",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/orders/:id/print-return/query-channel",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/payment/admin-order-actions.controller.ts",
+        "handler": "AdminOrderActionsController.registerChannelResult",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/orders/:id/print-return/register-channel-result",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/payment/admin-order-actions.controller.ts",
+        "handler": "AdminOrderActionsController.releasePaper",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/orders/:id/print-return/release-paper",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/payment/admin-order-actions.controller.ts",
         "handler": "AdminOrderActionsController.refund",
         "method": "POST",
         "models": [
@@ -3656,9 +3843,34 @@
           "PaymentAttempt",
           "PrintTask",
           "Refund",
-          "ServiceOrder"
+          "ServiceOrder",
+          "Terminal"
         ],
         "path": "/api/v1/admin/orders/:id/refund",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/payment/refund.service.ts"
+        ],
+        "services": [
+          "RefundService"
+        ]
+      },
+      {
+        "controller": "services/api/src/payment/admin-order-actions.controller.ts",
+        "handler": "AdminOrderActionsController.refundAfterPaperCheck",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Order",
+          "PaymentAttempt",
+          "PrintTask",
+          "Refund",
+          "ServiceOrder",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/orders/:id/refund-after-paper-check",
         "roles": [
           "admin"
         ],
@@ -6206,9 +6418,11 @@
           "FeedbackReply",
           "FeedbackTicket",
           "FileObject",
+          "InvoiceRequest",
           "JobAiRecommendation",
           "KioskSession",
           "MemberLegalConsent",
+          "MemberServiceCredit",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
@@ -6226,7 +6440,8 @@
           "StorageDeletion",
           "UserAiConsent",
           "UserDataRequest",
-          "UserNotification"
+          "UserNotification",
+          "VirtualPayOrder"
         ],
         "path": "/api/v1/admin/users/:endUserId/closure",
         "roles": [
@@ -8529,6 +8744,82 @@
         "services": []
       },
       {
+        "controller": "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+        "handler": "KioskInvoiceSessionsController.create",
+        "method": "POST",
+        "models": [
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/kiosk/invoice-sessions",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-sessions.service.ts"
+        ],
+        "services": [
+          "InvoiceSessionsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+        "handler": "KioskInvoiceSessionsController.poll",
+        "method": "GET",
+        "models": [
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/kiosk/invoice-sessions/:sessionId",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-sessions.service.ts"
+        ],
+        "services": [
+          "InvoiceSessionsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+        "handler": "KioskInvoiceSessionsController.submit",
+        "method": "POST",
+        "models": [
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/kiosk/invoice-sessions/:sessionId/submit",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-sessions.service.ts"
+        ],
+        "services": [
+          "InvoiceSessionsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+        "handler": "KioskInvoiceSessionsController.resolve",
+        "method": "POST",
+        "models": [
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/kiosk/invoice-sessions/scene/resolve",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-sessions.service.ts"
+        ],
+        "services": [
+          "InvoiceSessionsService"
+        ]
+      },
+      {
         "controller": "services/api/src/legal/legal.controller.ts",
         "handler": "LegalController.getActive",
         "method": "GET",
@@ -9364,6 +9655,63 @@
         ]
       },
       {
+        "controller": "services/api/src/invoices/member-invoice.controller.ts",
+        "handler": "MemberInvoiceController.list",
+        "method": "GET",
+        "models": [
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/me/invoice-orders",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-requests.service.ts"
+        ],
+        "services": [
+          "InvoiceRequestsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/member-invoice.controller.ts",
+        "handler": "MemberInvoiceController.create",
+        "method": "POST",
+        "models": [
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/me/invoice-requests",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-requests.service.ts"
+        ],
+        "services": [
+          "InvoiceRequestsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/invoices/member-invoice.controller.ts",
+        "handler": "MemberInvoiceController.getOne",
+        "method": "GET",
+        "models": [
+          "EndUser",
+          "InvoiceRequest",
+          "Order",
+          "ServiceOrder"
+        ],
+        "path": "/api/v1/me/invoice-requests/:id",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/invoices/invoice-requests.service.ts"
+        ],
+        "services": [
+          "InvoiceRequestsService"
+        ]
+      },
+      {
         "controller": "services/api/src/job-applications/job-applications.controller.ts",
         "handler": "JobApplicationsController.list",
         "method": "GET",
@@ -9998,6 +10346,41 @@
         ]
       },
       {
+        "controller": "services/api/src/virtual-pay/virtual-pay-credits.controller.ts",
+        "handler": "VirtualPayCreditsController.list",
+        "method": "GET",
+        "models": [
+          "MemberServiceCredit"
+        ],
+        "path": "/api/v1/member/service-credits",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-credits.service.ts"
+        ],
+        "services": [
+          "VirtualPayCreditsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/virtual-pay-order.controller.ts",
+        "handler": "VirtualPayOrderController.create",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "PlatformSetting",
+          "VirtualPayOrder"
+        ],
+        "path": "/api/v1/member/virtual-pay/orders",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-order.service.ts"
+        ],
+        "services": [
+          "VirtualPayOrderService"
+        ]
+      },
+      {
         "controller": "services/api/src/miniapp-code/miniapp-code.controller.ts",
         "handler": "MiniappCodeController.create",
         "method": "POST",
@@ -10423,6 +10806,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/orders/:id/code-pay",
@@ -10442,6 +10826,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/orders/:id/pay",
@@ -10461,6 +10846,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/orders/:id/pay-status",
@@ -10474,12 +10860,23 @@
       },
       {
         "controller": "services/api/src/payment/payment.controller.ts",
+        "handler": "PaymentController.abandonPayAttempt",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/orders/:id/pay/abandon",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/payment/payment.controller.ts",
         "handler": "PaymentController.reconcile",
         "method": "POST",
         "models": [
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/orders/:id/pay/reconcile",
@@ -12396,6 +12793,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/payment/channels",
@@ -12415,6 +12813,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "Refund",
           "ServiceOrder"
         ],
         "path": "/api/v1/payment/sandbox/simulate",
@@ -12427,6 +12826,16 @@
         ]
       },
       {
+        "controller": "services/api/src/payment/service-order-sandbox.controller.ts",
+        "handler": "SimulateServiceOrderDto.simulate",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/payment/sandbox/simulate-service-order",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
         "controller": "services/api/src/payment/payment.controller.ts",
         "handler": "PaymentController.wechatRefundNotify",
         "method": "POST",
@@ -12436,7 +12845,8 @@
           "PaymentAttempt",
           "PrintTask",
           "Refund",
-          "ServiceOrder"
+          "ServiceOrder",
+          "Terminal"
         ],
         "path": "/api/v1/payment/wechat/refund-notify",
         "roles": [],
@@ -12634,10 +13044,12 @@
           "FileObject",
           "Order",
           "OrderItem",
+          "PaymentAttempt",
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "TerminalServicePrice"
         ],
         "path": "/api/v1/print/jobs/:orderId/release",
         "roles": [],
@@ -12744,10 +13156,12 @@
           "FileObject",
           "Order",
           "OrderItem",
+          "PaymentAttempt",
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "TerminalServicePrice"
         ],
         "path": "/api/v1/print/jobs/claim-pickup",
         "roles": [],
@@ -14561,6 +14975,44 @@
         "services": [
           "UploadSessionsService"
         ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/wechat-miniapp-message.controller.ts",
+        "handler": "WechatMiniappMessageController.verify",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "MemberServiceCredit",
+          "VirtualPayOrder"
+        ],
+        "path": "/api/v1/wechat/miniapp/message",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/wechat-miniapp-message.service.ts"
+        ],
+        "services": [
+          "WechatMiniappMessageService"
+        ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/wechat-miniapp-message.controller.ts",
+        "handler": "WechatMiniappMessageController.receive",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "MemberServiceCredit",
+          "VirtualPayOrder"
+        ],
+        "path": "/api/v1/wechat/miniapp/message",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/wechat-miniapp-message.service.ts"
+        ],
+        "services": [
+          "WechatMiniappMessageService"
+        ]
       }
     ],
     "globalPrefix": "/api/v1",
@@ -14569,7 +15021,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 300,
+      "reachableFileCount": 309,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -15042,7 +15494,11 @@
             "GET /admin/orders",
             "GET /admin/orders/:param",
             "POST /admin/orders/:param/mark-paid",
+            "POST /admin/orders/:param/print-return/:param",
+            "POST /admin/orders/:param/print-return/query-channel",
+            "POST /admin/orders/:param/print-return/register-channel-result",
             "POST /admin/orders/:param/refund",
+            "POST /admin/orders/:param/refund-after-paper-check",
             "POST /admin/orders/:param/refund-service",
             "POST /admin/orders/:param/retry-service-refund"
           ],
@@ -15340,7 +15796,11 @@
             "GET /admin/users",
             "GET /admin/users/:param",
             "POST /admin/orders/:param/mark-paid",
+            "POST /admin/orders/:param/print-return/:param",
+            "POST /admin/orders/:param/print-return/query-channel",
+            "POST /admin/orders/:param/print-return/register-channel-result",
             "POST /admin/orders/:param/refund",
+            "POST /admin/orders/:param/refund-after-paper-check",
             "POST /admin/orders/:param/refund-service",
             "POST /admin/orders/:param/retry-service-refund",
             "POST /admin/users/:param/closure",
@@ -15356,11 +15816,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 330
+      "sourceFileCount": 339
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 851,
+      "reachableFileCount": 864,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15829,6 +16289,30 @@
           ],
           "path": "/interview/tips",
           "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "PhoneInvoicePage",
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/invoice/PhoneInvoicePages.tsx",
+          "layout": [],
+          "path": "/invoice/phone",
+          "styles": [
+            "apps/kiosk/src/pages/invoice/phone-invoice.css",
+            "apps/kiosk/src/pages/upload/kiosk-code-entry.css",
+            "apps/kiosk/src/pages/upload/phone-upload-service-desk.css"
+          ],
           "wrappers": []
         },
         {
@@ -16480,6 +16964,30 @@
           "wrappers": []
         },
         {
+          "component": "InvoiceSceneEntry",
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/invoice/PhoneInvoicePages.tsx",
+          "layout": [],
+          "path": "/k/i/:scene",
+          "styles": [
+            "apps/kiosk/src/pages/invoice/phone-invoice.css",
+            "apps/kiosk/src/pages/upload/kiosk-code-entry.css",
+            "apps/kiosk/src/pages/upload/phone-upload-service-desk.css"
+          ],
+          "wrappers": []
+        },
+        {
           "component": "LoginTicketEntry",
           "endpoints": [
             "GET /:param",
@@ -17118,6 +17626,117 @@
           "styles": [
             "apps/kiosk/src/pages/auth/mobile-qr-service-desk.css",
             "apps/kiosk/src/pages/auth/mobile-qr-touch.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "PayServicePage",
+          "endpoints": [
+            "GET /:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/pay/PayServicePage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/pay/interview",
+          "styles": [
+            "apps/kiosk/src/pages/pay/pay-service.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
+            "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "PayServicePage",
+          "endpoints": [
+            "GET /:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/pay/PayServicePage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/pay/resume",
+          "styles": [
+            "apps/kiosk/src/pages/pay/pay-service.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
+            "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "PayServicePage",
+          "endpoints": [
+            "GET /:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /:param/cancel",
+            "POST /:param/close",
+            "POST /:param/confirm",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/pay/PayServicePage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/pay/scan",
+          "styles": [
+            "apps/kiosk/src/pages/pay/pay-service.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
+            "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
         },
@@ -18441,7 +19060,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1040
+      "sourceFileCount": 1053
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18973,7 +19592,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 124,
+    "modelCount": 127,
     "models": [
       {
         "fieldCount": 7,
@@ -19208,6 +19827,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts",
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-user-closure-read.ts",
           "services/api/src/ai/quota/ai-quota.service.ts",
@@ -19223,10 +19843,24 @@
           "services/api/src/files/files.service.ts",
           "services/api/src/job-materials/job-materials.service.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/payment/print-no-paper-refund.ts",
+          "services/api/src/payment/print-return-disposition.ts",
+          "services/api/src/payment/print-return-settlement-fault.ts",
           "services/api/src/payment/reconciliation.service.ts",
+          "services/api/src/payment/refund-abnormal.ts",
           "services/api/src/payment/refund-amount-hold.ts",
+          "services/api/src/payment/refund-channel-answer.ts",
+          "services/api/src/payment/refund-channel-hold-gate.ts",
+          "services/api/src/payment/refund-channel-query.ts",
+          "services/api/src/payment/refund-channel-registration.ts",
+          "services/api/src/payment/refund-notify-paper-guard.ts",
+          "services/api/src/payment/refund-paper-exclusion.ts",
+          "services/api/src/payment/resolve-print-return-hold.ts",
+          "services/api/src/payment/service-order-refund-abnormal.ts",
+          "services/api/src/payment/stale-attempt-collection.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
+          "services/api/src/print-jobs/pickup-arrival-price.ts",
           "services/api/src/print-jobs/print-queue-timeout.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
@@ -19378,7 +20012,7 @@
         ]
       },
       {
-        "fieldCount": 34,
+        "fieldCount": 37,
         "name": "EndUser",
         "relations": [
           "AiResumeResult",
@@ -19394,14 +20028,17 @@
           "Favorite",
           "FeedbackTicket",
           "FileObject",
+          "InvoiceRequest",
           "JobAiSession",
           "JobApplication",
           "MemberLegalConsent",
           "MemberNotification",
+          "MemberServiceCredit",
           "PrintTask",
           "ScanTask",
           "UserAiConsent",
-          "UserDataRequest"
+          "UserDataRequest",
+          "VirtualPayOrder"
         ],
         "usedBy": [
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
@@ -19410,6 +20047,7 @@
           "services/api/src/common/auth/optional-end-user.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/common/guards/optional-end-user-auth.guard.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/member-auth/member-auth.service.ts",
           "services/api/src/member-auth/member-phone-rebind.service.ts",
           "services/api/src/member-auth/member-restore.service.ts",
@@ -19418,7 +20056,9 @@
           "services/api/src/member-privacy/member-closure-requests.ts",
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
-          "services/api/src/member-privacy/member-data-request.admin.ts"
+          "services/api/src/member-privacy/member-data-request.admin.ts",
+          "services/api/src/virtual-pay/virtual-pay-delivery.ts",
+          "services/api/src/virtual-pay/virtual-pay-order.service.ts"
         ]
       },
       {
@@ -19693,6 +20333,21 @@
         ]
       },
       {
+        "fieldCount": 18,
+        "name": "InvoiceRequest",
+        "relations": [
+          "EndUser"
+        ],
+        "usedBy": [
+          "services/api/src/invoices/admin-invoice.service.ts",
+          "services/api/src/invoices/invoice-email-retention.ts",
+          "services/api/src/invoices/invoice-privacy.test.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts"
+        ]
+      },
+      {
         "fieldCount": 47,
         "name": "Job",
         "relations": [
@@ -19924,6 +20579,19 @@
         ]
       },
       {
+        "fieldCount": 10,
+        "name": "MemberServiceCredit",
+        "relations": [
+          "EndUser",
+          "VirtualPayOrder"
+        ],
+        "usedBy": [
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/virtual-pay/virtual-pay-credits.service.ts",
+          "services/api/src/virtual-pay/virtual-pay-delivery.ts"
+        ]
+      },
+      {
         "fieldCount": 6,
         "name": "MockInterviewReport",
         "relations": [
@@ -20044,6 +20712,7 @@
           "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/copy-jobs/copy-agent.service.ts",
           "services/api/src/copy-jobs/copy-jobs.service.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
@@ -20054,18 +20723,35 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/payment/cancel-unclaimed-print-task.ts",
+          "services/api/src/payment/close-order-if-unreleased.ts",
+          "services/api/src/payment/closed-window-unprinted.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/pending-refund-signal.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
+          "services/api/src/payment/print-no-paper-refund.ts",
+          "services/api/src/payment/print-return-alert.ts",
+          "services/api/src/payment/print-return-disposition.ts",
+          "services/api/src/payment/print-return-settlement-fault.ts",
+          "services/api/src/payment/query-print-return-channel.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
+          "services/api/src/payment/refund-channel-answer.ts",
+          "services/api/src/payment/refund-channel-registration.ts",
+          "services/api/src/payment/refund-notify-paper-guard.ts",
+          "services/api/src/payment/refund-paper-exclusion.ts",
           "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/resolve-print-return-hold.ts",
+          "services/api/src/payment/stage-order-refund.ts",
+          "services/api/src/payment/stale-attempt-collection.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
           "services/api/src/print-jobs/free-print-quota.usage.ts",
           "services/api/src/print-jobs/paid-reprint-eligibility.ts",
+          "services/api/src/print-jobs/pickup-arrival-hold.ts",
+          "services/api/src/print-jobs/pickup-arrival-price.ts",
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
@@ -20086,7 +20772,10 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/pickup-validity.ts",
+          "services/api/src/payment/print-no-paper-refund.ts",
+          "services/api/src/payment/print-return-disposition.ts",
           "services/api/src/print-jobs/free-print-quota.usage.ts",
+          "services/api/src/print-jobs/pickup-arrival-price.ts",
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
@@ -20175,7 +20864,12 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/reconciliation.service.ts",
-          "services/api/src/payment/refund.service.ts"
+          "services/api/src/payment/refund-channel-query.ts",
+          "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/settled-collection-guard.ts",
+          "services/api/src/payment/stale-attempt-collection.ts",
+          "services/api/src/print-jobs/pickup-arrival-hold.ts",
+          "services/api/src/print-jobs/pickup-arrival-price.ts"
         ]
       },
       {
@@ -20212,7 +20906,8 @@
           "services/api/src/payment/terminal-charge-settings.ts",
           "services/api/src/print-jobs/free-print-quota.config.ts",
           "services/api/src/print-jobs/print-queue-timeout.ts",
-          "services/api/src/support-contact/support-contact.service.ts"
+          "services/api/src/support-contact/support-contact.service.ts",
+          "services/api/src/virtual-pay/virtual-pay-settings.ts"
         ]
       },
       {
@@ -20304,8 +20999,15 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/payment/cancel-unclaimed-print-task.ts",
+          "services/api/src/payment/close-order-if-unreleased.ts",
+          "services/api/src/payment/closed-window-unprinted.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
-          "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/print-no-paper-refund.ts",
+          "services/api/src/payment/refund-channel-answer.ts",
+          "services/api/src/payment/refund-notify-paper-guard.ts",
+          "services/api/src/payment/refund-paper-exclusion.ts",
+          "services/api/src/payment/resolve-print-return-hold.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
@@ -20392,16 +21094,33 @@
         ]
       },
       {
-        "fieldCount": 12,
+        "fieldCount": 13,
         "name": "Refund",
         "relations": [
           "Order"
         ],
         "usedBy": [
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/payment/closed-window-unprinted.ts",
+          "services/api/src/payment/print-no-paper-refund.ts",
+          "services/api/src/payment/print-return-disposition.ts",
+          "services/api/src/payment/query-print-return-channel.ts",
           "services/api/src/payment/reconciliation.service.ts",
+          "services/api/src/payment/refund-abnormal.ts",
           "services/api/src/payment/refund-amount-hold.ts",
-          "services/api/src/payment/refund.service.ts"
+          "services/api/src/payment/refund-channel-acceptance.ts",
+          "services/api/src/payment/refund-channel-answer.ts",
+          "services/api/src/payment/refund-channel-hold-gate.ts",
+          "services/api/src/payment/refund-channel-registration.ts",
+          "services/api/src/payment/refund-notify-paper-guard.ts",
+          "services/api/src/payment/refund-paper-exclusion.ts",
+          "services/api/src/payment/refund-remainder.ts",
+          "services/api/src/payment/refund.service.ts",
+          "services/api/src/payment/resolve-print-return-hold.ts",
+          "services/api/src/payment/settled-collection-guard.ts",
+          "services/api/src/payment/stage-order-refund.ts",
+          "services/api/src/payment/stale-attempt-collection.ts"
         ]
       },
       {
@@ -20492,7 +21211,10 @@
         ],
         "usedBy": [
           "services/api/src/admin-ops/derived-service-return-alerts.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/payment/service-order-refund-abnormal.ts",
+          "services/api/src/payment/service-order-sandbox.controller.ts",
           "services/api/src/payment/service-order.admin.ts",
           "services/api/src/payment/service-order.payment.ts",
           "services/api/src/payment/service-order.ref.ts",
@@ -20588,6 +21310,7 @@
           "services/api/src/activity/activity.controller.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-ops/derived-print-quota-alerts.ts",
+          "services/api/src/admin-ops/derived-print-return-alerts.ts",
           "services/api/src/admin-ops/derived-scan-device-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-fulfillment-lists.ts",
@@ -20619,6 +21342,7 @@
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/effective-user-prices.ts",
           "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/payment/print-return-alert.ts",
           "services/api/src/payment/terminal-charge-public-reset.ts",
           "services/api/src/payment/terminal-charge-reset-snapshot.ts",
           "services/api/src/payment/terminal-charge-settings.ts",
@@ -20739,6 +21463,7 @@
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/terminal-charge-public-reset.ts",
           "services/api/src/payment/terminal-charge-settings.ts",
+          "services/api/src/print-jobs/pickup-arrival-price.ts",
           "services/api/src/terminals/terminal-org-assignment.ts"
         ]
       },
@@ -20876,6 +21601,20 @@
         "relations": [],
         "usedBy": [
           "services/api/src/member-privacy/member-closure.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 16,
+        "name": "VirtualPayOrder",
+        "relations": [
+          "EndUser",
+          "MemberServiceCredit"
+        ],
+        "usedBy": [
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/virtual-pay/virtual-pay-delivery.ts",
+          "services/api/src/virtual-pay/virtual-pay-order.service.ts",
+          "services/api/src/virtual-pay/virtual-pay-reconcile.service.ts"
         ]
       }
     ],
@@ -22643,6 +23382,9 @@
     ],
     "apps/kiosk/src/pages/interview/useMockInterviewAvailability.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-availability.mjs"
+    ],
+    "apps/kiosk/src/pages/invoice/PhoneInvoicePages.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w6.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
@@ -24900,6 +25642,9 @@
     "apps/kiosk/src/services/resumeParseIntent.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
+    "apps/kiosk/src/services/serviceTrip.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
     "apps/kiosk/src/services/terminalAuth.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
@@ -26655,6 +27400,7 @@
       "services/api/scripts/verify-ai-usage-retention.ts"
     ],
     "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql": [
+      "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-http-exception-filter.ts"
     ],
     "services/api/prisma/postgres/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql": [
@@ -26683,6 +27429,7 @@
       "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-data-request-contract.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
       "services/api/scripts/verify-recruitment-capability-gate.ts",
@@ -27008,6 +27755,8 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-job-review.ts",
       "services/api/scripts/verify-jobfair-review.ts",
@@ -27022,6 +27771,8 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
@@ -27031,6 +27782,8 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
@@ -27077,8 +27830,37 @@
     "services/api/scripts/support/llm-pii-callsite-checks.ts": [
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
+    "services/api/scripts/support/member-closure-invoices.ts": [
+      "services/api/scripts/verify-member-closure.ts"
+    ],
     "services/api/scripts/support/member-closure-verification.ts": [
       "services/api/scripts/verify-member-closure.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-concurrent-reconcile.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-credits.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-delivery.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-hardening.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-notify-goods.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-orders.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-reconcile-edge.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-reconcile.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
     ],
     "services/api/scripts/support/minimal-pdf.ts": [
       "services/api/scripts/verify-derivation-kind.ts",
@@ -27112,6 +27894,114 @@
     ],
     "services/api/scripts/support/payment-callback-race-cases.ts": [
       "services/api/scripts/verify-payment-flow.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-channel-business-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-channel-fault-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-channel-steps-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-close-race-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-fault-text-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-release-outcome-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-sum-claim-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b8-verify-race-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-abnormal-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-answer-outside-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-channel-amount-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-channel-submitted-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-detail-flag-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-local-write-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-multi-refund-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-registration-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-submit-write-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9-verify-reason-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-abnormal-24h-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-conflict-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-multi-fail-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-query-channel-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-p2b9e-notify-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
+    ],
+    "services/api/scripts/support/pickup-arrival-price-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts"
     ],
     "services/api/scripts/support/png-fixtures.ts": [
       "services/api/scripts/verify-brand-logo-image.ts",
@@ -27161,7 +28051,13 @@
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts"
     ],
+    "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts": [
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts",
+      "services/api/scripts/verify-service-orders.ts"
+    ],
     "services/api/scripts/support/service-order-verify-fixture.ts": [
+      "services/api/scripts/verify-service-order-sandbox-simulate.ts",
       "services/api/scripts/verify-service-orders-charge.ts",
       "services/api/scripts/verify-service-orders-concurrency.ts",
       "services/api/scripts/verify-service-orders-settle.ts",
@@ -28658,6 +29554,8 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts",
       "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
@@ -28680,6 +29578,8 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
@@ -29068,6 +29968,7 @@
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-http-exception-filter.ts",
       "services/api/scripts/verify-internal-accounts.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-auth.ts",
@@ -29077,6 +29978,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
@@ -29110,6 +30012,7 @@
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-member-account-status.ts",
@@ -29119,6 +30022,7 @@
       "services/api/scripts/verify-member-favorites-benefits.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
@@ -29145,6 +30049,7 @@
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-closure.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
@@ -29177,6 +30082,7 @@
       "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-closure.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
@@ -29326,6 +30232,7 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-license-runtime.ts",
       "services/api/scripts/verify-member-auth-races.ts",
@@ -29338,6 +30245,7 @@
       "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-org-device-alert.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
@@ -29421,6 +30329,8 @@
       "services/api/scripts/verify-ai-platform-degradation.ts"
     ],
     "services/api/src/config/body-parsers.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts"
     ],
@@ -29430,6 +30340,7 @@
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
       "services/api/scripts/verify-cjk-font.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-operator-credential-type.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-payment-flow.ts",
@@ -29793,6 +30704,26 @@
     ],
     "services/api/src/first-order/first-order-report-metrics.ts": [
       "services/api/scripts/verify-first-order-http.ts"
+    ],
+    "services/api/src/invoices/admin-invoice.service.ts": [
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts"
+    ],
+    "services/api/src/invoices/invoice-member-list.ts": [
+      "services/api/scripts/verify-invoice-real-db.ts"
+    ],
+    "services/api/src/invoices/invoice-requests.service.ts": [
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts"
+    ],
+    "services/api/src/invoices/invoice-sessions.service.ts": [
+      "services/api/scripts/verify-invoice-http.ts"
+    ],
+    "services/api/src/invoices/kiosk-invoice-sessions.controller.ts": [
+      "services/api/scripts/verify-invoice-http.ts"
+    ],
+    "services/api/src/invoices/member-invoice.controller.ts": [
+      "services/api/scripts/verify-invoice-http.ts"
     ],
     "services/api/src/job-ai/governed-job-fit.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -30632,7 +31563,9 @@
       "services/api/scripts/verify-member-restore.ts"
     ],
     "services/api/src/member-privacy/member-closure-retention.ts": [
-      "services/api/scripts/verify-member-closure.ts"
+      "services/api/scripts/verify-invoice-real-db.ts",
+      "services/api/scripts/verify-member-closure.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
     ],
     "services/api/src/member-privacy/member-closure.service.ts": [
       "services/api/scripts/verify-job-application-track.ts",
@@ -30709,6 +31642,9 @@
     ],
     "services/api/src/member-privacy/member-privacy.types.ts": [
       "services/api/scripts/verify-job-ai-privacy.ts"
+    ],
+    "services/api/src/miniapp-access-token/miniapp-access-token.service.ts": [
+      "services/api/scripts/verify-miniapp-code.mjs"
     ],
     "services/api/src/mock-interview/asr/asr.service.ts": [
       "services/api/scripts/verify-mock-interview-deadline.ts",
@@ -31036,6 +31972,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-service-order-sandbox-simulate.ts",
       "services/api/scripts/verify-service-orders-concurrency.ts"
     ],
     "services/api/src/payment/payment-session-token.ts": [
@@ -31204,7 +32141,12 @@
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
+    "services/api/src/payment/service-order.intercept.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs"
+    ],
     "services/api/src/payment/service-order.payment.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
+      "services/api/scripts/verify-service-order-sandbox-simulate.ts",
       "services/api/scripts/verify-service-orders-concurrency.ts",
       "services/api/scripts/verify-service-orders-settle.ts"
     ],
@@ -31213,8 +32155,15 @@
       "services/api/scripts/verify-service-orders.ts"
     ],
     "services/api/src/payment/service-order.ref.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "services/api/scripts/verify-service-order-open-ref-postgres.ts",
       "services/api/scripts/verify-service-orders-settle.ts"
+    ],
+    "services/api/src/payment/service-order.service.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs"
+    ],
+    "services/api/src/payment/service-order.settle.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs"
     ],
     "services/api/src/payment/terminal-charge-public-reset.ts": [
       "services/api/scripts/verify-terminal-charge-public-reset.ts"
@@ -31228,6 +32177,7 @@
     "services/api/src/payment/terminal-charge.contract.ts": [
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pricing.ts",
@@ -31635,6 +32585,8 @@
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
+      "services/api/scripts/verify-invoice-http.ts",
+      "services/api/scripts/verify-invoice-real-db.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-job-application-track.ts",
@@ -31674,6 +32626,8 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-mock-interview-consent.ts",
       "services/api/scripts/verify-mock-interview-deadline.ts",
       "services/api/scripts/verify-mock-interview.ts",
@@ -31699,6 +32653,8 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "services/api/scripts/verify-pickup-arrival-price.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -32223,6 +33179,7 @@
       "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-official-channels.ts",
@@ -32248,6 +33205,7 @@
       "services/api/scripts/verify-branding.ts",
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-invoice-http.ts",
       "services/api/scripts/verify-license-state.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -32475,6 +33433,38 @@
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions-member-file.ts",
       "services/api/scripts/verify-upload-sessions.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay-admin.controller.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay-admin.service.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay-credits.controller.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay-credits.service.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay-order.controller.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay-order.service.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay-settings.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/virtual-pay.contract.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/wechat-miniapp-message.controller.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/src/virtual-pay/wechat-miniapp-message.service.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
     ]
   },
   "gateContradictions": [
@@ -32505,7 +33495,8 @@
         "@ai-job-print/admin::test:e2e",
         "@ai-job-print/admin::test:e2e:screen",
         "@ai-job-print/admin::verify:admin-alerts-refresh-e2e",
-        "@ai-job-print/admin::verify:admin-files-actions-e2e"
+        "@ai-job-print/admin::verify:admin-files-actions-e2e",
+        "@ai-job-print/admin::verify:admin-invoice-e2e"
       ],
       "wired": true
     },
@@ -33934,7 +34925,12 @@
           "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/auth/memberAuthApi.ts",
           "services/api/src/member-auth/member-phone-rebind.service.ts",
-          "services/api/src/member-auth/sms/sms-budget.ts"
+          "services/api/src/member-auth/sms/sms-budget.ts",
+          "services/api/src/payment/service-order.intercept.ts",
+          "services/api/src/payment/service-order.payment.ts",
+          "services/api/src/payment/service-order.ref.ts",
+          "services/api/src/payment/service-order.service.ts",
+          "services/api/src/payment/service-order.settle.ts"
         ],
         "missing": []
       },
@@ -34606,6 +35602,7 @@
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/kiosk/src/pages/invoice/PhoneInvoicePages.tsx",
           "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",
           "apps/kiosk/src/pages/upload/KioskCodeEntryPage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
@@ -35062,6 +36059,7 @@
           "apps/kiosk/src/services/api/throwHttpError.ts",
           "apps/kiosk/src/services/assistantDraft.ts",
           "apps/kiosk/src/services/resumeParseIntent.ts",
+          "apps/kiosk/src/services/serviceTrip.ts",
           "apps/kiosk/src/services/terminalAuth.ts",
           "apps/kiosk/src/services/terminalSessionRecovery.ts",
           "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -44110,6 +45108,7 @@
           "services/api/prisma/postgres/migrations"
         ],
         "files": [
+          "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql",
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
           "services/api/src/prisma/create-client.ts"
@@ -44433,6 +45432,60 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:internal-login-real-redis"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/invoices/admin-invoice.service.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/invoices/invoice-sessions.service.ts",
+          "services/api/src/invoices/kiosk-invoice-sessions.controller.ts",
+          "services/api/src/invoices/member-invoice.controller.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-invoice-http.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:invoice-http"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/invoices/admin-invoice.service.ts",
+          "services/api/src/invoices/invoice-member-list.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-invoice-real-db.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:invoice-real-db"
       ],
       "wired": true
     },
@@ -45909,6 +46962,7 @@
         "files": [
           "services/api/prisma/schema.prisma",
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/member-closure-invoices.ts",
           "services/api/scripts/support/member-closure-verification.ts",
           "services/api/src/admin-users/admin-users.controller.ts",
           "services/api/src/admin-users/admin-users.service.ts",
@@ -46556,7 +47610,9 @@
         "dirs": [
           "services/api/src/miniapp-code"
         ],
-        "files": [],
+        "files": [
+          "services/api/src/miniapp-access-token/miniapp-access-token.service.ts"
+        ],
         "missing": []
       },
       "file": "services/api/scripts/verify-miniapp-code.mjs",
@@ -46590,6 +47646,79 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:miniapp-review-backend"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-concurrent-reconcile.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-delivery.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/config/body-parsers.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/virtual-pay/wechat-miniapp-message.controller.ts",
+          "services/api/src/virtual-pay/wechat-miniapp-message.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:miniapp-virtual-pay:postgres"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-concurrent-reconcile.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-credits.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-delivery.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-hardening.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-notify-goods.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-orders.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-reconcile-edge.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-reconcile.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/config/body-parsers.ts",
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/virtual-pay/virtual-pay-admin.controller.ts",
+          "services/api/src/virtual-pay/virtual-pay-admin.service.ts",
+          "services/api/src/virtual-pay/virtual-pay-credits.controller.ts",
+          "services/api/src/virtual-pay/virtual-pay-credits.service.ts",
+          "services/api/src/virtual-pay/virtual-pay-order.controller.ts",
+          "services/api/src/virtual-pay/virtual-pay-order.service.ts",
+          "services/api/src/virtual-pay/virtual-pay-settings.ts",
+          "services/api/src/virtual-pay/virtual-pay.contract.ts",
+          "services/api/src/virtual-pay/wechat-miniapp-message.controller.ts",
+          "services/api/src/virtual-pay/wechat-miniapp-message.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-miniapp-virtual-pay.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:miniapp-virtual-pay"
       ],
       "wired": true
     },
@@ -47708,6 +48837,100 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:pg-serialization-conflict"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-business-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-fault-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-steps-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-close-race-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-fault-text-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-release-outcome-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-sum-claim-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-verify-race-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-abnormal-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-answer-outside-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-channel-amount-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-channel-submitted-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-detail-flag-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-local-write-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-multi-refund-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-registration-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-submit-write-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-verify-reason-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-abnormal-24h-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-conflict-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-multi-fail-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-query-channel-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9e-notify-cases.ts",
+          "services/api/scripts/support/pickup-arrival-price-cases.ts",
+          "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pickup-arrival-price:postgres"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-business-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-fault-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-channel-steps-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-close-race-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-fault-text-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-release-outcome-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-sum-claim-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b8-verify-race-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-abnormal-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-answer-outside-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-channel-amount-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-channel-submitted-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-detail-flag-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-local-write-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-multi-refund-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-registration-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-submit-write-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9-verify-reason-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-abnormal-24h-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-conflict-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-multi-fail-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-query-channel-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-reg-amount-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-stale-atomic-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9d-verified-guard-cases.ts",
+          "services/api/scripts/support/pickup-arrival-p2b9e-notify-cases.ts",
+          "services/api/scripts/support/pickup-arrival-price-cases.ts",
+          "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pickup-arrival-price.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pickup-arrival-price"
       ],
       "wired": true
     },
@@ -50409,6 +51632,26 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/service-order-verify-fixture.ts",
+          "services/api/src/payment/payment-provider.types.ts",
+          "services/api/src/payment/service-order.payment.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-service-order-sandbox-simulate.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:service-order-sandbox-simulate"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/service-order-verify-fixture.ts",
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/redis-inflight-lock.ts"
         ],
@@ -50478,6 +51721,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/service-order-p2b9d-abnormal-cases.ts",
           "services/api/scripts/support/service-order-verify-fixture.ts",
           "services/api/scripts/verify-service-orders-charge.ts",
           "services/api/scripts/verify-service-orders-settle.ts",

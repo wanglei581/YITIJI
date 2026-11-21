@@ -3,13 +3,15 @@ import { AuthModule } from '../auth/auth.module'
 import { TerminalsModule } from '../terminals/terminals.module'
 import { PaymentModule } from './payment.module'
 import { ServiceOrderAdminController } from './service-order-admin.controller'
+import { ServiceOrderSandboxController } from './service-order-sandbox.controller'
 import { ServiceOrderController } from './service-order.controller'
 import { ServiceOrderService } from './service-order.service'
 import { ServiceOrderTask } from './service-order.task'
 
 @Module({
   imports: [PaymentModule, TerminalsModule, AuthModule],
-  controllers: [ServiceOrderController, ServiceOrderAdminController],
+  // 沙箱模拟付成只给开发与联调：生产 404，只认沙箱通道（见控制器头注释）。
+  controllers: [ServiceOrderController, ServiceOrderAdminController, ServiceOrderSandboxController],
   providers: [ServiceOrderService, ServiceOrderTask],
   exports: [ServiceOrderService],
 })

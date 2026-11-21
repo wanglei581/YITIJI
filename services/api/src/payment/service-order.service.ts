@@ -195,10 +195,10 @@ export class ServiceOrderService {
   async getForSession(terminalId: string, orderId: string, kioskSessionId: string, refresh: boolean): Promise<ServiceOrderView> {
     const row = await this.owned(terminalId, orderId, kioskSessionId)
     let checking = false
-    if (refresh && row.status === 'pending' && row.expiresAt.getTime() > Date.now()) {
-      checking = true
+    if (refresh && row.status === 'pending') {
       const provider = this.registry.get(row.provider)
       if (provider?.queryPayment) {
+        checking = true
         try {
           const found = await provider.queryPayment({ attemptId: row.providerOrderNo, orderId: row.id })
           if (found.status === 'paid' && found.channelTxnNo && found.amountCents === row.amountCents) {
@@ -212,10 +212,16 @@ export class ServiceOrderService {
               data: { paymentFailed: true },
             })
             checking = false
+          } else if (found.status === 'closed') {
+            checking = false
+          } else if (found.status === 'pending') {
+            checking = row.expiresAt.getTime() > Date.now()
           }
         } catch {
           checking = true
         }
+      } else {
+        checking = row.expiresAt.getTime() > Date.now()
       }
     }
     const fresh = await this.prisma.serviceOrder.findUnique({ where: { id: row.id } })

@@ -187,6 +187,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.serviceOrder
   }
 
+  get invoiceRequest() {
+    return this.client.invoiceRequest
+  }
+
   // ── C5-4 退款域 ─────────────────────────────────────────────────────────────
 
   get refund() {
@@ -207,6 +211,14 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get endUser() {
     return this.client.endUser
+  }
+
+  get virtualPayOrder() {
+    return this.client.virtualPayOrder
+  }
+
+  get memberServiceCredit() {
+    return this.client.memberServiceCredit
   }
 
   get jobSource() {

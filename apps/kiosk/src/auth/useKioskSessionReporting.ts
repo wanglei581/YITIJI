@@ -17,6 +17,7 @@ import {
   type KioskVisitEndpoint,
 } from '../services/api/kioskSession'
 import { getTerminalId } from '../services/api/screensaver'
+import { onServiceTripsCleared, readServiceTripSessionIds } from '../services/serviceTrip'
 import { terminalProtectedFetch } from '../services/terminalAuth'
 import { IS_E2E_BUILD } from '../utils/buildMode'
 
@@ -55,13 +56,48 @@ const reporter = createKioskVisitReporter(
   REPORTING_ENABLED,
 )
 
-/** 清场时调用：结束当前使用周期。不抛错、不等待。 */
+// 换人 / 401 登出 / 引导票换票直接清本机服务单时，把这些旧单关联的旧周期编号同步通知服务端收尾。
+onServiceTripsCleared((sessionIds, clearReason) => {
+  try {
+    const endReason: KioskVisitEndReason = clearReason === 'login_handover' ? 'handover' : 'privacy_clear'
+    reporter.endSessions(sessionIds, endReason)
+  } catch {
+    // 上报绝不影响清场或换人。
+  }
+})
+
+/** 清场时调用：结束当前使用周期及重载保留的旧服务单关联周期。不抛错、不等待。 */
 export function endKioskVisit(reason: KioskVisitEndReason): void {
   try {
-    reporter.end(reason)
+    reporter.end(reason, readServiceTripSessionIds())
   } catch {
     // 上报绝不影响清场。
   }
+}
+
+/** 这一次使用周期的编号（clientSessionId）。服务单建单带它；清场后换新的，整页重载也会换。 */
+export function currentKioskVisitId(): string {
+  return reporter.snapshot().clientSessionId
+}
+
+/**
+ * 建服务单之前调：服务端要求这一周期的 start 已经落库，否则回 400 SERVICE_SESSION_REQUIRED。
+ * 页面的副作用先于守卫的副作用执行，直接打开付款屏时 start 可能还没发出，所以这里按当前路径补一次
+ * （已经开始过的周期不会重复发），再等在飞的上报全部结束，最后返回周期编号。
+ * 上报关着（演示模式、浏览器测试构建）时不发请求，照样返回编号。不抛错。
+ */
+export async function kioskVisitReadyForCharge(pathname: string): Promise<string> {
+  try {
+    reporter.enterPath(pathname)
+  } catch {
+    // 上报失败不拦建单：建单会回 SERVICE_SESSION_REQUIRED，由调用方稍等再试一次。
+  }
+  try {
+    await reporter.settle()
+  } catch {
+    // 同上。
+  }
+  return reporter.snapshot().clientSessionId
 }
 
 const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = ['pointerdown', 'keydown']

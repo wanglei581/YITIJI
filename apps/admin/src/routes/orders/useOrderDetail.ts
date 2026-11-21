@@ -55,6 +55,18 @@ export function useOrderDetail(refresh: () => unknown) {
     }
   }
 
+  const reloadDetail = useCallback(async (id: string) => {
+    try {
+      const data = await adminOrdersReadonlyService.getById(id)
+      if (detailIdRef.current === id) {
+        setDetail(data)
+        setDetailState('ready')
+      }
+    } catch {
+      /* 保留当前详情与结果提示，不因刷新失败卸载页面 */
+    }
+  }, [])
+
   const retryDetail = () => {
     const id = detailIdRef.current
     if (!id) return
@@ -201,7 +213,7 @@ export function useOrderDetail(refresh: () => unknown) {
     }
   }, [detail, refresh, verifyConfirm, verifyOpen])
 
-  return { detail, detailState, refundOpen, setRefundOpen, refundReason, setRefundReason, refundSubmitting, refundError, setRefundError, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidSubmitting, markPaidError, setMarkPaidError, markPaidResult, setMarkPaidResult, serviceRefundSubmitting, serviceRefundError, adminRefundOpen, setAdminRefundOpen, adminRefundSubmitting, adminRefundError, setAdminRefundError, abandonConfirmOpen, setAbandonConfirmOpen, abandonSubmitting, abandonError, setAbandonError, verifyOpen, setVerifyOpen, verifyConfirm, setVerifyConfirm, verifySubmitting, verifyError, setVerifyError, openDetail, retryDetail, closeDetail, handleRefund, handleMarkPaid, handleRetryServiceRefund, handleAdminServiceRefund, handleAbandon, handleVerifyOutcome }
+  return { detail, detailState, refundOpen, setRefundOpen, refundReason, setRefundReason, refundSubmitting, refundError, setRefundError, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidSubmitting, markPaidError, setMarkPaidError, markPaidResult, setMarkPaidResult, serviceRefundSubmitting, serviceRefundError, adminRefundOpen, setAdminRefundOpen, adminRefundSubmitting, adminRefundError, setAdminRefundError, abandonConfirmOpen, setAbandonConfirmOpen, abandonSubmitting, abandonError, setAbandonError, verifyOpen, setVerifyOpen, verifyConfirm, setVerifyConfirm, verifySubmitting, verifyError, setVerifyError, openDetail, reloadDetail, retryDetail, closeDetail, refresh, handleRefund, handleMarkPaid, handleRetryServiceRefund, handleAdminServiceRefund, handleAbandon, handleVerifyOutcome }
 }
 
 export type OrderDetailControls = ReturnType<typeof useOrderDetail>

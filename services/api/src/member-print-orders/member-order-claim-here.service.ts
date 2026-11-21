@@ -10,6 +10,7 @@
 import { ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common'
 import { RedisService } from '../common/redis/redis.service'
 import { consumePickupClaimRate } from '../print-jobs/pickup-claim-rate-limit'
+import { releaseStaleArrivalHold } from '../print-jobs/pickup-arrival-hold'
 import { PickupOrderService } from '../print-jobs/pickup-order.service'
 import { PrismaService } from '../prisma/prisma.service'
 
@@ -32,11 +33,16 @@ export class MemberOrderClaimHereService {
     }
     // 不看到机码锁定：锁定防的是「猜码」，这里本人已登录、按自己的订单领取，不涉及任何码。
     // 所以本机被人恶意打错码锁住时，登录用户仍能从「我的打印订单」取到自己的单。
+    const found = await this.prisma.order.findFirst({ where: { id: orderId, endUserId } })
+    if (!found) {
+      throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
+    }
+    await releaseStaleArrivalHold(this.prisma, found.id)
     const order = await this.prisma.order.findFirst({ where: { id: orderId, endUserId } })
     if (!order) {
       throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
     }
-    if (order.terminalId !== terminal.id) {
+    if (order.terminalId && order.terminalId !== terminal.id) {
       // 本人已证明身份：直接告诉他该去哪台机器，不计入锁机、不需要防枚举的同文案。
       const target = order.terminalId
         ? await this.prisma.terminal.findUnique({

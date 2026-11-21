@@ -1,5 +1,295 @@
 # 当前开发进度
 
+## 2026-11-21：小程序微信虚拟支付后端极小收口返工 P2d1b3（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
+
+- 来由：按 Codex 独立复收 `P2d1b2`（`f61d17b23`）复现出的 4 处阻塞/并发缺陷 + 1 处 XML 重复键收紧，接在 `f61d17b23` 之后逐项完成极小收口并提交（零新增数据库迁移）。
+- ① 闭户写保护（`closing`/`closed` 窗口）：`virtual-pay-delivery.ts`（`grantPaid` 事务内与 `confirmPaid` 唯一冲突兜底）在更新订单为 `paid` 与 `ensureCredit` 之前核对 `EndUser.status === 'active'`；非 `active` 会员一律拒转 `paid` 与建权益，返回 `member_not_active`，推送仍返回 HTTP 200 空串、查单不影响同批正常单，诊断审计不记录 openid/PII；`verify:member-closure` 在隔离 SQLite 与真实 PostgreSQL 16 + 真 Redis（21 groups）均零退化。
+- ② 待人工单锁定：`virtual-pay-delivery.ts` 将 `allowClosedRecovery` 严格收窄为仅放行 `order.status === 'closed'`，彻底移除 `manual_review` 放行；查单因官方状态 `7`/`9`/`10` 或连续失败转入 `manual_review` 后，再收到验签且字段全对的迟到推送一律拒转 `paid`、权益数严格为 `0`，返回 `order_manual_review` 并记诊断。
+- ③ 并发失败计数与诊断去重原子化：`virtual-pay-reconcile.service.ts` 将 `recordQueryFailure` 改为事务内 `{ increment: 1 }` 原子自增并在达阈值或超 24h 时原子转 `manual_review`（不再以旧内存快照覆写 `queryFailCount`）；`diagnoseOrder` 改为数据库原子 CAS（抢占成功 `count === 1` 才写审计，并按 `pending`/`manual_review` 约束避免迟到工作线程覆写状态）。已同时在 SQLite 与真实 PostgreSQL 16 补齐 2/3 并发实例失败回归（`verify:miniapp-virtual-pay` 与 `verify:miniapp-virtual-pay:postgres`）。
+- ④ 查单与通知发货 HTTP 超时控制：`virtual-pay-xpay-client.ts` 新增 `VIRTUAL_PAY_HTTP_TIMEOUT_MS = 10_000`，为 `queryWechatVirtualPayOrder` 与 `notifyWechatProvideGoods` 统一挂 `AbortSignal.timeout(timeoutMs)`；首单 `notify_provide_goods` 挂起超时返回 `false`、保留首单已记权益并写 `notify_provide_goods_failed` 诊断，立即继续处理同批第二单（补短超时与防卡死保护回归）。
+- ⑤ XML 重复冲突标签拒绝：`wechat-miniapp-message.service.ts` 在 `parseXmlChildren`（及外层 `<Encrypt>` 提取）中拒绝同层级值不同的重复标签（如两个不同 `<OpenId>` 或 `<ActualPrice>`），不再静默取末值，补齐推送回归用例。
+- 未新增数据库迁移，没改 `apps/miniapp/**`、`apps/kiosk/**`、`apps/admin/**`、`apps/partner/**`、`docs/design/**` 与生产配置；改动业务源码全部 `< 500` 行；已完成 SQLite + 真实 PostgreSQL 16 + 真 Redis 全套门禁、M1–M3 反向变异跑红并还原复绿、`tsc`/`eslint`/`pnpm lint`、图谱重生与 `--check`、CI 门禁覆盖与仓库完整性校验；未推送，未上线。
+
+## 2026-11-21：小程序微信虚拟支付后端第一包返工 P2d1b2（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
+
+- 来由：补全线返工包 P2d1b2（原返工包 P2d1b 第 1–7 条，清单第 6 项），接在 P2d1 交货头 `8164ccea2` 之后逐条完成并提交。
+- ① 运行门禁只要求所选 `env` 对应的 AppKey：`env=0` 只要求现网键 `WECHAT_MINIAPP_VPAY_APP_KEY`，`env=1` 只要求沙箱键 `WECHAT_MINIAPP_VPAY_SANDBOX_APP_KEY`，生产仍禁止 `env=1`；`.env.example` 同步注明（只放占位说明）。
+- ② 查单按订单自己的 `order.env` 选对应环境的 AppKey 签名，缺少对应环境的键时不拿另一环境的键代签，记录 `app_key_missing` 诊断。
+- ③ 查单持续报错出口与诊断限频：给 `VirtualPayOrder` 新增只增列 `queryFailCount` 与 `lastDiagnosticReason`（SQLite 与 PostgreSQL 同步迁移 `20261121120000_virtual_pay_reconcile_state`）。同一单连续查询失败达 3 次或超过 24 小时仍因查询失败无法收敛时转 `manual_review`（待人工），写诊断并复用运维告警出口 `deliverOpsAlert` 告警，不再进自动批次；按单诊断改为状态变化才写；功能未配置且没有在途待支付单时定时查单静默跳过，不再每 5 分钟写诊断。
+- ④ 查单已支付状态严格收窄为官方 `query_order` 的 `2`（已支付待发货）、`3`（发货中）、`4`（已发货）；`7`（退款失败）、`9`（回收广告金完成）、`10`（分账回退完成）只写诊断 `non_grantable_order_status` 并转 `manual_review`，绝不记权益。
+- ⑤ 关单后到账不丢：本地已关闭的订单（`closed`）若收到验签通过且 openid、env、道具、数量、金额全部核对一致的已付推送，仍幂等补记一次权益（同一单至多一条，唯一约束兜底），写入 `virtual_pay.closed_order_paid_recovered`（「关单后到账补记」）审计并告警；字段不符仍拒绝。
+- ⑥ XML 推送解析容忍空白：外层 `<Encrypt>` 信封、内层 XML 叶子值、标签与 CDATA 之间及 CDATA 内首尾空白全部做 `trim` 容错。
+- ⑦ 查单补记后通知发货：依官方接口总表与 `notify_provide_goods` 原文（核对表 3.8、3.9），对经查单补记成功且微信侧状态为 `2`（待发货）或 `3`（发货中）的现金单，幂等调用 `POST /xpay/notify_provide_goods?access_token=...`（官方原文不带 `pay_sig`）；状态为 `4`（已发货）或已由推送标 `paid` 的单不重复调；通知失败不回滚已记权益，写 `notify_provide_goods_failed` 诊断。
+- 没改 `apps/miniapp/**`、`apps/kiosk/**`、`apps/admin/**`、`docs/design/**`、生产配置，仓库不含任何真实价格或道具 ID；图谱由生成器重生并通过 `--check`；未推送，未上线。
+
+## 2026-11-19：小程序微信虚拟支付后端第一段（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
+
+- 来由：补全线第二十五任 P2d1，清单第 6 项。从 `origin/main` `47e3a99af` 开出。只做后端第一段：开关默认关、下单并签名、接收发货推送并记一次权益、每 5 分钟查单兜底、会员查看自己的可用权益。小程序、一体机、管理员页面和设计稿都没改。用掉权益、失败退款、后台查看与退款留到第二包。
+- 平台开关 `charge.miniappVirtualPay.enabled` 只认字符串 `true`，没有这一行就是关。打开必须带 confirm，并写审计。能卖的前提是它和个人收费总开关都开。每个服务的道具 ID 和价格只经后台接口写入，仓库里不放真实价格或道具 ID。环境变量缺了，或生产环境用了沙箱，下单会被拒绝并写诊断，进程照常启动。
+- `POST /api/v1/member/virtual-pay/orders` 用这一次 `wx.login` 的 code 换 session_key 和 openid。openid 必须等于当前会员的 `wxOpenId`，否则拒绝并且不建单。session_key 只在这一次请求的内存里用完，不落库、不进日志、不进审计。用户态签名用 session_key 字符串本身的 UTF-8 字节当 HMAC 密钥，不先做 base64 解码。服务端 `pay_sig` 签实际发出的 body。官方示例的两段签名都复算对得上。
+- `GET/POST /api/v1/wechat/miniapp/message`：GET 按 token 验签后原样回 echostr；POST 安全模式验 `msg_signature`、解密并核 AppID。发货事件 `xpay_goods_deliver_notify` 核对 openid、道具、金额和 env，幂等地标成已支付并记一条权益。同一单重复推送、以及 PostgreSQL 上并发 20 次，都只有一条。验签或 AppID 不对返回 401。金额或道具对不上只写诊断，不记权益。
+- 新表 `VirtualPayOrder` 和 `MemberServiceCredit`，SQLite 与 PostgreSQL 都加了只增迁移。会员注销时断开账号和 openid，账务行留下。`consumedAt` 和 `refundedAt` 本包不写。
+- 每 5 分钟对仍待支付、且落在时窗里的订单调 `query_order`。查到已支付走发货同一条幂等路径。超时未付关单。access_token 只留 `MiniappAccessTokenService` 一处（稳定版凭证接口加 Redis 缓存），会员登录和小程序码都改用它。
+- `GET /api/v1/member/service-credits` 只回本人仍可用的权益：服务种类和记入时间。开关关着也照常回，不让已经记下的消失。用掉的、退款的和别人的不出现。
+- 虚拟支付模块导入共享的 `JwtVerifierModule`，管理员登录守卫才能在全应用里拿到验签服务。否则应用起不来。
+- 没有改打印、服务单和退款。没有推送，没有上线。图谱由生成器重生，没有手改 `docs/graph/`。会员权益接口 `GET /api/v1/member/service-credits` 补进图谱后是 682 个端点。
+
+## 2026-11-21：一体机付款屏到点核实端到端闭合与统一节流退避（P2e-1c，分支 `claude/kiosk-pay-service-p2e1`，未推送）
+
+- 来由：补全线第三十任依据 Codex 独立复收 `6819fb0c8` 暴露的 2 处精确缺陷派发的极小范围收口返工，从 `6819fb0c8` 继续按 2 项逐项提交，所有改动/新增业务源码保持 `< 500` 行，未新增数据库迁移、未触碰 P2e-2/3/4 业务页与生产配置。
+- 到点核实端到端闭合（必改 1）：
+  - 后端 `services/api/src/payment/service-order.service.ts`：`getForSession` 在 `refresh && row.status === 'pending'` 时不再被 `row.expiresAt.getTime() > Date.now()` 阻断，有 `provider.queryPayment` 时照常查渠道——`paid`（流水/金额匹配）走 `markServiceOrderPaid` 且 `checking: false`、`failed` 标 `paymentFailed: true` 且 `checking: false`、`closed` 设 `checking: false`、`pending` 仅未过期时保持 `checking: true`（已过期确认未付设 `checking: false`）、`unknown` 或查询抛异常保持 `checking: true`；无 `queryPayment`（`sandbox`）则未过期保持 `checking: true`、已过期设 `checking: false`。`verify-service-order-sandbox-simulate.ts` 补齐已过 `expiresAt` 待付单 `refresh=1` 的真 HTTP 回归（`paid` / 抛错 / `unknown` / `pending` / `closed` / `failed` / 沙箱过期）。
+  - 前端 `apps/kiosk/src/services/api/serviceOrders.ts` + `usePayServiceFlow.ts`：`serviceOrderPhase` 在 `pending` 下调整为 `paymentFailed` → `checking` → `serviceOrderExpiredLocally`，不再把服务端 `200 + pending + checking: true` 抢判成 `timed_out`；`usePayServiceFlow.ts` 增加 `postExpiryChecking` 续查态，到点 `refresh=1` 返回 `checking: true` 后保持轮询激活并每 `>= 10s` 自动续查 `refresh=1`，续查期间普通 GET 返回 `checking: false` 不抢判 `timeout`，仅在 `fromRefresh === true && checking === false` 或 `status !== 'pending'` 时收口；未过期期间普通查单 `checking: false` 仍立即复位回 `wait`。
+- 统一节流、每分钟上限与 429 退避（必改 2）：
+  - 抽出零运行时依赖的 `apps/kiosk/src/pages/pay/payPollGuard.ts`（150 行），让常规轮询、手动刷新、到点自动核实、`lookup`/`close_failed`「再查一次」四条路径（及重载恢复 `enter`）共用同一份 `lastRefreshAt`、`getLog`（60 秒窗口 28 次封顶）、`rateLimitHits`、`backoffUntil`；到点核实若距上次刷新不足 10 秒、处于退避期或满 28 次则通过定时器推迟至允许时刻发送（卸载/换单/离页自动清理）；`lookup`/`close_failed`「再查一次」与到点核实遇 `429 / RATE_LIMITED / RECONCILE_TOO_FREQUENT` 均走 `recordRateLimit` 尊重 `Retry-After` 并置 `rateLimited: true`，`PayServicePage.tsx` 同步在 `lookup`/`close_failed` 渲染限流温和提示。
+  - 新增 `apps/kiosk/scripts/tests/pay-poll-guard.test.mjs`（6 条单测与源码流程回归，挂入 `verify:kiosk-session-reporting`），`apps/kiosk/tests/visual/pay-service.spec.ts` 扩至 26 条（补齐到点 `checking: true` 12 秒后承接晚到 `paid`、到点前 1 秒手动核实推迟到 `>= 10000ms`、`lookup` 429 `Retry-After: 15` 退避期内连点 3 次发 0 次并过期后恢复 3 条精确回归）。
+- 验证：本机跑通 API `verify:service-orders`（38 PASS）、`verify:service-orders-concurrency`（21 PASS）、`verify:service-order-sandbox-simulate`（8 PASS）；`kiosk`/`api` `tsc --noEmit`、改动文件 `eslint --quiet`、`verify:kiosk-session-reporting`（21/21）、`verify:backend-error-copy-coverage`、`verify:fusion-w6`、`verify:kiosk-frontend-debt`、`verify:kiosk-unattended-copy`、`verify:kiosk-ai-declaration`、`blk.sh` 锁下 Playwright `pay-service.spec.ts`（26/26）与 W6 `/pay/`（3/3）、3 条反向变异 M1–M3 红绿复核、`generate-project-graph --check`、`verify-ci-gate-coverage` 与 `verify-repository-integrity`。未推送，未上线。
+
+## 2026-11-21：一体机按次付款屏地基返工（P2e-1b，分支 `claude/kiosk-pay-service-p2e1`，未推送）
+
+- 来由：补全线第三十任依据 Codex 独立收货结论（针对 `a22cbb25d`）派发的 P2e-1b 返工，从 `a22cbb25d` 继续小步提交，手写修改 14 个文件。未碰 `apps/admin/`、`apps/partner/`、`apps/miniapp/`、数据库 schema/迁移与生产配置。
+- 免费直通（阻塞 1）：零价、公共就业点位、总开关关闭、机构承担、无终端身份及 409 `SERVICE_FREE_ON_THIS_TERMINAL` 均自动前往白名单合法站内 `next`（如 `/resume/optimize`），兜底 `free` 态主按钮也指向 `onStart`（`targets.next`）而非退回 `back`；`fusion-w6-route-cases.ts` 同步更新 `/pay/resume`、`/pay/interview`、`/pay/scan` 的预期落地路径与页面标记。
+- 本地到点先核实（阻塞 2）：`usePayServiceFlow.ts` 本地倒计时归零时不再直接切 `timeout` 停轮询，先停常规 3 秒轮询并发一次 `refresh=1` 核实——服务端已 `paid` 直接进 `ok` 并前进下一步；明确未付成才落 `timeout`；核实请求本身网络/5xx 失败则保留单号落 `lookup`（可点「再查一次」发 `refresh=1` 承接晚到已付结果，不误判超时）。
+- 关单失败留单（应改 3）：`retireServiceTripOrder` 改为结构化返回，仅在关单成功、单本就终态或回 404 `SERVICE_ORDER_NOT_FOUND` 时才 `forgetServiceTrip`；返回或换码关单失败时保留 `sessionStorage` 原单号与 `tripRef`，进入 `close_failed` 给出温和提示与「再查一次 / 先返回」恢复路径，不静默丢单再建新单。
+- 重载旧周期收尾与游客转会员边界（应改 4、5）：`serviceTrip.ts`（保持零运行时依赖）新增无 PII 归属标记（游客 `guest` / 会员内存随机 `mark`）、旧周期号读取 `readServiceTripSessionIds` 与清场回调 `onServiceTripsCleared`；`kioskSession.ts`（零运行时依赖）新增 `end(reason, extraSessionIds)` 与 `endSessions`（带 64 条去重、含当前周期时轮换新编号）；`useKioskSessionReporting.ts` 在 `endKioskVisit` 与清场订阅里把重载保留的旧周期号一并通知服务端 `/kiosk/session/end`；`AuthContext.tsx` 游客转会员登录分支调用 `clearServiceTrips('login_handover')`，并由 `readServiceTrip` 归属隔离双保险拦截跨人/重载后继承。
+- 429 退避、`checking` 复位、底栏离开回归与门禁加强（应改 6、7）：`serviceOrders.ts` 解析 `Retry-After` 头（不改动 `httpAdapter.ts`），轮询遇 429 按 `Retry-After` 或 10s→60s 指数退避并显示温和提示（恢复 200 自动清除）；`applyView` 在收到普通响应 `checking: false` 时立即清除 `checking` 态不再粘滞；`pay-service.spec.ts` 扩至 23 条（补齐免费直通、到点核实与压哨付成、核实失败承接晚到已付、返回/换码关单失败留单、游客转会员隔离、429 退避、底栏「问小青」与主导航离开停轮询/恢复/清场、轮询 ≥3s 与 `refresh=1` ≥10s 实际间隔断言）；`verify-service-order-sandbox-simulate.ts` 明确断言非沙箱拒绝错误码为 `SANDBOX_ONLY`。
+- 验证：本机跑通 `kiosk`/`api` `tsc --noEmit`、改动文件 `eslint --quiet`、API `verify-service-order-sandbox-simulate`（7 PASS）与 `verify-service-orders`（38 PASS）与 `verify-service-orders-concurrency`、`blk.sh` 锁下 Playwright `pay-service.spec.ts`（23/23 通过）及 W6 `/pay/{resume,interview,scan}`（3/3 通过）、17 项图谱关联 kiosk 门禁、`kiosk-session-reporting.test.mjs`（15/15）、`generate-project-graph --check`、`verify-ci-gate-coverage`、`verify-repository-integrity` 及 4 条反向变异红绿复核。未推送，未上线。
+
+## 2026-11-19：一体机按次付款的地基与付款屏（P2e-1，分支 `claude/kiosk-pay-service-p2e1`，未推送）
+
+- 来由：补全线第二十七任派的收费第一包，清单第 7 项。起点 `origin/main` `f25d2b65f`。简历、面试、扫描三包（P2e-2/3/4）接在这一包上。
+- 服务单客户端 `apps/kiosk/src/services/api/serviceOrders.ts`：建单、查单（含 `refresh=1`）、关单；`ServiceOrderView` 照后端逐字段；受费用接口要带的 `x-kiosk-session-id`、`x-service-order-id` 由 `serviceOrderHeaders` 构造；状态判定按本地时钟对 `expiresAt` 判超时，管理员改价、改向个人收费总开关、改绑机构关掉的待付单归入没付成，可免费再试是 `status==='paid' && attemptsUsed>=1 && retryUntil>now`。没有扩 `ApiHttpError`。
+- 这一趟的订单号记在 sessionStorage（`apps/kiosk/src/services/serviceTrip.ts`），带着建单时的使用周期编号：整页重载会换编号，查单、关单仍要用建单时那个。键登记进 `auth/kioskSensitiveSession.ts` 清场表，每条清场路径都清。`useKioskSessionReporting.ts` 导出 `currentKioskVisitId`、`kioskVisitReadyForCharge`（建单前补发并等 start 落库）；建单遇 `SERVICE_SESSION_REQUIRED` 稍等 1.5 秒再建一次，再不成出标准句，不循环。
+- 付款屏 `/pay/resume`、`/pay/interview`、`/pay/scan`（`apps/kiosk/src/pages/pay/`），照触屏稿 `pay-1113.js` 的 pay-service：等待、核实中、付好了（停 1.6 秒去下一步）、没付成、超时、免费兜底（本机这一项 0 元时画稿里的免费屏；建单回 409 时刷新本机价目后直接去下一步）。渠道照实写（微信「请用微信扫这张码」、沙箱「测试支付通道 · 非真实收款」），简历 TRIP 句按运行页改，金额用建单返回的 `amountCents`，写「X.XX 元」。不付了返回会关掉待付单，付好了的返回不关。轮询普通查单 3 秒一次，核实间隔不少于 10 秒，每分钟封顶 28 次。「手机上买过」后端没有核销接口，不接。三条路由分开登记，授权收尾与使用统计各归简历、面试、扫描。
+- 后端只加开发与联调用的沙箱模拟付成 `POST /api/v1/payment/sandbox/simulate-service-order`（新文件 `service-order-sandbox.controller.ts`：生产 404、只认沙箱通道、按库内服务单造签名合法的回调、走真回调同一条验签入账路径），用例 `verify:service-order-sandbox-simulate` 进 CI。服务单的建单、查单、关单、结算、退款没有改，`online-payment.service.ts`、`refund.service.ts` 没动。
+- 路由登记：routes、`KioskRoot` 青序与触屏两张表、route-manifest、W6 用例与波次表、视觉证据处置、授权收尾、使用统计、迁移对照表一行。`userErrorMessage` 补服务单 8 个码，`verify-backend-error-copy-coverage` 加服务单一组。浏览器用例 `pay-service.spec.ts` 16 条挂进 `test:browser:truth`；并排截图按需跑（touch-pairs「付款 并排」）。
+- 本机真服务走了四遍（模拟付成、模拟付失败再出一张码、等真 5 分钟超时、中途把价改成 0）。没改简历、面试、扫描、打印的页面与调用，没碰小程序、两个后台和生产配置，价目仍 0。没有推送，没有上线。
+
+## 2026-11-21：收费第 2 期 b 返工第十轮 `P2b9d`，渠道退成事实保底、防二退、服务单异常与在途查询收口（未推送）
+
+- 分支 `claude/pricing-p2b-1119c`（从第九轮头 `f968e3522` 继续）。默认仍是机构承担、价目 0、个人收费总开关关、公共就业点位永不收费；未新增数据库迁移，未触碰 `apps/kiosk/`、`apps/miniapp/`、`apps/partner/`、`apps/terminal-agent/`、生产配置，未推送。
+- 渠道退成事实绝不回滚：`recordChannelAnswers` 先在事务内落库 `Refund.status = 'success'`、渠道实退额、`channelRefundNo` 与 `refund.channel_answer` 审计；遇纸已出或非过期成功退款合计超应付时不再回滚退款成功，保留 `Refund.status = 'success'`、写入 `refund.channel_success_conflict` 冲突审计并触发运维告警（同时修掉 `print-return-alert.ts` 未 `connect()` 导致告警被吞的缺陷），不再误导「先不记账，请走核对后仍退款」。`refund-notify-paper-guard.ts` 同步对齐，订单留在冲突待人工核对态。
+- 「核对后仍退款」前后端双防线守住 `channelInFlight`：前端 `PrintReturnHoldActions.tsx` 改判 `!channelPending`（`!detail.channelInFlight`）；后端 `refund-paper-exclusion.ts`（`allowFailedHold` 不放行仍在途的 `manual_review`）与 `stage-order-refund.ts`（`verifiedAfterPaper` 撤回条件加 `channelSubmittedAt: null`）联防，非默认单号在途 `manual_review` 调用 `verifiedAfterPaper` 被拒且 `provider.refund()` 调 0 次。
+- 多笔退款失败恢复计入 `manual_review`：`refund-channel-answer.ts` 统计仍有未结清退款覆盖 `pending` 与 `manual_review`，仍有在途 `manual_review` 时不把 `order.payStatus` 从 `refunding` 提前翻回 `paid`。
+- AI 服务单 `ABNORMAL` 全部三处收口：拆出 `service-order-refund-abnormal.ts`，在发起退款应答、`applyRefundQuery`、`settleServiceRefundNotify`（补 `refundState` 并纳入通知去重指纹）三处先判 `isChannelAbnormal`，不调 `markRefundFailed`、不递增 `refundAttempts`、写 `service_order.refund_abnormal` 审计与中间账户诊断并触发告警。
+- 24 小时内在途单加只查不处置端点与按钮：新增 `POST /admin/orders/:id/print-return/query-channel`（鉴权、限流、`mock-server-contract` 登记），前端在 `channelPending` 时提供「向渠道查询结果」并原地刷新详情保留中文结果提示；`refund-notify-paper-guard.ts` 打通 `manual_review` 收到微信成功通知收口（已关单重复通知仍幂等拦截）。
+- 按商户平台核实结果登记支持填实退金额（元转分、前后端校验 `0 < actualAmountCents <= refund.amountCents`，小于实付记 `partial_refunded` 留余款可退）；微信 `ABNORMAL` 满 24 小时不再误导为「长期查不到」或暴露登记按钮，引导商户平台处理后点「向渠道查询结果」收口；过期付款补收退款先查 provider 存在性并在 `db.refund.create` 原子写入 `channelSubmittedAt`。
+- 临时 PostgreSQL 16 @5677（UTC）与隔离 SQLite 全套打印到机价目、退款、服务单门禁、类型/lint/契约/文案/图谱/CI 门禁全绿；后台订单 Playwright 浏览器 18/18 通过；PG 5677 反向变异 5/5 必红并还原。
+- 2026-11-21 `P2b9e` 极小收口：微信退款成功通知（`refund-notify-paper-guard.ts` 及续退金额门 `refund-amount-hold.ts`、冲突判定 `print-return-disposition.ts` / `admin-orders-readonly.service.ts`）统一到与 `recordChannelAnswers` 同一口径——`casRefund` 同步落 `amountCents`，过期补收退款不翻动正常订单，非过期累计超应付或订单意外态绝不静默 `refunded` 或抛 `ORDER_INVALID_TRANSITION` 回滚，均保留 `Refund.status = 'success'`、写 `refund.channel_success_conflict`（`source: 'notify'`）、保持 `manual` / `opsAttention` 并触发 Webhook 回微信 200，`partial_refunded` 续退按累计实退正确落 `partial_refunded` 或 `refunded`；新增 PG/SQLite 双库真实 HTTP 回归（`pickup-arrival-p2b9e-notify-cases.ts`），PG 16 @5677（UTC）+ Redis 6677 全套门禁与 M1/M2 反向变异 2/2 必红并还原。
+
+## 2026-11-19：收费第 2 期 b 返工第九轮，「已提交渠道」改成显式记录（未推送）
+
+- 分支 `claude/pricing-p2b-1119c`（从第九轮第 1 条 e85d0f262 接着做）。默认仍是机构承担、价目 0、个人收费总开关关、公共就业点位永不收费。没有推送，没改小程序、一体机、终端 Agent、设计稿、生产配置。
+- 退款加「已提交渠道时间」一列（只加不改的迁移，SQLite 与 PostgreSQL 各一份，存量渠道退款处理中或待人工的回填为创建时间）。向渠道发起退款前先写这一列并提交；窗口关闭、没有渠道流水的过期付款、线下与免费单永远不写。「渠道受理过且没答复」只看这一列和状态，按原因、单号前缀、历史审计、「已关单有渠道退款号」的猜测都删掉。迁移清单门禁登记并核对回填。
+- 三步处置对订单上每一笔在途退款都问渠道，全部有明确答复才往下走，任何一笔还在途整单拒绝、都不改。渠道说成功按渠道回报的金额记账，合计等于应付记已退、小于记部分退；改为出纸、关单照实拒绝「渠道已经退成」，不再改写成整单确认退成。核验出纸不再按过期付款原因放行。
+- 微信退款异常（ABNORMAL）不当失败：钱停在渠道中间账户，退款保持处理中、订单不回滚、不放行出纸，记诊断并告警，商户处理完后渠道通知退成照常收口。服务单的口径没动。
+- 后台三颗按钮只看详情接口给的 channelInFlight；长期查不到渠道结果（不支持在线查询或满 24 小时）可以按商户平台核实结果登记，必须重输订单号，登记前先问一次渠道。
+- 渠道失败答复改成和退款失败回滚同一口径，订单离开退款中（原来部分退款单剩余那笔失败后能被直接关单，本机复现后修掉）。先拆分了四份超 500 行的文件再改（微信渠道、后台订单只读服务、后台订单服务、审计中文名），拆分提交不改行为。
+- SQLite 与 PostgreSQL 的到机价目套件、退款与支付相关门禁、迁移清单门禁、后台订单浏览器用例都过；反向检查九条都红。
+
+- 分支 `claude/pricing-p2b-1117`。到机价目门禁新接的第八轮用例写入图谱。`node scripts/generate-project-graph.mjs --check` 通过。没有改行为，没有推送。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，类型检查三处收口（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。没有改退款判断，没有新迁移，没有推送。
+- 渠道在途被拒绝时，函数把拒绝的结果返回出去，类型检查才能确认每条路都有结果。
+- 事务里按合计判断时，读退款带上 id。合计盖住应付才挡住，和原来一样。
+- 领取前锁订单的参数收成事务客户端。调用处本来就在领取事务里。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，确认退成后的退款单号保留（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。没有改代码，没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。
+- `Order` 没有 `refundLedgerNo` 列。详情里的这个字段是只读计算值，等于 `explainPrintRefund` 选中的那笔 `Refund.refundNo`（`admin-orders-readonly.service.ts`）。确认整单退成后，订单是 `refunded`、退款是 `success`，解释结果是 `auto_success`，单号仍带着，详情页「自动原路退」一栏要显示它。
+- 三步按钮只在解释结果是 `manual` 或 `auto_failed` 且有单号时出现。「这笔待人工处理」只写在 `manual` 下面。确认退成后这两处都不亮。再退一笔被挡住，靠的是退款状态已经成功，不是靠这个单号还在。清掉单号会让已经退成的详情失去这笔账的标识，后续流程不会因为留下它而重新打开处置。所以不清。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，查询出错的非 Error 也写入诊断（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。
+- 渠道查询抛出的不是 Error 时，诊断写 `String(error)` 截断后的文字，不再固定写成「查询渠道没有完成」。写入前去掉网址、手机号和 18 位证件号。退款状态仍保持原样。
+- 反向改回只在 Error 上取 message，同一用例的诊断里没有抛出的原文。已还原。SQLite 与 PostgreSQL 的到机价目套件都过。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，渠道业务答复按官方文档区分失败（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。退款收敛仍只看查证结果的 `status`，不看新增的原文状态。
+- 三步处置只把官方写明这笔钱没退成的当成失败。微信退款关闭（处理中超过 7 天且余额不足，请求已关闭）：https://pay.weixin.qq.com/doc/v3/partner/4013080623 。退款单不存在（受理失败，原单重试不会重复出款）：https://pay.weixin.qq.com/doc/v3/partner/4014960215 。这两条可以继续改为出纸或关单。
+- 退款异常是原路到银行卡失败后要人工处理，文档没有写钱已经确定没退出去：https://pay.weixin.qq.com/doc/v3/merchant/4012791884 。三步拒绝，退款保持处理中。抛出的「退款单不存在」字样不是这条官方状态，仍按查询出错，状态不改。支付宝没返回退款状态时写的是「未收到或者退款失败」，两种可能，也不当失败：https://opendocs.alipay.com/open-v3/b9ef37bd_alipay.trade.fastpay.refund.query 。
+- 反向拿掉退款异常这条，同一用例立刻把异常当成失败。已还原。SQLite 与 PostgreSQL 的到机价目套件都过。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，改为出纸清掉旧的未出纸结论（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。
+- 确认改为出纸把任务重置成待领取时，已经把 `printOutcome` 写成空。不是 `printed` 才能进这条更新；`printed` 仍然拒绝。先把结论记成 `unprinted`，改为出纸后是空，重新领取后仍是空。
+- 反向拿掉这一行清空，同一用例立刻留下 `unprinted`。已还原。SQLite 与 PostgreSQL 的到机价目套件都过。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，事务内按成功退款合计判断（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent 的业务行数（领取调用仍是一行）、设计稿、生产配置。领取查询条件没改，原因是空的成功退款仍算进去。
+- 领取在事务里先锁订单，再按非过期成功退款的合计判断。两笔各 100 分、应付 200、支付状态仍是已付时，单行都没盖住，合计盖住，不能领。一笔 100 分没凑满仍不挡。过期成功退款不计入合计。
+- PostgreSQL 上领取先通过查询条件，锁内再写上两笔成功，20 轮没有既领走又凑满。反向拿掉合计、只留单行金额，第 0 轮又领走。已还原。SQLite 与 PostgreSQL 的到机价目套件都过。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，关单和纸已出放进同一条条件更新（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。
+- 确认关单改支付状态时，和确认退成一样：同一条语句先锁订单、再锁打印任务。任务已领、正在打、已完成，或 `printOutcome` 已是 `printed`，这条更新不命中，整笔回滚。随后取消还没领走的任务也排除已经核验成已出纸，没命中就拒绝关单。
+- PostgreSQL 上先把 `printOutcome` 写成 `printed` 再放行关单，20 轮没有既关单又留下已出纸。关单回 `PAPER_ALREADY_OUT_CANNOT_CLOSE`，支付状态不是已关闭。没有竞态时，关单后支付状态是已关闭，出纸结论不是已出纸，退款行是已关闭。
+- 反向：拿掉关单条件里的 `printOutcome`，以及取消任务时的同一条件，第 0 轮又变成既关单又已出纸（`code=ok pay=closed outcome=printed`）。已还原。SQLite 与 PostgreSQL 的到机价目套件都过。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，核验出纸与在途退款同一把锁（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。
+- 核验出纸先只锁订单行，拿到锁后再读退款。不再把「没有在途退款」和行锁写在同一条语句里，避免等锁期间用旧快照把已经提交的处理中退款看成没有。发起退款和失败后重试改成处理中，也先锁同一行再读。
+- PostgreSQL 上核验先等锁、退款后提交，20 轮没有既写成已出纸、退款又停在处理中。先提交在途再核验会拒绝。先核验已出纸再发起退款会拒绝，退款行不会变成处理中。
+- 渠道没受理过的待人工（窗口清扫），核验已出纸放行，同一事务里撤回成 `withdrawn`，原因「核验已出纸」，并写审计。需关注里不再出现。核验未出纸不撤回。渠道受理过的待人工仍拒绝，退款状态不改。
+- 反向：先读退款再锁订单，同一用例第 0 轮又变成既出纸又在退。已还原。SQLite 与 PostgreSQL 的到机价目套件都过。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，渠道在途时三步都不能处置（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。默认仍是机构承担、五个价 0、个人收费总开关关、公共就业点位永不收费。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。
+- 渠道受理过、还没有明确失败答复的退款，确认退成、改为出纸、确认关单都先问渠道。不传查询函数直接打这三步，也回 `REFUND_CHANNEL_UNCONFIRMED`，文案「退款还在渠道处理中，结果出来前不能处置。」退款状态不改，订单留在需关注，并写 `refund.hold_rejected`。
+- 渠道说成功：不论点的是哪一步，都改成记退成，不出纸、不关单。渠道说失败：先把退款记成失败，再按点的那一步做。处理中、未知、这条路不支持查询：拒绝，状态保持原样。查询自己抛错仍是 `REFUND_CHANNEL_QUERY_FAILED`，不改状态。
+- 订单已经关闭之后，渠道又通知退成，退款行被搁成待人工并带上渠道退款号。这是渠道的成功答复。确认后退款记成成功，订单保持关闭。金额不符再查到成功仍拒绝，不改状态。
+- 个人收费打开但支付通道没配上（审计码 `ONLINE_PAYMENT_DISABLED`）、请求没有离开本机的待处理退款，不算渠道受理过，三步照常。已经写过渠道处理中或结果不可知的，仍拦住。
+- 后台这三颗按钮在退款还是处理中时全部禁用，并写明同一句原因。渠道已经失败的待人工，三步仍可点。
+- 期望值收紧：sandbox 上还在处理的三步改为拒绝，退款仍是处理中、订单仍已付。并发夹具改成渠道已经明确失败，保住「只成功一笔」。渠道查到成功时，改为出纸和关单也改成记退成。
+- 反向：闸门暂时只拦改为出纸，确认退成立刻变成成功。已还原。SQLite 与 PostgreSQL 的到机价目套件都过。后台浏览器用例覆盖三颗禁用按钮。
+
+## 2026-11-19：收费第 2 期 b 返工第八轮，渠道查询出错不再改状态（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。默认仍是机构承担、五个价 0、个人收费总开关关、公共就业点位永不收费。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。
+- 渠道查询自己抛错时，退款状态保持原样，不再把 `pending` 改成 `manual_review`。仍回 `REFUND_CHANNEL_QUERY_FAILED`，写诊断审计 `print_order.no_paper_manual`，并走原来的告警。诊断写明状态保持原样、这次不能处置。
+- 改为出纸前的渠道核查不再只找 `pending`。支付渠道（wechat / alipay / sandbox）上还没明确失败的处理中，以及渠道受理过的待人工（含有渠道退款号、查询出错留下的待人工、金额不符），都要先查渠道。窗口清扫（`RFD-WINDOW-` / `pickup_window_closed_unprinted`）和没有渠道流水的过期待人工不查渠道，改为出纸照常。
+- 现有用例里「查询出错后状态变成待人工」改成仍是 `pending`。这是收紧，不是放宽：故障码、审计原文、订单仍已付、任务仍失败都还在。后台错误文案改成「查询渠道时出错了，退款状态保持原样，这次不能处置。」
+- 反向：把改状态加回去，同一用例立刻要求 `pending` 却得到 `manual_review`。只查 `pending` 时，渠道受理过的待人工改为出纸直接成功。两处都已还原。SQLite 与 PostgreSQL 的到机价目套件都过。
+
+## 2026-11-19：收费第 2 期 b 返工第七轮，纸已出与退成互斥，反方七条（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是退款和出纸。默认仍是机构承担、五个价 0、个人收费总开关关、公共就业点位永不收费。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。
+- 后台核验出纸只写 `printOutcome=printed` 也算纸已经出去。确认退成的条件更新排除任务状态 claimed、printing、completed，以及 `printOutcome=printed`。PostgreSQL 上先锁订单再锁打印任务。核验写 `printOutcome` 时排除已在退或已退成（过期付款那笔成功退款不挡）。两边各并发 20 轮只一边成立。
+- 领取条件里，成功退款补上 `reason` 为空。部分成功退款不再因为 SQL 把空原因漏掉而让领取和退款同时成立。整单成功且原因为空时，金额已经盖住应付，领取仍被另一道拦住，这一条复现不出「整单也领走」。
+- 部分退款不能直接关单。剩下的钱再退，或留在待人工。确认关单的条件更新也排除 `partial_refunded`。
+- 窗口关闭、没出纸，同一张单已经有待人工、处理中、失败或成功的退款记录时不再重复写，也不再重复告警。两轮清扫只留一条。
+- 确认改为出纸的订单更新排除已经领取、正在打印、已经完成。打印任务只在失败、取消或待领取，且还没核验成已出纸时才能重置。和终端出纸并发，PostgreSQL 上 20 轮只放行一次出纸。
+- 过期成功退款之外还有当前这笔失败退款时，需关注不再整单滤掉。已经出纸、没有过期成功退款、完全没有退款行的单仍不进。渠道明确返回未知仍是未知，退款保持处理中，不能改为出纸。查询过程自己抛错记成 fault，写诊断，退款改待人工，回 `REFUND_CHANNEL_QUERY_FAILED`，不静默当成未知。
+- 后台三步在退款还是处理中时，「确认改为出纸」禁用，并写明「退款还在处理，先查渠道结果。」确认退成和关单仍可点。演示单可点的三步改为渠道已经失败；处理中用 `mock:order-hold=pending`。浏览器用例 4 条通过。现有三步断言的期望值没改。
+- 反向把过期需关注的排除条件加回去，同一用例立刻漏单（0 不等于 1），恢复后再次通过。SQLite 与 PostgreSQL 的到机价目套件、核验出纸和人工退款门禁都过。图谱里 AuditLog 引用 33 个文件变成 34 个，Refund 15 个变成 16 个，多出的是渠道查询失败写诊断。
+
+## 2026-11-19：收费第 2 期 b 返工，窗口关闭没出纸、自动退关着也有去向（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一条只处理「钱收了必须有去向，不看开关」。`PICKUP_EXPIRY_AUTO_REFUND_ENABLED` 默认仍是只有环境变量等于 `true` 才开，没有改默认值，也没有改 `verify-pickup-code-share.ts` 对这句的断言。
+- 生产清扫每 10 分钟仍跑。开关开着，仍走原来的 `sweep()`：窗口关闭、没出纸的已付单按实付原路退。开关关着，不再直接返回：同一批「已付、窗口已关、还没挂打印任务」的单留下待人工退款（`manual_review`，原因 `pickup_window_closed_unprinted`，单号 `RFD-WINDOW-` 加订单号），不改支付状态。告警类型仍是 `print_return_manual`。订单列表「需关注」能筛到，角标是「待人工」。
+- 直接调用 `sweep()` 的 7 天未取件和出纸异常自动退不改。开关关着时，这两条不自动退，也不进这一条待人工。
+- 已经挂上打印任务、纸还没出去的单也进同一条清扫。到机放行后取件状态是 `used`、窗口时间已过：任务失败且出纸结果是 `not_printed`（卡纸），或任务还是待领取、出纸结果为空（脱机没领走），开关关着进待人工，开着原路退。已经领走、正在打印、已完成或出纸结果是 `printed` 的不进。出纸结果为空不能写成「不是 printed」，否则 SQL 会把这一行漏掉。
+- 渠道退款成功仍不改打印任务状态（`verify-wechat-refund-notify.ts` 那条「退款回调全程不影响 PrintTask.status」不动）。退成后这张单领不到，是因为支付状态已经不是已付。同一台机器上另一张已付单仍能领走。
+- 第一次部分退款不再因为「此前没有成功记录」被记成全额已退。200 分先退成 50，订单停在部分退款、已退 50；剩下的 150 仍走普通退款入口，退完已退 200。过期付款的成功退款仍不计入这一笔。
+- 在途 `pending` 点「确认改为出纸」先查渠道。只有渠道明确失败才放行。成功、处理中、未知，或这条路没有查证（sandbox），回 `REFUND_CHANNEL_UNCONFIRMED`，写审计 `refund.hold_rejected`，订单和退款行不动。确认退成，以及没出纸时的关单，仍可用。已经出纸的单点关单回 `PAPER_ALREADY_OUT_CANNOT_CLOSE`，同样写这条审计；后台不再显示关单按钮。审计列表上的中文名改为「拒绝这笔待人工处置」，具体原因写在审计内容里。原先「sandbox 的在途退款可以直接改为出纸」这条期望改掉，因为这路查不了渠道。
+- 只有成功的部分退款、没有失败或待人工行时，三步不再显示，页面指向「退还剩余」。点了仍回 `REFUND_REMAINDER_REQUIRED`。剩余退款失败后再点确认退成，会接住部分退款：先前 50 加上确认的 150，已退记 200 并变成已退；没盖住应付就停在部分退款，已退按累计。反方写的 409，代码里实际是 `ORDER_INVALID_TRANSITION`（HTTP 400）。
+- 确认退成和终端领取、出纸回报抢同一张订单。订单更新要求任务状态还不是已领取、打印中或已完成。抢输就整笔回滚，回 `PAPER_ALREADY_RELEASED`，拒绝审计写在事务外面。PostgreSQL 上领取对确认退成、出纸回报对确认退成各 20 轮，只有一边成立。真实领取在待人工退款还在时选不中这张单，也各跑了 20 轮。
+- 成功的过期退款（当前这笔仍已付、任务失败、纸没出）原来只在待人工和告警里，订单列表「需关注」是空的。现在同一形状能筛出来，角标仍是「待人工」。不改订单上的待退款原因，避免挡住领取。已经出纸的，以及非过期的全额成功退款，不进这一条。
+- 领取时「退款挡住出纸」的查询条件从 `terminals-agent.service.ts` 挪到 `refund-paper-exclusion.ts`。判断不变：已付、待领取，待退款原因和在办、失败、待人工、已按实付退成的退款仍不领；过期付款的退款仍不挡。该文件行数回到不超过 P2b4c 交货时。
+- 图谱重生后，`PaymentAttempt` 的引用从 9 个文件变成 10 个，多出的是在途退款查渠道的 `payment/refund-channel-query.ts`。
+- 后台只读门禁的需关注类型在五类之外增加 `print_return_manual`（待人工）。原来的五类码和中文还在。SQLite 与 PostgreSQL 的到机价目套件都过。没有新迁移，没有改价目，没有推送。
+
+## 2026-11-19：收费第 2 期 b 返工，收货九处与反方（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是收钱和退钱，补收货不通过的九处，以及反方里成立的两条。默认仍是机构承担、五个价 0、个人收费总开关关、公共就业点位永不收费。三组到机报价仍是 738、5505、2573 分。没有新迁移，没有改价目，没有推送。没改小程序、终端 Agent、设计稿、生产配置。告警类型仍是 `print_return_manual`。
+- 上一节「过期付款尝试金额与订单一致、订单还没付、取件窗口还开着，仍入账」保留。入账之后取件窗口关上、纸还没出去，不能停在已付、退款 0。按实付原路退；退成则已退，退不成就留下待人工。原因是 `pickup_window_closed_unprinted`。不靠个人收费总开关。
+- 上一节「过期付款成功不再盖住后面的自动退失败」从这一节起收窄到这一笔已付：当前是已付、退款中或部分退款，且应付大于 0 时，更早那笔过期付款的成功退款不属于这一笔，不能把后来的已付没出纸显示成自动退成功，也不能盖住未履约待退。应付为 0 的过期退款仍算自动退成功。
+- 上一节把部分退款只写成进待人工。从这一节起，剩下的钱按同一退款入口再退，单号是 `RFD-REST-` 加订单号。没有待处理退款行时，三步回 `REFUND_REMAINDER_REQUIRED`，不把剩余停住。部分退款、已出纸且退款失败进入订单列表「需关注」，文案是「部分退款」「已出纸退款失败」。
+- 上一节三步对着失败和待人工。排队超时、渠道还没确认的 `pending` 退款同样在这三步里。待人工里不能有点不动的单。
+- 三步在同一事务里按当前退款状态条件更新。确认退成和确认关单并发，只成功一笔，另一笔回 `REFUND_HOLD_ALREADY_RESOLVED` 并回滚。PostgreSQL 上各并发 20 轮。上一节没写两笔都能提交，从这一节起不再允许。
+- 上一节「确认退成把已付或退款中改成已退」对已经出纸不再适用。已出纸只许走「核对后仍退款」，审计仍是 `refund.paper_checked`。已出纸点「确认退成」回 `PAPER_ALREADY_RELEASED`，不改订单、不改退款、不改纸、不写这条核对审计。已出纸再点「改为出纸」先写 `refund.hold_rejected`（中文「已出纸，拒绝再改成出纸」）再拒绝。核对后仍退款时，失败和待人工不再挡住再开一笔；`pending` 仍挡住。
+- 确认退成按钮仍读 `refundLedgerCents`。排队超时、渠道关着时，详情把最新一笔待处理、失败或待人工退款的金额和状态填进这个字段，按钮金额与要确认的那一笔一致，不再显示 0。上一节「退款按钮和核对后退款按钮按应付额」不变。
+- 普通退款成功、订单变成已退之后，这张单还没领走的打印任务一并取消（只取消待打印、且出纸结果不是已出纸），再发一次领取领不到。部分退款不取消。渠道成功通知那条路径仍不取消任务。上一节「打印任务不在这条路径上取消」只约束渠道成功通知。
+- 改为出纸只把「已付没出纸待退」这一原因清掉，其它原因不动；清掉之后终端能领到。过期付款退款不论什么状态都不挡住这一笔新付款的领取。原因是空的普通待处理退款仍挡住。反方里「同一过期流水号再通知一次会抛已支付」不成立：第二次同一流水号按成功幂等确认，不抛 `ORDER_ALREADY_PAID`，窗口开着仍入账。反方里「排队超时要造一笔待人工退款」不成立：超时结算异常只写审计，不建退款行；普通退款入口仍能退成。
+- 后台订单浏览器用例：打开待人工演示单，三步各点一次。按钮金额 2 元。确认退成后已退款、任务已取消；改为出纸后已支付、待领取；确认关单后已关闭。演示单默认不进列表。本机已跑过。
+- 图谱已按当前代码重生。后台只读门禁的需关注类型从三类扩成五类，原三类正向断言还在。
+
+## 2026-11-19：收费第 2 期 b 返工，退款与出纸只能成立一个，已付没出纸都有去向（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮仍是收钱和退钱。默认仍是机构承担、五个价 0、个人收费总开关关、公共就业点位永不收费。三组到机报价仍是 738、5505、2573 分。没有新迁移，没有改价目，没有推送。告警类型仍是 `print_return_manual`。
+- 同一张单的放行出纸和退款在同一事务里互斥。退款还在处理、失败待人工，或已经退成且不是过期付款那一笔，终端领取一律拒绝，审计写明「这单有退款在处理或已经退成，不能出纸」。已经放行或已经出纸，后台普通退款拒绝，并写明要走「核对后仍退款」。核对后仍退款仍是这一张单上的一笔，纸可能已经出去，审计动作是 `refund.paper_checked`。上一节「任务已经失败才允许渠道成功通知把订单改成已退款」从这一节起不再适用：没放行出纸时，待确认、失败或已改为出纸的退款都可以收敛成退款成功，打印任务不在这条路径上取消；已经放行则改回待人工，不把订单改成已退款。
+- 退款失败留在待人工，不会永久挡住。管理员三步，做完只剩一种状态：确认退成（订单已付或退款中则改成已退，并取消还没领走的任务；未付、支付中、已关闭只把退款行标成功，不改订单支付状态）；确认改为出纸（退款行改为 withdrawn，这笔钱不记成已退回，任务回到可领取）；确认关单（订单关闭，纸不再出，钱不记成已退回）。关单之后渠道又通知退成，退款行回到待人工，订单保持关闭。改为出纸之后渠道又通知退成：任务还没领走就按退款成功收口，领取仍要已付，所以不会再出纸；已经领走则回到待人工。
+- 已付大于 0 且没出纸，每张单只落一种去向：自动退成功、待人工、自动退失败进待人工。裸的已付失败、纸面为空、退款中但没有退款行、部分退款、非自动原因的失败或处理中，都进待人工，后台列表和 `print_return_manual` 告警看得到。全额退款成功离开待人工列表。普通已付、任务还在排队、没有退款，不进待人工。过期付款成功不再盖住后面的自动退失败。上一节「待人工核对时写不要再发起一笔、不再放第二颗出款按钮」从这一节起不再适用：订单页对有退款单号的待人工给出上面三步；那句只留在上一节。
+- 到机按本机价重算时把旧抵扣清成 0。收费第 1 期只做整单抵扣，部分抵扣不支持（`order-status.service.ts` 写明本波不接部分抵扣）。清掉之后付款金额等于应付额，没出纸自动退退回的就是实付。后台退款按钮按应付额写金额。上一节「改价留下减免」从这一节起不再适用。在线收款回调仍按订单 `amountCents` 比对，不改成应付额，避免把途中的付款尝试改分类。
+- 排队超时后的结算如果抛出预料外的异常，记下诊断并发 `print_return_manual`，这张单进待人工，不再把异常吞掉。后台能看见的告警是从待人工列表派生的；只有同时配置了告警 webhook 和 Redis 才会往外推。
+- 过期付款尝试金额与订单一致、订单还没付、取件窗口还开着，仍入账。订单已经付过，或窗口已关，同额迟到成功改走原路退，不再吞掉。订单支付状态已是关闭、取件窗口还开着时，同额迟到款入账，可以出纸。放弃付款后到公共就业点位免费放行，这是公共就业点位永不收费，不改成收费；迟到的原金额仍按过期付款原路退。放弃付款只把本地尝试标成过期，不调渠道关单。
+- 退款还在处理、纸已经出去时，渠道成功通知不记成退款成功，退款行改待人工，订单回到已付款。纸还没出去时，处理中的退款仍可以记成成功。后台退款按钮和核对后退款按钮上的金额是服务端 `payableCents`，与实退金额同一个函数。带抵扣时退回的是应付额，不是订单原金额。
+- 管理端日志里 `refund.hold_resolved` 显示「处置没出纸的退款待办」，`refund.paper_checked` 显示「核对后仍退款」。告警页仍不出现英文 refund。
+- 已经领取、正在出纸或已核查出纸的普通退款，拒绝码是 `PAPER_ALREADY_RELEASED`，并写明走核对后仍退款。旧的 `ORDER_TASK_IN_PROGRESS` 和 `PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN` 不再是这条路径的第一道拒绝。
+
+## 2026-11-18：收费第 2 期 b 第三轮，迟到付款原路退、占单释放、退款与出纸不能同时成立（未推送）
+
+- 分支 `claude/pricing-p2b-1117`。这一轮改的是收钱和退钱。默认仍是机构承担、五个价 0、个人收费总开关关、公共就业点位永不收费。没有新迁移，没有改价目，没有推送。
+- 过期付款尝试在订单已经改价或免费放行之后才扣到钱：按尝试上的金额原路退，留下可处理的退款记录。退成则退款单成功，后台看得到单号、金额和「过期付款 N 分已原路退回」。没有渠道流水则待人工并告警。失败回调不记成已收款。这单仍按现在的价，不按旧金额放行。上一节「记待人工、不原路退」从这一节起不再适用。
+- 放弃付款、尝试过期、渠道确认关单之后都放开这台机器。还没有付款尝试时不占机器。换到另一台按那台的价，公共就业点位不收钱。已经扣到的成功尝试不因放弃被抹掉。上一节「渠道已经受理的尝试过期后仍占着这台」从这一节起不再适用。
+- 同一单不许既出纸又退款。放行前只要还有待确认、失败或待人工的退款就拒绝出纸。渠道对一笔已经失败的退款又发来成功通知时：打印任务还没失败、还没取消，或已经核对为出纸，就不能把订单改成已退款，退款行改待人工；任务已经失败（明确没出纸）仍可收敛为退款成功。退款还是待确认、任务也还是待打印的旧路径不变。
+- 已付大于 0 且没出纸，只落一种去向：自动退成功（不进待处理列表）、自动退失败并告警、待人工并告警。自动退或过期付款还在处理中算待人工，不能写成已经退成。金额对不上、没有渠道流水、已经放行不能再记成功，都算待人工。待人工核对时后台写明退款单号和金额，并写「不要再发起一笔」；不再放第二颗出款按钮。
+- 排队超时清扫在个人收费开着时留下成功退款，关着时不建退款行，只留待人工审计。告警类型仍是 `print_return_manual`：后台告警页门禁不许页面和运营客户端出现英文 refund，不能改成含 refund 的名字。类型已经登记在告警类型表里。
+- 缺纸、说不准、部分出纸、名单外错误码仍只待人工，不自动退。`PRINT_QUEUE_TIMEOUT` 仍在允许名单里，清扫只失败还没被领走的任务。
+- 取件页对「退款还没结清」显示「这单的退款还没结清，现在不能出纸」，归到不能重输的终态。审计里过期付款退回、没出纸自动退失败、没出纸待人工、退款通知时已经出纸，都有中文名。
+- 浏览器：收银台「退出支付」会带付款票请求放弃付款并回到首页。核码页在补价说明上点「返回」，也会放弃这次付款。
+
+## 2026-11-17：收费第 2 期 b，到机补价与明确没出纸自动退（未推送）
+
+- 分支 `claude/pricing-p2b-1117`，从主线 `9b50f8e0f` 拉出。一体机核到机码时按这台机器的生效价重算。未付按本机价收并记审计；0 元免费已付到收费机先付款；已按大于 0 付过的不补不退；本机价 0 和公共就业点位照旧。
+- 已付款且终端明确没出纸，自动原路退跟着个人收费总开关。开关默认关，关时只落待退款信号，不调渠道，同时进待人工。自动退只认确定没交给打印机的允许名单。出纸未确认、部分出纸、缺纸、名单外的新错误码改为待人工。后台订单页按自动退成功、自动退失败、待人工分开写原因。退款按实付，不按后来的本机价。已退款或退款中的单不再放行；放行时先占住已付款，避免和退款回调一起既退钱又出纸。
+- 看价格不写终端号。只有出码前把终端号写成这台，并且付款还没过期，才占住。渠道还没受理的过期或失败、以及用户在受理前返回，会放开终端号。已经绑在别的机器上的单仍拒绝，避免走错机器变成可枚举的成功。未付且金额大于 0、本机价为 0（含公共就业点位）时改成 0 元免费并放行。改价留下减免，报价行数和子项对不上则整单不改。向用户收费的单价不在 0 到上限之间就拒绝报价。改回未付时把待付尝试过期；过期尝试按旧金额付来的钱不入账，记待人工。渠道已经受理的尝试过期后仍占着这台，避免旧码还能扣时又出一笔。
+- 到机报价仍是整数分，黑白和彩色分开：123 分 × 3 页 × 2 份 = 738，367 分 × 5 页 × 3 份 = 5505，两样相加 738 + 367 × 5 = 2573。
+- 一体机核码页：返回后再输同一枚码仍进入付款；换一台不收费的机器再输，不再出现补价说明，也不再给出收银台。收费说明不写岗位、招聘或投递。定稿 `pay-1113.js` 没有「付不成可以返回，订单还在，可以再来付款。」这句，页上保留这句话。
+- 没有新迁移。没有推送。已并入当时的 `origin/main`。进度冲突只在本文件，两侧记录都留。图谱按合并后的代码重生。
+- 缺纸、说不准、部分出纸只记待人工审计和告警，不写成「文件失效待退款」。个人收费总开关关着、且错误码在允许名单里，仍写那条信号并进待人工，不调渠道。超时未确认走同一条口径。后台待人工同时认这条信号和待人工审计。核码重发比对的是入口时手里的码哈希，刷新订单不会把哈希换成库里的新码。个人收费开着时，打印机离线这类确定没交给打印机的失败会自动原路退；打印链路里继续重提的夹具改用缺纸。
+
+## 2026-11-21：一体机首页四个入口的短价收尾（P2e-5，分支 `claude/kiosk-home-price-p2e5`，未推送、未上线）
+
+- 来由：收费第 7 项第五包（P2e-5），起点提交 `f25d2b65fed330923242d91f8ab95df9d083030b`（当时 `origin/main`），只改 `apps/kiosk/`，不碰后端、管理员后台、机构后台与小程序。
+- 数据透出：`kioskHomeFreeBadgeReader.ts` 与 `useKioskHomeFreeBadge.ts` 在原有 `{badge, charged}` 同轮配置读取中透出五个生效价（分，非负整数）；缺键、非法值、读失败、超时或换终端均记为 `null`（未知），绝不默认成 0，且「免费使用」角标语义一字未改。价格只取 `GET /terminals/:id/config` 的 `pricing.effective`，无硬编码价格、无「¥」、无「工作人员」。
+- 卡片与页脚：`QxTouchTask.tsx` 新增可选 `priceLines` 槽位；`homeTouchCopy.ts` 的 `homePriceLines` 仅在五个生效价全部读到且至少一项 > 0 时渲染三张收费入口卡短价（改简历「每次 X.XX 元 · 诊断免费」或「免费」、练面试「每次 X.XX 元」或「免费」、打印 · 扫描两行「打印 黑白每页 X.XX 元 / 免费」与「扫描 每次 X.XX 元 / 免费」，彩色单价不上首页，查政策与到机取件不标价）。页脚「收费以现场公示为准」沿用既有出现条件并接在自动退出登录之后，加 `.qxt-home-keep`（`white-space: nowrap`）确保整句不折行。
+- 样式与压低态：`home-touch.css` 按设计稿 `pay-1113.js` 补价格行样式，并仅在「已登录且有继续办理」或「私有化四磁贴压紧版式（不压低会溢出 76px）」且标价时压低四张入口卡（标题 32px、图标 52px、正文与短价 20px、继续办理条最小高 72px、右下角小样图按右下角缩到 0.78），确保字号不小于 20px、可点区不小于 48px、页脚三行与备案号位于底部导航之上；标准 2 磁贴未登录态与所有不收费态样式保持原样。
+- 验证：新增/扩展 `scripts/tests/home-free-badge.test.mjs`（29/29 PASS）、`tests/fixtures/machine-pricing.ts` 与 `tests/visual/home-price-lines.spec.ts`（挂入 `playwright.w1.config.ts`）；连同 `qingxu-home.spec.ts`（共 51/51 PASS）、`home-continue-handover.spec.ts` 与 `home-fill-when-empty.spec.ts`（19/19 PASS）、全部关联静态/单元/API 门禁、`tsc --noEmit`、全仓 `pnpm lint`（0 errors）及 3 条反向变异均验证通过。本地独立 Redis 6666 + API 3366 + 隔离库 `/tmp/p2e5-verify.db` 真服务三态走通，4 张 1080×1920 照稿并排图逐张目视核对无版式/折行/越界/遮挡差异。未推送，未并主线，未上线。
+
+## 2026-11-21：用户自助开票第一包最终收口返工（分支 `claude/invoice-p2c-1119b`，接在 P2c1b `6be42a9cb` 后面，未推送）
+
+- 来由：补全线第三十任返工包 P2c1c，按独立收货报告 `agy-recv-p2c1b-reply.md` 实测复现的两项阻塞隐私问题与三项收口项返工。
+- 封堵注销后扫码开票会话迟到写入明文 PII（三层防线）：`MemberClosureRedisService.revoke` 扫描并吊销该会员的 `invoice_session:*`、`invoice_session_scene:*` 及 `invoice_session_lock:*`；`InvoiceRequestsService.submit` 写库前核验 `EndUser.status === 'active' && enabled === true`（否则 409 `ACCOUNT_UNAVAILABLE`，不落行），并识别库级触发器错误；SQLite 与 PostgreSQL 迁移 `20261119120000_add_invoice_request/migration.sql` 补挂同口径闭户写入触发器（PG 挂 `reject_closed_member_write()`，SQLite 挂 `InvoiceRequest_closed_member_insert` / `bind`）。`verify-member-closure`（真 Redis）、`verify-invoice-real-db` 与 `verify-first-order-migrations`（SQLite + PG）均补真库验证用例。
+- 封堵退回原因脱敏逃逸与仅单位发票注销残留：`invoice-masking.ts` 将 `CREDIT_CODE_IN_TEXT` 改为大小写不敏感匹配 18 位统一社会信用代码并覆盖 15/17/20 位旧税号（要求含数字、排除带连字符订单号、日期与普通短数字），单测与 `verify-invoice-http` 逐一验过；`deidentifyClosedMemberInvoices` 对已退回申请在注销时直接将 `returnReason` 清空为 `null`（已提交转已退回仍写「会员已注销」），根除管理员手写非账号姓名与旧税号残留。
+- 注销开票去标识补行级 CAS：`deidentifyClosedMemberInvoices` 将 `submitted -> returned` 改为行级条件更新 `updateMany({ where: { id, status: 'submitted' } })`，并发窗口里管理员抢先标已开或退回时绝不覆写 `status`/`invoiceNo`/`issuedAt`，只补做个人抬头与邮箱去标识；`verify-invoice-real-db` 补真库 `Read Committed` 探针验证。
+- 修掉 `verify-invoice-http.ts` 新增 1 处 `eslint --quiet` error（`Reply.json.data` 去掉 `any`），全分支改动文件直接运行 `eslint --quiet` 零新增 error；手机开票页 `phoneInvoiceCopy.ts` 无服务电话降级句改为「需要专用发票请在一体机上查看《隐私政策》里的联系方式」，同步补单测与 w5 浏览器用例。
+- 本机隔离 PostgreSQL 16.15（5675，UTC）+ SQLite + Redis 6675 + 共用锁 `blk.sh` 下全部正向门禁、两套 Playwright 浏览器套与 5 条反向变异均已跑通；图谱按本轮代码重生，未推送、未并主线、未上线。
+
+## 2026-11-19：用户自助开票第一包返工（分支 `claude/invoice-p2c-1119b`，接在第一包 5b29d7a53 后面，未推送）
+
+- 来由：补全线第二十七任 P2c1b，按收货报告第 5 节和 agy 核对表返工。下面几条改的是同日第一包（下一条）的行为。
+- 两条会红的门禁修好：模型总数 124→125（多了 `InvoiceRequest`）；迁移对照表补 `/k/i/:scene`、`/invoice/phone` 两行（总指挥裁定只许加这两行，`docs/design/**` 别的不动）。
+- 注销：本人在任何一份申请里填过的个人抬头和邮箱，连同退回原因里出现的这些姓名、邮箱和其余邮箱串，一并擦掉；已提交、还没处理的申请转「已退回」，原因只写「会员已注销」。退回的审计只记原因长度和「原因见申请」，不写原文。审计按现有口径不改写；把原文写进审计的只有第一包分支，没合并、没上线，线上没有这类存量。
+- 后台标已开前用提交时同一套判断复核订单：申请后订单已退款或退款在途，回 409，提示改去「退回」。标已开、退回没成（含 409）时重读申请按最新状态画；只在成功后收起表单，刚填的发票号码留着。
+- 能不能开只看订单自己的事实（付款状态、实付、退款记录），不看终端现在绑的机构：终端改绑到就业服务站后，原先付过钱的单照样能开；公共点位永不收费，那里的单实付是 0，按「没有实付」开不了。一体机建会话被挡时与会员口一样回 409。
+- 会员接口（小程序以后用，一体机带会员令牌也能调）：单条查询和会员数据导出里，税号、邮箱只给打码后的 `taxIdMasked`、`emailMasked`，退回原因里抄到的也打码；可开票订单列表改成分页（`limit` 1–50、`cursor`，返回 `{ items, nextCursor }`），每页只批量读几次库；抬头、税号、邮箱填错时，`INVOICE_TITLE_INVALID` 等专用码和中文句子经 HTTP 真能拿到。接口说明 `docs/api/member-invoice-requests.md` 已对齐，并补了登录错误 `ACCOUNT_UNAVAILABLE` 和导出一节。
+- 手机填写页：去掉一体机屏才用的「这台屏幕不保存税号」；六个没有动作的按钮去掉（下一步本来就写在状态句里）；专用发票一句接上公开的服务电话（读不到号码时用标准句「查看《隐私政策》里的联系方式」）。
+- 已开或已退回的邮箱保留天数单独设 `INVOICE_EMAIL_RETENTION_DAYS`（默认 90），不再借用 AI 服务日志的天数；`.env.example`、数据清单、影响评估同步。
+- 新门禁 `verify:invoice-real-db`（真库）与 `verify:invoice-http`（只挂开票两个控制器的真 HTTP），SQLite 与 PostgreSQL 两个作业都跑；手机页浏览器用例补了提交时过期、抬头报错留在表单；后台浏览器用例补了三种 409。
+- 没改小程序、一体机「我的」和打印页、退款文件、生产配置；`docs/design/**` 只动了上面两行。没有推送，没有上线。
+
+## 2026-11-19：用户自助开票第一包，手机上填抬头（分支 `claude/invoice-p2c-1119`，未推送）
+
+- 来由：补全线第二十五任 P2c1，清单第 5 项。开票信息在手机上填，一体机扫我们自己的网页；小程序以后共用会员接口，本包不改 `apps/miniapp/**`。
+- 已有开票申请表、能不能开的判断、一体机扫码会话（十分钟，Redis 只存哈希，轮询不回税号和邮箱）。
+- 手机中转 `/k/i/:scene` 兑换后进入 `/invoice/phone`。这两页挂在一体机运行时根外面。个人不出现税号框。提交成功写「已提交。开好后，电子发票发到你填的邮箱。」过期、已提交、开不了各有一句和下一步。专用发票这句是「需要专用发票请拨打服务电话」。一体机上的开票屏和「我的订单」入口下一包再做。
+- 会员接口给小程序用，页面没改：`GET /api/v1/me/invoice-orders` 只列本人能开的订单和已经有申请的订单，不带税号和邮箱；`POST /api/v1/me/invoice-requests` 提交，判断与一体机相同；`GET /api/v1/me/invoice-requests/:id` 只查本人的一份。说明在 `docs/api/member-invoice-requests.md`。
+- 后台订单详情抽屉只多挂一块开票申请。已提交时可以「标已开」（发票号码选填）或「退回」（原因必填）。两个人同时点，只成功一次。审计动作是 `invoice.mark_issued`（标已开）和 `invoice.return`（退回开票申请）。演示数据下没有申请，不出现这两颗按钮。
+- 开票申请里的个人抬头和邮箱进入注销：个人抬头改成去标识，邮箱清空，申请行、金额、单位名称和统一社会信用代码留下。已开或已退回满 90 天再清一次邮箱，天数与 AI 服务日志同一函数 `readAiServiceLogRetentionDays`（`AI_SERVICE_LOG_RETENTION_DAYS`）。已提交的不按这 90 天清。数据清单第 40 行、个人信息影响评估第 9 节各补了「发票信息（抬头、税号、邮箱）」。
+- 没改小程序、打印页、我的页、设计稿和生产配置。没有推送，没有上线。图谱按本包代码重生（路由、端点、`InvoiceRequest`、开票门禁），没有手改 `docs/graph/`。
+
+## 2026-11-19：S15c9 打印状态照稿第三轮（分支 `claude/print-status-s15c9-1119`，起点 `4ada86eac`，未推送，未上线）
+
+- 失败四态照稿收紧竖向间距（只管打印失败页，不动「无法确认」）：标题区下空 46→16，三步卡不设最小高（约 104）、卡间距 16→10，信息表行 72→62，带走卡 226→202（内边距 14/24，二维码 188→172，仍不小于 168）。登录后「查看打印订单」行和下面「订单记录保留着…」一屏装下。没登录时不画这一行，小字下面多留一份同宽空当，十张失败页最长空带都不比稿长出 30px 以上（最大是带走链接没取到，103 对 81）。
+- 首页打印机卡纸胶囊改用琥珀色一档（warn），和失败页同一句「打印机卡纸」同一组色值。
+- 待取单去处句由程序拼出：汉字挨着半角数字、字母处空一格，「二楼服务区的 2 号机」「请到 KSK-014 领取」。按第二十九任总指挥 C1 裁定修正：打印中行不显示到机码（服务端仅在可取/可续打时下发，不改后端，与稿有差）。
+- 首页招聘格：上轮并排图出「社会招聘」「校园招聘」，是拍图夹具沿用了用例默认的托管打开（私有化部署 b）；我方云上默认（服务端不设招聘内容托管开关）下发关闭，首页只摆到机取件和帮助。新增 W2 用例证明这一点。
+- 收货条件：首页卡纸胶囊的页面接线补了 7 条 W2 用例（`home-printer-jam`）；订单页「输到机码取件」断言改在出路卡块里按含字查。
+- 反向：间距改回、首页把 errorCode 接成 null、夹具改回托管打开、出路卡多一张「输到机码取件」、卡纸改回 bad 档、去处句改回直接接「的」，都红；还原后都绿。
+- 并排图 17 张和 `geometry.json` 在 `/tmp/s15c9-sbs/`。现有用例改了三处：首页卡纸 tone 由 bad 改 warn；去处句两条期望多了「的」后的空格；订单页「输到机码取件」为 0 颗改在出路卡块里按含字查（原写法恒为 0）。正向断言都还在。
+- 没改小程序、两个后台、设计稿和 `services/api`。没有并主线，没有推送。
+
 ## 2026-11-19：合并车 F（小青原话与排版出站遮盖 M1434e–m2）、第五次发布（分支 `claude/train-1119f`，未上线）
 
 - 第五次发布已完成：线上 `f25d2b65f`（合并车 D #1656：政策截止日期、关键词、拒绝与一体机政策页照稿；#1654 只改设计稿），发布运行 44493095777（11/19 17:10 成功，CI 44480232016 四项全绿），1 条只加不改迁移 `20261117155000_add_policy_valid_through` 已执行（共 118 条），价目仍 0，公开只读复验全部符合（政策关键词超 30 字回 400 `POLICY_KEYWORD_TOO_LONG`、三端主包都换新），只读巡检 PASS 12。回退标签 `prod-before-release-1119` 指 `47e3a99af`。
@@ -164,6 +454,7 @@
 - 格式转换没有任务表或订单表，不能列真实任务。证件照、格式转换、签名三个页签保留，标签加上「（停放）」，正文写明不在本期。页签留着，是因为设备能力里仍有同名项，藏掉会让人以为入口丢了。不再是点开永远空着。
 - 屏上扫描存成「可用」后，成功提示写明：还要在这台终端的终端程序配置里把 `agent-config.json` 的 `scanDeviceEnabled` 写成 true，并重启终端程序（Terminal Agent）才生效。终端程序只在启动时 `loadConfig()` 读这个开关（`apps/terminal-agent/src/index.ts`），心跳里的配置热更新不重读它。存成「测试中」不提这句。终端程序源码没改。
 - 用例：`services/api` 的 `verify:admin-fulfillment-lists`（有任务、没任务、非管理员 403）；后台静态门禁与 HTTP 浏览器用例（列表、筛选、空态、读失败、停放、扫描提示）。没改小程序、终端程序、设计稿和生产配置。`origin/main` 仍是 `d71f1c37c`，不含 `428cbb8c6`，所以没有并主线。没有推送，没有上线。
+
 ## 2026-11-19：S15c8 打印状态照稿第二轮（分支 `claude/print-status-s15c-1118`，未推送，未上线）
 
 - 稿取自已合进主线的补稿（`origin/main` `0f054f0a8`）。只读出稿，没有切分支、没有合并。

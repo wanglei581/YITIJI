@@ -799,6 +799,10 @@ model Refund {
   channel         String // sandbox | offline | manual_confirmed | free | voucher
   channelRefundNo String? // 渠道退款流水号（sandbox 假标识；线下/免费单为 null）
   operatorId      String? // 操作员标识（Admin/服务端；写入审计 payload，非 User 外键）
+  /// 已经向渠道（sandbox / wechat / alipay）发起过退款的时间。本地新建的待人工（窗口关闭、
+  /// 没有渠道流水的过期付款、线下/人工确认/免费/券）永远为 null。渠道受理过且状态仍不是
+  /// success / failed / withdrawn / closed 时，表示这笔退款还在渠道处理中。
+  channelSubmittedAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -1099,8 +1103,85 @@ model EndUser {
   scanTasks       ScanTask[]
   contractReviewTasks ContractReviewTask[]
   jobApplications JobApplication[]
+  invoiceRequests  InvoiceRequest[]
+  virtualPayOrders VirtualPayOrder[]
+  serviceCredits   MemberServiceCredit[]
 
   @@index([status])
+}
+
+/// 开票申请。打印订单（Order）与服务单（ServiceOrder）都用 orderKind + orderId 关联。
+/// 同一订单至多一条未退回的申请。Prisma @@unique 表达不了
+/// WHERE status <> 'returned'，条件唯一索引 InvoiceRequest_open_order_key 只写在迁移里。
+model InvoiceRequest {
+  id             String    @id @default(cuid())
+  /// print | service
+  orderKind      String
+  orderId        String
+  endUserId      String
+  endUser        EndUser   @relation(fields: [endUserId], references: [id], onDelete: Restrict)
+  /// personal | company
+  titleType      String
+  title          String
+  /// 单位才有：统一社会信用代码
+  taxId          String?
+  email          String?
+  /// 提交时的实付金额快照，单位分
+  amountCents    Int
+  /// submitted | issued | returned
+  status         String    @default("submitted")
+  issuedAt       DateTime?
+  invoiceNo      String?
+  returnReason   String?
+  operatorId     String?
+  emailClearedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([endUserId, createdAt])
+  @@index([orderKind, orderId])
+  @@index([status, updatedAt])
+}
+
+// 小程序微信虚拟支付订单。openid 注销时清空。价格是下单时冻住的分，不写进仓库。
+// 用掉和退款留给第二包：本表没有消耗字段。
+model VirtualPayOrder {
+  id          String    @id @default(cuid())
+  endUserId   String?
+  endUser     EndUser?  @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  openId      String?
+  serviceKind String
+  productId   String
+  priceCents  Int
+  /// 0 现网 / 1 沙箱。下单时冻住，推送和查单必须对上。
+  env                  Int
+  status               String    @default("pending")
+  outTradeNo           String    @unique
+  wxOrderId            String?
+  paidAt               DateTime?
+  queryFailCount       Int       @default(0)
+  lastDiagnosticReason String?
+  createdAt            DateTime  @default(now())
+  credit               MemberServiceCredit?
+
+  @@index([status, createdAt])
+}
+
+// 付款后得到的一次服务权益。一单至多一条，sourceOrderId 唯一。
+// consumedAt / refundedAt 留给第二包，本包只写入 available。
+model MemberServiceCredit {
+  id            String          @id @default(cuid())
+  endUserId     String?
+  endUser       EndUser?        @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  serviceKind   String
+  sourceOrderId String          @unique
+  sourceOrder   VirtualPayOrder @relation(fields: [sourceOrderId], references: [id], onDelete: Restrict)
+  status        String          @default("available")
+  consumedAt    DateTime?
+  refundedAt    DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([endUserId, status])
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────

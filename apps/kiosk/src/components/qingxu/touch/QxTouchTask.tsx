@@ -15,6 +15,8 @@ export type QxTouchTaskProps = {
   takeIcon?: QxTouchIconName
   /** 加在去处文字前面、不加重的前缀。 */
   takePrefix?: string
+  /** 标题下的短价，一条一行（首页打印 · 扫描卡两行）。不传或为空就不画。 */
+  priceLines?: readonly string[]
   note?: string
   held?: boolean
   pressable?: boolean
@@ -37,6 +39,7 @@ export function QxTouchTask({
   take,
   takeIcon = 'arrowR',
   takePrefix = '',
+  priceLines,
   note,
   held = false,
   pressable = false,
@@ -51,7 +54,10 @@ export function QxTouchTask({
   const descId = useId()
   const chipId = useId()
   const noteId = useId()
-  const describedBy = [descId, chip ? chipId : '', note ? noteId : ''].filter(Boolean).join(' ')
+  const priceId = useId()
+  const prices = priceLines ?? []
+  const priceIds = prices.map((_, line) => `${priceId}-${line}`)
+  const describedBy = [...priceIds, descId, chip ? chipId : '', note ? noteId : ''].filter(Boolean).join(' ')
   const interactive = Boolean(onClick) && (!held || pressable)
   const className = [
     'qxt-task',
@@ -68,6 +74,7 @@ export function QxTouchTask({
         {chip ? <QxTouchChip id={chipId} tone={chipTone} ai={chipAi}>{chip}</QxTouchChip> : null}
       </div>
       <h3 id={titleId}>{title}</h3>
+      {prices.map((text, line) => <span key={priceIds[line]} id={priceIds[line]} className="qxt-task-price">{text}</span>)}
       <p id={descId}>{desc}</p>
       {note ? <small id={noteId} className="qxt-task-note">{note}</small> : null}
       {visual ? <div className="qxt-mini">{visual}</div> : null}

@@ -18,6 +18,8 @@ import {
   markPaidUnfulfilledRefundRequired,
   PAID_UNFULFILLED_PENDING_REFUND_REASON,
 } from '../payment/pending-refund-signal'
+import { settleExplicitNoPaperFromReportedFailure } from '../payment/print-no-paper-refund'
+import { recordTimeoutSettlementFault } from '../payment/print-return-settlement-fault'
 import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 
 export const PRINT_QUEUE_TIMEOUT = 'PRINT_QUEUE_TIMEOUT'
@@ -168,7 +170,13 @@ function failWhere(cutoff: Date, now: Date) {
  * 与领取抢同一行时只看 status 仍是 pending 的 CAS：一边成功，另一边改不到。
  * 传入 now 便于测试把「现在」拨到将来；生产调用用当前时间。
  */
-export async function expireQueuedPrintTasks(prisma: PrismaService, now = new Date()): Promise<number> {
+export async function expireQueuedPrintTasks(
+  prisma: PrismaService,
+  now = new Date(),
+  settle: (db: PrismaService, taskId: string) => Promise<unknown> = (db, taskId) => (
+    settleExplicitNoPaperFromReportedFailure(db, taskId)
+  ),
+): Promise<number> {
   const minutes = await readPrintQueueTimeoutMinutes(prisma)
   const cutoff = printQueueClaimableSinceCutoff(now, minutes)
   const candidates = await prisma.printTask.findMany({
@@ -239,7 +247,13 @@ export async function expireQueuedPrintTasks(prisma: PrismaService, now = new Da
       })
       return true
     })
-    if (didFail) expired += 1
+    if (didFail) {
+      expired += 1
+      // 事务已经提交。开关关时只保留上面的待退款信号，不调渠道。
+      await settle(prisma, task.id).catch(async (error: unknown) => {
+        await recordTimeoutSettlementFault(prisma, task.id, error)
+      })
+    }
   }
   return expired
 }

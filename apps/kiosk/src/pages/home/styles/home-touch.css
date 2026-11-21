@@ -295,6 +295,50 @@
 }
 [data-qx-page='home'] .qxt-home-free svg { flex: none; }
 
+/* 首页短价，照稿 pay-1113.js「首页短价」。这台机器收费、五个价都读到时卡上才有 .qxt-task-price，
+   不收费、读不齐时下面整段都不生效，首页与改前一致。页脚收费句整句不拆到两行（稿 .py-keep）。 */
+[data-qx-page='home'] .qxt-task-price {
+  display: block;
+  margin-top: 2px;
+  padding-right: 158px;
+  font: 800 22px/1.25 var(--qx-sans);
+  color: var(--qxt-teal-ink);
+  white-space: nowrap;
+}
+[data-qx-page='home'] .qxt-task-dark .qxt-task-price { color: var(--qx-emerald); }
+[data-qx-page='home'] .qxt-home-keep { white-space: nowrap; }
+
+@media (min-width: 761px) {
+  /* 标价的卡：内边距、标题、说明照稿。高度不跟稿压到 300px：运行页说明只有两行，压到 300px 卡比稿矮约 30px，
+     右下角小样图会顶到角标；仍按所在版式的最低高度排（未登录 340px）。 */
+  [data-qx-page='home'] .qxt-home-tasks .qxt-task:has(.qxt-task-price) { gap: 8px; padding: 22px 26px 16px; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-task:has(.qxt-task-price) h3 { margin-top: 0; font-size: 36px; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-task:has(.qxt-task-price) p { font-size: 21px; line-height: 1.35; }
+  /* 标价的卡左右内边距各多 10px，角标的 58% 跟着窄了约 12px，「带走」会被拆到两行；补回这 12px，折行位置与不收费时一致。 */
+  [data-qx-page='home'] .qxt-home-tasks .qxt-task:has(.qxt-task-price) .qxt-chip { max-width: calc(58% + 12px); }
+  /* 压低这一态：已登录又多一条「继续办理」（稿 ?fee=1&login=1），或磁贴多、进了压紧版式（私有化部署）。
+     收费卡片再按原样排，页脚和备案号会被底部导航挡住。已登录但没有可继续的办理时照同屏未登录态排，不压。
+     压低后四张卡分掉剩下的高度（同上面「填满」那一条，最高不超过未登录态），底部导航上方不留空带。 */
+  [data-qx-page='home'] .qxt-body:is(.qxt-home-on:has(> .qxt-home-go:not(:empty)), .qxt-home-squeeze):has(.qxt-task-price) { gap: 8px; padding-top: 8px; padding-bottom: 4px; }
+  [data-qx-page='home'] .qxt-body:is(.qxt-home-on:has(> .qxt-home-go:not(:empty)), .qxt-home-squeeze):has(.qxt-task-price) > .qxt-home-tasks {
+    flex: 1 1 auto;
+    max-height: calc(340px * 2 + 16px);
+    gap: 12px;
+  }
+  [data-qx-page='home'] .qxt-body:is(.qxt-home-on:has(> .qxt-home-go:not(:empty)), .qxt-home-squeeze):has(.qxt-task-price) .qxt-home-tasks .qxt-task { min-height: 0; gap: 2px; padding: 10px 14px 8px; }
+  [data-qx-page='home'] .qxt-body:is(.qxt-home-on:has(> .qxt-home-go:not(:empty)), .qxt-home-squeeze):has(.qxt-task-price) .qxt-home-tasks .qxt-task h3 { margin-top: 0; font-size: 32px; line-height: 1.15; }
+  [data-qx-page='home'] .qxt-body:is(.qxt-home-on:has(> .qxt-home-go:not(:empty)), .qxt-home-squeeze):has(.qxt-task-price) .qxt-home-tasks .qxt-ic { width: 52px; height: 52px; border-radius: 16px; }
+  [data-qx-page='home'] .qxt-body:is(.qxt-home-on:has(> .qxt-home-go:not(:empty)), .qxt-home-squeeze):has(.qxt-task-price) .qxt-home-tasks .qxt-task p { font-size: 20px; line-height: 1.25; }
+  [data-qx-page='home'] .qxt-body:is(.qxt-home-on:has(> .qxt-home-go:not(:empty)), .qxt-home-squeeze):has(.qxt-task-price) .qxt-task-price { margin-top: 0; font-size: 20px; line-height: 1.2; }
+  [data-qx-page='home'] .qxt-body:is(.qxt-home-on:has(> .qxt-home-go:not(:empty)), .qxt-home-squeeze):has(.qxt-task-price) .qxt-home-go .continue { min-height: 72px; padding: 6px 10px 6px 14px; }
+  /* 卡片压低后右下角小样图会顶到角标行：只在这一态把小样按右下角缩到 0.78。 */
+  [data-qx-page='home'] .qxt-body:is(.qxt-home-on:has(> .qxt-home-go:not(:empty)), .qxt-home-squeeze):has(.qxt-task-price) .qxt-home-tasks .qxt-mini { transform: scale(0.78); transform-origin: right bottom; }
+}
+
+@media (max-width: 760px) {
+  [data-qx-page='home'] .qxt-task-price { padding-right: 76px; font-size: 20px; white-space: normal; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-qx-page='home'] .qxt-home-tasks .qxt-task:focus-visible,
   [data-qx-page='home'] .qxt-home-tiles .qxt-tile:focus-visible,

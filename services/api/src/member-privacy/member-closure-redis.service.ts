@@ -94,6 +94,24 @@ export class MemberClosureRedisService {
         if (await this.client.get(scene) === sessionId) await this.client.del(scene)
       }
     }
+    // 注销前建好的扫码开票会话不带会员守卫，必须随注销吊销会话键与场景码索引，防止迟到提交写入明文抬头和邮箱。
+    const revokedInvoiceSessions = new Set<string>()
+    for (const key of await this.keys('invoice_session:*')) {
+      const raw = await this.client.get(key)
+      if (!raw || !this.owned(raw, endUserId)) continue
+      const record = JSON.parse(raw) as { sessionId?: string; sceneTokenHash?: string }
+      const sessionId = record.sessionId ?? key.slice('invoice_session:'.length)
+      revokedInvoiceSessions.add(sessionId)
+      const toDelete = [key, `invoice_session:${sessionId}`, `invoice_session_lock:${sessionId}`]
+      if (record.sceneTokenHash) toDelete.push(`invoice_session_scene:${record.sceneTokenHash}`)
+      await this.client.del(...toDelete)
+    }
+    if (revokedInvoiceSessions.size > 0) {
+      for (const scene of await this.keys('invoice_session_scene:*')) {
+        const sid = await this.client.get(scene)
+        if (sid && revokedInvoiceSessions.has(sid)) await this.client.del(scene)
+      }
+    }
     return files
   }
 

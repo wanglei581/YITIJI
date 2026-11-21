@@ -12,7 +12,7 @@
  *   审计 refund.processing；重复调用经 queryRefund 收敛——仍受理中原样返回、
  *   SUCCESS 补完成（refund.created 带 convergedFromProcessing）、再重复幂等。
  * - 渠道结果三分法（双模型审查 H1 修复）：
- *   · 明确拒绝（ABNORMAL / 4xx 业务码）→ failed + 回滚 paid + refund.channel_error 审计，
+ *   · 明确拒绝（CLOSED / 4xx 业务码）→ failed + 回滚 paid + refund.channel_error 审计，
  *     且可**同号重试**（H2 修复：refund.retried 审计 + 重新走渠道，渠道幂等兜底）；
  *   · 结果不可知（HTTP 5xx/超时）→ 保持 pending+refunding + refund.channel_ambiguous 审计，
  *     **绝不判失败**；查证 unknown（渠道查无此单）时**同号重发**收敛到 refunded。
@@ -471,9 +471,9 @@ async function main(): Promise<void> {
       fail('post-convergence repeat not idempotent')
     }
 
-    // ── (W3) wechat 渠道明确拒绝（ABNORMAL）→ 回滚 → 同号重试成功（H2 修复）──
+    // ── (W3) wechat 渠道明确拒绝（CLOSED；ABNORMAL 是钱停在中间账户、不当失败，见 p2b9 异常用例）→ 回滚 → 同号重试成功（H2 修复）──
     const W3 = await makePaidOrder('w3', 'wechat')
-    wechatRefundCreateResponse = { body: { status: 'ABNORMAL', refund_id: 'wxrfd_abn' } }
+    wechatRefundCreateResponse = { body: { status: 'CLOSED', refund_id: 'wxrfd_closed' } }
     await expectCode('wechat 渠道拒绝 → REFUND_CHANNEL_FAILED', 'REFUND_CHANNEL_FAILED', () =>
       refundService.refund(W3.orderId, { reason: '用户申请退款' }),
     )

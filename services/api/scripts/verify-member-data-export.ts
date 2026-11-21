@@ -22,7 +22,7 @@ const FORBIDDEN_KEYS = /phoneEnc|phoneHash|contactPhoneEnc|storageKey|objectKey|
 const PHONE_LIKE = /1[3-9]\d{9}/
 // 编号类字段原样导出（编号不是手机号，打码会把它打坏），不做手机号扫描。按导出里实际有的编号字段逐个列：
 // 导出新加编号字段要在这里显式登记，没登记的字段一律按自由文本扫。
-const IDENTIFIER_KEYS = new Set(['id', 'taskId', 'targetId', 'jobId', 'externalId', 'orderNo', 'requestId'])
+const IDENTIFIER_KEYS = new Set(['id', 'taskId', 'targetId', 'jobId', 'externalId', 'orderNo', 'requestId', 'orderId'])
 
 type WalkVisitor = (key: string, value: unknown) => void
 
@@ -76,6 +76,8 @@ const COLLECTION_MODELS = [
   'userDataRequest',
   // AI 用量明细。加进导出就必须同时加进本清单，否则假 prisma 上没有这个委托。
   'aiUsageRecord',
+  // 开票申请（返工包 P2c1b 第 14 条）。税号、邮箱只导出打码后的样子，字段断言在 src/invoices/invoice-privacy.test.ts。
+  'invoiceRequest',
 ] as const
 
 function date(day: number): Date {
@@ -128,6 +130,10 @@ function dualUserFixtures(): FixtureStore {
       { ...base('usage-one', 'member-one'), featureKey: 'resume_optimize', status: 'ok', costCny: 1.25, createdAt: date(5), terminalId: 'TERMINAL_SECRET', orgId: 'ORG_SECRET', model: 'deepseek-v4-flash', vendor: 'deepseek', promptTokens: 12345 },
       { ...base('usage-unmeasured', 'member-one'), featureKey: 'resume_optimize', status: 'timeout', costCny: null, createdAt: date(4), terminalId: 'TERMINAL_SECRET', orgId: 'ORG_SECRET' },
       { ...base('usage-other', 'member-two'), featureKey: 'OTHER_MEMBER_SECRET', status: 'ok', costCny: 9, createdAt: date(5) },
+    ],
+    invoiceRequest: [
+      { ...base('invoice-one', 'member-one'), orderKind: 'print', orderId: 'order-one', titleType: 'company', title: '目标单位', taxId: '91000000MA0000000N', email: 'finance.desk@example.com', amountCents: 100, status: 'submitted', issuedAt: null, invoiceNo: null, returnReason: null, operatorId: 'ADMIN_SECRET' },
+      { ...base('invoice-two', 'member-two'), orderKind: 'print', orderId: 'order-two', titleType: 'personal', title: 'OTHER_MEMBER_SECRET', taxId: null, email: 'other@example.com', amountCents: 100, status: 'submitted', issuedAt: null, invoiceNo: null, returnReason: null },
     ],
   }
 }
@@ -333,7 +339,7 @@ async function verifyDualUserIsolation(): Promise<void> {
   const envelope = await mapper.build({ endUserId: 'member-one', requestId: 'request-one', generatedAt: date(17) })
   const serialized = JSON.stringify(envelope)
   assert.match(serialized, /目标会员/)
-  assert.doesNotMatch(serialized, /member-two|OTHER_MEMBER_SECRET|TERMINAL_SECRET|ORG_SECRET/)
+  assert.doesNotMatch(serialized, /member-two|OTHER_MEMBER_SECRET|TERMINAL_SECRET|ORG_SECRET|ADMIN_SECRET|other@example\.com/)
   assert.deepEqual(envelope.sections.aiRecords.jobSessions, [])
   assert.deepEqual(envelope.sections.aiRecords.mockInterviews, [])
   assert.equal(calls.length, COLLECTION_MODELS.length + 1)
@@ -349,8 +355,9 @@ async function verifyWhitelistEnvelope(): Promise<void> {
   assert.equal(envelope.schemaVersion, MEMBER_EXPORT_SCHEMA_VERSION)
   assert.equal(envelope.generatedAt, date(17).toISOString())
   assert.equal(envelope.requestId, 'request-one')
+  // 期望值改动（返工包 P2c1b 第 14 条）：导出新增 invoiceRequests 分区（本人的开票申请，税号邮箱打码），排在打印订单后面。
   assert.deepEqual(Object.keys(envelope.sections), [
-    'account', 'files', 'aiRecords', 'aiUsage', 'printOrders', 'favorites', 'jobApplications', 'benefits',
+    'account', 'files', 'aiRecords', 'aiUsage', 'printOrders', 'invoiceRequests', 'favorites', 'jobApplications', 'benefits',
     'activity', 'notifications', 'feedback', 'consents', 'requests',
   ])
   const usageCall = calls.find((call) => call.model === 'aiUsageRecord')

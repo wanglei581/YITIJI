@@ -10,7 +10,8 @@
  * 6. 未知 out_refund_no 不误改订单（400，不影响无关记录）
  * 7. 金额不符拒绝（400）
  * 8. 时间窗过期拒绝
- * 9. CLOSED/ABNORMAL → Refund failed + 订单回 paid（可重试）
+ * 9. CLOSED → Refund failed + 订单回 paid（可重试）。ABNORMAL 退款异常不当失败（P2b9 第 5 条，
+ *    断言在 pickup-arrival-p2b9-abnormal-cases）
  * 10. 已 SUCCESS 不得被 CLOSED 通知回退
  * 11. 不影响 PrintTask.status（退款回调全程不触碰打印任务）
  * 12. 迟到回调待退失败回滚 closed 后，SUCCESS 通知把同一 refundNo 从 failed 收敛为

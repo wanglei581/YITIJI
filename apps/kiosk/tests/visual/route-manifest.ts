@@ -2,6 +2,8 @@ export const productionRoutePatterns = [
   '/', '/login', '/member/qr-login', '/upload/phone', '/legal/:doc',
   // 2026-10-29 一体机手机码短链的网页中转（上传 / 登录），兑换或校验后 replace 到上面两个手机页。
   '/k/u/:scene', '/k/l/:ticketId',
+  // 2026-11-19 开票手机页：/k/i 兑换后 replace 到 /invoice/phone。前缀不进小程序扫普通链接规则。
+  '/k/i/:scene', '/invoice/phone',
   '/resume/job-fit/*', '/resume/career-plan/*', '/interview',
   '/interview/setup',
   '/interview/session', '/interview/report', '/interview/tips',
@@ -34,6 +36,8 @@ export const productionRoutePatterns = [
   '/interview-service',
   // 打印取件认领
   '/print/pickup-claim',
+  // 按次付款（简历优化、模拟面试、扫描各一条）
+  '/pay/resume', '/pay/interview', '/pay/scan',
   // PR #496 (AI OS 三新路由)
   '/ai/plan',
   '/session-resume',

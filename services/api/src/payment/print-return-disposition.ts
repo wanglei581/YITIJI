@@ -1,0 +1,379 @@
+/**
+ * 已付金额大于 0、没出纸的单，最后只落在三种去向之一：
+ * 自动退成功、自动退失败、待人工退款。一张单只进一种。
+ *
+ * 状态落点：
+ * - 自动退款成功，或过期付款已按尝试金额原路退成：自动退成功，不进待处理列表。
+ * - 自动退款失败，或只有失败审计还没有退款行：自动退失败，告警。订单停在退款中也算。
+ * - 退款待人工（金额对不上、已经放行不能再记成功、过期付款没有渠道流水）：待人工，告警。
+ * - 自动退或过期付款还在处理中：待人工，不能写成已经退成。
+ * - 说不准、部分出纸、缺纸、个人收费总开关关着：待人工，告警。
+ */
+import { PAID_UNFULFILLED_PENDING_REFUND_REASON, payableCents } from './pending-refund-signal'
+import {
+  PAID_NO_PAPER_AUTO_REASON,
+  STALE_ATTEMPT_REFUND_REASON,
+} from './print-no-paper-refund.constants'
+import type { PrismaService } from '../prisma/prisma.service'
+import { CHANNEL_ABNORMAL_AUDIT, CHANNEL_ABNORMAL_DETAIL } from './refund-abnormal'
+import { CHANNEL_SUCCESS_CONFLICT_AUDIT } from './refund-channel-answer'
+
+export const PRINT_NO_PAPER_MANUAL_AUDIT = 'print_order.no_paper_manual'
+export const PRINT_NO_PAPER_AUTO_FAILED_AUDIT = 'print_order.auto_return_failed'
+
+const CHANNEL_FAILED_REASON = '退款渠道返回失败（REFUND_CHANNEL_FAILED），没有退成'
+const SWITCH_OFF_REASON = '个人收费总开关关着，没有发起自动退款'
+
+export type PrintRefundDisposition = 'auto_success' | 'auto_failed' | 'manual'
+
+export interface PrintRefundView {
+  disposition: PrintRefundDisposition | null
+  refundStatus: string | null
+  reason: string | null
+  refundNo: string | null
+  amountCents: number | null
+}
+
+const EMPTY_VIEW: PrintRefundView = {
+  disposition: null,
+  refundStatus: null,
+  reason: null,
+  refundNo: null,
+  amountCents: null,
+}
+
+export function staleCollectedRefundReason(amountCents: number): string {
+  return `过期付款 ${amountCents} 分已原路退回`
+}
+
+export const CHANNEL_UNCONFIRMED_REFUND_REASON = '渠道还没确认退款结果，不能当成已经退成'
+
+export function switchOffRefundReason(): string {
+  return SWITCH_OFF_REASON
+}
+
+export function manualHoldReason(input: {
+  errorCode: string | null
+  completedItemCount: number
+  itemCount: number
+}): string {
+  if (input.completedItemCount > 0) {
+    const total = input.itemCount > 0 ? input.itemCount : input.completedItemCount
+    return `材料包 ${total} 份里出了 ${input.completedItemCount} 份，没有全部出纸，不能自动退`
+  }
+  if (!input.errorCode) return '打印失败但没有错误码，不能确定有没有出纸，不能自动退'
+  if (input.errorCode === 'PRINT_JOB_UNCONFIRMED') return '出纸结果未确认，不能自动退'
+  if (input.errorCode === 'PRINTING_REPORT_LOST') return '打印过程中报告丢失，不能自动退'
+  if (input.errorCode === 'PARTIAL_OUTPUT') return '只出了一部分纸，不能自动退'
+  if (input.errorCode === 'PAPER_EMPTY') return '打印机缺纸，没有自动退'
+  return `打印失败（${input.errorCode}），还不能确定有没有出纸，不能自动退`
+}
+
+function blockedReason(code: string): string {
+  if (code === 'REFUND_CHANNEL_FAILED') return CHANNEL_FAILED_REASON
+  if (code === 'REFUND_SOURCE_ATTEMPT_MISSING') return '找不到当时的付款记录，没有退成'
+  if (code === 'REFUND_SOURCE_AMBIGUOUS') return '付款记录不止一条，没有退成'
+  if (code === 'REFUND_AMOUNT_BASIS_UNSUPPORTED') return '实付金额对不上，没有退成'
+  return `自动退款被拦住（${code}）`
+}
+
+interface AuditFact {
+  action: string
+  payloadJson: string
+}
+
+function readPayload(raw: string): { code?: unknown; errorCode?: unknown; detail?: unknown } {
+  try {
+    const parsed = JSON.parse(raw) as { code?: unknown; errorCode?: unknown; detail?: unknown }
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+export function autoRefundFailureReason(audits: AuditFact[]): string {
+  for (const audit of audits) {
+    if (audit.action !== 'refund.channel_error') continue
+    const errorCode = readPayload(audit.payloadJson).errorCode
+    if (typeof errorCode === 'string' && errorCode.trim()) return `退款渠道拒绝：${errorCode.trim()}`
+  }
+  for (const audit of audits) {
+    if (audit.action !== 'refund.blocked' && audit.action !== PRINT_NO_PAPER_AUTO_FAILED_AUDIT) continue
+    const code = readPayload(audit.payloadJson).code
+    if (typeof code === 'string' && code.trim()) return blockedReason(code.trim())
+  }
+  return CHANNEL_FAILED_REASON
+}
+
+export function manualReasonFromAudit(audits: AuditFact[]): string | null {
+  for (const audit of audits) {
+    if (audit.action !== PRINT_NO_PAPER_MANUAL_AUDIT) continue
+    const detail = readPayload(audit.payloadJson).detail
+    if (typeof detail === 'string' && detail.trim()) return detail.trim()
+  }
+  return null
+}
+
+const REASON_ACTIONS = [
+  'refund.channel_error',
+  'refund.blocked',
+  PRINT_NO_PAPER_AUTO_FAILED_AUDIT,
+  PRINT_NO_PAPER_MANUAL_AUDIT,
+  'refund.notify_amount_mismatch',
+  'refund.notify_paper_already_released',
+  CHANNEL_ABNORMAL_AUDIT,
+  CHANNEL_SUCCESS_CONFLICT_AUDIT,
+] as const
+
+const AUTO_REASONS = new Set<string>([PAID_NO_PAPER_AUTO_REASON, STALE_ATTEMPT_REFUND_REASON])
+
+interface RefundFact {
+  refundNo: string
+  amountCents: number
+  status: string
+  reason: string | null
+}
+
+function viewOf(
+  disposition: PrintRefundDisposition,
+  refund: RefundFact | undefined,
+  reason: string | null,
+  refundStatus?: string,
+): PrintRefundView {
+  return {
+    disposition,
+    refundStatus: refundStatus ?? refund?.status ?? null,
+    reason,
+    refundNo: refund?.refundNo ?? null,
+    amountCents: refund?.amountCents ?? null,
+  }
+}
+
+function readNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) ? value : null
+}
+
+function mismatchReason(audits: AuditFact[]): string | null {
+  for (const audit of audits) {
+    if (audit.action !== 'refund.notify_amount_mismatch') continue
+    const payload = readPayload(audit.payloadJson) as { notifyAmountCents?: unknown; wholeOrderCents?: unknown }
+    const notify = readNumber(payload.notifyAmountCents)
+    const whole = readNumber(payload.wholeOrderCents)
+    if (notify != null && whole != null) return `渠道通知退了 ${notify} 分，这笔应退 ${whole} 分，待人工核对`
+  }
+  return null
+}
+
+function paperReleasedReason(audits: AuditFact[]): string | null {
+  for (const audit of audits) {
+    if (audit.action !== 'refund.notify_paper_already_released') continue
+    const detail = readPayload(audit.payloadJson).detail
+    if (typeof detail === 'string' && detail.trim()) return detail.trim()
+  }
+  return null
+}
+
+function channelSuccessConflictReason(audits: AuditFact[]): string | null {
+  for (const audit of audits) {
+    if (audit.action !== CHANNEL_SUCCESS_CONFLICT_AUDIT) continue
+    const detail = readPayload(audit.payloadJson).detail
+    if (typeof detail === 'string' && detail.trim()) return detail.trim()
+  }
+  return null
+}
+
+function manualReviewReason(refund: RefundFact, audits: AuditFact[]): string {
+  return mismatchReason(audits)
+    ?? paperReleasedReason(audits)
+    ?? manualReasonFromAudit(audits)
+    ?? (refund.reason === STALE_ATTEMPT_REFUND_REASON
+      ? `过期付款 ${refund.amountCents} 分没有渠道流水，待人工原路退回`
+      : '退款结果对不上，待人工核对')
+}
+
+export async function explainPrintRefund(db: PrismaService, orderId: string): Promise<PrintRefundView> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: {
+      payStatus: true,
+      refundReason: true,
+      amountCents: true,
+      discountCents: true,
+      taskStatus: true,
+      printTask: { select: { printOutcome: true, errorCode: true } },
+    },
+  })
+  const refunds = await db.refund.findMany({
+    where: { orderId },
+    orderBy: { createdAt: 'desc' },
+    select: { refundNo: true, amountCents: true, status: true, reason: true },
+  })
+  const latest = refunds[0]
+  if (!order) {
+    return latest
+      ? { ...EMPTY_VIEW, refundStatus: latest.status, refundNo: latest.refundNo, amountCents: latest.amountCents }
+      : EMPTY_VIEW
+  }
+  const audits = await db.auditLog.findMany({
+    where: { targetId: orderId, action: { in: [...REASON_ACTIONS] } },
+    orderBy: { createdAt: 'desc' },
+    select: { action: true, payloadJson: true },
+  })
+  const printed = order.printTask?.printOutcome === 'printed'
+  const payable = payableCents(order)
+  // 当前这笔还没收口时，更早的过期付款退款不属于这一笔，不能拿来报成功或部分退。
+  const paymentOpen = payable > 0 && (
+    order.payStatus === 'paid'
+    || order.payStatus === 'refunding'
+    || order.payStatus === 'partial_refunded'
+  )
+  const forThisPayment = (refund: RefundFact): boolean =>
+    !(paymentOpen && refund.reason === STALE_ATTEMPT_REFUND_REASON)
+  const thisPaymentRefunds = refunds.filter(forThisPayment)
+  // 渠道说退款异常、还没落定的那一笔：待人工，诊断写明资金在渠道中间账户。
+  const abnormalNos = new Set(audits
+    .filter((audit) => audit.action === CHANNEL_ABNORMAL_AUDIT)
+    .map((audit) => (readPayload(audit.payloadJson) as { refundNo?: unknown }).refundNo))
+  const abnormal = refunds.find((refund) => (refund.status === 'pending' || refund.status === 'manual_review') && abnormalNos.has(refund.refundNo))
+  if (abnormal) return viewOf('manual', abnormal, CHANNEL_ABNORMAL_DETAIL)
+  // 还没结清的退款优先于更早的一笔成功，避免旧的过期退款把后来的失败盖住。
+  const manualReview = refunds.find((refund) => refund.status === 'manual_review')
+  if (manualReview) return viewOf('manual', manualReview, manualReviewReason(manualReview, audits))
+  const failedAuto = refunds.find((refund) => refund.status === 'failed' && refund.reason != null && AUTO_REASONS.has(refund.reason))
+  const failedAudit = audits.some((audit) => audit.action === PRINT_NO_PAPER_AUTO_FAILED_AUDIT)
+  if (failedAuto || failedAudit) {
+    // 失败审计可能先于退款行落成失败。排队超时、渠道没开时，行还是 pending，金额仍要挂在这一笔上。
+    const holdRow = refunds.find((refund) => refund.status === 'pending' || refund.status === 'failed' || refund.status === 'manual_review')
+    const shown = holdRow ?? failedAuto
+    return viewOf('auto_failed', shown, autoRefundFailureReason(audits), shown?.status ?? 'failed')
+  }
+  const pendingAuto = refunds.find((refund) => refund.status === 'pending' && refund.reason != null && AUTO_REASONS.has(refund.reason))
+  if (pendingAuto) return viewOf('manual', pendingAuto, CHANNEL_UNCONFIRMED_REFUND_REASON)
+  const failedOther = refunds.find((refund) => refund.status === 'failed')
+  if (failedOther) return viewOf('manual', failedOther, '退款没有成功，待人工处理')
+  const pendingOther = refunds.find((refund) => refund.status === 'pending')
+  if (pendingOther) return viewOf('manual', pendingOther, '退款还在处理，待人工核对')
+  // 渠道退成事实已落库，但与出纸、实付合计或订单状态冲突：留在待人工核对与告警，不得伪装成自动退成功。
+  const channelConflictDetail = channelSuccessConflictReason(audits)
+  if (channelConflictDetail) {
+    const conflictRow = thisPaymentRefunds.find((refund) => refund.status === 'success')
+      ?? refunds.find((refund) => refund.status === 'success')
+    if (conflictRow) return viewOf('manual', conflictRow, channelConflictDetail)
+  }
+  const paperConflictDetail = paperReleasedReason(audits)
+  if (paperConflictDetail && order.payStatus !== 'refunded' && order.payStatus !== 'closed') {
+    const conflictRow = thisPaymentRefunds.find((refund) => refund.status === 'success')
+      ?? refunds.find((refund) => refund.status === 'success')
+    if (conflictRow) return viewOf('manual', conflictRow, paperConflictDetail)
+  }
+  const autoSuccess = thisPaymentRefunds.find((refund) => refund.status === 'success' && refund.reason != null && AUTO_REASONS.has(refund.reason))
+  if (autoSuccess || (order.payStatus === 'refunded' && order.refundReason === PAID_NO_PAPER_AUTO_REASON)) {
+    const stale = autoSuccess?.reason === STALE_ATTEMPT_REFUND_REASON
+    return viewOf(
+      'auto_success',
+      autoSuccess,
+      stale && autoSuccess ? staleCollectedRefundReason(autoSuccess.amountCents) : null,
+      autoSuccess?.status ?? 'success',
+    )
+  }
+  const fullSuccess = thisPaymentRefunds.find((refund) => refund.status === 'success' && (
+    order.payStatus === 'refunded' || (payable > 0 && refund.amountCents >= payable)
+  ))
+  if (fullSuccess) return viewOf('auto_success', fullSuccess, null)
+  const thisSuccess = thisPaymentRefunds.filter((refund) => refund.status === 'success')
+  if (!printed && ((order.payStatus === 'partial_refunded' && thisSuccess.length > 0) || thisSuccess.some((refund) => payable > 0 && refund.amountCents < payable))) {
+    return viewOf('manual', thisSuccess[0], '只退了一部分，纸没有出，待人工核对')
+  }
+  if (printed || payable <= 0) return EMPTY_VIEW
+  const manualDetail = manualReasonFromAudit(audits)
+  const signaled = order.payStatus === 'paid'
+    && order.taskStatus === 'failed'
+    && (
+      order.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON
+      || (order.refundReason == null && manualDetail != null)
+    )
+  if (signaled) {
+    const itemCount = await db.orderItem.count({ where: { orderId } })
+    const completedItemCount = await db.orderItem.count({ where: { orderId, status: 'completed' } })
+    return viewOf('manual', undefined, manualDetail ?? manualHoldReason({
+      errorCode: order.printTask?.errorCode ?? null,
+      completedItemCount,
+      itemCount,
+    }))
+  }
+  if (order.payStatus === 'paid' && order.taskStatus === 'failed' && thisPaymentRefunds.length === 0) {
+    return viewOf('manual', undefined, '已付款，打印失败，没有退款记录，待人工处理')
+  }
+  if (order.payStatus === 'refunding' && thisPaymentRefunds.length === 0) {
+    return viewOf('manual', undefined, '订单停在退款中，但没有退款记录，待人工处理')
+  }
+  return EMPTY_VIEW
+}
+
+export interface PrintReturnHold {
+  orderId: string
+  terminalId: string | null
+  updatedAt: Date
+  disposition: 'auto_failed' | 'manual'
+  reason: string
+}
+
+const HOLD_AUDIT_ACTIONS = [
+  PRINT_NO_PAPER_MANUAL_AUDIT,
+  PRINT_NO_PAPER_AUTO_FAILED_AUDIT,
+  'refund.notify_amount_mismatch',
+  'refund.notify_paper_already_released',
+  CHANNEL_SUCCESS_CONFLICT_AUDIT,
+] as const
+
+export async function listPrintReturnHolds(db: PrismaService): Promise<PrintReturnHold[]> {
+  const [openRefunds, audits, signaled, stuck] = await Promise.all([
+    db.refund.findMany({
+      where: { status: { in: ['failed', 'pending', 'manual_review'] } },
+      select: { orderId: true },
+    }),
+    db.auditLog.findMany({
+      where: { action: { in: [...HOLD_AUDIT_ACTIONS] } },
+      select: { targetId: true },
+    }),
+    db.order.findMany({
+      where: { refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON },
+      select: { id: true },
+    }),
+    db.order.findMany({
+      where: {
+        OR: [
+          { payStatus: 'refunding' },
+          { payStatus: 'partial_refunded' },
+          { payStatus: 'paid', taskStatus: 'failed', amountCents: { gt: 0 } },
+          { payStatus: 'paid', amountCents: { gt: 0 }, refunds: { some: { status: 'success' } } },
+        ],
+      },
+      select: { id: true },
+    }),
+  ])
+  const orderIds = [...new Set([
+    ...openRefunds.map((row) => row.orderId),
+    ...audits.map((row) => row.targetId).filter((id): id is string => Boolean(id)),
+    ...signaled.map((row) => row.id),
+    ...stuck.map((row) => row.id),
+  ])]
+  const holds: PrintReturnHold[] = []
+  for (const orderId of orderIds) {
+    const explained = await explainPrintRefund(db, orderId)
+    if (explained.disposition !== 'auto_failed' && explained.disposition !== 'manual') continue
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: { terminalId: true, updatedAt: true },
+    })
+    if (!order || !explained.reason) continue
+    holds.push({
+      orderId,
+      terminalId: order.terminalId,
+      updatedAt: order.updatedAt,
+      disposition: explained.disposition,
+      reason: explained.reason,
+    })
+  }
+  return holds
+}

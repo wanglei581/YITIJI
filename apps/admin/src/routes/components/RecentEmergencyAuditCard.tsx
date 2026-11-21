@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatDateTime } from '@ai-job-print/shared'
 import { getAuditLogs, type AuditLogRecord } from '../../services/api/audit'
-import { getAuditActorLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
+import { getAuditTargetLabel } from '../../lib/auditActionLabels'
+import { getAuditActorLabel } from '../../lib/auditActorLabels'
 import { getUser } from '../../services/auth'
 
 export const RECRUITMENT_AUDIT_ACTIONS = ['recruitment.emergency_takedown', 'recruitment.circuit_break'] as const

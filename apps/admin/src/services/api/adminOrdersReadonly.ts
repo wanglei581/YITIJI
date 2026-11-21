@@ -1,5 +1,8 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
+import { currentHoldDemo, queryHoldDemo, registerHoldDemo, resolveHoldDemo } from './adminOrdersHoldDemo'
+import { findServiceDemo, refundServiceDemo, retryServiceDemoRefund, serviceDemoPage } from './adminOrdersServiceDemo'
+import type { ChannelResultRegistrationInput, ChannelResultRegistrationOutcome, QueryPrintReturnChannelOutcome } from './adminOrdersRegistration'
 
 export type AdminOrderAftercareStatus = 'manual_check_required' | null
 
@@ -32,16 +35,16 @@ export interface AdminOrderReadonlyItem {
   retryForbidden: boolean
   refundRequired: boolean
   /**
-   * 运营必须看见的三类单：待退款、退款中、渠道已受理但本地确认未落地。
+   * 运营必须看见的单：待退款、退款中、渠道已受理但本地确认未落地、部分退款、已出纸且退款失败、待人工。
    * 只读信号，不自动出款、不改 payStatus。字段与取值照抄后端
    * `services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts`，
-   * 前端不新增第四类取值、不自行推导。
+   * 前端不自行推导。
    *
    * 两个字段刻意可选：存量后端（未部署本次只读视图）不返回它们，此时页面
    * 必须什么都不显示，而不是把 `undefined` 当成 false 去编一个「一切正常」。
    */
   opsAttention?: boolean
-  opsAttentionCode?: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | null
+  opsAttentionCode?: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'partial_refunded' | 'paper_refund_failed' | 'print_return_manual' | null
   createdAt: string
   updatedAt: string
   /** 服务单才有。缺省表示打印订单，列表默认不出现。 */
@@ -81,6 +84,21 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
     errorCode: string | null
     createdAt: string
   }>
+  autoRefund: boolean
+  refundStatus: string | null
+  refundFailureReason: string | null
+  printRefundDisposition: 'auto_success' | 'auto_failed' | 'manual' | null
+  printRefundReason: string | null
+  refundLedgerNo: string | null
+  refundLedgerCents: number | null
+  /** 应付额（分）。服务端按退款公式算好，按钮只展示这个数。 */
+  payableCents: number
+  /** 部分退款还没退完的金额（分）。不是部分退款时为 null。 */
+  refundRemainderCents?: number | null
+  /** 有渠道受理过、还没落定的退款（与服务端三步处置同一个判断）。为 true 时三步按钮都禁用。服务单不返回。 */
+  channelInFlight?: boolean
+  /** 长期查不到渠道结果、可以按商户平台核实结果登记的那一笔。服务单不返回。 */
+  channelResultRegistration?: { refundNo: string; amountCents: number; submittedAt: string; abnormal: boolean } | null
 }
 
 export interface AdminOrderReadonlyPage {
@@ -133,6 +151,15 @@ export interface AdminOrderMarkPaidResult {
   paidAt: string | null
 }
 
+export interface PrintReturnResolutionResult {
+  orderId: string
+  payStatus: string
+  refundStatus: string
+  taskStatus: string
+  refundNo: string
+  amountCents: number
+}
+
 export interface AdminOrderRefundResult {
   refund: {
     refundNo: string
@@ -151,6 +178,10 @@ interface AdminOrdersReadonlyService {
   list(params: ListAdminOrdersReadonlyParams): Promise<AdminOrderReadonlyPage>
   getById(id: string): Promise<AdminOrderReadonlyDetail>
   refundOrder(id: string, refundReason: string): Promise<AdminOrderRefundResult>
+  resolvePrintReturnHold(id: string, action: 'confirm-refunded' | 'release-paper' | 'close'): Promise<PrintReturnResolutionResult>
+  queryPrintReturnChannel(id: string): Promise<QueryPrintReturnChannelOutcome>
+  refundAfterPaperCheck(id: string, refundReason: string): Promise<AdminOrderRefundResult>
+  registerChannelResult(id: string, input: ChannelResultRegistrationInput): Promise<ChannelResultRegistrationOutcome>
   /** 线下 / 人工确认收款入账；仅 `payStatus==='unpaid'` 的订单可成功，其余由后端拒绝并回错误码。 */
   markPaidOrder(id: string, paymentSource: AdminOrderMarkPaidSource): Promise<AdminOrderMarkPaidResult>
   retryServiceRefund(id: string): Promise<AdminOrderReadonlyDetail>
@@ -228,6 +259,14 @@ const httpAdapter: AdminOrdersReadonlyService = {
   refundServiceOrder: (id) => post<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}/refund-service`, { confirm: true }),
   refundOrder: (id, refundReason) =>
     post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund`, { refundReason }),
+  resolvePrintReturnHold: (id, action) =>
+    post<PrintReturnResolutionResult>(`/admin/orders/${encodeURIComponent(id)}/print-return/${action}`, {}),
+  queryPrintReturnChannel: (id) =>
+    post<QueryPrintReturnChannelOutcome>(`/admin/orders/${encodeURIComponent(id)}/print-return/query-channel`, {}),
+  refundAfterPaperCheck: (id, refundReason) =>
+    post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund-after-paper-check`, { refundReason }),
+  registerChannelResult: (id, input) =>
+    post<ChannelResultRegistrationOutcome>(`/admin/orders/${encodeURIComponent(id)}/print-return/register-channel-result`, input),
   markPaidOrder: (id, paymentSource) =>
     post<AdminOrderMarkPaidResult>(`/admin/orders/${encodeURIComponent(id)}/mark-paid`, { paymentSource }),
 }
@@ -241,6 +280,7 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   ownerType: 'member',
   userLabel: '演示会员',
   terminalCode: 'KSK-001',
+  payableCents: 0,
   // mock 用 null 而非 'kiosk'：让 mock 模式下也能看到「未标注」这个真实存在的存量态，
   // 避免开发期误以为所有单都有渠道。
   channel: null,
@@ -287,6 +327,17 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
     { fromStatus: 'pending', toStatus: 'claimed', errorCode: null, createdAt: now() },
     { fromStatus: 'claimed', toStatus: 'completed', errorCode: null, createdAt: now() },
   ],
+  autoRefund: false,
+  refundStatus: null,
+  refundFailureReason: null,
+  printRefundDisposition: null,
+  printRefundReason: null,
+  refundLedgerNo: null,
+  refundLedgerCents: null,
+  refundRemainderCents: null,
+  channelInFlight: false,
+  // 契约门禁要求把服务端可能返回的嵌套字段写全。这张单不在待人工，页面不会显示登记入口。
+  channelResultRegistration: { refundNo: 'RFD-MOCK-REGISTRATION', amountCents: 0, submittedAt: now(), abnormal: false },
 }
 
 /** 存量订单未记录计费页数，供列表和详情验证空值展示。 */
@@ -309,6 +360,7 @@ function demoRefundDetail(): AdminOrderReadonlyDetail | null {
     id: 'ord_mock_refund',
     orderNo: 'ORD-20261105-7A3C91E204',
     amountCents: scenario === 'zero' ? 0 : 100,
+    payableCents: scenario === 'zero' ? 0 : 100,
     payStatus: 'paid',
     taskStatus: 'failed',
     refundEligible: true,
@@ -333,265 +385,32 @@ let mockDetailState: AdminOrderReadonlyDetail = { ...MOCK_DETAIL }
 /** 只读订单视图不返回 paymentSource（真实后端亦然），mock 单独记一份用于复刻幂等/冲突分支。 */
 let mockPaymentSource: AdminOrderMarkPaidSource | null = null
 
-/**
- * 演示服务单。金额只是演示数，不是价目。自营点位，青岛真实区名。
- * 默认列表不返回这些行，避免盖住原来的打印演示单。
- */
-function demoServiceOrders(): AdminOrderReadonlyDetail[] {
-  const paidAt = '2026-11-13T09:12:00+08:00'
-  const base = {
-    ownerType: 'anonymous' as const,
-    userLabel: '现场用户',
-    currency: 'CNY',
-    channel: 'kiosk',
-    pickupStatus: 'none',
-    pickupCodeExpiresAt: null,
-    billablePages: null,
-    printFileName: null,
-    copies: null,
-    colorMode: null,
-    paperSize: null,
-    errorCode: null,
-    printOutcome: null,
-    aftercareStatus: null,
-    refundEligible: false,
-    refundRequired: false,
-    discountCents: 0,
-    printTaskId: null,
-    print: null,
-    statusLogs: [],
-    recordKind: 'service' as const,
-    createdAt: '2026-11-13T09:10:00+08:00',
-    updatedAt: paidAt,
-  }
-  return [
-    {
-      ...base,
-      id: 'svc_demo_used',
-      orderNo: 'SVC-DEMO-SN-01',
-      type: 'resume_optimize',
-      serviceKey: 'resume_optimize',
-      serviceName: 'AI 简历优化',
-      serviceStatus: 'consumed',
-      terminalCode: 'ZYD-SN-01',
-      locationLabel: '市南 · 香港中路',
-      amountCents: 100,
-      payStatus: 'paid',
-      taskStatus: 'completed',
-      paidAt,
-      refundReason: null,
-      refundedAt: null,
-      refundedAmountCents: 0,
-      refundAttempts: 0,
-      retryForbidden: true,
-      opsAttention: false,
-      opsAttentionCode: null,
-      failureReason: null,
-      closeReason: null,
-    },
-    {
-      ...base,
-      id: 'svc_demo_refunded',
-      orderNo: 'SVC-DEMO-SB-02',
-      type: 'scan',
-      serviceKey: 'scan',
-      serviceName: '扫描',
-      serviceStatus: 'refunded',
-      terminalCode: 'ZYD-SB-02',
-      locationLabel: '市北 · 辽宁路',
-      amountCents: 100,
-      payStatus: 'refunded',
-      taskStatus: 'cancelled',
-      paidAt: '2026-11-13T10:02:00+08:00',
-      refundReason: '扫描没出文件',
-      refundedAt: '2026-11-13T10:14:00+08:00',
-      refundedAmountCents: 100,
-      refundAttempts: 0,
-      retryForbidden: true,
-      opsAttention: false,
-      opsAttentionCode: null,
-      failureReason: '扫描没出文件',
-      closeReason: null,
-      updatedAt: '2026-11-13T10:14:00+08:00',
-    },
-    {
-      ...base,
-      id: 'svc_demo_refunding',
-      orderNo: 'SVC-DEMO-LC-03',
-      type: 'mock_interview',
-      serviceKey: 'mock_interview',
-      serviceName: 'AI 模拟面试',
-      serviceStatus: 'refunding',
-      terminalCode: 'ZYD-LC-03',
-      locationLabel: '李沧 · 九水路',
-      amountCents: 200,
-      payStatus: 'refunding',
-      taskStatus: 'failed',
-      paidAt: '2026-11-13T11:20:00+08:00',
-      refundReason: '面试没开起来',
-      refundedAt: null,
-      refundedAmountCents: 0,
-      refundAttempts: 2,
-      retryForbidden: false,
-      opsAttention: true,
-      opsAttentionCode: 'refunding',
-      failureReason: '面试没开起来',
-      closeReason: null,
-      updatedAt: '2026-11-13T11:28:00+08:00',
-    },
-    {
-      ...base,
-      id: 'svc_demo_paid',
-      orderNo: 'SVC-DEMO-HD-04',
-      type: 'scan',
-      serviceKey: 'scan',
-      serviceName: '扫描',
-      serviceStatus: 'paid',
-      terminalCode: 'ZYD-HD-04',
-      locationLabel: '黄岛 · 长江路',
-      amountCents: 100,
-      payStatus: 'paid',
-      taskStatus: 'pending',
-      paidAt: '2026-11-13T12:05:00+08:00',
-      refundReason: null,
-      refundedAt: null,
-      refundedAmountCents: 0,
-      refundAttempts: 0,
-      retryForbidden: true,
-      opsAttention: false,
-      opsAttentionCode: null,
-      failureReason: null,
-      closeReason: null,
-      updatedAt: '2026-11-13T12:05:00+08:00',
-    },
-    {
-      ...base,
-      id: 'svc_demo_manual',
-      orderNo: 'SVC-DEMO-JM-06',
-      type: 'scan',
-      serviceKey: 'scan',
-      serviceName: '扫描',
-      serviceStatus: 'refund_failed',
-      terminalCode: 'ZYD-JM-06',
-      locationLabel: '即墨 · 蓝鳌路',
-      amountCents: 100,
-      payStatus: 'refund_failed',
-      taskStatus: 'failed',
-      paidAt: '2026-11-13T13:02:00+08:00',
-      refundReason: '扫描没出文件',
-      refundedAt: null,
-      refundedAmountCents: 0,
-      refundAttempts: 8,
-      retryForbidden: false,
-      opsAttention: true,
-      opsAttentionCode: 'refunding',
-      failureReason: '扫描没出文件',
-      closeReason: null,
-      updatedAt: '2026-11-13T13:40:00+08:00',
-    },
-    {
-      ...base,
-      id: 'svc_demo_running',
-      orderNo: 'SVC-DEMO-SN-05',
-      type: 'scan',
-      serviceKey: 'scan',
-      serviceName: '扫描',
-      serviceStatus: 'consumed',
-      terminalCode: 'ZYD-SN-01',
-      locationLabel: '市南 · 香港中路',
-      amountCents: 100,
-      payStatus: 'paid',
-      taskStatus: 'in_progress',
-      paidAt: '2026-11-13T12:20:00+08:00',
-      refundReason: null,
-      refundedAt: null,
-      refundedAmountCents: 0,
-      refundAttempts: 0,
-      retryForbidden: true,
-      opsAttention: false,
-      opsAttentionCode: null,
-      failureReason: null,
-      closeReason: null,
-      updatedAt: '2026-11-13T12:21:00+08:00',
-    },
-  ]
-}
-
-let serviceDemoState = demoServiceOrders()
 
 const mockAdapter: AdminOrdersReadonlyService = {
   async list(params) {
-    if (params.recordKind === 'service') {
-      const items = serviceDemoState.filter((row) => {
-        if (params.type && row.serviceKey !== params.type) return false
-        if (params.serviceStatus && row.serviceStatus !== params.serviceStatus) return false
-        if (params.search && !`${row.orderNo} ${row.terminalCode ?? ''} ${row.locationLabel ?? ''}`.includes(params.search)) return false
-        return true
-      })
-      return {
-        items,
-        pagination: { page: params.page, pageSize: params.pageSize, total: items.length, totalPages: 1 },
-      }
-    }
+    if (params.recordKind === 'service') return serviceDemoPage(params)
     const refundDetail = demoRefundDetail()
-    const items = [mockDetailState, MOCK_UNRECORDED_DETAIL, ...(refundDetail ? [refundDetail] : [])]
+    const holdDetail = currentHoldDemo()
+    const items = [mockDetailState, MOCK_UNRECORDED_DETAIL, ...(refundDetail ? [refundDetail] : []), ...(holdDetail ? [holdDetail] : [])]
     return {
       items,
       pagination: { page: params.page, pageSize: params.pageSize, total: items.length, totalPages: 1 },
     }
   },
   async getById(id) {
-    const service = serviceDemoState.find((row) => row.id === id)
+    const service = findServiceDemo(id)
     if (service) return service
     const refundDetail = demoRefundDetail()
     if (refundDetail?.id === id) return refundDetail
+    const holdDetail = currentHoldDemo()
+    if (holdDetail?.id === id) return holdDetail
     return id === MOCK_UNRECORDED_DETAIL.id ? MOCK_UNRECORDED_DETAIL : mockDetailState
   },
   async retryServiceRefund(id) {
-    const index = serviceDemoState.findIndex((row) => row.id === id)
-    const row = index >= 0 ? serviceDemoState[index] : undefined
-    if (!row || (row.serviceStatus !== 'refunding' && row.serviceStatus !== 'refund_failed')) {
-      throw new ApiHttpError('SERVICE_REFUND_NOT_RETRYABLE', '这张单现在不在退款中', 409)
-    }
-    const refundedAt = now()
-    const next: AdminOrderReadonlyDetail = {
-      ...row,
-      serviceStatus: 'refunded',
-      payStatus: 'refunded',
-      taskStatus: 'cancelled',
-      refundedAt,
-      refundedAmountCents: row.amountCents,
-      opsAttention: false,
-      opsAttentionCode: null,
-      retryForbidden: true,
-      updatedAt: refundedAt,
-    }
-    serviceDemoState = serviceDemoState.map((item, i) => (i === index ? next : item))
-    return next
+    return retryServiceDemoRefund(id)
   },
   async refundServiceOrder(id) {
-    const index = serviceDemoState.findIndex((row) => row.id === id)
-    const row = index >= 0 ? serviceDemoState[index] : undefined
-    const stuck = row?.serviceStatus === 'paid' || (row?.serviceStatus === 'consumed' && row.taskStatus === 'in_progress')
-    if (!row || !stuck) {
-      throw new ApiHttpError('SERVICE_REFUND_NOT_RETRYABLE', '这张单现在不能原路退款', 409)
-    }
-    const refundedAt = now()
-    const next: AdminOrderReadonlyDetail = {
-      ...row,
-      serviceStatus: 'refunded',
-      payStatus: 'refunded',
-      taskStatus: 'cancelled',
-      refundReason: '管理员原路退款',
-      refundedAt,
-      refundedAmountCents: row.amountCents,
-      opsAttention: false,
-      opsAttentionCode: null,
-      retryForbidden: true,
-      updatedAt: refundedAt,
-    }
-    serviceDemoState = serviceDemoState.map((item, i) => (i === index ? next : item))
-    return next
+    return refundServiceDemo(id)
   },
   async markPaidOrder(_id, paymentSource) {
     // 复刻后端状态机：仅 unpaid 可入账；已 paid 同来源幂等回放，异来源冲突。
@@ -635,6 +454,42 @@ const mockAdapter: AdminOrdersReadonlyService = {
       order: { orderNo: MOCK_DETAIL.orderNo, payStatus: 'refunded', refundedAmountCents: 0, refundedAt },
       idempotent: false,
     }
+  },
+  async resolvePrintReturnHold(id, action) {
+    const held = resolveHoldDemo(id, action)
+    if (held) return held
+    if (!mockDetailState.refundLedgerNo) {
+      throw new ApiHttpError('REFUND_HOLD_NOT_FOUND', '没有待人工处理的退款，不能做这一步。', 400)
+    }
+    const payStatus = action === 'confirm-refunded' ? 'refunded' : action === 'close' ? 'closed' : 'paid'
+    const refundStatus = action === 'confirm-refunded' ? 'success' : action === 'close' ? 'closed' : 'withdrawn'
+    mockDetailState = {
+      ...mockDetailState,
+      payStatus,
+      refundStatus,
+      refundEligible: false,
+      printRefundDisposition: null,
+      updatedAt: now(),
+    }
+    return {
+      orderId: id,
+      payStatus,
+      refundStatus,
+      taskStatus: action === 'release-paper' ? 'pending' : 'cancelled',
+      refundNo: mockDetailState.refundLedgerNo ?? '',
+      amountCents: mockDetailState.refundLedgerCents ?? 0,
+    }
+  },
+  async queryPrintReturnChannel(id) {
+    return queryHoldDemo(id) ?? { orderId: id, outcome: 'no_in_flight', payStatus: mockDetailState.payStatus, refundStatus: mockDetailState.refundStatus, channelInFlight: false, checkedCount: 0, message: '这单目前没有渠道在途退款，无需查询。' }
+  },
+  async refundAfterPaperCheck(_id, refundReason) {
+    return mockAdapter.refundOrder(_id, refundReason)
+  },
+  async registerChannelResult(id, input) {
+    const held = registerHoldDemo(id, input)
+    if (held) return held
+    throw new ApiHttpError('REGISTRATION_NOT_IN_FLIGHT', '这笔退款不在渠道处理中，不用登记。请刷新后再看。', 400)
   },
 }
 

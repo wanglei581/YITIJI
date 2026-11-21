@@ -26,6 +26,9 @@ import { consumePickupClaimRate } from './pickup-claim-rate-limit'
 import { maskPickupFileName } from './pickup-file-mask'
 import { isPickupClaimWindowClosed } from './pickup-claim-window'
 import { resumeReleasedFailure } from './pickup-code-resume'
+import { settlePickupArrival } from './pickup-arrival-price'
+import { releaseStaleArrivalHold } from './pickup-arrival-hold'
+import { findOpenRefund } from '../payment/open-refund-hold'
 
 export { isPickupClaimWindowClosed }
 
@@ -112,13 +115,17 @@ export class PickupOrderService {
       await this.noteClaimFailure(terminal.id, 'code_not_found', null)
       throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     }
-    if (order.terminalId !== terminal.id) {
+    await releaseStaleArrivalHold(this.prisma, order.id)
+    const heldOrder = await this.prisma.order.findUnique({ where: { id: order.id } })
+    if (!heldOrder) throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
+    if (heldOrder.terminalId && heldOrder.terminalId !== terminal.id) {
       // 码真实存在但绑在别的终端：这是运营真正需要区分的场景（用户走错机器），
       // 也是攻击者「猜中了一枚真码」的场景 —— 两者都值得留痕，且发生率天然很低。
-      await this.noteClaimFailure(terminal.id, 'terminal_mismatch', order.id)
+      // 看价不写终端号。付款进行中才会占住；过期且渠道还没受理的占用已在上面放开。
+      await this.noteClaimFailure(terminal.id, 'terminal_mismatch', heldOrder.id)
       throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     }
-    return this.settleClaim(order, terminal, 'pickup_code')
+    return this.settleClaim(heldOrder, terminal, 'pickup_code')
   }
 
   /**
@@ -126,13 +133,20 @@ export class PickupOrderService {
    *
    * 到机码（claim）与会员本机领取（claim-here）都走这里，不许各写一份 ——
    * 两份判定迟早漂移，漂移的那一份就是能绕过退款或过期出纸的那一份。
-   * 调用方负责先把单找出来、并按各自口径处理「单不属于本机」；下面那行只是兜底。
+   * 调用方负责先把单找出来、并按各自口径处理「已经绑在别的机器上」；没绑终端的单在下面抢占。
    *
    * via 只影响两件事：到机码成功才给本机失败计数抵一次（它证明手里是真码，会员入口不证明这一点，
    * 否则登录用户可以拿自己的单反复抵扣、给枚举续命）；审计 payload 记下入口。
    */
   async settleClaim(order: OrderRecord, terminal: { id: string }, via: PickupClaimVia) {
-    if (order.terminalId !== terminal.id) throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
+    // 调用方手里的是核销开始时的码哈希。刷新订单只能更新终端占用和付款状态，不能把哈希换成库里的新码，
+    // 否则重发之后这一次仍会按新码认领成功。
+    const presentedCodeHash = order.pickupCodeHash
+    await releaseStaleArrivalHold(this.prisma, order.id)
+    const currentOrder = await this.prisma.order.findUnique({ where: { id: order.id } })
+    if (!currentOrder) throw new NotFoundException('ORDER_NOT_FOUND')
+    order = currentOrder
+    if (order.terminalId && order.terminalId !== terminal.id) throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     // 退款态必须先于关窗判断：claimed + refunding 不再算活租约，否则会先被写成
     // PICKUP_CODE_EXPIRED，把「钱已退」说成「码过期」。
     if (REFUNDED_PAY_STATUSES.has(order.payStatus)) {
@@ -195,26 +209,55 @@ export class PickupOrderService {
     // 打印机检查放在过期、状态、文件、能力判定之后、任何写库之前：
     // 过期码仍先说「已过期」，不能被说成「到机码没有作废」；被拒时不认领、不建任务、不计输错。
     await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, via === 'member_order' ? 'claim_here' : 'pickup')
+    // 重发码必须先于补价：调用方手里的是核销开始时的码哈希。库里的码已经换过，就按原口径拒绝，不改金额、不抢占。
+    if (order.pickupStatus === 'pending') {
+      const liveCode = await this.prisma.order.findUnique({
+        where: { id: order.id },
+        select: { pickupCodeHash: true },
+      })
+      if (liveCode && liveCode.pickupCodeHash !== presentedCodeHash) {
+        if (via === 'member_order') {
+          throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '这一单刚刚有变化，请刷新订单后再领取' } })
+        }
+        throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
+      }
+    }
+    // 免费额度之前按本机生效价重算。0 元免费已付改成收费后，不能再被免费额度拦住。
+    const arrival = await settlePickupArrival(this.prisma, { orderId: order.id, terminalId: terminal.id })
+    if (arrival.kind === 'lost') {
+      const raced = await this.prisma.order.findUnique({ where: { id: order.id } })
+      if (raced && raced.terminalId === terminal.id && (raced.pickupStatus === 'used' || raced.printTaskId)) {
+        return this.replayReleasedClaim(raced, terminal.id)
+      }
+      throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
+    }
+    if (arrival.kind === 'unpriced') {
+      throw new BadRequestException({
+        error: { code: 'ARRIVAL_PRICE_UNAVAILABLE', message: '这台机器的打印价格暂时算不出来，请稍后再试' },
+      })
+    }
+    const priced = await this.prisma.order.findUnique({ where: { id: order.id } })
+    if (!priced) throw new NotFoundException('ORDER_NOT_FOUND')
     // 免费额度在写库前先预判一次：被拒时不认领、不抵失败计数，订单保持待领取，明天还能直接领。
     // release 事务里同口径再判一次，那一次才是并发下的准绳。
     // 材料包按这单还没打完的各项合计判（第一次放行时就是整包）。单文件单仍按本单面数。
     // 后续各项由 advance 连续派发，不再判额度：整包已在第一次放行按合计准入。
     await assertFreePrintQuota(this.prisma, {
       terminalId: terminal.id,
-      endUserId: order.endUserId,
+      endUserId: priced.endUserId,
       requestedSides: packageItems.length > 0
         ? unprintedPackageSides(packageItems)
-        : printOrderSideCount([], { billablePages: order.billablePages, printParamsJson: order.printParamsJson }),
-      payableCents: payableCents(order),
+        : printOrderSideCount([], { billablePages: priced.billablePages, printParamsJson: priced.printParamsJson }),
+      payableCents: payableCents(priced),
     })
 
-    if (order.pickupStatus === 'pending') {
+    if (priced.pickupStatus === 'pending') {
       const claimed = await this.prisma.order.updateMany({
         where: {
-          id: order.id,
+          id: priced.id,
           pickupStatus: 'pending',
           printTaskId: null,
-          pickupCodeHash: order.pickupCodeHash,
+          pickupCodeHash: presentedCodeHash,
           payStatus: { in: [...CLAIMABLE_PAY_STATUSES] },
         },
         data: { pickupStatus: 'claimed', pickupClaimedAt: new Date(), taskStatus: 'awaiting_payment' },
@@ -226,9 +269,9 @@ export class PickupOrderService {
       // 一张新单只换回一次猜码机会。
       if (claimed.count === 1 && via === 'pickup_code') await creditPickupClaimSuccess(this.redis, terminal.id)
       if (claimed.count !== 1) {
-        const raced = await this.prisma.order.findUnique({ where: { id: order.id } })
+        const raced = await this.prisma.order.findUnique({ where: { id: priced.id } })
         if (!raced) throw new NotFoundException('ORDER_NOT_FOUND')
-        if (raced.pickupCodeHash !== order.pickupCodeHash) {
+        if (raced.pickupCodeHash !== presentedCodeHash) {
           // 到机码刚被重发：码入口照旧同文案防撞码；会员本机领取没输过码，说「这一单有变化」而不是「码无效」。
           if (via === 'member_order') {
             throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '这一单刚刚有变化，请刷新订单后再领取' } })
@@ -241,7 +284,7 @@ export class PickupOrderService {
         if (raced.pickupStatus === 'pending') this.assertPayStatusClaimable(raced.payStatus)
       }
     }
-    const fresh = await this.prisma.order.findUnique({ where: { id: order.id } })
+    const fresh = await this.prisma.order.findUnique({ where: { id: priced.id } })
     if (!fresh) throw new NotFoundException('ORDER_NOT_FOUND')
 
     if (fresh.payStatus === 'paid') return this.release(fresh.id, terminal.id, this.paymentToken(fresh), via)
@@ -267,7 +310,8 @@ export class PickupOrderService {
       billablePages: fresh.billablePages,
       ...this.printSummary(fresh),
       fileName: fresh.sourceFileName ?? (firstItem ? `材料包第${firstItem.seq + 1}份` : null),
-      paymentSessionToken: this.paymentToken(fresh),
+      paymentSessionToken: this.paymentToken(fresh, terminal.id),
+      ...(arrival.notice ? { arrivalChargeNotice: true as const } : {}),
     }
   }
 
@@ -285,6 +329,8 @@ export class PickupOrderService {
     if (order.printTaskId) return this.releasedView(order)
     if (order.pickupStatus !== 'claimed') throw new BadRequestException('PICKUP_NOT_CLAIMED')
     if (order.payStatus !== 'paid') throw new BadRequestException('ORDER_NOT_PAID')
+    // 退款还可能变成成功时不能建任务。放在文件和打印机检查之前，避免没文件时把这笔冲突藏起来。
+    if (await findOpenRefund(this.prisma, order.id)) throw new BadRequestException('ORDER_REFUND_UNRESOLVED')
     const firstItem = !order.sourceFileId
       ? await this.prisma.orderItem.findFirst({ where: { orderId: order.id, seq: 0 }, orderBy: { seq: 'asc' } })
       : null
@@ -304,6 +350,7 @@ export class PickupOrderService {
       if (current.pickupStatus !== 'claimed' || current.payStatus !== 'paid') {
         throw new BadRequestException('ORDER_RELEASE_INVALID_STATE')
       }
+      if (await findOpenRefund(tx, current.id)) throw new BadRequestException('ORDER_REFUND_UNRESOLVED')
       const packageRows = !current.sourceFileId
         ? await tx.orderItem.findMany({ where: { orderId: current.id }, orderBy: { seq: 'asc' } })
         : []
@@ -496,11 +543,11 @@ export class PickupOrderService {
     throw new UnauthorizedException(result.code)
   }
 
-  private paymentToken(order: OrderRecord): string {
+  private paymentToken(order: OrderRecord, terminalId?: string | null): string {
     return createPaymentSessionToken({
       orderId: order.id,
       orderNo: order.orderNo,
-      terminalId: order.terminalId,
+      terminalId: terminalId ?? order.terminalId,
       amountCents: order.amountCents,
       printTaskId: order.printTaskId,
     })

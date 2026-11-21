@@ -442,6 +442,20 @@
   color: var(--qxt-ink);
 }
 
+[data-qx-page='print-pickup-ok'] .pok-charge {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px 28px;
+  border-radius: 26px;
+  border: 2px solid var(--qxt-band-b);
+  background: var(--qxt-well);
+  color: var(--qxt-ink);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
 /* 稿 .process */
 [data-qx-page='print-pickup-ok'] .pok-steps {
   display: flex;

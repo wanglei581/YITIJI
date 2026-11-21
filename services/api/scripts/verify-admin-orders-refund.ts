@@ -38,16 +38,26 @@ function makeSandboxProvider(): Partial<PaymentProvider> & Pick<PaymentProvider,
 function pass(msg: string): void { console.log(`  PASS ${msg}`) }
 function fail(msg: string): never { throw new Error(msg) }
 
+function thrownCode(error: unknown): string {
+  const candidate = error as { message?: string; getResponse?: () => unknown }
+  const response = typeof candidate.getResponse === 'function' ? candidate.getResponse() : undefined
+  if (response && typeof response === 'object') {
+    const nested = (response as { error?: { code?: unknown } }).error
+    if (typeof nested?.code === 'string') return nested.code
+  }
+  return candidate.message ?? String(error)
+}
+
 async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
   try {
     await fn()
   } catch (e) {
-    const msg = (e as Error)?.message ?? String(e)
-    if (msg.includes(code)) {
+    const actual = thrownCode(e)
+    if (actual === code || actual.includes(code)) {
       pass(label)
       return
     }
-    fail(`${label} — expected ${code}, got: ${msg}`)
+    fail(`${label} — expected ${code}, got: ${actual}`)
   }
   fail(`${label} — expected ${code}, but resolved`)
 }
@@ -314,7 +324,7 @@ async function main(): Promise<void> {
         channelTxnNo: `txn_${ordPendPrint}`,
       },
     })
-    await expectCode('已核查出纸的待退单 → PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN', 'PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN', () =>
+    await expectCode('已核查出纸的待退单 → PAPER_ALREADY_RELEASED', 'PAPER_ALREADY_RELEASED', () =>
       refundService.refund(ordPendPrint, { reason: '已出纸', operatorId }),
     )
 
@@ -398,8 +408,8 @@ async function main(): Promise<void> {
       await refundService.refund(ordPrinted, { reason: '已出纸不应退款', operatorId })
       fail('已核查出纸订单退款应被拒绝')
     } catch (e) {
-      if (e instanceof BadRequestException && e.message === 'PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN') {
-        pass('已核查出纸退款被 PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN 拒绝')
+      if (e instanceof BadRequestException && thrownCode(e) === 'PAPER_ALREADY_RELEASED') {
+        pass('已核查出纸的普通退款被 PAPER_ALREADY_RELEASED 拒绝，须走核对后仍退款')
       } else {
         throw e
       }

@@ -379,7 +379,7 @@ pass('ADM-C15 三个来源页分页控件读服务端 total，mock/http 都按 p
       useState: (initial) => { const slot = stateIndex++; states[slot] = initial; return [initial, (value) => { states[slot] = value }] },
       useCallback: (fn) => fn, useEffect: (fn) => effects.push(fn), useRef: (current) => ({ current }),
     },
-    '@ai-job-print/shared': {}, '../../lib/auditActionLabels': {}, '../../services/auth': {},
+    '@ai-job-print/shared': {}, '../../lib/auditActionLabels': {}, '../../lib/auditActorLabels': {}, '../../services/auth': {},
     '../../services/api/audit': {
       getAuditLogs: async (query) => {
         queries.push(query)

@@ -17,6 +17,7 @@ process.env['SANDBOX_PAYMENT_SECRET'] = 'verify-service-orders-sandbox-secret'
 process.env['JWT_SECRET'] = 'verify-service-orders-jwt-secret-0123456789'
 
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import { HttpException, HttpStatus } from '@nestjs/common'
 import { SERVICE_ORDER_KEYS as SHARED_KEYS, SERVICE_ORDER_NAMES as SHARED_NAMES } from '@ai-job-print/shared'
 import { executeResumeCharge } from '../src/ai/quota/ai-resume-charge'
@@ -127,6 +128,9 @@ async function main(): Promise<void> {
   await withServiceOrderFixture(async (fx) => {
     const consumedOrderId = await verifyServiceOrderChargeCases(fx)
     await verifyServiceOrderSettleCases(fx, consumedOrderId)
+    const { runServiceOrderP2b9dAbnormalCases } = await import('./support/service-order-p2b9d-abnormal-cases')
+    await runServiceOrderP2b9dAbnormalCases(fx.prisma, randomUUID().slice(0, 8))
+    pass('b 服务单发起/查询/通知三路 ABNORMAL 不当失败，写清中间账户并告警')
   })
   pass('服务单收钱、占用、退款和后台查看')
 }

@@ -292,7 +292,13 @@ test('R10 白名单与服务端源码一致；路径归类抽样', () => {
     '/print-scan': 'print',
     '/print/pickup-claim': 'print',
     '/upload/phone': 'print',
+    '/invoice/phone': 'print',
+    '/k/i/scene-token': 'print',
     '/scan': 'scan',
+    // 按次付款屏归到它付的那种服务：付完接着办同一件事，使用统计不多出一类。
+    '/pay/scan': 'scan',
+    '/pay/resume': 'resume',
+    '/pay/interview': 'interview',
     '/resume/source': 'resume',
     '/resume/career-plan': 'career',
     '/resume/self-assessment/intro': 'career',
@@ -313,5 +319,206 @@ test('R10 白名单与服务端源码一致；路径归类抽样', () => {
   for (const path of Object.keys(cases)) {
     const got = categoryForPath(path)
     if (got !== null) assert.ok(KIOSK_VISIT_CATEGORIES.includes(got), `${path} 归到了白名单外的 ${got}`)
+  }
+})
+
+test('R11 重载后旧服务单挂在旧周期 A：结束新周期 B 一并通知服务端结束 A 且去重不重发', async () => {
+  const sessionA = '11111111-1111-4111-8111-111111111111'
+  const h = harness()
+  // 新周期 B 已开始
+  h.reporter.enterPath('/resume/optimize')
+  await h.reporter.settle()
+  const sessionB = h.calls[0].body.clientSessionId
+  h.advance(MIN)
+  const endAt = h.at()
+  h.reporter.end('user_exit', [sessionA, sessionB])
+  await h.reporter.settle()
+  const ends = h.calls.filter((c) => c.endpoint === 'end')
+  assert.deepEqual(ends.map((c) => c.body.clientSessionId), [sessionB, sessionA], 'B 和旧周期 A 都收到 end，B 不重复')
+  assert.deepEqual(ends[1].body, { clientSessionId: sessionA, endedAt: h.iso(endAt), endReason: 'user_exit' })
+  // 紧接着 clearServiceTrips 回调再次传入 A：已发过 end，去重不再重发。
+  h.reporter.endSessions([sessionA], 'privacy_clear')
+  await h.reporter.settle()
+  assert.equal(h.calls.filter((c) => c.endpoint === 'end').length, 2)
+
+  // 新周期根本没开始（例如重载落首页后直接结束使用）：仍须通知服务端结束旧周期 A，404 不伪造 start。
+  const hIdle = harness({ respond: () => 404 })
+  hIdle.reporter.end('idle_timeout', [sessionA])
+  await hIdle.reporter.settle()
+  assert.deepEqual(hIdle.calls.map((c) => [c.endpoint, c.body.clientSessionId, c.body.endReason]), [
+    ['end', sessionA, 'idle_timeout'],
+  ])
+})
+
+test('R12 endSessions：含当前周期时同步结束并轮换新周期；只含旧周期时不打断当前周期', async () => {
+  const oldA = '22222222-2222-4222-8222-222222222222'
+  const h = harness()
+  const cur1 = h.reporter.snapshot().clientSessionId
+  h.reporter.endSessions([oldA], 'handover')
+  await h.reporter.settle()
+  assert.equal(h.reporter.snapshot().clientSessionId, cur1, '只收尾旧周期 A 时不打断当前周期')
+  assert.deepEqual(h.calls.map((c) => [c.endpoint, c.body.clientSessionId, c.body.endReason]), [
+    ['end', oldA, 'handover'],
+  ])
+
+  // 当旧单就在当前周期里：收尾当前周期并轮换新编号，避免后续用户沿用已结束周期建单被拒。
+  h.reporter.enterPath('/pay/resume')
+  await h.reporter.settle()
+  const curBefore = h.reporter.snapshot().clientSessionId
+  h.reporter.endSessions([curBefore], 'handover')
+  await h.reporter.settle()
+  assert.notEqual(h.reporter.snapshot().clientSessionId, curBefore, '含当前周期时必须轮换新周期编号')
+  assert.ok(h.calls.some((c) => c.endpoint === 'end' && c.body.clientSessionId === curBefore && c.body.endReason === 'handover'))
+})
+
+test('R13 serviceTrip 保持零运行时依赖，清场前收集旧周期号并回调收尾', async () => {
+  const tripSrc = readFileSync(join(kioskRoot, 'src/services/serviceTrip.ts'), 'utf8')
+  const tripOut = ts.transpileModule(tripSrc, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: 'serviceTrip.ts',
+  }).outputText
+  assert.deepEqual([...tripOut.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]), [], 'serviceTrip.ts 必须保持零运行时依赖')
+  const map = new Map()
+  const prevWin = globalThis.window
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(String(k), String(v)) },
+      removeItem: (k) => { map.delete(k) },
+    },
+  }
+  try {
+    const tripMod = await import(`data:text/javascript;base64,${Buffer.from(tripOut).toString('base64')}`)
+    tripMod.rememberServiceTrip({ serviceKey: 'resume_optimize', orderId: 'ord-a', kioskSessionId: 'sess-a' }, 1_000)
+    tripMod.rememberServiceTrip({ serviceKey: 'scan', orderId: 'ord-b', kioskSessionId: 'sess-b' }, 1_000)
+    assert.deepEqual(tripMod.readServiceTripSessionIds().sort(), ['sess-a', 'sess-b'])
+    const received = []
+    const off = tripMod.onServiceTripsCleared((ids, reason) => received.push({ ids: [...ids].sort(), reason }))
+    const offBoom = tripMod.onServiceTripsCleared(() => { throw new Error('listener boom') })
+    const cleared = tripMod.clearServiceTrips('clear')
+    off()
+    offBoom()
+    assert.deepEqual(cleared.sort(), ['sess-a', 'sess-b'])
+    assert.equal(tripMod.readServiceTrip('resume_optimize', 1_000), null)
+    assert.deepEqual(received, [{ ids: ['sess-a', 'sess-b'], reason: 'clear' }])
+  } finally {
+    if (prevWin === undefined) delete globalThis.window
+    else globalThis.window = prevWin
+  }
+})
+
+test('R14 游客转会员与跨人归属隔离：旧单号清掉并通知收尾，存储零 PII，AuthContext 登录分支必清', async () => {
+  const tripSrc = readFileSync(join(kioskRoot, 'src/services/serviceTrip.ts'), 'utf8')
+  const tripOut = ts.transpileModule(tripSrc, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: 'serviceTrip.ts',
+  }).outputText
+  const map = new Map()
+  const prevWin = globalThis.window
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(String(k), String(v)) },
+      removeItem: (k) => { map.delete(k) },
+    },
+  }
+  try {
+    const tripMod = await import(`data:text/javascript;base64,${Buffer.from(`${tripOut}\n// r14-a`).toString('base64')}`)
+    const notified = []
+    const off = tripMod.onServiceTripsCleared((ids, reason) => notified.push({ ids: [...ids], reason }))
+    // 1) 游客记单后，登录会员读单被归属隔离拒绝并清掉，同时触发旧周期收尾
+    tripMod.rememberServiceTrip({
+      serviceKey: 'resume_optimize',
+      orderId: 'ord-guest-1',
+      kioskSessionId: 'sess-guest-1',
+      owner: tripMod.serviceTripOwnerFor(null),
+    }, 1_000)
+    const memberA = tripMod.serviceTripOwnerFor('member-id-secret-A')
+    assert.equal(tripMod.readServiceTrip('resume_optimize', { owner: memberA, nowMs: 2_000 }), null, '会员不得继承匿名游客留下的旧单')
+    assert.equal(map.get(tripMod.SERVICE_TRIP_STORAGE_KEY) ?? null, null, '归属不符的旧单当场清除')
+    assert.deepEqual(notified, [{ ids: ['sess-guest-1'], reason: 'login_handover' }])
+
+    // 2) 会员 A 记单：存储不含会员 id；同次登录可读；会员 B 不可读；重载后标记丢失游客也不可读
+    tripMod.rememberServiceTrip({
+      serviceKey: 'scan',
+      orderId: 'ord-mem-a',
+      kioskSessionId: 'sess-mem-a',
+      owner: memberA,
+    }, 3_000)
+    const raw = map.get(tripMod.SERVICE_TRIP_STORAGE_KEY) ?? ''
+    assert.ok(!raw.includes('member-id-secret-A'), 'sessionStorage 不得存会员 id 等 PII')
+    assert.equal(tripMod.readServiceTrip('scan', { owner: memberA, nowMs: 4_000 })?.orderId, 'ord-mem-a')
+    const memberB = tripMod.serviceTripOwnerFor('member-id-secret-B')
+    assert.equal(tripMod.readServiceTrip('scan', { owner: memberB, nowMs: 4_000 }), null, '另一会员不得继承会员 A 的旧单')
+
+    // 3) 整页重载后内存标记重置：新模块里的游客无法继承旧会员单
+    tripMod.rememberServiceTrip({
+      serviceKey: 'mock_interview',
+      orderId: 'ord-mem-reload',
+      kioskSessionId: 'sess-mem-reload',
+      owner: memberA,
+    }, 5_000)
+    off()
+    const reloadedMod = await import(`data:text/javascript;base64,${Buffer.from(`${tripOut}\n// r14-b`).toString('base64')}`)
+    assert.equal(reloadedMod.readServiceTrip('mock_interview', { owner: reloadedMod.serviceTripOwnerFor(null), nowMs: 6_000 }), null)
+    assert.equal(reloadedMod.readServiceTrip('mock_interview', { owner: reloadedMod.serviceTripOwnerFor('member-id-secret-A'), nowMs: 6_000 }), null)
+  } finally {
+    if (prevWin === undefined) delete globalThis.window
+    else globalThis.window = prevWin
+  }
+
+  // 4) AuthContext 游客 → 会员登录分支必须调用 clearServiceTrips('login_handover')
+  const authSrc = readFileSync(join(kioskRoot, 'src/auth/AuthContext.tsx'), 'utf8')
+  assert.match(
+    authSrc,
+    /\} else if \(!current\) \{[\s\S]{0,800}?clearServiceTrips\('login_handover'\)/,
+    'AuthContext 游客转会员分支必须清掉游客服务单号并收尾旧周期',
+  )
+})
+
+test('R15 retireServiceTripOrder 关单失败保留本机单号，成功或 404 才遗忘', async () => {
+  const toUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
+  const transpileTs = (rel) => ts.transpileModule(readFileSync(join(kioskRoot, rel), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: rel,
+  }).outputText
+  const map = new Map()
+  const prevWin = globalThis.window
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(String(k), String(v)) },
+      removeItem: (k) => { map.delete(k) },
+    },
+  }
+  try {
+    const tripUrl = toUrl(`${transpileTs('src/services/serviceTrip.ts')}\n// r15`)
+    const errUrl = toUrl(`export function errorCodeOf(e) { return e && typeof e === 'object' ? e.code : undefined }\n// r15`)
+    const orderSrc = `${transpileTs('src/services/serviceTripOrder.ts')}\n// r15`
+      .replaceAll("from '../auth/useKioskSessionReporting'", `from '${toUrl('export async function kioskVisitReadyForCharge() { return "s" }')}'`)
+      .replaceAll("from './api/serviceOrders'", `from '${toUrl('export async function closeServiceOrder() { return null }; export async function createServiceOrder() { return null }')}'`)
+      .replaceAll("from './api/userErrorMessage'", `from '${errUrl}'`)
+      .replaceAll("from './serviceTrip'", `from '${tripUrl}'`)
+    const tripMod = await import(tripUrl)
+    const orderMod = await import(toUrl(orderSrc))
+    const trip = { serviceKey: 'resume_optimize', orderId: 'ord-keep', kioskSessionId: 'sess-keep', owner: { kind: 'guest' }, savedAt: 1_000 }
+    orderMod.keepServiceTripOrder(trip)
+    // 503 关单失败：必须保留本地单号
+    const failed = await orderMod.retireServiceTripOrder(trip, 'pending', async () => { throw { code: 'UPSTREAM_UNAVAILABLE', status: 503 } })
+    assert.equal(failed.ok, false)
+    assert.equal(tripMod.readServiceTrip('resume_optimize', 2_000)?.orderId, 'ord-keep', '关单失败不得静默忘掉旧单号')
+    // 404 不存在：可安全忘掉
+    const gone = await orderMod.retireServiceTripOrder(trip, 'pending', async () => { throw { code: 'SERVICE_ORDER_NOT_FOUND', status: 404 } })
+    assert.equal(gone.ok, true)
+    assert.equal(tripMod.readServiceTrip('resume_optimize', 2_000), null)
+    // 正常关单成功：忘掉并返回关闭后的视图
+    orderMod.keepServiceTripOrder(trip)
+    const closed = await orderMod.retireServiceTripOrder(trip, 'pending', async () => ({ id: 'ord-keep', status: 'closed' }))
+    assert.equal(closed.ok, true)
+    assert.equal(closed.view?.status, 'closed')
+    assert.equal(tripMod.readServiceTrip('resume_optimize', 2_000), null)
+  } finally {
+    if (prevWin === undefined) delete globalThis.window
+    else globalThis.window = prevWin
   }
 })

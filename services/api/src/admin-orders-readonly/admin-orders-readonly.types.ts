@@ -44,11 +44,11 @@ export interface AdminOrderReadonlyItem {
   /** 已付款未出纸、已落待退款信号。不会自动出款。 */
   refundRequired: boolean
   /**
-   * 运营必须看见：待退款、退款中、或渠道已受理但本地确认未落地。
+   * 运营必须看见：待退款、退款中、渠道已受理但本地确认未落地、部分退款、已出纸且退款失败、待人工。
    * 只读；不自动出款、不改 payStatus。
    */
   opsAttention: boolean
-  opsAttentionCode: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'copy_result_unconfirmed' | null
+  opsAttentionCode: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | 'copy_result_unconfirmed' | 'partial_refunded' | 'paper_refund_failed' | 'print_return_manual' | null
   createdAt: string
   updatedAt: string
 }
@@ -75,6 +75,8 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   refundReason: string | null
   /** 券/权益抵扣（分）。Order.discountCents，无抵扣为 0。 */
   discountCents: number
+  /** 应付额（分）。与退款同一公式，按钮只展示这个数。 */
+  payableCents: number
   /** 已退金额累计（分）。Order.refundedAmountCents，未退为 0。 */
   refundedAmountCents: number
   /** PrintTask.id（废弃孤单入口使用；非文件链接，不含敏感内容）。 */
@@ -86,6 +88,33 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
     errorCode: string | null
   }) | null
   statusLogs: AdminOrderStatusLogItem[]
+  /** 这一单有「已付款没出纸」的自动原路退记录。 */
+  autoRefund: boolean
+  /** 自动退款那一行的状态：pending / success / failed。没有记录时为 null。 */
+  refundStatus: string | null
+  /** 自动退款失败时给管理员看的原因。成功或还没有记录时为 null。 */
+  refundFailureReason: string | null
+  /** 已付没出纸的去向。自动退成功、自动退失败、待人工。都不是时为 null。 */
+  printRefundDisposition: 'auto_success' | 'auto_failed' | 'manual' | null
+  /** 这一去向的原因。普通没出纸自动退成功时为 null；过期付款退成时写明金额。 */
+  printRefundReason: string | null
+  /** 这一去向对应的退款单号。没有退款行时为 null。 */
+  refundLedgerNo: string | null
+  /** 这一去向对应的退款金额（分）。没有退款行时为 null。 */
+  refundLedgerCents: number | null
+  /** 部分退款还没退完的金额（分）。不是部分退款时为 null。 */
+  refundRemainderCents: number | null
+  /**
+   * 这单有渠道受理过、还没落定的退款（任何一笔都算）。和三步处置、核验出纸用同一个判断：
+   * Refund.channelSubmittedAt 非空且状态不是 success / failed / withdrawn / closed。
+   * 为 true 时后台三步的三颗按钮都禁用，只看这个字段，不再自己看 refundStatus。
+   */
+  channelInFlight: boolean
+  /**
+   * 长期查不到渠道结果、可以按商户平台核实结果登记的那一笔：渠道不支持在线查询，
+   * 或提交渠道满 24 小时还在途。没有可登记的为 null。登记接口会先问一次渠道再决定。
+   */
+  channelResultRegistration: { refundNo: string; amountCents: number; submittedAt: string; abnormal: boolean } | null
 }
 
 export interface AdminOrderReadonlyPage {

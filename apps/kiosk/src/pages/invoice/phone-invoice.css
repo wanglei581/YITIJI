@@ -1,0 +1,73 @@
+/* 手机填写开票信息。壳与令牌照 phone-upload-service-desk.css，这里只补表单。不新增颜色值。 */
+
+.k1-phone-upload .ph-inv {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.k1-phone-upload .ph-inv h1,
+.k1-phone-upload .ph-inv h2 {
+  margin: 0;
+  font-family: var(--m-serif);
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.k1-phone-upload .ph-inv h1 { font-size: 20px; }
+.k1-phone-upload .ph-inv h2 { font-size: 16px; }
+
+.k1-phone-upload .ph-inv-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--m-ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.k1-phone-upload .ph-inv-field input {
+  width: 100%;
+  min-height: 52px;
+  box-sizing: border-box;
+  border: 1px solid var(--m-line2);
+  border-radius: 16px;
+  padding: 0 14px;
+  color: var(--m-ink);
+  background: var(--m-surface);
+  font-size: 16px;
+}
+
+.k1-phone-upload .ph-inv-choice { display: flex; gap: 8px; }
+
+.k1-phone-upload .ph-inv-choice button {
+  flex: 1;
+  min-width: 48px;
+  min-height: 52px;
+  border: 1px solid var(--m-line2);
+  border-radius: 16px;
+  color: var(--m-ink);
+  background: var(--m-surface);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.k1-phone-upload .ph-inv-choice button[aria-pressed='true'] {
+  border-color: var(--m-teal-d);
+  color: var(--m-teal-d);
+}
+
+.k1-phone-upload .ph-inv-note,
+.k1-phone-upload .ph-inv-alert {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.k1-phone-upload .ph-inv-note { color: var(--m-muted); }
+.k1-phone-upload .ph-inv-alert { color: var(--m-cinnabar-d); }

@@ -154,8 +154,8 @@ export default function OrdersPage() {
               onClick={() => { setRefundRequiredFilter(true); setOpsAttentionFilter(false); setServiceOnly(false); setPayStatus(''); setStatusFilter(''); setPage(1) }}
             />
             {/*
-              需运营关注 = 服务端 opsAttention 的**三支 OR**：待退款、退款中、
-              渠道已受理但本地确认未落地。后两支在本页此前完全没有入口。
+              需运营关注 = 服务端 opsAttention：待退款、退款中、
+              渠道已受理但本地确认未落地、部分退款、已出纸且退款失败。
 
               与上面那条同一个坑，必须再说一遍：这里**不能**顺手补 payStatus。
               `channel_accepted_unconfirmed` 的 payStatus 是 paying / closed ——

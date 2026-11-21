@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { compatibilityRedirects, productionRoutePatterns } from '../route-manifest'
-import { W6_LOGIN_TICKET, W6_LONG_LEGAL_TEXT, W6_UPLOAD_SCENE } from './fusion-w6-api'
+import { W6_INVOICE_SCENE, W6_LOGIN_TICKET, W6_LONG_LEGAL_TEXT, W6_UPLOAD_SCENE } from './fusion-w6-api'
 
 export type ProductionRoutePattern = (typeof productionRoutePatterns)[number]
 
@@ -21,7 +21,7 @@ export interface W6RouteCase {
 
 type W6RouteDefinition = Omit<W6RouteCase, 'viewport' | 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'> & Partial<Pick<W6RouteCase, 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'>>
 
-const MOBILE_ROUTE_PATTERNS = new Set<ProductionRoutePattern>(['/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId'])
+const MOBILE_ROUTE_PATTERNS = new Set<ProductionRoutePattern>(['/member/qr-login', '/upload/phone', '/k/u/:scene', '/k/l/:ticketId', '/invoice/phone', '/k/i/:scene'])
 const TOUCH_TARGET_EXEMPTIONS = ['/screensaver', '/upload/phone'] as const satisfies readonly ProductionRoutePattern[]
 const touchTargetExemptions = new Set<ProductionRoutePattern>(TOUCH_TARGET_EXEMPTIONS)
 
@@ -79,6 +79,11 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // /k/l 票据格式对，转到手机确认登录页。兑换成功、失效、格式不对各态由 kiosk-code-entry-fusion-w5.spec.ts 钉。
   { pattern: '/k/u/:scene', url: `/k/u/${W6_UPLOAD_SCENE}`, marker: screen('upload-scene-entry'), featureText: '网络连接失败，请稍后重试' },
   { pattern: '/k/l/:ticketId', url: `/k/l/${W6_LOGIN_TICKET}`, expectedPath: '/member/qr-login', marker: screen('member-qr-login'), featureText: '手机确认登录' },
+  // 2026-11-19 开票手机页。冷开没有 fragment，停在「链接不能用来填写」。/k/i 夹具兑换回 503。
+  // 返工包 P2c1b 第 7 条：冷链接那一屏原先靠一个没有动作的按钮凑触控目标，按钮去掉后只剩一句说明。
+  // 这里改走带凭据的表单屏（这页的主状态，抬头类型、输入框、提交都是真动作）；冷链接一屏由 phone-invoice-fusion-w5.spec.ts 钉住。
+  { pattern: '/invoice/phone', url: '/invoice/phone#sessionId=w6-invoice-session&submitToken=w6-invoice-submit-token', marker: screen('phone-invoice'), featureText: '用手机扫码填写开票信息' },
+  { pattern: '/k/i/:scene', url: `/k/i/${W6_INVOICE_SCENE}`, marker: screen('invoice-scene-entry'), featureText: '网络连接失败，请稍后重试' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },
   { pattern: '/resume/job-fit/*', url: '/resume/job-fit', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
@@ -145,6 +150,11 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // 青序流光 11-arrival-code.html 把本页从「扫码取件」重定位为「输入你的到机码」；
   // marker / featureText 改指新页身份，强度不变：删掉页头或 data-w2-page 仍然会红。
   { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: w2('pickup-claim'), featureText: '输入你的到机码' },
+  // 按次付款（稿 pay-1113.js 的 pay-service）。夹具终端三项价都是 0：直接打开自动前往对应合法站内下一步，不建单。
+  // 收费机器上的等待、核实、付好了、没付成、超时各态由 pay-service.spec.ts 钉。
+  { pattern: '/pay/resume', url: '/pay/resume', expectedPath: '/resume/optimize', marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
+  { pattern: '/pay/interview', url: '/pay/interview', expectedPath: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
+  { pattern: '/pay/scan', url: '/pay/scan', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("小青的作业面")', featureText: '小青的作业面' },
   { pattern: '/session-resume', url: '/session-resume', marker: '[data-testid="session-resume-state-list"]', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
@@ -255,7 +265,8 @@ if (duplicates.length || missing.length || unexpected.length) {
 }
 // mobile 这条**故意**写死：它是一个有名有姓的小集合（扫码登录、手机上传，及两者的短链网页中转），
 // 增减都该是深思熟虑的动作，撞红正是想要的效果。2026-10-29 加两条短链中转：2 → 4。
-if (w6MobileCases.length !== 4) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
+// 2026-11-19 再加开票手机填写页与 /k/i 中转：4 → 6。
+if (w6MobileCases.length !== 6) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
 // kiosk 这条**不写死**：它 = 总数 − mobile。改成分区完整性判据，比原来的 `!== 106` 强——
 // 既堵住 viewport 写错值（那种情况两个子集都收不到它，和会一直对不上），
 // 又不必每加一条路由就人工重算。原来那个 106 就是这么过期的：

@@ -1,0 +1,129 @@
+/* 付款屏（稿 pay-1113.js 的 .py-pay.d3-cashier）。数值照稿：screens.js 195–204、pay-1113.js 89–94。
+   摘要卡、说明小字复用触屏公共件 .qxt-sum / .qxt-fine，只在本页把行高、列宽收成稿里收银台那一档。
+   只挂在 data-qx-page='pay-service'，不改 .qxt-* 默认，也不碰打印收银台的样式。 */
+
+[data-qx-page='pay-service'] .pys-body {
+  justify-content: flex-start;
+  gap: 12px;
+  padding-top: 12px;
+  padding-bottom: 10px;
+}
+
+/* 稿 .d3-chline */
+[data-qx-page='pay-service'] .pys-chline {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.45;
+  text-align: left;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='pay-service'] .pys-chline b {
+  display: block;
+  font-size: 24px;
+}
+
+/* 稿 .d3-cashier .sumcard .r 与 .py-pay .sumcard .r */
+[data-qx-page='pay-service'] .pys-sum {
+  flex: none;
+}
+
+[data-qx-page='pay-service'] .pys-sum .qxt-sum-r {
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+  min-height: 72px;
+  padding: 10px 22px;
+}
+
+[data-qx-page='pay-service'] .pys-sum .qxt-sum-r b {
+  word-break: normal;
+  min-width: 0;
+}
+
+/* 稿 .d3-qrframe，付款页收成按内容高（.py-pay.d3-cashier .d3-qrframe） */
+[data-qx-page='pay-service'] .pys-qrframe {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 0;
+  padding: 12px 16px;
+  border-radius: 28px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='pay-service'] .pys-qrframe p,
+[data-qx-page='pay-service'] .pys-qrframe b {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+  text-align: center;
+}
+
+[data-qx-page='pay-service'] .pys-qrframe b {
+  font-size: 28px;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='pay-service'] .pys-qrframe .pys-qrt {
+  font: 700 34px var(--qx-serif);
+  color: var(--qx-deep);
+}
+
+[data-qx-page='pay-service'] .pys-qr {
+  display: block;
+  width: 280px;
+  height: 280px;
+}
+
+[data-qx-page='pay-service'] .pys-qr svg {
+  display: block;
+  width: 280px;
+  height: 280px;
+}
+
+/* 稿 .py-sample：剩下的高度画这一次要办的事的小样，两张各占 46%，扫描三张各占三分之一。 */
+[data-qx-page='pay-service'] .pys-sample {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  overflow: hidden;
+}
+
+[data-qx-page='pay-service'] .pys-sample > svg,
+[data-qx-page='pay-service'] .pys-sample > .pa {
+  flex: none;
+  height: 46%;
+  max-height: 580px;
+  width: auto;
+  max-width: 100%;
+}
+
+[data-qx-page='pay-service'] .pys-sample > .pa {
+  display: flex;
+  justify-content: center;
+}
+
+[data-qx-page='pay-service'] .pys-sample > .pa > svg {
+  height: 100%;
+  width: auto;
+}
+
+[data-qx-page='pay-service'] .pys-sample-scan > .pa {
+  height: 33.33%;
+  max-height: 420px;
+}
+
+/* 手机宽度关掉 1080 舞台后：码框和摘要不压扁，整页不横向溢出。 */
+[data-kiosk-stage-fit='off'] [data-qx-page='pay-service'] .pys-qr,
+[data-kiosk-stage-fit='off'] [data-qx-page='pay-service'] .pys-qr svg {
+  width: min(280px, 70vw);
+  height: min(280px, 70vw);
+}
