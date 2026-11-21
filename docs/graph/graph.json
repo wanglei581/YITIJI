@@ -19553,6 +19553,7 @@
           "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/member-privacy/member-data-request.admin.ts",
+          "services/api/src/virtual-pay/virtual-pay-delivery.ts",
           "services/api/src/virtual-pay/virtual-pay-order.service.ts"
         ]
       },
@@ -27226,11 +27227,18 @@
     "services/api/scripts/support/member-closure-verification.ts": [
       "services/api/scripts/verify-member-closure.ts"
     ],
+    "services/api/scripts/support/miniapp-virtual-pay-concurrent-reconcile.ts": [
+      "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
     "services/api/scripts/support/miniapp-virtual-pay-credits.ts": [
       "services/api/scripts/verify-miniapp-virtual-pay.ts"
     ],
     "services/api/scripts/support/miniapp-virtual-pay-delivery.ts": [
       "services/api/scripts/verify-miniapp-virtual-pay-postgres.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay.ts"
+    ],
+    "services/api/scripts/support/miniapp-virtual-pay-hardening.ts": [
       "services/api/scripts/verify-miniapp-virtual-pay.ts"
     ],
     "services/api/scripts/support/miniapp-virtual-pay-notify-goods.ts": [
@@ -46575,6 +46583,7 @@
         "files": [
           "services/api/prisma/postgres/schema.prisma",
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-concurrent-reconcile.ts",
           "services/api/scripts/support/miniapp-virtual-pay-delivery.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/config/body-parsers.ts",
@@ -46599,8 +46608,10 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-concurrent-reconcile.ts",
           "services/api/scripts/support/miniapp-virtual-pay-credits.ts",
           "services/api/scripts/support/miniapp-virtual-pay-delivery.ts",
+          "services/api/scripts/support/miniapp-virtual-pay-hardening.ts",
           "services/api/scripts/support/miniapp-virtual-pay-notify-goods.ts",
           "services/api/scripts/support/miniapp-virtual-pay-orders.ts",
           "services/api/scripts/support/miniapp-virtual-pay-reconcile-edge.ts",

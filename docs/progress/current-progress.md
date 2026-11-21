@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-11-21：小程序微信虚拟支付后端极小收口返工 P2d1b3（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
+
+- 来由：按 Codex 独立复收 `P2d1b2`（`f61d17b23`）复现出的 4 处阻塞/并发缺陷 + 1 处 XML 重复键收紧，接在 `f61d17b23` 之后逐项完成极小收口并提交（零新增数据库迁移）。
+- ① 闭户写保护（`closing`/`closed` 窗口）：`virtual-pay-delivery.ts`（`grantPaid` 事务内与 `confirmPaid` 唯一冲突兜底）在更新订单为 `paid` 与 `ensureCredit` 之前核对 `EndUser.status === 'active'`；非 `active` 会员一律拒转 `paid` 与建权益，返回 `member_not_active`，推送仍返回 HTTP 200 空串、查单不影响同批正常单，诊断审计不记录 openid/PII；`verify:member-closure` 在隔离 SQLite 与真实 PostgreSQL 16 + 真 Redis（21 groups）均零退化。
+- ② 待人工单锁定：`virtual-pay-delivery.ts` 将 `allowClosedRecovery` 严格收窄为仅放行 `order.status === 'closed'`，彻底移除 `manual_review` 放行；查单因官方状态 `7`/`9`/`10` 或连续失败转入 `manual_review` 后，再收到验签且字段全对的迟到推送一律拒转 `paid`、权益数严格为 `0`，返回 `order_manual_review` 并记诊断。
+- ③ 并发失败计数与诊断去重原子化：`virtual-pay-reconcile.service.ts` 将 `recordQueryFailure` 改为事务内 `{ increment: 1 }` 原子自增并在达阈值或超 24h 时原子转 `manual_review`（不再以旧内存快照覆写 `queryFailCount`）；`diagnoseOrder` 改为数据库原子 CAS（抢占成功 `count === 1` 才写审计，并按 `pending`/`manual_review` 约束避免迟到工作线程覆写状态）。已同时在 SQLite 与真实 PostgreSQL 16 补齐 2/3 并发实例失败回归（`verify:miniapp-virtual-pay` 与 `verify:miniapp-virtual-pay:postgres`）。
+- ④ 查单与通知发货 HTTP 超时控制：`virtual-pay-xpay-client.ts` 新增 `VIRTUAL_PAY_HTTP_TIMEOUT_MS = 10_000`，为 `queryWechatVirtualPayOrder` 与 `notifyWechatProvideGoods` 统一挂 `AbortSignal.timeout(timeoutMs)`；首单 `notify_provide_goods` 挂起超时返回 `false`、保留首单已记权益并写 `notify_provide_goods_failed` 诊断，立即继续处理同批第二单（补短超时与防卡死保护回归）。
+- ⑤ XML 重复冲突标签拒绝：`wechat-miniapp-message.service.ts` 在 `parseXmlChildren`（及外层 `<Encrypt>` 提取）中拒绝同层级值不同的重复标签（如两个不同 `<OpenId>` 或 `<ActualPrice>`），不再静默取末值，补齐推送回归用例。
+- 未新增数据库迁移，没改 `apps/miniapp/**`、`apps/kiosk/**`、`apps/admin/**`、`apps/partner/**`、`docs/design/**` 与生产配置；改动业务源码全部 `< 500` 行；已完成 SQLite + 真实 PostgreSQL 16 + 真 Redis 全套门禁、M1–M3 反向变异跑红并还原复绿、`tsc`/`eslint`/`pnpm lint`、图谱重生与 `--check`、CI 门禁覆盖与仓库完整性校验；未推送，未上线。
+
 ## 2026-11-21：小程序微信虚拟支付后端第一包返工 P2d1b2（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
 
 - 来由：补全线返工包 P2d1b2（原返工包 P2d1b 第 1–7 条，清单第 6 项），接在 P2d1 交货头 `8164ccea2` 之后逐条完成并提交。
