@@ -213,6 +213,120 @@ export async function assertVirtualPayMemberClosureWriteProtection(options: {
   }
 }
 
+export async function assertVirtualPayManualReviewLocked(options: {
+  prisma: PrismaService
+  base: string
+  redis: HardeningRedisStub
+}): Promise<void> {
+  const { prisma, base, redis } = options
+  const saved = snapshotEnv()
+  try {
+    applyEnv({ ALERT_WEBHOOK_URL: undefined })
+    await prisma.virtualPayOrder.updateMany({ where: { status: 'pending' }, data: { status: 'closed' } })
+
+    const memberId = 'vpay-manual-lock-member'
+    const openId = 'openid-manual-lock-member'
+    await prisma.endUser.create({
+      data: {
+        id: memberId,
+        phoneHash: hashPhone('13800138034'),
+        phoneEnc: encryptPhone('13800138034'),
+        wxOpenId: openId,
+      },
+    })
+    const now = new Date()
+    const dueAt = now.getTime() - VIRTUAL_PAY_QUERY_MIN_AGE_MS - 60_000
+    const statusByOrder = new Map<string, number>([
+      ['vpmanlock70001', 7],
+      ['vpmanlock90001', 9],
+      ['vpmanlock10001', 10],
+    ])
+    for (const outTradeNo of statusByOrder.keys()) {
+      await prisma.virtualPayOrder.create({
+        data: {
+          endUserId: memberId,
+          openId,
+          serviceKind: 'resume_optimize',
+          productId: PRODUCT_ID,
+          priceCents: PRICE_CENTS,
+          env: 0,
+          status: 'pending',
+          outTradeNo,
+          createdAt: new Date(dueAt),
+        },
+      })
+    }
+    const fetchStatuses: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('stable_token')) return json({ access_token: ACCESS_TOKEN, expires_in: 7200 })
+      const parsed = JSON.parse(String(init?.body ?? '{}')) as { order_id: string }
+      return json({
+        errcode: 0,
+        errmsg: 'ok',
+        order: {
+          order_id: parsed.order_id,
+          status: statusByOrder.get(parsed.order_id) ?? 1,
+          paid_fee: PRICE_CENTS,
+          env_type: 1,
+          wx_order_id: `WX_${parsed.order_id}`,
+          paid_time: Math.floor(now.getTime() / 1000),
+        },
+      })
+    }) as typeof fetch
+
+    const reconcile = new VirtualPayReconcileService(
+      prisma,
+      new AuditService(prisma),
+      new MiniappAccessTokenService(redis as unknown as RedisService),
+      redis as unknown as RedisService,
+    )
+    await reconcile.reconcileOnce(now, fetchStatuses)
+
+    // 额外覆盖：连续失败转 manual_review 的单同样锁定
+    const failManualOrder = await prisma.virtualPayOrder.create({
+      data: {
+        endUserId: memberId,
+        openId,
+        serviceKind: 'resume_optimize',
+        productId: PRODUCT_ID,
+        priceCents: PRICE_CENTS,
+        env: 0,
+        status: 'manual_review',
+        queryFailCount: 3,
+        outTradeNo: 'vpmanlockfail1',
+      },
+    })
+
+    for (const outTradeNo of [...statusByOrder.keys(), failManualOrder.outTradeNo]) {
+      const rowBefore = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { outTradeNo } })
+      assert.equal(rowBefore.status, 'manual_review', `${outTradeNo} 应先进入 manual_review`)
+
+      const latePush = await postMessage(base, seal(deliverJson(outTradeNo, openId)))
+      assert.equal(latePush.status, 200)
+      assert.equal(await latePush.text(), '')
+
+      const rowAfter = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: rowBefore.id } })
+      assert.equal(rowAfter.status, 'manual_review', `${outTradeNo} 收到迟到有效推送仍必须停在 manual_review`)
+      assert.equal(await creditCount(prisma, rowBefore.id), 0, `${outTradeNo} 绝不得由迟到推送解锁补发权益`)
+      assert.equal(
+        await prisma.auditLog.count({
+          where: { action: VIRTUAL_PAY_CLOSED_RECOVERY_AUDIT_ACTION, targetId: outTradeNo },
+        }),
+        0,
+      )
+      const diag = await prisma.auditLog.findFirstOrThrow({
+        where: { action: VIRTUAL_PAY_DIAGNOSTIC_ACTION, targetId: outTradeNo },
+        orderBy: { createdAt: 'desc' },
+      })
+      assert.equal(JSON.parse(diag.payloadJson).reason, 'order_manual_review')
+      assert.equal(diag.payloadJson.includes(openId), false)
+    }
+    console.log('PASS 待人工锁定：状态 7/9/10 及连续失败转 manual_review 后收到迟到有效推送仍拒转 paid、权益严格为 0')
+  } finally {
+    restoreEnv(saved)
+  }
+}
+
 function seal(message: string, appId = APP_ID): string {
   const key = Buffer.from(`${AES_KEY}=`, 'base64')
   const msg = Buffer.from(message, 'utf8')

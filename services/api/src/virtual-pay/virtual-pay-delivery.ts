@@ -10,13 +10,14 @@ export interface ConfirmPaidInput {
   priceCents: number
   wxOrderId: string | null
   paidAt: Date | null
-  /** 验签通过且字段核对一致的已付推送，允许把本地已关单（或待人工）补记一次权益。 */
+  /** 验签通过且字段核对一致的已付推送，只允许把本地已关单（closed）补记一次权益；绝不解锁 manual_review。 */
   allowClosedRecovery?: boolean
 }
 
 export type ConfirmPaidFailure =
   | 'order_missing'
   | 'order_closed'
+  | 'order_manual_review'
   | 'member_not_active'
   | 'openid_mismatch'
   | 'env_mismatch'
@@ -57,7 +58,10 @@ export async function confirmPaid(prisma: PrismaService, input: ConfirmPaidInput
     if (!(await isOrderMemberActive(prisma, order.endUserId))) {
       return { ok: false, reason: 'member_not_active' }
     }
-    if (order.status === 'pending' || (input.allowClosedRecovery === true && (order.status === 'closed' || order.status === 'manual_review'))) {
+    if (order.status === 'manual_review') {
+      return { ok: false, reason: 'order_manual_review' }
+    }
+    if (order.status === 'pending' || (input.allowClosedRecovery === true && order.status === 'closed')) {
       await prisma.virtualPayOrder.updateMany({
         where: { id: order.id, status: order.status },
         data: {
@@ -86,7 +90,10 @@ async function grantPaid(prisma: PrismaService, input: ConfirmPaidInput): Promis
       await ensureCredit(tx, order)
       return { ok: true, granted: false, recoveredFromClosed: false }
     }
-    const recoverable = input.allowClosedRecovery === true && (order.status === 'closed' || order.status === 'manual_review')
+    if (order.status === 'manual_review') {
+      return { ok: false, reason: 'order_manual_review' }
+    }
+    const recoverable = input.allowClosedRecovery === true && order.status === 'closed'
     if (order.status !== 'pending' && !recoverable) return { ok: false, reason: 'order_closed' }
     const fromClosed = order.status === 'closed'
     const updated = await tx.virtualPayOrder.updateMany({
@@ -101,6 +108,7 @@ async function grantPaid(prisma: PrismaService, input: ConfirmPaidInput): Promis
     })
     if (updated.count !== 1) {
       const again = await tx.virtualPayOrder.findUnique({ where: { id: order.id } })
+      if (again?.status === 'manual_review') return { ok: false, reason: 'order_manual_review' }
       if (again?.status !== 'paid') return { ok: false, reason: 'order_closed' }
       if (!(await isOrderMemberActive(tx, again.endUserId))) {
         return { ok: false, reason: 'member_not_active' }
