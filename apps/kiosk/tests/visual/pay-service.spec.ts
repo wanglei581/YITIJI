@@ -456,6 +456,47 @@ test.describe('付款屏 @kiosk', () => {
     expect(after.filter((call) => call.method === 'POST' && call.path === SERVICE_ORDERS_PATH)).toHaveLength(1)
   })
 
+  test('游客转会员边界：登录后不得继承上一位匿名游客的服务单号 @kiosk', async ({ page, api }) => {
+    chargingMachine(api, { resume_optimize: 200 })
+    const first = { ...ORDER_A, createdAt: Date.now() }
+    const second = { ...ORDER_B, createdAt: Date.now() + 1_000 }
+    api.respondWith('POST', SERVICE_ORDERS_PATH, (n) => ok(serviceOrderView(n === 1 ? first : second)))
+    respondOrder(api, first)
+    respondOrder(api, second)
+    const calls = recordServiceOrderCalls(page)
+
+    // 1) 匿名游客建单后留在 sessionStorage
+    await page.goto('/pay/resume')
+    await expectState(page, 'wait')
+    expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toContain(first.id)
+    const markBeforeLogin = calls.length
+
+    // 2) 另一位用户走可见登录界面登成会员（回到 /pay/resume）
+    await page.goto('/login?from=%2Fpay%2Fresume')
+    await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+    await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+    for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+    await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+    for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    await page.getByRole('button', { name: '确认登录', exact: true }).click()
+
+    // 3) 登录后回到付款屏：必须建新单，不碰游客旧单，存储不含旧单号也不含会员 id
+    await page.waitForURL((url) => url.pathname === '/pay/resume', { timeout: 15_000 })
+    await expectState(page, 'wait')
+    await expect(page.getByTestId('pay-service-amount')).toHaveText('2.00 元')
+    const afterLogin = calls.slice(markBeforeLogin)
+    expect(afterLogin.filter((call) => call.path.startsWith(serviceOrderPath(first.id)))).toEqual([])
+    const memberCreate = afterLogin.find((call) => call.method === 'POST' && call.path === SERVICE_ORDERS_PATH)
+    expect(memberCreate?.body).toMatchObject({ serviceKey: 'resume_optimize', endUserId: 'member-w6' })
+    const storedRaw = await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)
+    expect(storedRaw).toContain(second.id)
+    expect(storedRaw).not.toContain(first.id)
+    expect(storedRaw).not.toContain('member-w6')
+  })
+
   test('轮询限额：一分钟里连点刷新，查单总数也不超过 30 次，核实间隔不少于 10 秒 @kiosk', async ({ page, api }) => {
     await page.clock.install({ time: new Date('2026-11-19T14:40:00+08:00').getTime() })
     chargingMachine(api)

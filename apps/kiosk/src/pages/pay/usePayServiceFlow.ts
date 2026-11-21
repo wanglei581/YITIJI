@@ -20,7 +20,7 @@ import {
 } from '../../services/api/serviceOrders'
 import { getTerminalId, refreshKioskTerminalConfig } from '../../services/api/terminalConfig'
 import { errorCodeOf } from '../../services/api/userErrorMessage'
-import { forgetServiceTrip, readServiceTrip, type ServiceTrip } from '../../services/serviceTrip'
+import { forgetServiceTrip, readServiceTrip, serviceTripOwnerFor, type ServiceTrip } from '../../services/serviceTrip'
 import { keepServiceTripOrder, openServiceTripOrder, retireServiceTripOrder } from '../../services/serviceTripOrder'
 import {
   PAY_SERVICE_KEY,
@@ -151,7 +151,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     } catch {
       // 读不到本机价目就照常建单，由服务端按生效价判；免费时它会回 409。
     }
-    const stored = readServiceTrip(serviceKey)
+    const stored = readServiceTrip(serviceKey, { owner: serviceTripOwnerFor(endUserId) })
     if (stored) {
       try {
         let view = await getServiceOrder(stored.orderId, stored.kioskSessionId)
@@ -190,7 +190,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       }
     }
     await create(gen)
-  }, [applyView, create, current, passFree, serviceKey])
+  }, [applyView, create, current, endUserId, passFree, serviceKey])
 
   // 进屏即出码。挂上之后隔一拍再开始：开发模式下组件会挂两次，第一次在这一拍之前就被撤掉，不会多建一张单。
   useEffect(() => {
@@ -328,7 +328,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         const old = tripRef.current
         if (view === 'lookup' || view === 'close_failed') {
           // 本机记着的单核实或关单失败：带 refresh=1 再核实一次，覆盖晚到已付结果，不另建新单。
-          const stored = old ?? readServiceTrip(serviceKey)
+          const stored = old ?? readServiceTrip(serviceKey, { owner: serviceTripOwnerFor(endUserId) })
           if (!stored) {
             await enter(gen)
             return
@@ -374,7 +374,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         setBusy(false)
       }
     })()
-  }, [applyView, busy, create, current, enter, serviceKey, view])
+  }, [applyView, busy, create, current, endUserId, enter, serviceKey, view])
 
   const onLeave = useCallback((closeOrder: boolean) => {
     if (leavingRef.current) return

@@ -29,16 +29,57 @@ export const SERVICE_TRIP_STORAGE_KEY = 'ai-job-print:service-trip:v1'
  */
 export const SERVICE_TRIP_MAX_AGE_MS = 35 * 60 * 1000
 
+export type ServiceTripOwner =
+  | { kind: 'guest' }
+  | { kind: 'member'; mark: string }
+
 export interface ServiceTrip {
   serviceKey: ServiceOrderKey
   orderId: string
   /** 建单时的使用周期编号（clientSessionId）。 */
   kioskSessionId: string
+  /** 归属：游客为 guest，会员只存本次内存登录的随机标记（不写会员 id / 手机号等 PII）。 */
+  owner: ServiceTripOwner
   /** 记下时的本机时刻（毫秒）。 */
   savedAt: number
 }
 
 type TripTable = Partial<Record<ServiceOrderKey, ServiceTrip>>
+
+const memberMarks = new Map<string, string>()
+
+function randomMark(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** 当前内存登录对应的服务单归属标记。游客为 guest；会员按内存会话生成随机标记，重载或清场后作废。 */
+export function serviceTripOwnerFor(endUserId: string | null | undefined): ServiceTripOwner {
+  const id = typeof endUserId === 'string' ? endUserId.trim() : ''
+  if (!id) return { kind: 'guest' }
+  let mark = memberMarks.get(id)
+  if (!mark) {
+    mark = randomMark()
+    memberMarks.set(id, mark)
+  }
+  return { kind: 'member', mark }
+}
+
+export function serviceTripOwnerMatches(stored: ServiceTripOwner, current: ServiceTripOwner): boolean {
+  if (stored.kind === 'guest' && current.kind === 'guest') return true
+  return stored.kind === 'member' && current.kind === 'member' && stored.mark === current.mark
+}
+
+function asOwner(value: unknown): ServiceTripOwner | null {
+  if (value === undefined) return { kind: 'guest' }
+  if (!value || typeof value !== 'object') return null
+  const row = value as { kind?: unknown; mark?: unknown }
+  if (row.kind === 'guest') return { kind: 'guest' }
+  if (row.kind === 'member' && typeof row.mark === 'string' && row.mark.trim() && row.mark.length <= 80) {
+    return { kind: 'member', mark: row.mark }
+  }
+  return null
+}
 
 function storage(): Storage | null {
   try {
@@ -59,7 +100,9 @@ function asTrip(key: ServiceOrderKey, value: unknown): ServiceTrip | null {
   if (typeof row.orderId !== 'string' || !row.orderId.trim() || row.orderId.length > 64) return null
   if (typeof row.kioskSessionId !== 'string' || !row.kioskSessionId.trim() || row.kioskSessionId.length > 80) return null
   if (typeof row.savedAt !== 'number' || !Number.isFinite(row.savedAt)) return null
-  return { serviceKey: key, orderId: row.orderId, kioskSessionId: row.kioskSessionId, savedAt: row.savedAt }
+  const owner = asOwner(row.owner)
+  if (!owner) return null
+  return { serviceKey: key, orderId: row.orderId, kioskSessionId: row.kioskSessionId, owner, savedAt: row.savedAt }
 }
 
 function readTable(): TripTable {
@@ -92,17 +135,44 @@ function writeTable(table: TripTable): void {
   }
 }
 
-/** 这一种服务这一趟记下的单。过期、形状不对一律当没有。 */
-export function readServiceTrip(serviceKey: ServiceOrderKey, nowMs = Date.now()): ServiceTrip | null {
-  const trip = readTable()[serviceKey] ?? null
+function notifyClearListeners(sessionIds: readonly string[], reason: ServiceTripClearReason): void {
+  if (sessionIds.length === 0) return
+  clearListeners.forEach((listener) => {
+    try {
+      listener(sessionIds, reason)
+    } catch {
+      // 通知收尾失败不拦清场。
+    }
+  })
+}
+
+/** 这一种服务这一趟记下的单。过期、形状不对或归属不符一律当没有（归属不符时当场清掉并通知收尾）。 */
+export function readServiceTrip(
+  serviceKey: ServiceOrderKey,
+  options?: number | { owner?: ServiceTripOwner; nowMs?: number },
+): ServiceTrip | null {
+  const nowMs = typeof options === 'number' ? options : (options?.nowMs ?? Date.now())
+  const owner = typeof options === 'object' ? options?.owner : undefined
+  const table = readTable()
+  const trip = table[serviceKey] ?? null
   if (!trip) return null
   if (nowMs - trip.savedAt > SERVICE_TRIP_MAX_AGE_MS || trip.savedAt - nowMs > 60_000) return null
+  if (owner && !serviceTripOwnerMatches(trip.owner, owner)) {
+    delete table[serviceKey]
+    writeTable(table)
+    const stillUsed = SERVICE_ORDER_KEYS.some((key) => table[key]?.kioskSessionId === trip.kioskSessionId)
+    if (!stillUsed) notifyClearListeners([trip.kioskSessionId], 'login_handover')
+    return null
+  }
   return trip
 }
 
-export function rememberServiceTrip(trip: Omit<ServiceTrip, 'savedAt'>, nowMs = Date.now()): void {
+export function rememberServiceTrip(
+  trip: Omit<ServiceTrip, 'savedAt' | 'owner'> & { owner?: ServiceTripOwner },
+  nowMs = Date.now(),
+): void {
   const table = readTable()
-  table[trip.serviceKey] = { ...trip, savedAt: nowMs }
+  table[trip.serviceKey] = { ...trip, owner: trip.owner ?? { kind: 'guest' }, savedAt: nowMs }
   writeTable(table)
 }
 
@@ -141,6 +211,7 @@ export function readServiceTripSessionIds(): string[] {
 /** 清场用：这一趟记的单全部作废，并返回 / 广播它们关联的旧周期编号以便服务端收尾。 */
 export function clearServiceTrips(reason: ServiceTripClearReason = 'clear'): string[] {
   const sessionIds = readServiceTripSessionIds()
+  memberMarks.clear()
   const store = storage()
   if (store) {
     try {
@@ -149,14 +220,6 @@ export function clearServiceTrips(reason: ServiceTripClearReason = 'clear'): str
       // 清不掉也不拦清场；读的时候还有过期判断。
     }
   }
-  if (sessionIds.length > 0) {
-    clearListeners.forEach((listener) => {
-      try {
-        listener(sessionIds, reason)
-      } catch {
-        // 通知收尾失败不拦清场。
-      }
-    })
-  }
+  notifyClearListeners(sessionIds, reason)
   return sessionIds
 }

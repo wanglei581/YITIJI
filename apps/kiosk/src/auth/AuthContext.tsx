@@ -1,4 +1,5 @@
 import { clearResumeGenerateDraft } from '../pages/resume/resumeGenerateDraft'
+import { clearServiceTrips } from '../services/serviceTrip'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { memberLogout } from '../services/auth/memberAuthApi'
 import { onMemberSessionExpired } from '../services/auth/memberSessionEvents'
@@ -62,6 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearGuestScanBeforeMemberLogin()
       // 简历填写页没有发起登录续办；新登录不能继承上一位游客的输入。
       clearResumeGenerateDraft()
+      // 付款屏没有登录续办入口：匿名游客留下的按次付款单号不得无条件带给刚登录的会员，
+      // 当场清掉本地记录并通知服务端结束旧周期。
+      clearServiceTrips('login_handover')
     }
     // 这一位已经换了一张有效令牌：还在等收尾闸放行的那次「回登录页」就此作废。
     sessionExpiryExit.cancel()

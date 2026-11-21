@@ -404,3 +404,119 @@ test('R13 serviceTrip 保持零运行时依赖，清场前收集旧周期号并�
     else globalThis.window = prevWin
   }
 })
+
+test('R14 游客转会员与跨人归属隔离：旧单号清掉并通知收尾，存储零 PII，AuthContext 登录分支必清', async () => {
+  const tripSrc = readFileSync(join(kioskRoot, 'src/services/serviceTrip.ts'), 'utf8')
+  const tripOut = ts.transpileModule(tripSrc, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: 'serviceTrip.ts',
+  }).outputText
+  const map = new Map()
+  const prevWin = globalThis.window
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(String(k), String(v)) },
+      removeItem: (k) => { map.delete(k) },
+    },
+  }
+  try {
+    const tripMod = await import(`data:text/javascript;base64,${Buffer.from(`${tripOut}\n// r14-a`).toString('base64')}`)
+    const notified = []
+    const off = tripMod.onServiceTripsCleared((ids, reason) => notified.push({ ids: [...ids], reason }))
+    // 1) 游客记单后，登录会员读单被归属隔离拒绝并清掉，同时触发旧周期收尾
+    tripMod.rememberServiceTrip({
+      serviceKey: 'resume_optimize',
+      orderId: 'ord-guest-1',
+      kioskSessionId: 'sess-guest-1',
+      owner: tripMod.serviceTripOwnerFor(null),
+    }, 1_000)
+    const memberA = tripMod.serviceTripOwnerFor('member-id-secret-A')
+    assert.equal(tripMod.readServiceTrip('resume_optimize', { owner: memberA, nowMs: 2_000 }), null, '会员不得继承匿名游客留下的旧单')
+    assert.equal(map.get(tripMod.SERVICE_TRIP_STORAGE_KEY) ?? null, null, '归属不符的旧单当场清除')
+    assert.deepEqual(notified, [{ ids: ['sess-guest-1'], reason: 'login_handover' }])
+
+    // 2) 会员 A 记单：存储不含会员 id；同次登录可读；会员 B 不可读；重载后标记丢失游客也不可读
+    tripMod.rememberServiceTrip({
+      serviceKey: 'scan',
+      orderId: 'ord-mem-a',
+      kioskSessionId: 'sess-mem-a',
+      owner: memberA,
+    }, 3_000)
+    const raw = map.get(tripMod.SERVICE_TRIP_STORAGE_KEY) ?? ''
+    assert.ok(!raw.includes('member-id-secret-A'), 'sessionStorage 不得存会员 id 等 PII')
+    assert.equal(tripMod.readServiceTrip('scan', { owner: memberA, nowMs: 4_000 })?.orderId, 'ord-mem-a')
+    const memberB = tripMod.serviceTripOwnerFor('member-id-secret-B')
+    assert.equal(tripMod.readServiceTrip('scan', { owner: memberB, nowMs: 4_000 }), null, '另一会员不得继承会员 A 的旧单')
+
+    // 3) 整页重载后内存标记重置：新模块里的游客无法继承旧会员单
+    tripMod.rememberServiceTrip({
+      serviceKey: 'mock_interview',
+      orderId: 'ord-mem-reload',
+      kioskSessionId: 'sess-mem-reload',
+      owner: memberA,
+    }, 5_000)
+    off()
+    const reloadedMod = await import(`data:text/javascript;base64,${Buffer.from(`${tripOut}\n// r14-b`).toString('base64')}`)
+    assert.equal(reloadedMod.readServiceTrip('mock_interview', { owner: reloadedMod.serviceTripOwnerFor(null), nowMs: 6_000 }), null)
+    assert.equal(reloadedMod.readServiceTrip('mock_interview', { owner: reloadedMod.serviceTripOwnerFor('member-id-secret-A'), nowMs: 6_000 }), null)
+  } finally {
+    if (prevWin === undefined) delete globalThis.window
+    else globalThis.window = prevWin
+  }
+
+  // 4) AuthContext 游客 → 会员登录分支必须调用 clearServiceTrips('login_handover')
+  const authSrc = readFileSync(join(kioskRoot, 'src/auth/AuthContext.tsx'), 'utf8')
+  assert.match(
+    authSrc,
+    /\} else if \(!current\) \{[\s\S]{0,800}?clearServiceTrips\('login_handover'\)/,
+    'AuthContext 游客转会员分支必须清掉游客服务单号并收尾旧周期',
+  )
+})
+
+test('R15 retireServiceTripOrder 关单失败保留本机单号，成功或 404 才遗忘', async () => {
+  const toUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
+  const transpileTs = (rel) => ts.transpileModule(readFileSync(join(kioskRoot, rel), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: rel,
+  }).outputText
+  const map = new Map()
+  const prevWin = globalThis.window
+  globalThis.window = {
+    sessionStorage: {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(String(k), String(v)) },
+      removeItem: (k) => { map.delete(k) },
+    },
+  }
+  try {
+    const tripUrl = toUrl(`${transpileTs('src/services/serviceTrip.ts')}\n// r15`)
+    const errUrl = toUrl(`export function errorCodeOf(e) { return e && typeof e === 'object' ? e.code : undefined }\n// r15`)
+    const orderSrc = `${transpileTs('src/services/serviceTripOrder.ts')}\n// r15`
+      .replaceAll("from '../auth/useKioskSessionReporting'", `from '${toUrl('export async function kioskVisitReadyForCharge() { return "s" }')}'`)
+      .replaceAll("from './api/serviceOrders'", `from '${toUrl('export async function closeServiceOrder() { return null }; export async function createServiceOrder() { return null }')}'`)
+      .replaceAll("from './api/userErrorMessage'", `from '${errUrl}'`)
+      .replaceAll("from './serviceTrip'", `from '${tripUrl}'`)
+    const tripMod = await import(tripUrl)
+    const orderMod = await import(toUrl(orderSrc))
+    const trip = { serviceKey: 'resume_optimize', orderId: 'ord-keep', kioskSessionId: 'sess-keep', owner: { kind: 'guest' }, savedAt: 1_000 }
+    orderMod.keepServiceTripOrder(trip)
+    // 503 关单失败：必须保留本地单号
+    const failed = await orderMod.retireServiceTripOrder(trip, 'pending', async () => { throw { code: 'UPSTREAM_UNAVAILABLE', status: 503 } })
+    assert.equal(failed.ok, false)
+    assert.equal(tripMod.readServiceTrip('resume_optimize', 2_000)?.orderId, 'ord-keep', '关单失败不得静默忘掉旧单号')
+    // 404 不存在：可安全忘掉
+    const gone = await orderMod.retireServiceTripOrder(trip, 'pending', async () => { throw { code: 'SERVICE_ORDER_NOT_FOUND', status: 404 } })
+    assert.equal(gone.ok, true)
+    assert.equal(tripMod.readServiceTrip('resume_optimize', 2_000), null)
+    // 正常关单成功：忘掉并返回关闭后的视图
+    orderMod.keepServiceTripOrder(trip)
+    const closed = await orderMod.retireServiceTripOrder(trip, 'pending', async () => ({ id: 'ord-keep', status: 'closed' }))
+    assert.equal(closed.ok, true)
+    assert.equal(closed.view?.status, 'closed')
+    assert.equal(tripMod.readServiceTrip('resume_optimize', 2_000), null)
+  } finally {
+    if (prevWin === undefined) delete globalThis.window
+    else globalThis.window = prevWin
+  }
+})

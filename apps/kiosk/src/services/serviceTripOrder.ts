@@ -9,7 +9,7 @@ import type { ServiceOrderKey } from '@ai-job-print/shared'
 import { kioskVisitReadyForCharge } from '../auth/useKioskSessionReporting'
 import { closeServiceOrder, createServiceOrder, type ServiceOrderView } from './api/serviceOrders'
 import { errorCodeOf } from './api/userErrorMessage'
-import { forgetServiceTrip, rememberServiceTrip, type ServiceTrip } from './serviceTrip'
+import { forgetServiceTrip, rememberServiceTrip, serviceTripOwnerFor, type ServiceTrip } from './serviceTrip'
 
 /** 服务端说「这一次使用还没开始」之后，等多久再建第二次。 */
 export const SERVICE_SESSION_RETRY_DELAY_MS = 1_500
@@ -46,12 +46,24 @@ export async function openServiceTripOrder(
     kioskSessionId = await deps.ready(input.pathname)
     view = await deps.create({ serviceKey: input.serviceKey, kioskSessionId, endUserId: input.endUserId })
   }
-  return { view, trip: { serviceKey: input.serviceKey, orderId: view.id, kioskSessionId, savedAt: Date.now() } }
+  return {
+    view,
+    trip: {
+      serviceKey: input.serviceKey,
+      orderId: view.id,
+      kioskSessionId,
+      owner: serviceTripOwnerFor(input.endUserId),
+      savedAt: Date.now(),
+    },
+  }
 }
 
 /** 记下这一趟的单（调用方确认这次结果仍有效之后）。 */
 export function keepServiceTripOrder(trip: ServiceTrip): void {
-  rememberServiceTrip({ serviceKey: trip.serviceKey, orderId: trip.orderId, kioskSessionId: trip.kioskSessionId }, trip.savedAt)
+  rememberServiceTrip(
+    { serviceKey: trip.serviceKey, orderId: trip.orderId, kioskSessionId: trip.kioskSessionId, owner: trip.owner },
+    trip.savedAt,
+  )
 }
 
 export type RetireServiceTripResult =
