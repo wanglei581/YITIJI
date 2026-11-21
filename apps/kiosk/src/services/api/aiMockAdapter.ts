@@ -112,9 +112,16 @@ export const aiMockAdapter = {
     return rejectMockMode('简历诊断报告')
   },
 
-  getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse> {
+  getResumeOptimize(
+    taskId: string,
+    access?: ResumeReadAccess,
+    existingOnly?: boolean,
+    extraHeaders?: Record<string, string>,
+  ): Promise<ResumeOptimizeResponse> {
     void taskId
     void access
+    void existingOnly
+    void extraHeaders
     return rejectMockMode('简历优化建议与逐条改写候选')
   },
 
@@ -124,9 +131,11 @@ export const aiMockAdapter = {
     action: ResumeLayoutAdjustAction,
     _layout: ResumeLayoutSettings,
     _access?: ResumeReadAccess,
+    _extraHeaders?: Record<string, string>,
   ): Promise<ResumeLayoutAdjustResponse> {
     void _layout
     void _access
+    void _extraHeaders
     await delay(300)
     const trimSentence = (value: string | undefined, max = 72) => {
       const text = (value ?? '').trim()

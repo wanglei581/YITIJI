@@ -22,7 +22,10 @@ import { isAiOutage, useAiTask } from '../../ai'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useResumeLayout } from './hooks/useResumeLayout'
-import { readAiResumeSession } from './aiResumeSession'
+import { readAiResumeSession, saveAiResumeSession } from './aiResumeSession'
+import { forgetServiceTrip } from '../../services/serviceTrip'
+import { payServicePath } from '../pay/payServiceModel'
+import { RESUME_RETRY_COPY, shouldForgetTripOnPaymentError, useResumeTripCharge } from './useResumeTripCharge'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { RESUME_AI_CONSENT_NEEDED_COPY } from './resumeAiConsentPrompt'
 import { useInlineResumeAiConsent } from './useInlineResumeAiConsent'
@@ -71,6 +74,7 @@ export function ResumeOptimizePage() {
   const token = getToken()
   const access = { token, accessToken }
   const pricing = useResumeExportPricing(access, token)
+  const tripCharge = useResumeTripCharge()
   const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
   const {
     modules, setModules, optimizedResume, setOptimizedResume, loading, setLoading,
@@ -98,6 +102,15 @@ export function ResumeOptimizePage() {
   useOptimizeLoad({
     taskId, access, syntheticReady, requested: query.requested,
     existingOnly,
+    serviceHeaders: existingOnly ? undefined : tripCharge.headers,
+    onPaymentRequired: (code) => {
+      if (shouldForgetTripOnPaymentError(code) && tripCharge.trip) {
+        forgetServiceTrip('resume_optimize', tripCharge.trip.orderId)
+      }
+      if (taskId) saveAiResumeSession({ taskId, accessToken })
+      navigate(payServicePath('resume', { next: 'optimize', back: 'report' }), { replace: true })
+    },
+    onLoadFailure: () => { void tripCharge.refreshOrder() },
     consentChecking: consent.checking, consentNeedsPrompt: consent.needsPrompt, consentReady: consent.ready, retryNonce,
     setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume, setBaseResume,
     setTemplatesError, setResumeTemplates, setSelectedTemplateId,
@@ -259,7 +272,7 @@ export function ResumeOptimizePage() {
     if (viewOnly || !taskId || !resume || adjustOutage || (failKind === 'outage' && failMsg)) return
     const before = resume; setAdjusting(action); setAdjustError(null)
     try {
-      const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access)
+      const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access, tripCharge.headers)
       setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings?.length ? ['调整后的内容仍需你逐项核对，确认事实无误。'] : []); setExported(null); setIsDirty(true)
     } catch (err) {
       if (resumeAiConsent.promptIfNeeded(err, Boolean(token), () => { void handleAiAdjust(action) })) return
@@ -282,13 +295,15 @@ export function ResumeOptimizePage() {
   const saveInfo = saveInfoOf(Boolean(token), draft.status, draft.savedAt)
   const exportIsPdf = exportKind === 'change_list' || exportFormat === 'pdf'
   const canPrint = Boolean(exported?.printFileUrl) && exportIsPdf
-  const retryable = failKind !== 'outage' && (view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent')
+  const retryable = failKind !== 'outage' && (tripCharge.canFreeRetry || view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent')
+  const showFreeRetry = view !== 'ready' && view !== 'loading' && retryable && tripCharge.canFreeRetry
   const reupload = () => navigate('/resume/source?intent=optimize')
   const retry = () => { setFailMsg(null); setRetryNonce((n) => n + 1) }
   const { ask, back, statePrimary, primary } = buildOptimizeDockControls({
     view, pane, editorOpen, showOverview, hasAssembled: Boolean(assembled), hasModules: modules.length > 0,
     aiDown, viewOnly, leaveDirty, exporting, exported, canPrint, exportBlocked, titleBlocked, factsValid,
     printNavigating, retryable,
+    retryLabel: showFreeRetry ? '免费再试一次' : '重试',
     onRequestLeaveToAssistant: (text) => requestLeave(() => { rememberAssistantDraft(text); navigate('/assistant') }),
     onOpenCompare: () => openCompare(),
     onRequestResumeExport: requestResumeExport,
@@ -406,7 +421,7 @@ export function ResumeOptimizePage() {
           exportBlocked={exportBlocked}
           changeListBusy={exporting && factOpen === 'change_list'}
           stateTitle={optimizeStateTitle(view)}
-          stateDescription={unattendedResumeCopy(optimizeStateDescription(view, failMsg), contact)}
+          stateDescription={showFreeRetry ? RESUME_RETRY_COPY : unattendedResumeCopy(optimizeStateDescription(view, failMsg), contact)}
           stateActions={statePrimary && retryable ? <button type="button" className="qxt-btn-line" disabled={viewOnly} title={viewOnly ? LICENSE_NO_NEW_TASK_REASON : undefined} onClick={reupload}>重新上传简历</button> : undefined}
           showDraftBanner={view === 'ready' && (choicePending || Boolean(token && draft.loading))}
           draftLoading={Boolean(token && draft.loading)}

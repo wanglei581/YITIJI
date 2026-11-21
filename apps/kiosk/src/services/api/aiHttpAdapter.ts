@@ -82,7 +82,12 @@ function accessHeaders(access?: ResumeReadAccess): Record<string, string> {
 // 没有终端身份（手机、桌面浏览器）时原样发出，服务端退回按 IP 计。
 // ──────────────────────────────────────────────────────────────
 
-async function get<T>(path: string, access?: ResumeReadAccess, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+async function get<T>(
+  path: string,
+  access?: ResumeReadAccess,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
   const ac = new AbortController()
   const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
@@ -92,6 +97,7 @@ async function get<T>(path: string, access?: ResumeReadAccess, timeoutMs = DEFAU
       headers: {
         Accept: 'application/json',
         ...accessHeaders(access),
+        ...extraHeaders,
       },
       credentials: 'include',
       signal: ac.signal,
@@ -181,6 +187,7 @@ async function sendJson<T>(
   body: unknown,
   access?: ResumeReadAccess,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
   const ac = new AbortController()
   const timerId = setTimeout(() => ac.abort(), timeoutMs)
@@ -192,6 +199,7 @@ async function sendJson<T>(
         Accept: 'application/json',
         'Content-Type': 'application/json',
         ...accessHeaders(access),
+        ...extraHeaders,
       },
       credentials: 'include',
       body: JSON.stringify(body),
@@ -219,8 +227,14 @@ async function sendJson<T>(
   return res.json() as Promise<T>
 }
 
-async function postWithAccess<T>(path: string, body: unknown, access?: ResumeReadAccess, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
-  return sendJson<T>('POST', path, body, access, timeoutMs)
+async function postWithAccess<T>(
+  path: string,
+  body: unknown,
+  access?: ResumeReadAccess,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
+  return sendJson<T>('POST', path, body, access, timeoutMs, extraHeaders)
 }
 
 async function putWithAccess<T>(path: string, body: unknown, access?: ResumeReadAccess, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
@@ -277,9 +291,19 @@ export const aiHttpAdapter = {
     return get<ResumeParseResponse>(`/resume/records/${taskId}`, access)
   },
 
-  async getResumeOptimize(taskId: string, access?: ResumeReadAccess, existingOnly = false): Promise<ResumeOptimizeResponse> {
+  async getResumeOptimize(
+    taskId: string,
+    access?: ResumeReadAccess,
+    existingOnly = false,
+    extraHeaders?: Record<string, string>,
+  ): Promise<ResumeOptimizeResponse> {
     const query = existingOnly ? '?existingOnly=1' : ''
-    return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize${query}`, access, existingOnly ? DEFAULT_TIMEOUT_MS : LLM_TIMEOUT_MS)
+    return get<ResumeOptimizeResponse>(
+      `/resume/records/${taskId}/optimize${query}`,
+      access,
+      existingOnly ? DEFAULT_TIMEOUT_MS : LLM_TIMEOUT_MS,
+      extraHeaders,
+    )
   },
 
   async adjustResumeLayoutDraft(
@@ -288,12 +312,14 @@ export const aiHttpAdapter = {
     action: ResumeLayoutAdjustAction,
     layout: ResumeLayoutSettings,
     access?: ResumeReadAccess,
+    extraHeaders?: Record<string, string>,
   ): Promise<ResumeLayoutAdjustResponse> {
     return postWithAccess<ResumeLayoutAdjustResponse>(
       `/resume/records/${taskId}/layout-adjust`,
       { resume, action, layout },
       access,
       LLM_TIMEOUT_MS,
+      extraHeaders,
     )
   },
 
