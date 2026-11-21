@@ -16,8 +16,8 @@ const LEDGER_NO = 'RFD-HOLD-MANUAL'
 const LEDGER_CENTS = 200
 
 type HoldAction = 'confirm-refunded' | 'release-paper' | 'close'
-type HoldDemoMode = 'manual' | 'pending' | 'channel-manual' | 'window-local' | 'channel-stuck' | 'paper-channel-manual'
-const HOLD_DEMO_MODES: readonly HoldDemoMode[] = ['manual', 'pending', 'channel-manual', 'window-local', 'channel-stuck', 'paper-channel-manual']
+type HoldDemoMode = 'manual' | 'pending' | 'channel-manual' | 'window-local' | 'channel-stuck' | 'paper-channel-manual' | 'channel-abnormal'
+const HOLD_DEMO_MODES: readonly HoldDemoMode[] = ['manual', 'pending', 'channel-manual', 'window-local', 'channel-stuck', 'paper-channel-manual', 'channel-abnormal']
 
 let loaded = false
 let holdOrder: AdminOrderReadonlyDetail | null = null
@@ -82,18 +82,20 @@ function freshHoldOrder(mode: HoldDemoMode): AdminOrderReadonlyDetail {
     },
     statusLogs: [{ fromStatus: 'pending', toStatus: mode === 'paper-channel-manual' ? 'completed' : 'failed', errorCode: null, createdAt }],
     autoRefund: false,
-    refundStatus: mode === 'pending' || mode === 'channel-stuck' ? 'pending' : mode === 'manual' ? 'failed' : 'manual_review',
+    refundStatus: mode === 'pending' || mode === 'channel-stuck' || mode === 'channel-abnormal' ? 'pending' : mode === 'manual' ? 'failed' : 'manual_review',
     refundFailureReason: mode === 'manual' ? '渠道退款失败' : null,
     printRefundDisposition: 'manual',
     printRefundReason: mode === 'window-local'
       ? '取件窗口已经关了，纸没出，待人工原路退回'
-      : mode === 'channel-manual' || mode === 'paper-channel-manual' ? '渠道通知退款金额对不上，待人工核对' : '渠道未确认',
+      : mode === 'channel-abnormal'
+        ? '渠道说退款异常：资金在渠道中间账户，需按渠道异常退款流程处理。'
+        : mode === 'channel-manual' || mode === 'paper-channel-manual' ? '渠道通知退款金额对不上，待人工核对' : '渠道未确认',
     refundLedgerNo: LEDGER_NO,
     refundLedgerCents: LEDGER_CENTS,
     refundRemainderCents: null,
-    channelInFlight: mode === 'pending' || mode === 'channel-manual' || mode === 'channel-stuck' || mode === 'paper-channel-manual',
-    channelResultRegistration: mode === 'channel-stuck'
-      ? { refundNo: LEDGER_NO, amountCents: LEDGER_CENTS, submittedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString() }
+    channelInFlight: mode === 'pending' || mode === 'channel-manual' || mode === 'channel-stuck' || mode === 'paper-channel-manual' || mode === 'channel-abnormal',
+    channelResultRegistration: mode === 'channel-stuck' || mode === 'channel-abnormal'
+      ? { refundNo: LEDGER_NO, amountCents: LEDGER_CENTS, submittedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(), abnormal: mode === 'channel-abnormal' }
       : null,
   }
 }

@@ -98,7 +98,7 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   /** 有渠道受理过、还没落定的退款（与服务端三步处置同一个判断）。为 true 时三步按钮都禁用。服务单不返回。 */
   channelInFlight?: boolean
   /** 长期查不到渠道结果、可以按商户平台核实结果登记的那一笔。服务单不返回。 */
-  channelResultRegistration?: { refundNo: string; amountCents: number; submittedAt: string } | null
+  channelResultRegistration?: { refundNo: string; amountCents: number; submittedAt: string; abnormal: boolean } | null
 }
 
 export interface AdminOrderReadonlyPage {
@@ -337,7 +337,7 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   refundRemainderCents: null,
   channelInFlight: false,
   // 契约门禁要求把服务端可能返回的嵌套字段写全。这张单不在待人工，页面不会显示登记入口。
-  channelResultRegistration: { refundNo: 'RFD-MOCK-REGISTRATION', amountCents: 0, submittedAt: now() },
+  channelResultRegistration: { refundNo: 'RFD-MOCK-REGISTRATION', amountCents: 0, submittedAt: now(), abnormal: false },
 }
 
 /** 存量订单未记录计费页数，供列表和详情验证空值展示。 */

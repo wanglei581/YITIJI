@@ -10,7 +10,7 @@
  */
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
-import { CHANNEL_ABNORMAL_DETAIL, parkAbnormalChannelRefund } from './refund-abnormal'
+import { CHANNEL_ABNORMAL_AUDIT, CHANNEL_ABNORMAL_DETAIL, parkAbnormalChannelRefund } from './refund-abnormal'
 import { recordChannelAnswers, type ChannelResultRegistration } from './refund-channel-answer'
 import { refundMayStillBeAtChannel } from './refund-channel-acceptance'
 import { parkChannelQueryFault } from './refund-channel-query'
@@ -34,12 +34,12 @@ export function channelRegistrationOpen(
   return now.getTime() - refund.channelSubmittedAt.getTime() >= CHANNEL_REGISTRATION_AFTER_MS
 }
 
-/** 后台详情用：这单哪一笔现在可以按商户平台核实结果登记。没有就是 null。 */
+/** 后台详情用：这单哪一笔现在可以按商户平台核实结果登记（含是否已标记微信退款异常）。没有就是 null。 */
 export async function channelRegistrationEntry(
   db: PrismaService,
   orderId: string,
   now: Date = new Date(),
-): Promise<{ refundNo: string; amountCents: number; submittedAt: string } | null> {
+): Promise<{ refundNo: string; amountCents: number; submittedAt: string; abnormal: boolean } | null> {
   const rows = await db.refund.findMany({
     where: { orderId, channelSubmittedAt: { not: null } },
     orderBy: { createdAt: 'asc' },
@@ -47,7 +47,16 @@ export async function channelRegistrationEntry(
   })
   const open = rows.find((row) => channelRegistrationOpen(row, REFUND_QUERY_CHANNELS.has(row.channel), now))
   if (!open?.channelSubmittedAt) return null
-  return { refundNo: open.refundNo, amountCents: open.amountCents, submittedAt: open.channelSubmittedAt.toISOString() }
+  const abnormalAudit = await db.auditLog.findFirst({
+    where: { targetId: orderId, action: CHANNEL_ABNORMAL_AUDIT, payloadJson: { contains: open.refundNo } },
+    select: { id: true },
+  })
+  return {
+    refundNo: open.refundNo,
+    amountCents: open.amountCents,
+    submittedAt: open.channelSubmittedAt.toISOString(),
+    abnormal: Boolean(abnormalAudit),
+  }
 }
 
 export async function registerChannelResult(
@@ -121,7 +130,7 @@ export async function registerChannelResult(
       recordedBy = 'channel'
     } else if (raw === 'abnormal') {
       await parkAbnormalChannelRefund(db, { refundId: refund.id, refundNo: refund.refundNo, orderId, channelRefundNo: null, source: 'hold' })
-      throw deny('REFUND_CHANNEL_ABNORMAL', `${CHANNEL_ABNORMAL_DETAIL}不能按登记处理。`)
+      throw deny('REFUND_CHANNEL_ABNORMAL', `${CHANNEL_ABNORMAL_DETAIL}请先到微信商户平台完成异常退款，再点「向渠道查询结果」收口，不能按登记处理。`)
     } else if (raw === 'processing') {
       throw deny('REFUND_CHANNEL_UNCONFIRMED', '渠道说这笔退款还在处理，不能登记，等渠道答复。')
     }

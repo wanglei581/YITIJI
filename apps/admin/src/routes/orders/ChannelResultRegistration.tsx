@@ -41,6 +41,18 @@ export function ChannelResultRegistration({
   const [error, setError] = useState<string | null>(null)
   if (!entry) return null
 
+  if (entry.abnormal) {
+    return (
+      <div className="space-y-1.5 border-t border-warning/20 pt-3">
+        <p className="text-[13px] font-bold text-neutral-800">微信退款异常，待商户平台处理</p>
+        <p className="text-xs leading-relaxed text-neutral-600">
+          退款单 {entry.refundNo}，金额 {amountText(entry.amountCents, detail.currency)}。资金目前停留在微信退款中间账户，不属于长期查不到。
+          请先到微信商户平台完成异常退款，处理完成后点击上方「向渠道查询结果」自动收口。如在商户平台选择退回商户银行卡，请另行核对用户赔付。
+        </p>
+      </div>
+    )
+  }
+
   const parsedAmountCents = parseYuanToCents(actualAmountYuan)
   const amountValid = parsedAmountCents !== null && parsedAmountCents > 0 && parsedAmountCents <= entry.amountCents
   const filled = result === 'refunded'

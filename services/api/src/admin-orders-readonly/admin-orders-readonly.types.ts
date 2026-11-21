@@ -114,7 +114,7 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
    * 长期查不到渠道结果、可以按商户平台核实结果登记的那一笔：渠道不支持在线查询，
    * 或提交渠道满 24 小时还在途。没有可登记的为 null。登记接口会先问一次渠道再决定。
    */
-  channelResultRegistration: { refundNo: string; amountCents: number; submittedAt: string } | null
+  channelResultRegistration: { refundNo: string; amountCents: number; submittedAt: string; abnormal: boolean } | null
 }
 
 export interface AdminOrderReadonlyPage {

@@ -14,7 +14,7 @@ const BLOCKED = '退款还在渠道处理中，结果出来前不能处置。'
  */
 async function openHoldDetail(
   page: Page,
-  mode: 'channel-manual' | 'window-local' | 'channel-stuck' | 'paper-channel-manual',
+  mode: 'channel-manual' | 'window-local' | 'channel-stuck' | 'paper-channel-manual' | 'channel-abnormal',
   refundStatus = '待人工核对',
 ) {
   await page.addInitScript((value) => localStorage.setItem('mock:order-hold', value), mode)
@@ -137,6 +137,19 @@ test.describe('待人工三步按钮只看渠道在途', () => {
     await expect(detail.getByText('已退款', { exact: true }).locator('..')).toContainText('¥0.60')
     await expect(detail.getByRole('button', { name: '退还剩余', exact: true })).toBeVisible()
     await expect(detail.getByText(/退还剩余 ¥1\.40/)).toBeVisible()
+    await settleAdminPage(page, guards)
+  })
+
+  test('微信 ABNORMAL 满 24 小时：不误导为长期查不到、不出登记按钮，引导商户平台处理后点查询收口', async ({ page }) => {
+    const { guards, detail } = await openHoldDetail(page, 'channel-abnormal', '处理中')
+    await expect(detail.getByText('微信退款异常，待商户平台处理', { exact: true })).toBeVisible()
+    await expect(detail.getByText('长期查不到渠道结果', { exact: true })).toHaveCount(0)
+    await expect(detail.getByRole('button', { name: '按商户平台核实结果登记', exact: true })).toHaveCount(0)
+    const queryBtn = detail.getByRole('button', { name: '向渠道查询结果', exact: true })
+    await expect(queryBtn).toBeVisible()
+    await queryBtn.click()
+    await expect(detail.getByText('渠道已确认退款成功，已按渠道金额记账。', { exact: true })).toBeVisible()
+    await expect(detail.getByText('支付状态', { exact: true }).locator('..')).toContainText('已退款')
     await settleAdminPage(page, guards)
   })
 })
