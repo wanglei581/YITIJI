@@ -1,0 +1,140 @@
+/* pages/service-credits/service-credits.wxss */
+/* 字号与圆角全部采用 app.wxss 的 --fs-* / --r-* 令牌，不新增视觉刻度偏离。 */
+
+.sc-content { padding: 16rpx 0 56rpx; }
+
+.sc-intro {
+  margin: 0 32rpx 24rpx;
+  padding: 24rpx;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+}
+.sc-intro-ic {
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: var(--r);
+  background: var(--plum-soft);
+  color: var(--plum-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.sc-intro-ic .ficon { width: 36rpx; height: 36rpx; }
+.sc-intro-copy { flex: 1; min-width: 0; }
+.sc-intro-title { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.sc-intro-sub { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; }
+
+.sc-sec-title {
+  margin: 24rpx 32rpx 14rpx;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sc-summary-grid {
+  margin: 0 32rpx 16rpx;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+}
+.sc-sum-card {
+  padding: 24rpx;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+}
+.sc-sum-label { font-size: var(--fs-sm); color: var(--muted); }
+.sc-sum-num {
+  margin-top: 12rpx;
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.sc-sum-unit { font-size: var(--fs-sm); font-weight: 500; color: var(--muted); }
+
+.sc-empty-inline { padding: 24rpx; text-align: center; }
+.sc-empty-t { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
+.sc-empty-d { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
+
+.sc-banner {
+  padding: 20rpx 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.sc-banner.info { background: var(--teal-wash); border-color: var(--teal-soft); }
+.sc-banner.ok { background: var(--ok-soft); border-color: var(--ok); }
+.sc-banner.warn { background: var(--warn-soft); border-color: var(--wheat); }
+.sc-banner-text { flex: 1; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.55; }
+.sc-banner-retry {
+  min-width: 88rpx;
+  min-height: 64rpx;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--link);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-notice-card { padding: 24rpx; }
+.sc-notice-head { display: flex; align-items: center; gap: 12rpx; }
+.sc-notice-ic { width: 32rpx; height: 32rpx; color: var(--teal-deep); }
+.sc-notice-title { font-size: var(--fs-base); font-weight: 700; color: var(--ink); }
+.sc-notice-desc { margin-top: 12rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.6; }
+
+.sc-buy-list { margin: 0 32rpx; display: flex; flex-direction: column; gap: 16rpx; }
+.sc-buy-card {
+  padding: 24rpx;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+.sc-buy-copy { flex: 1; min-width: 0; }
+.sc-buy-title { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.sc-buy-desc { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
+.sc-buy-btn {
+  min-height: 80rpx;
+  padding: 0 28rpx;
+  border-radius: var(--r);
+  background: var(--teal);
+  color: #fff;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.sc-buy-btn.disabled { opacity: 0.45; }
+.sc-buy-foot {
+  padding: 4rpx 8rpx 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.sc-records-card { padding: 8rpx 24rpx; }
+.sc-rec-row {
+  padding: 20rpx 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.sc-rec-row + .sc-rec-row { border-top: 1rpx solid var(--line-faint); }
+.sc-rec-left { display: flex; align-items: center; gap: 12rpx; }
+.sc-rec-ic { width: 28rpx; height: 28rpx; color: var(--ok); }
+.sc-rec-title { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
+.sc-rec-time { font-size: var(--fs-sm); color: var(--muted); flex-shrink: 0; }

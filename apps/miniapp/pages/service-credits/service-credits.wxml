@@ -1,0 +1,131 @@
+<!--pages/service-credits/service-credits.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" role="button" aria-label="返回">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">{{copy.pageTitle}}</view>
+      <view class="nav-right"></view>
+    </view>
+  </view>
+
+  <view class="content sc-content">
+    <view class="sc-intro">
+      <view class="sc-intro-ic"><text class="ficon i-thunder"></text></view>
+      <view class="sc-intro-copy">
+        <view class="sc-intro-title">{{copy.pageTitle}}</view>
+        <view class="sc-intro-sub">{{copy.usageNotice}}</view>
+      </view>
+    </view>
+
+    <view class="card sc-banner warn" wx:if="{{identityNotice}}" role="alert">
+      <view class="sc-banner-text">{{identityNotice}}</view>
+    </view>
+
+    <block wx:if="{{!isLoggedIn}}">
+      <view class="card">
+        <view class="empty-slot">
+          <text class="ficon i-user es-ic"></text>
+          <view class="es-t">{{copy.loginTitle}}</view>
+          <view class="es-d">{{copy.loginDesc}}</view>
+          <view class="btn primary block tap" hover-class="tap-press" bindtap="toLogin" role="button">去登录</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:else>
+
+      <view class="sc-sec-title">{{copy.sectionCredits}}</view>
+
+      <view class="card" wx:if="{{loading && !loadedOnce}}">
+        <view class="empty-slot">
+          <view class="es-t">正在读取可用次数…</view>
+        </view>
+      </view>
+
+      <view class="card" wx:elif="{{error && !loadedOnce}}">
+        <view class="empty-slot">
+          <text class="ficon i-warning es-ic"></text>
+          <view class="es-t">读取失败</view>
+          <view class="es-d">{{error}}</view>
+          <view class="btn ghost block tap" hover-class="tap-press" bindtap="retryLoad" role="button">重新加载</view>
+        </view>
+      </view>
+
+      <block wx:else>
+        <view class="sc-summary-grid">
+          <view class="sc-sum-card" wx:for="{{summary}}" wx:key="kind">
+            <view class="sc-sum-label">{{item.title}}</view>
+            <view class="sc-sum-num">{{item.count}}<text class="sc-sum-unit"> 次</text></view>
+          </view>
+        </view>
+
+        <view class="card sc-empty-inline" wx:if="{{totalCount === 0}}">
+          <view class="sc-empty-t">{{copy.emptyCreditsTitle}}</view>
+          <view class="sc-empty-d">{{copy.emptyCreditsDesc}}</view>
+        </view>
+
+        <view class="card sc-banner warn" wx:if="{{error}}" role="alert">
+          <view class="sc-banner-text">{{error}}</view>
+          <view class="sc-banner-retry tap" bindtap="retryLoad" role="button">重试</view>
+        </view>
+      </block>
+
+      <view class="card sc-banner {{buyNoticeTone}}" wx:if="{{buyNotice}}" role="status">
+        <view class="sc-banner-text">{{buyNotice}}</view>
+      </view>
+
+      <view class="sc-sec-title">{{copy.sectionBuy}}</view>
+
+      <view class="card sc-notice-card" wx:if="{{!clientSupported}}">
+        <view class="sc-notice-head">
+          <text class="ficon i-info sc-notice-ic"></text>
+          <text class="sc-notice-title">{{copy.unsupportedClientTitle}}</text>
+        </view>
+        <view class="sc-notice-desc">{{copy.unsupportedClientNotice}}</view>
+      </view>
+
+      <view class="card sc-notice-card" wx:elif="{{purchaseUnavailable}}">
+        <view class="sc-notice-head">
+          <text class="ficon i-info sc-notice-ic"></text>
+          <text class="sc-notice-title">{{copy.unavailableTitle}}</text>
+        </view>
+        <view class="sc-notice-desc">{{purchaseUnavailableText || copy.unavailableNotice}}</view>
+      </view>
+
+      <view class="sc-buy-list" wx:else>
+        <view class="sc-buy-card" wx:for="{{catalog}}" wx:key="kind">
+          <view class="sc-buy-copy">
+            <view class="sc-buy-title">{{item.buyTitle}}</view>
+            <view class="sc-buy-desc">{{item.desc}}</view>
+          </view>
+          <view
+            class="sc-buy-btn tap {{buyingKind ? 'disabled' : ''}}"
+            hover-class="tap-press"
+            data-kind="{{item.kind}}"
+            bindtap="tapBuy"
+            role="button"
+          >{{buyingKind === item.kind ? copy.buyingButton : copy.buyButton}}</view>
+        </view>
+        <view class="sc-buy-foot">{{copy.buyFooterNote}}</view>
+      </view>
+
+      <block wx:if="{{records.length}}">
+        <view class="sc-sec-title">{{copy.sectionRecords}}</view>
+        <view class="card sc-records-card">
+          <view class="sc-rec-row" wx:for="{{records}}" wx:key="id">
+            <view class="sc-rec-left">
+              <text class="ficon i-check-circle sc-rec-ic"></text>
+              <text class="sc-rec-title">{{item.title}}</text>
+            </view>
+            <view class="sc-rec-time">{{item.createdAtText}}</view>
+          </view>
+        </view>
+      </block>
+
+    </block>
+  </view>
+</view>

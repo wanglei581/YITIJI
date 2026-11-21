@@ -1,0 +1,274 @@
+<!--pages/invoice-center/invoice-center.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" role="button" aria-label="返回">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">{{copy.pageTitle}}</view>
+      <view class="nav-right"></view>
+    </view>
+  </view>
+
+  <view class="content inv-content">
+    <view class="inv-intro">
+      <view class="inv-intro-ic"><text class="ficon i-form"></text></view>
+      <view class="inv-intro-copy">
+        <view class="inv-intro-title">{{copy.pageTitle}}</view>
+        <view class="inv-intro-sub">{{copy.subtitle}}</view>
+      </view>
+    </view>
+
+    <view class="card inv-banner warn" wx:if="{{identityNotice}}" role="alert">
+      <view class="inv-banner-text">{{identityNotice}}</view>
+    </view>
+
+    <block wx:if="{{!isLoggedIn}}">
+      <view class="card">
+        <view class="empty-slot">
+          <text class="ficon i-user es-ic"></text>
+          <view class="es-t">{{copy.loginTitle}}</view>
+          <view class="es-d">{{copy.loginDesc}}</view>
+          <view class="btn primary block tap" hover-class="tap-press" bindtap="toLogin" role="button">去登录</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:else>
+
+      <!-- 开票表单面板（仅驻留内存，提交或离开即清） -->
+      <view class="card inv-form-card" wx:if="{{selectedOrder}}">
+        <view class="inv-panel-head">
+          <view>
+            <view class="inv-panel-title">填写开票信息</view>
+            <view class="inv-panel-sub">{{selectedOrder.orderKindLabel}} · {{selectedOrder.orderId}} · {{selectedOrder.amountText}}</view>
+          </view>
+          <view class="inv-close tap" hover-class="tap-press" bindtap="cancelForm" role="button" aria-label="关闭表单">关闭</view>
+        </view>
+
+        <view class="inv-field">
+          <view class="inv-label">抬头类型</view>
+          <view class="inv-seg">
+            <view
+              class="inv-seg-item tap {{form.titleType === 'personal' ? 'on' : ''}}"
+              data-type="personal"
+              bindtap="selectTitleType"
+              role="button"
+            >个人</view>
+            <view
+              class="inv-seg-item tap {{form.titleType === 'company' ? 'on' : ''}}"
+              data-type="company"
+              bindtap="selectTitleType"
+              role="button"
+            >单位</view>
+          </view>
+        </view>
+
+        <view class="inv-field">
+          <view class="inv-label">{{form.titleType === 'company' ? copy.titleCompanyLabel : copy.titlePersonalLabel}}</view>
+          <input
+            class="inv-input"
+            value="{{form.title}}"
+            maxlength="80"
+            data-field="title"
+            bindinput="onFormInput"
+            placeholder="{{form.titleType === 'company' ? copy.titleCompanyPlaceholder : copy.titlePersonalPlaceholder}}"
+          />
+        </view>
+
+        <view class="inv-field" wx:if="{{form.titleType === 'company'}}">
+          <view class="inv-label">{{copy.taxIdLabel}}</view>
+          <input
+            class="inv-input"
+            value="{{form.taxId}}"
+            maxlength="18"
+            data-field="taxId"
+            bindinput="onFormInput"
+            placeholder="{{copy.taxIdPlaceholder}}"
+          />
+        </view>
+
+        <view class="inv-field">
+          <view class="inv-label">{{copy.emailLabel}}</view>
+          <input
+            class="inv-input"
+            value="{{form.email}}"
+            maxlength="120"
+            data-field="email"
+            bindinput="onFormInput"
+            placeholder="{{copy.emailPlaceholder}}"
+          />
+        </view>
+
+        <view class="inv-form-error" wx:if="{{formError}}" role="alert">{{formError}}</view>
+
+        <view class="inv-privacy">{{copy.privacyNote}}</view>
+
+        <view class="inv-form-actions">
+          <view class="btn ghost-ink tap inv-act-btn" hover-class="tap-press" bindtap="cancelForm" role="button">取消</view>
+          <view
+            class="btn primary tap inv-act-btn {{submitting ? 'disabled' : ''}}"
+            hover-class="tap-press"
+            bindtap="submitForm"
+            role="button"
+          >{{submitting ? '正在提交…' : '提交申请'}}</view>
+        </view>
+      </view>
+
+      <!-- 已提交申请详情（仅展示服务端打码后的税号与邮箱） -->
+      <view class="card inv-detail-card" wx:if="{{detailLoading}}">
+        <view class="empty-slot">
+          <view class="es-d">{{copy.detailLoading}}</view>
+        </view>
+      </view>
+
+      <view class="card inv-detail-card" wx:elif="{{detailError}}">
+        <view class="inv-panel-head">
+          <view class="inv-panel-title">开票申请详情</view>
+          <view class="inv-close tap" hover-class="tap-press" bindtap="closeDetail" role="button">关闭</view>
+        </view>
+        <view class="inv-form-error" role="alert">{{detailError}}</view>
+      </view>
+
+      <view class="card inv-detail-card" wx:elif="{{detail}}">
+        <view class="inv-panel-head">
+          <view class="inv-panel-title">开票申请详情</view>
+          <view class="inv-close tap" hover-class="tap-press" bindtap="closeDetail" role="button">关闭</view>
+        </view>
+        <view class="inv-detail-rows">
+          <view class="inv-row">
+            <text class="inv-k">状态</text>
+            <view class="chip {{detail.statusTone}}">{{detail.statusLabel}}</view>
+          </view>
+          <view class="inv-row">
+            <text class="inv-k">订单</text>
+            <text class="inv-v">{{detail.orderKindLabel}} · {{detail.orderId}}</text>
+          </view>
+          <view class="inv-row">
+            <text class="inv-k">{{copy.amountLabel}}</text>
+            <text class="inv-v">{{detail.amountText}}</text>
+          </view>
+          <view class="inv-row">
+            <text class="inv-k">抬头类型</text>
+            <text class="inv-v">{{detail.titleTypeLabel}}</text>
+          </view>
+          <view class="inv-row">
+            <text class="inv-k">抬头</text>
+            <text class="inv-v">{{detail.title}}</text>
+          </view>
+          <view class="inv-row" wx:if="{{detail.taxIdMasked}}">
+            <text class="inv-k">税号</text>
+            <text class="inv-v">{{detail.taxIdMasked}}</text>
+          </view>
+          <view class="inv-row" wx:if="{{detail.emailMasked}}">
+            <text class="inv-k">接收邮箱</text>
+            <text class="inv-v">{{detail.emailMasked}}</text>
+          </view>
+          <view class="inv-row" wx:if="{{detail.invoiceNo}}">
+            <text class="inv-k">发票号码</text>
+            <text class="inv-v">{{detail.invoiceNo}}</text>
+          </view>
+          <view class="inv-row" wx:if="{{detail.issuedAtText}}">
+            <text class="inv-k">开票时间</text>
+            <text class="inv-v">{{detail.issuedAtText}}</text>
+          </view>
+          <view class="inv-row">
+            <text class="inv-k">提交时间</text>
+            <text class="inv-v">{{detail.createdAtText}}</text>
+          </view>
+          <view class="inv-return-box" wx:if="{{detail.returnReason}}">
+            <view class="inv-return-t">退回原因</view>
+            <view class="inv-return-d">{{detail.returnReason}}</view>
+          </view>
+        </view>
+        <view class="inv-detail-foot" wx:if="{{detail.canResubmit}}">
+          <view class="btn primary block tap" hover-class="tap-press" bindtap="resubmitFromDetail" role="button">重新申请开票</view>
+        </view>
+      </view>
+
+      <!-- 可开票订单列表 -->
+      <view class="card" wx:if="{{loading && !orders.length}}">
+        <view class="empty-slot">
+          <view class="es-t">正在读取可开票订单…</view>
+        </view>
+      </view>
+
+      <block wx:elif="{{orders.length}}">
+        <view class="inv-order-card" wx:for="{{orders}}" wx:key="key">
+          <view class="inv-oc-top">
+            <view class="inv-oc-kind">{{item.orderKindLabel}}</view>
+            <view class="chip {{item.statusTone}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="inv-oc-meta">
+            <view class="inv-row">
+              <text class="inv-k">订单编号</text>
+              <text class="inv-v">{{item.orderId}}</text>
+            </view>
+            <view class="inv-row">
+              <text class="inv-k">{{copy.amountLabel}}</text>
+              <text class="inv-v inv-amt">{{item.amountText}}</text>
+            </view>
+          </view>
+          <view class="inv-block-note" wx:if="{{!item.canRequest && item.blockMessage}}">{{item.blockMessage}}</view>
+          <view class="inv-oc-foot">
+            <view
+              wx:if="{{item.canViewDetail}}"
+              class="inv-btn ghost tap"
+              hover-class="tap-press"
+              data-request-id="{{item.requestId}}"
+              bindtap="viewDetail"
+              role="button"
+            >查看申请</view>
+            <view
+              wx:if="{{item.canRequest}}"
+              class="inv-btn pri tap"
+              hover-class="tap-press"
+              data-key="{{item.key}}"
+              bindtap="openForm"
+              role="button"
+            >{{item.requestButtonLabel}}</view>
+          </view>
+        </view>
+
+        <view
+          wx:if="{{nextCursor}}"
+          class="btn ghost block tap inv-load-more"
+          hover-class="tap-press"
+          bindtap="loadMore"
+          role="button"
+        >{{loadingMore ? '正在加载…' : '加载更多订单'}}</view>
+
+        <view class="inv-foot-warn" wx:if="{{moreError}}">
+          {{moreError}}
+          <text class="inv-foot-retry tap" bindtap="loadMore">重试</text>
+        </view>
+        <view class="inv-foot-warn" wx:elif="{{error}}">
+          {{error}}
+          <text class="inv-foot-retry tap" bindtap="retryLoad">重试</text>
+        </view>
+      </block>
+
+      <view class="card" wx:elif="{{error}}">
+        <view class="empty-slot">
+          <text class="ficon i-warning es-ic"></text>
+          <view class="es-t">读取失败</view>
+          <view class="es-d">{{error}}</view>
+          <view class="btn ghost block tap" hover-class="tap-press" bindtap="retryLoad" role="button">重新加载</view>
+        </view>
+      </view>
+
+      <view class="card" wx:elif="{{loadedOnce}}">
+        <view class="empty-slot">
+          <text class="ficon i-form es-ic"></text>
+          <view class="es-t">{{copy.emptyTitle}}</view>
+          <view class="es-d">{{copy.emptyDesc}}</view>
+        </view>
+      </view>
+
+    </block>
+
+    <view class="inv-foot-note">{{copy.specialNote}}</view>
+  </view>
+</view>

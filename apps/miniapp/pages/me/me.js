@@ -67,6 +67,8 @@ Page({
       { id: 'docs',      icon: 'folder',    title: '我的文档',      sub: '可再次发起打印',       accent: 'teal'  },
       { id: 'orders',    icon: 'printer',   title: '打印订单',      sub: '到机码与出纸状态',     accent: 'clay'  },
       { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'cyan'  },
+      { id: 'invoice',   icon: 'form',      title: '自助开票',      sub: '付费订单申请电子发票', accent: 'wheat' },
+      { id: 'credits',   icon: 'thunder',   title: '一体机服务次数', sub: '已购 AI 服务与单次购买', accent: 'plum' },
       // 我的收藏 / 招聘会提醒 / 浏览与跳转记录只装岗位、招聘会、企业、政策四类内容，
       // 「我的权益」首发不对 AI 收费、先收起：四页随岗位招聘会政策页一起停放
       // （首发按非招聘类目提审，compliance-boundary.md §1.1）。
@@ -143,6 +145,8 @@ Page({
       docs:       '/pages/documents/documents',
       orders:     '/pages/orders/orders',
       ai:         '/pages/ai-records/ai-records',
+      invoice:    '/pages/invoice-center/invoice-center',
+      credits:    '/pages/service-credits/service-credits',
       feedback:   '/pages/feedback/feedback',
       settings:   '/pages/settings/settings',
     }
