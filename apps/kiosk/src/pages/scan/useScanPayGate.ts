@@ -27,9 +27,11 @@ import {
 } from '../../services/serviceTrip'
 import {
   readScanEffectiveCents,
+  scanOrderBelongsToScanTask,
   scanOrderIsEndedForNewTrip,
   scanOrderNeedsSettlePoll,
   scanTripAllowsStartWithoutPay,
+  type ScanOrderOwnershipContext,
 } from './scanPayModel'
 import { scanLifecycleGeneration } from './scanWorkbenchSession'
 
@@ -74,6 +76,13 @@ export function consumeScanDeviceAutoStartAfterPay(orderId?: string | null): boo
 
 /** 面板路径上已被 POST /scan/sessions 以 402 明确拒过的“看似已付”旧单号，防止付款屏 ok ↔ 设置页 402 死循环。 */
 const panelRejectedOrderIds = new Set<string>()
+/** 本页内存登记：建会话成功拿到的 scanTaskId → 当时提交的 orderId（null 表示明确未付新建）。 */
+const scanTaskOrderByTask = new Map<string, string | null>()
+/** 每个 orderId 绑定过哪些 scanTaskId，以及最近绑定时的扫描生命周期代次。 */
+const scanTasksByOrder = new Map<string, Set<string>>()
+const scanOrderGeneration = new Map<string, number>()
+/** 面板创建 promise → 发请求时携带的 orderId（null 表示未带单号），用于 .then 精确绑定。 */
+const pendingScanPromiseOrder = new WeakMap<Promise<unknown>, string | null>()
 
 export function markScanPanelOrderRejected(orderId: string | null | undefined): void {
   if (orderId) panelRejectedOrderIds.add(orderId)
@@ -83,10 +92,61 @@ export function wasScanPanelOrderRejected(orderId: string | null | undefined): b
   return Boolean(orderId && panelRejectedOrderIds.has(orderId))
 }
 
+export function rememberPendingScanPromiseOrder(promise: Promise<unknown>, orderId: string | null): void {
+  pendingScanPromiseOrder.set(promise, orderId && orderId.trim() ? orderId.trim() : null)
+}
+
+export function readPendingScanPromiseOrder(promise: Promise<unknown> | null): string | null {
+  if (!promise) return null
+  return pendingScanPromiseOrder.get(promise) ?? null
+}
+
+/** 建会话成功拿到 scanTaskId 时记下本趟订单归属（orderId=null 表示明确未付新建）。 */
+export function recordScanTaskOrder(taskId: string, orderId: string | null): void {
+  const trimmedTask = taskId.trim()
+  if (!trimmedTask) return
+  const normalizedOrder = orderId && orderId.trim() ? orderId.trim() : null
+  scanTaskOrderByTask.set(trimmedTask, normalizedOrder)
+  if (normalizedOrder) {
+    let tasks = scanTasksByOrder.get(normalizedOrder)
+    if (!tasks) {
+      tasks = new Set<string>()
+      scanTasksByOrder.set(normalizedOrder, tasks)
+    }
+    tasks.add(trimmedTask)
+    scanOrderGeneration.set(normalizedOrder, scanLifecycleGeneration())
+  }
+}
+
+export function buildScanOrderOwnershipContext(
+  orderId: string,
+  taskId?: string | null,
+): ScanOrderOwnershipContext {
+  const normalizedTask = taskId && taskId.trim() ? taskId.trim() : null
+  const boundOrderId = normalizedTask && scanTaskOrderByTask.has(normalizedTask)
+    ? scanTaskOrderByTask.get(normalizedTask)
+    : undefined
+  const orderTasks = scanTasksByOrder.get(orderId)
+  const orderBoundToOtherTask = Boolean(
+    orderTasks && orderTasks.size > 0 && (!normalizedTask || !orderTasks.has(normalizedTask)),
+  )
+  const recordedGen = scanOrderGeneration.get(orderId)
+  const generationMatched = recordedGen !== undefined && recordedGen === scanLifecycleGeneration()
+  return {
+    taskId: normalizedTask,
+    boundOrderId,
+    generationMatched,
+    orderBoundToOtherTask,
+  }
+}
+
 function resetScanPayMemory(): void {
   clearScanDeviceAutoStartAfterPay()
   deviceAutoStartBlockedOrders.clear()
   panelRejectedOrderIds.clear()
+  scanTaskOrderByTask.clear()
+  scanTasksByOrder.clear()
+  scanOrderGeneration.clear()
 }
 
 subscribeKioskSensitiveSessionClear(resetScanPayMemory)
@@ -246,9 +306,11 @@ export function useScanPayState(options?: { enabled?: boolean }): ScanPayGateSta
 
 /**
  * 结果页读当前这一趟的扫描服务单。无单（不收费 / 没付过）时不发请求，页面保持一字不改。
+ * 核对当前扫描任务 ID 与本趟订单归属：若订单属于旧已结案单、不匹配当前任务或当前任务未付新建，
+ * 一律不返回旧单并清理已终结旧 trip，绝不串金额。
  * 失败结果页传入 pollWhileSettling=true，服务端清扫从 consumed/refunding 落定时自动刷新文案。
  */
-export function useScanTripOrder(options?: { pollWhileSettling?: boolean }): {
+export function useScanTripOrder(options?: { pollWhileSettling?: boolean; taskId?: string | null }): {
   trip: ServiceTrip | null
   order: ServiceOrderView | null
   loading: boolean
@@ -256,6 +318,7 @@ export function useScanTripOrder(options?: { pollWhileSettling?: boolean }): {
   const { user } = useAuth()
   const endUserId = user?.id ?? null
   const pollWhileSettling = options?.pollWhileSettling === true
+  const taskId = options?.taskId ?? null
   const [trip, setTrip] = useState<ServiceTrip | null>(() => (
     API_MODE === 'http' && getTerminalId()
       ? readServiceTrip('scan', { owner: serviceTripOwnerFor(endUserId) })
@@ -288,6 +351,16 @@ export function useScanTripOrder(options?: { pollWhileSettling?: boolean }): {
       try {
         const view = await getServiceOrder(currentTrip.orderId, currentTrip.kioskSessionId)
         if (stale) return
+        const ownership = buildScanOrderOwnershipContext(view.id, taskId)
+        if (!scanOrderBelongsToScanTask(view, ownership)) {
+          if (scanOrderIsEndedForNewTrip(view, Date.now())) {
+            safeForgetScanTripById(currentTrip.orderId)
+            setTrip(null)
+          }
+          setOrder(null)
+          setLoading(false)
+          return
+        }
         setOrder(view)
         setLoading(false)
         if (pollWhileSettling && scanOrderNeedsSettlePoll(view) && polls < SETTLE_POLL_MAX) {
@@ -297,7 +370,7 @@ export function useScanTripOrder(options?: { pollWhileSettling?: boolean }): {
       } catch (error) {
         if (stale) return
         if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
-          forgetServiceTrip('scan', currentTrip.orderId)
+          safeForgetScanTripById(currentTrip.orderId)
           setTrip(null)
           setOrder(null)
         }
@@ -309,7 +382,7 @@ export function useScanTripOrder(options?: { pollWhileSettling?: boolean }): {
       stale = true
       window.clearTimeout(timer)
     }
-  }, [endUserId, pollWhileSettling])
+  }, [endUserId, pollWhileSettling, taskId])
 
   return { trip, order, loading }
 }

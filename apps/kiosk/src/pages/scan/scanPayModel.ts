@@ -168,11 +168,71 @@ export function scanFailedOrderNotice(
   return { kind: 'none', text: null }
 }
 
-/** 成功完成页取这一趟已付金额（分）。没付过、未扣款、已退款一律返回 null（完成页一字不改）。 */
-export function scanPaidAmountCentsForDone(view: ServiceOrderView | null): number | null {
+export interface ScanOrderOwnershipContext {
+  /** 当前扫描结果页对应的扫描任务 ID（取自 live.scanTaskId）。 */
+  taskId?: string | null
+  /**
+   * 建会话时为该 taskId 记下的服务单号：
+   * - string：该任务确实带这张单建成；
+   * - null：该任务明确未带服务单（未付/免费新建）；
+   * - undefined：内存里没有该任务的建单记录（重载或直达夹具）。
+   */
+  boundOrderId?: string | null
+  /** 该订单在当前扫描生命周期代次内有绑定记录。 */
+  generationMatched?: boolean
+  /** 该订单在内存里已绑定给其它扫描任务（不含当前 taskId）。 */
+  orderBoundToOtherTask?: boolean
+}
+
+function readOrderResourceId(view: ServiceOrderView): string | null {
+  const row = view as ServiceOrderView & { resourceId?: unknown; consumedRef?: unknown }
+  const raw = typeof row.resourceId === 'string'
+    ? row.resourceId
+    : typeof row.consumedRef === 'string'
+      ? row.consumedRef
+      : null
+  if (!raw) return null
+  const trimmed = raw.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+/**
+ * 核对查回来的服务单是否归属当前正在展示的这一趟扫描结果：
+ * - 订单带非空 resourceId/consumedRef 时，必须与当前 taskId 严格一致；
+ * - 当前 taskId 明确是未付新建（boundOrderId === null）或绑定了别的单号，绝不借用；
+ * - 订单在内存里已绑定给其它任务（不含当前 taskId），绝不借用；
+ * - 已结案旧单（consumed + settledAt）若无当前 taskId 或当前代次的归属证明，绝不借用。
+ */
+export function scanOrderBelongsToScanTask(
+  view: ServiceOrderView | null,
+  ctx?: ScanOrderOwnershipContext,
+): boolean {
+  if (!view) return false
+  if (!ctx) return true
+  const resourceId = readOrderResourceId(view)
+  if (resourceId !== null) {
+    return Boolean(ctx.taskId && resourceId === ctx.taskId)
+  }
+  if (ctx.taskId && ctx.boundOrderId === null) return false
+  if (ctx.taskId && typeof ctx.boundOrderId === 'string') {
+    return ctx.boundOrderId === view.id
+  }
+  if (ctx.orderBoundToOtherTask) return false
+  if (view.status === 'consumed' && Boolean(view.settledAt)) {
+    return ctx.generationMatched === true
+  }
+  return true
+}
+
+/** 成功完成页取这一趟已付金额（分）。没付过、未扣款、已退款或不归属当前扫描任务一律返回 null（完成页一字不改）。 */
+export function scanPaidAmountCentsForDone(
+  view: ServiceOrderView | null,
+  ctx?: ScanOrderOwnershipContext,
+): number | null {
   if (!view || view.amountCents <= 0) return null
-  if (view.status === 'consumed' || view.status === 'paid') return view.amountCents
-  return null
+  if (view.status !== 'consumed' && view.status !== 'paid') return null
+  if (ctx && !scanOrderBelongsToScanTask(view, ctx)) return null
+  return view.amountCents
 }
 
 /** 服务单是不是还在等后端清扫落定（失败结果页需要轻轮询）。 */

@@ -27,6 +27,7 @@ import {
   forgetScanServiceTrip,
   markScanDeviceAutoStartBlocked,
   readScanServiceHeaders,
+  recordScanTaskOrder,
 } from './useScanPayGate'
 
 const UNRESOLVED_MS = 60_000
@@ -165,6 +166,7 @@ async function run(input: DeviceStartRequest): Promise<void> {
     live,
     result: undefined,
   })
+  if (durable) recordScanTaskOrder(created.scanTaskId, serviceHeaders?.['x-service-order-id'] ?? null)
   bumpScanDeviceEpoch()
   input.onGoStage('progress')
   if (!durable) {

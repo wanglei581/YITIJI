@@ -14,7 +14,7 @@ import { scanPaidAmountCentsForDone } from './scanPayModel'
 import { type ScanStage } from './scanWorkbenchModel'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { beginDeviceScanAgain, readScanWorkbenchSession } from './scanWorkbenchSession'
-import { forgetScanServiceTrip, useScanTripOrder } from './useScanPayGate'
+import { buildScanOrderOwnershipContext, forgetScanServiceTrip, useScanTripOrder } from './useScanPayGate'
 import { useScanResultExits } from './useScanResultExits'
 import './styles/scan-device-flow.css'
 import './styles/scan-device-done.css'
@@ -32,9 +32,12 @@ export function ScanDeviceDonePage({ onGoStage }: { onGoStage?: (stage: ScanStag
   const fileId = file?.fileId ?? ''
   const material = session?.material ?? null
   const scanType = session?.scanType ?? 'document'
+  const scanTaskId = session?.live?.scanTaskId ?? null
   const exits = useScanResultExits({ file, scanType })
-  const { order } = useScanTripOrder()
-  const paidAmountCents = scanPaidAmountCentsForDone(order)
+  const { order } = useScanTripOrder({ taskId: scanTaskId })
+  const paidAmountCents = order
+    ? scanPaidAmountCentsForDone(order, buildScanOrderOwnershipContext(order.id, scanTaskId))
+    : null
   const [previewOpen, setPreviewOpen] = useState(false)
   const [owner, setOwner] = useState<Owner>(isLoggedIn ? 'checking' : 'guest')
 

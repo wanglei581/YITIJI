@@ -13,7 +13,7 @@ import { deriveOutcome, type ScanResultState } from './scanResultModel'
 import { scanShownText } from './scanShownText'
 import { type ScanStage } from './scanWorkbenchModel'
 import { readScanWorkbenchSession } from './scanWorkbenchSession'
-import { forgetScanServiceTrip, useScanTripOrder } from './useScanPayGate'
+import { buildScanOrderOwnershipContext, forgetScanServiceTrip, useScanTripOrder } from './useScanPayGate'
 import { useScanResultExits } from './useScanResultExits'
 import { useScanResultRescan } from './useScanResultRescan'
 import './styles/scan-pay.css'
@@ -62,7 +62,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   const closePreview = useCallback(() => setPreviewOpen(false), [])
   const [nowMs, setNowMs] = useState(() => Date.now())
 
-  const { order } = useScanTripOrder({ pollWhileSettling: isFailed })
+  const { order } = useScanTripOrder({ pollWhileSettling: isFailed, taskId: priorScanTaskId })
   useEffect(() => {
     setNowMs(Date.now())
     if (!isFailed || !order?.retryUntil) return undefined
@@ -73,7 +73,9 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   }, [isFailed, order?.retryUntil])
 
   const tripNotice = isFailed ? scanFailedOrderNotice(order, nowMs, outcome) : { kind: 'none' as const, text: null }
-  const paidAmountCents = isFailed ? null : scanPaidAmountCentsForDone(order)
+  const paidAmountCents = isFailed || !order
+    ? null
+    : scanPaidAmountCentsForDone(order, buildScanOrderOwnershipContext(order.id, priorScanTaskId))
 
   const { rescanAuthorized, safeRescanLost, handleRetry, handlePlainRestart } = useScanResultRescan({
     state, scanType, outcome, priorScanTaskId, priorControlToken, onGoStage,

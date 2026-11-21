@@ -40,7 +40,10 @@ import {
   forgetEndedScanTrip,
   forgetScanServiceTrip,
   markScanPanelOrderRejected,
+  readPendingScanPromiseOrder,
   readScanServiceHeaders,
+  recordScanTaskOrder,
+  rememberPendingScanPromiseOrder,
   useScanPayState,
   wasScanPanelOrderRejected,
 } from './useScanPayGate'
@@ -258,6 +261,7 @@ export function useScanSessionCreate(
          * 代次，而那条路径上执行环境还在，重放领回来的 child 会被当场撤掉，更干净。 */
         shouldContinue: () => !scanCleanupInProgress(),
       })
+      rememberPendingScanPromiseOrder(sessionPromiseRef.current, serviceHeaders?.['x-service-order-id'] ?? null)
       /* 把这一次创建交给收尾闸看着，连同身份快照。
        *
        * 清场发生在创建在飞的那一刻时，本机登记里还没有 live —— 闸从登记里读不到任何
@@ -357,6 +361,7 @@ export function useScanSessionCreate(
           ackRequestedForRef.current = created.scanTaskId
           setAckState('pending')
         }
+        recordScanTaskOrder(created.scanTaskId, readPendingScanPromiseOrder(sessionPromiseRef.current))
       })
       .catch((error: unknown) => {
         const code = errorCodeOf(error)
