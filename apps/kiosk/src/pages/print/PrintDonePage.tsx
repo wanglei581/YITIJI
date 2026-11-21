@@ -479,7 +479,7 @@ export function PrintDonePage() {
           orderNo={displayOrderNo}
           fileName={file?.name ?? null}
           paramLine={paramLine}
-          amountCents={amountCents}
+          money={outOfPaperMoneyOf(takeaway, amountCents)}
           helpLine={helpNeededLine(support)}
           canReportIssue={canReportIssue}
           isLoggedIn={isLoggedIn}
