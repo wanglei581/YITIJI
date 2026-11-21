@@ -68,6 +68,7 @@ export interface OptimizeBodyPanesProps {
   pricing: ResumeExportPricing | null
   pricingLoading: boolean
   blockedReason: string | null
+  machineCharged?: boolean
   savedToDocuments: boolean | undefined
   printNavigating: boolean
   titleBlocked: boolean
@@ -216,6 +217,7 @@ export function OptimizeBodyPanes(props: OptimizeBodyPanesProps) {
           pricing={pricing}
           pricingLoading={pricingLoading}
           blockedReason={blockedReason}
+          machineCharged={props.machineCharged}
           guest={!token}
           savedToDocuments={savedToDocuments}
           printNavigating={printNavigating}

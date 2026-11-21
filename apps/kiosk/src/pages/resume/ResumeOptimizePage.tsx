@@ -415,6 +415,7 @@ export function ResumeOptimizePage() {
           pricing={pricing.pricing}
           pricingLoading={pricing.loading}
           blockedReason={pricing.blockedReason}
+          machineCharged={tripCharge.machineCharged}
           savedToDocuments={savedToDocuments}
           printNavigating={printNavigating}
           titleBlocked={titleBlocked}

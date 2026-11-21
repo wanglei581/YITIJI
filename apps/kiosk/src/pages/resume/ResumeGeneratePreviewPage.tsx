@@ -45,6 +45,7 @@ import {
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
 import { GeneratePreviewCta, GeneratePreviewEmptyExits } from './GeneratePreviewChrome'
 import { ResumeGenerateAdvisor } from './components/ResumeGenerateQxChrome'
+import { RESUME_EXPORT_NO_EXTRA_COPY, useResumeTripCharge } from './useResumeTripCharge'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-preview-qx.css'
@@ -73,6 +74,7 @@ export function ResumeGeneratePreviewPage() {
   const restoreTaskId = !state?.result ? (stateTaskId ?? query.taskId ?? null) : null
   const access = { token, accessToken: undefined as string | undefined }
   const pricing = useResumeExportPricing(access, token)
+  const tripCharge = useResumeTripCharge()
   const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
   const summaryRef = useRef<HTMLTextAreaElement>(null)
   const pendingTitleFocus = useRef<string | null>(null)
@@ -373,6 +375,9 @@ export function ResumeGeneratePreviewPage() {
                 <span className="qx-rd-pending-why">{UNCONFIRMED_WHY}</span>
               </p>
             )}
+            {tripCharge.machineCharged && pricing.pricing?.mode === 'free' ? (
+              <p className="qx-rg-export-price" data-testid="resume-generate-export-no-extra">{RESUME_EXPORT_NO_EXTRA_COPY}</p>
+            ) : null}
             <div className="qxt-exits">
               <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={focusSummary}>改一段描述</button>
               <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={() => document.getElementById('resume-generate-preview-hints')?.scrollIntoView({ block: 'center' })}>
@@ -432,6 +437,7 @@ export function ResumeGeneratePreviewPage() {
             pricing={pricing.pricing}
             pricingLoading={pricing.loading}
             blockedReason={pricing.blockedReason}
+            machineCharged={tripCharge.machineCharged}
             guest={!token}
             synthetic={resolved.synthetic}
             printNavigating={printNavigating}

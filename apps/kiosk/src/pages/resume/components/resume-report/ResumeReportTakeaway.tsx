@@ -149,6 +149,8 @@ export function ResumeReportTakeaway(props: {
   onExportedChange?: (exported: boolean) => void
   /** 收费且这一趟尚未付款时，在「带走这份报告」卡内补充一行价格说明（稿 310 行）。 */
   optimizePriceNote?: string | null
+  /** 这台机器处于收费态：导出免费文案由「免费试运营」换成「导出不另收钱」。 */
+  machineCharged?: boolean
 }) {
   const startPrint = useStartPrintHandoff()
   const location = useLocation()
@@ -265,7 +267,7 @@ export function ResumeReportTakeaway(props: {
         data-charge-note={props.optimizePriceNote ? '1' : undefined}
       >
         <div className="rrp-take-h" data-testid="resume-report-takeaway-title">带走这份报告</div>
-        <ResumePricingBar pricing={pricing} loading={pricingLoading} blockedReason={blockedReason} />
+        <ResumePricingBar pricing={pricing} loading={pricingLoading} blockedReason={blockedReason} machineCharged={props.machineCharged} />
         <div className="rrp-export">
           {exported ? <TakeawayButton
             label={exportKind === 'change_list' ? '打印修改清单' : '打印这份报告'}

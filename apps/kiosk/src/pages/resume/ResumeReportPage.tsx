@@ -397,6 +397,7 @@ export function ResumeReportPage() {
               accessToken={accessToken}
               capture={isExportCaptureState(viewState) ? viewState : null}
               onExportedChange={setExportedNow}
+              machineCharged={tripCharge.machineCharged}
             /></LicenseLock> : <ResumeReportTakeaway
               key={`${viewState}:${taskId ?? ''}`}
               show
@@ -405,6 +406,7 @@ export function ResumeReportPage() {
               capture={isExportCaptureState(viewState) ? viewState : null}
               onExportedChange={setExportedNow}
               optimizePriceNote={needsPay ? diagnosisPriceNote(tripCharge.resumePriceCents) : null}
+              machineCharged={tripCharge.machineCharged}
             />}
             <p className="qxt-fine" id="resume-report-why">{why}</p>
           </>

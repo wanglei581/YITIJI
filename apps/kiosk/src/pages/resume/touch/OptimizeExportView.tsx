@@ -90,6 +90,7 @@ export function OptimizeExportView(props: {
   pricing: ResumeExportPricing | null
   pricingLoading: boolean
   blockedReason: string | null
+  machineCharged?: boolean
   guest: boolean
   savedToDocuments?: boolean
   printNavigating: boolean
@@ -130,10 +131,10 @@ export function OptimizeExportView(props: {
           isPdf={isPdf}
           onPrint={() => { if (props.contentBlocked) props.onContentBlocked?.(); else props.onPrint() }}
           onOpenPreview={props.onOpenPreview}
-          priceCopy={free ? '免费试运营，本单 0 元' : null}
+          priceCopy={free ? (props.machineCharged ? '导出不另收钱' : '免费试运营，本单 0 元') : null}
         />
       ) : (
-        <div className="qxt-pricebar"><ResumePricingBar pricing={props.pricing} loading={props.pricingLoading} blockedReason={props.blockedReason} /></div>
+        <div className="qxt-pricebar"><ResumePricingBar pricing={props.pricing} loading={props.pricingLoading} blockedReason={props.blockedReason} machineCharged={props.machineCharged} /></div>
       )}
       {props.exportError ? <p className="qxt-note" data-tone="bad" role="alert">{props.exportError}</p> : null}
       {props.showChangeList ? (
