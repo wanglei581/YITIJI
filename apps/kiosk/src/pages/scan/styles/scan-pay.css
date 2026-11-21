@@ -1,0 +1,37 @@
+/* 扫描按次付款说明条（稿 pay-1113.js .py-bar.on）与金额不换行（.py-keep）。
+   只挂在 data-qx-page='scan-workbench'，不改 .qxt-* 默认。 */
+
+[data-qx-page='scan-workbench'] .fs-pay-bar {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='scan-workbench'] .fs-pay-bar b {
+  font: 800 26px/1.25 var(--qx-sans);
+  color: var(--qx-deep, var(--qxt-deep-2));
+}
+
+[data-qx-page='scan-workbench'] .fs-pay-bar span {
+  font-size: 20px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .fs-pay-keep {
+  white-space: nowrap;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .fs-pay-bar b {
+  font-size: 18px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .fs-pay-bar span {
+  font-size: 14px;
+}
