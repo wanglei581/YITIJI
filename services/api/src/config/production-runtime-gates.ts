@@ -350,6 +350,16 @@ function encodingAesKeyOk(value: string): boolean {
   return key.length === 32
 }
 
+/** 按订单自身的 env（0 现网 / 1 沙箱）选对应环境的 AppKey。绝不拿另一环境的键代签。 */
+export function resolveMiniappVirtualPayAppKeyForEnv(
+  orderEnv: number,
+  env: ProductionRuntimeEnv = process.env,
+): string | null {
+  if (orderEnv === 0) return trimmedEnv(env.WECHAT_MINIAPP_VPAY_APP_KEY) || null
+  if (orderEnv === 1) return trimmedEnv(env.WECHAT_MINIAPP_VPAY_SANDBOX_APP_KEY) || null
+  return null
+}
+
 /**
  * 虚拟支付能不能调微信。不抛异常，也不看数据库开关。
  * 生产用沙箱（env=1）或任一变量缺失，都是功能失败关闭。

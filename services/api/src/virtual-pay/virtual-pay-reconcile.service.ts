@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
 import { AuditService } from '../audit/audit.service'
-import { evaluateMiniappVirtualPayRuntime } from '../config/production-runtime-gates'
+import {
+  evaluateMiniappVirtualPayRuntime,
+  resolveMiniappVirtualPayAppKeyForEnv,
+} from '../config/production-runtime-gates'
 import { MiniappAccessTokenService } from '../miniapp-access-token/miniapp-access-token.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { confirmPaid } from './virtual-pay-delivery'
@@ -68,16 +71,15 @@ export class VirtualPayReconcileService {
       return
     }
     for (const order of due) {
-      await this.reconcileOrder(order, runtime.appKey, token, false, fetchImpl)
+      await this.reconcileOrder(order, token, false, fetchImpl)
     }
     for (const order of expired) {
-      await this.reconcileOrder(order, runtime.appKey, token, true, fetchImpl)
+      await this.reconcileOrder(order, token, true, fetchImpl)
     }
   }
 
   private async reconcileOrder(
     order: PendingOrder,
-    appKey: string,
     token: string,
     expired: boolean,
     fetchImpl: typeof fetch,
@@ -87,10 +89,15 @@ export class VirtualPayReconcileService {
       if (expired) await this.close(order.id)
       return
     }
+    const orderAppKey = resolveMiniappVirtualPayAppKeyForEnv(order.env)
+    if (!orderAppKey) {
+      await this.diagnose('app_key_missing', order.outTradeNo)
+      return
+    }
     const openId = order.openId
     let outcome: 'paid' | 'unpaid' | 'close' | 'mismatch' | 'error'
     try {
-      outcome = await this.queryOne({ ...order, openId }, appKey, token, fetchImpl)
+      outcome = await this.queryOne({ ...order, openId }, orderAppKey, token, fetchImpl)
     } catch {
       await this.diagnose('query_failed', order.outTradeNo)
       return
