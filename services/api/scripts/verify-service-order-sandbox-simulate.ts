@@ -20,6 +20,7 @@ process.env['SANDBOX_PAYMENT_SECRET'] = 'verify-service-orders-sandbox-secret'
 process.env['JWT_SECRET'] = 'verify-service-orders-jwt-secret-0123456789'
 
 import assert from 'node:assert/strict'
+import type { PaymentProvider, PaymentQueryResult } from '../src/payment/payment-provider.types'
 import { newProviderOrderNo } from '../src/payment/service-order.payment'
 import {
   DEMO_PRICES,
@@ -38,9 +39,10 @@ async function createOrder(fx: ServiceOrderFixture, serviceKey: 'resume_optimize
   return String(made.json.data?.['id'])
 }
 
-async function readOrder(fx: ServiceOrderFixture, id: string): Promise<Record<string, unknown>> {
-  const got = await fx.call('GET', `/api/v1/kiosk/service-orders/${id}`, undefined, fx.termHeaders(TERM_CHARGE, fx.chargeToken, fx.chargeSession))
-  fx.expectStatus(got, 200, `查单 ${id}`)
+async function readOrder(fx: ServiceOrderFixture, id: string, refresh = false): Promise<Record<string, unknown>> {
+  const query = refresh ? '?refresh=1' : ''
+  const got = await fx.call('GET', `/api/v1/kiosk/service-orders/${id}${query}`, undefined, fx.termHeaders(TERM_CHARGE, fx.chargeToken, fx.chargeSession))
+  fx.expectStatus(got, 200, `查单 ${id}${query}`)
   return got.json.data ?? {}
 }
 
@@ -151,6 +153,119 @@ async function cases(fx: ServiceOrderFixture): Promise<void> {
   fx.expectStatus(failedAgain, 200, '再模拟付失败一次')
   assert.equal((await readOrder(fx, failedOrder))['paymentFailed'], true)
   pass('模拟付失败：paymentFailed 且仍是待付；再来一次结果不变')
+
+  // ── 服务端已过 expiresAt 但清扫尚未关单时，refresh=1 必须照常向渠道核实 ──
+  const expiredPaidWechat = await fx.prisma.serviceOrder.create({
+    data: {
+      terminalId: TERM_CHARGE,
+      serviceKey: 'resume_optimize',
+      amountCents: DEMO_PRICES.resume_optimize,
+      status: 'pending',
+      kioskSessionId: fx.chargeSession,
+      provider: 'wechat',
+      providerOrderNo: newProviderOrderNo(),
+      prepayId: 'wx-prepay-expired-paid',
+      expiresAt: new Date(Date.now() - 10_000),
+    },
+  })
+  const expiredProbeWechat = await fx.prisma.serviceOrder.create({
+    data: {
+      terminalId: TERM_CHARGE,
+      serviceKey: 'resume_optimize',
+      amountCents: DEMO_PRICES.resume_optimize,
+      status: 'pending',
+      kioskSessionId: fx.chargeSession,
+      provider: 'wechat',
+      providerOrderNo: newProviderOrderNo(),
+      prepayId: 'wx-prepay-expired-probe',
+      expiresAt: new Date(Date.now() - 10_000),
+    },
+  })
+  const expiredSandbox = await fx.prisma.serviceOrder.create({
+    data: {
+      terminalId: TERM_CHARGE,
+      serviceKey: 'resume_optimize',
+      amountCents: DEMO_PRICES.resume_optimize,
+      status: 'pending',
+      kioskSessionId: fx.chargeSession,
+      provider: 'sandbox',
+      providerOrderNo: newProviderOrderNo(),
+      prepayId: 'sbx-prepay-expired',
+      expiresAt: new Date(Date.now() - 10_000),
+    },
+  })
+
+  let queryCalls = 0
+  let queryHandler: () => Promise<PaymentQueryResult> = async () => ({
+    status: 'paid',
+    channelTxnNo: 'wx_txn_expired_paid_001',
+    amountCents: DEMO_PRICES.resume_optimize,
+  })
+  const wechatStub = {
+    channel: 'wechat',
+    async queryPayment() {
+      queryCalls += 1
+      return queryHandler()
+    },
+  } as unknown as PaymentProvider
+  const prevGet = fx.registry.get.bind(fx.registry)
+  fx.registry.get = ((channel: string) => (channel === 'wechat' ? wechatStub : prevGet(channel))) as typeof fx.registry.get
+  try {
+    // ① 过期待付 + refresh=1，渠道返回 paid → 必须调用 queryPayment，订单变 paid 且 checking:false
+    const expiredPaidView = await readOrder(fx, expiredPaidWechat.id, true)
+    assert.ok(queryCalls >= 1, '已过 expiresAt 的待付单 refresh=1 必须调用 provider.queryPayment')
+    assert.equal(expiredPaidView['status'], 'paid', '渠道已付的过期单必须落为 paid')
+    assert.equal(expiredPaidView['checking'], false, '确认已付后 checking 必须为 false')
+    assert.equal((await fx.loadOrder(expiredPaidWechat.id)).channelTxnNo, 'wx_txn_expired_paid_001')
+
+    // ②a 渠道查询抛错 → 返回 200 + pending + checking:true（绝不把查不到当已确认未付）
+    const callsBeforeThrow = queryCalls
+    queryHandler = async () => { throw new Error('wechat query timeout') }
+    const throwView = await readOrder(fx, expiredProbeWechat.id, true)
+    assert.equal(queryCalls, callsBeforeThrow + 1)
+    assert.equal(throwView['status'], 'pending')
+    assert.equal(throwView['checking'], true, '渠道查询抛错时必须保持 checking:true')
+
+    // ②b 渠道返回 unknown → 返回 200 + pending + checking:true
+    const callsBeforeUnknown = queryCalls
+    queryHandler = async () => ({ status: 'unknown', channelTxnNo: null, amountCents: null })
+    const unknownView = await readOrder(fx, expiredProbeWechat.id, true)
+    assert.equal(queryCalls, callsBeforeUnknown + 1)
+    assert.equal(unknownView['status'], 'pending')
+    assert.equal(unknownView['checking'], true, '渠道返回 unknown 时必须保持 checking:true')
+
+    // ③ 渠道明确返回 pending（NOTPAY，且单已过 expiresAt）→ 返回 200 + pending + checking:false
+    const callsBeforePending = queryCalls
+    queryHandler = async () => ({ status: 'pending', channelTxnNo: null, amountCents: null })
+    const pendingExpiredView = await readOrder(fx, expiredProbeWechat.id, true)
+    assert.equal(queryCalls, callsBeforePending + 1)
+    assert.equal(pendingExpiredView['status'], 'pending')
+    assert.equal(pendingExpiredView['checking'], false, '渠道明确未付且已过 expiresAt 时应返回 checking:false')
+
+    // 附：未过期微信单查得 pending 保持 checking:true；过期单查得 closed/failed → checking:false；沙箱过期 → checking:false
+    queryHandler = async () => ({ status: 'pending', channelTxnNo: null, amountCents: null })
+    const unexpiredPendingView = await readOrder(fx, wechatRow.id, true)
+    assert.equal(unexpiredPendingView['status'], 'pending')
+    assert.equal(unexpiredPendingView['checking'], true, '未过期微信单查得 pending 仍保持 checking:true')
+
+    queryHandler = async () => ({ status: 'closed', channelTxnNo: null, amountCents: null })
+    const closedExpiredView = await readOrder(fx, expiredProbeWechat.id, true)
+    assert.equal(closedExpiredView['status'], 'pending')
+    assert.equal(closedExpiredView['checking'], false, '渠道返回 closed 时 checking 必须为 false')
+
+    queryHandler = async () => ({ status: 'failed', channelTxnNo: null, amountCents: null })
+    const failedExpiredView = await readOrder(fx, expiredProbeWechat.id, true)
+    assert.equal(failedExpiredView['status'], 'pending')
+    assert.equal(failedExpiredView['paymentFailed'], true, '渠道返回 failed 必须标 paymentFailed:true')
+    assert.equal(failedExpiredView['checking'], false, '渠道返回 failed 时 checking 必须为 false')
+
+    const expiredSandboxView = await readOrder(fx, expiredSandbox.id, true)
+    assert.equal(expiredSandboxView['status'], 'pending')
+    assert.equal(expiredSandboxView['checking'], false, '沙箱单已过 expiresAt 仍待付应返回 checking:false')
+  } finally {
+    fx.registry.get = prevGet
+  }
+  pass('过期待付 refresh=1 三态：paid 入账、抛错/unknown 保持 checking:true、明确未付/沙箱过期返回 checking:false')
 }
 
 async function main(): Promise<void> {

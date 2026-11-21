@@ -49,6 +49,8 @@ interface FlowState {
   error: unknown
   /** 服务端最新视图处于核实中（checking:true）；收到 checking:false 时立即复位。 */
   checking: boolean
+  /** 本地已过 expiresAt 后已发过 refresh=1 且服务端仍返回 checking:true，需保持续查。 */
+  postExpiryChecking: boolean
   /** 轮询遇到 429 限流，当前正按 Retry-After 或退避间隔等待下一次核对。 */
   rateLimited: boolean
 }
@@ -64,7 +66,15 @@ export interface PayFlow extends FlowState {
   onStart: () => void
 }
 
-const INITIAL: FlowState = { screen: 'loading', order: null, phase: null, error: null, checking: false, rateLimited: false }
+const INITIAL: FlowState = {
+  screen: 'loading',
+  order: null,
+  phase: null,
+  error: null,
+  checking: false,
+  postExpiryChecking: false,
+  rateLimited: false,
+}
 const WAITING: ReadonlySet<PayScreen> = new Set(['wait', 'check'])
 
 function isRateLimitedError(error: unknown): boolean {
@@ -104,17 +114,27 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     // 剩余时间按这一刻算：进屏到出码之间隔了一两秒，沿用挂载时的时刻会多写一秒（5:01）。
     setNowMs(now)
     const phase = serviceOrderPhase(view, now)
-    setState(() => {
+    const expired = serviceOrderExpiredLocally(view, now)
+    setState((prev) => {
       // 本地已到点但本次不是 refresh=1 核实、且服务端尚未关单（仍是 pending 无失败）：
-      // 不让普通轮询抢先判 timeout，先留核实态等到点那一次 refresh=1 落定。
+      // 不让普通轮询抢先判 timeout，先留核实态等到点或续查的 refresh=1 落定。
       if (phase === 'timed_out' && view.status === 'pending' && !fromRefresh) {
-        return { screen: 'check', order: view, phase: 'checking', error: null, checking: true, rateLimited: false }
+        return {
+          screen: 'check',
+          order: view,
+          phase: 'checking',
+          error: null,
+          checking: true,
+          postExpiryChecking: prev.postExpiryChecking,
+          rateLimited: false,
+        }
       }
-      // checking 严格跟随服务端最新视图：普通查单返回 checking:false 时立即复位，不粘滞假核实。
+      // checking 严格跟随服务端最新视图：未过期期间普通查单返回 checking:false 立即复位回 wait，不粘滞假核实。
       const checking = phase === 'checking'
+      const postExpiryChecking = checking && expired && (fromRefresh || prev.postExpiryChecking)
       const mapped = screenForPhase(phase)
       const screen: PayScreen = mapped === 'renew' ? 'timeout' : WAITING.has(mapped) ? (checking ? 'check' : 'wait') : mapped
-      return { screen, order: view, phase, error: null, checking, rateLimited: false }
+      return { screen, order: view, phase, error: null, checking, postExpiryChecking, rateLimited: false }
     })
   }, [])
 
@@ -193,7 +213,15 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         if (!retired.ok) {
           tripRef.current = stored
           orderRef.current = view
-          setState({ screen: 'close_failed', order: view, phase: serviceOrderPhase(view, Date.now()), error: retired.error, checking: false, rateLimited: false })
+          setState({
+            screen: 'close_failed',
+            order: view,
+            phase: serviceOrderPhase(view, Date.now()),
+            error: retired.error,
+            checking: false,
+            postExpiryChecking: false,
+            rateLimited: false,
+          })
           return
         }
       } catch (error) {
@@ -232,8 +260,14 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     getLogRef.current = log
     if (log.length >= PAY_GET_CAP_PER_MINUTE) return { nextDelayMs: PAY_POLL_MS, sent: false }
     const sinceRefresh = now - lastRefreshRef.current
-    const provider = orderRef.current?.provider
-    const refresh = manual ? sinceRefresh >= PAY_REFRESH_GAP_MS : provider !== 'sandbox' && sinceRefresh >= PAY_AUTO_REFRESH_GAP_MS
+    const order = orderRef.current
+    const provider = order?.provider
+    const postExpiry = order !== null && serviceOrderExpiredLocally(order, now)
+    const refresh = manual
+      ? sinceRefresh >= PAY_REFRESH_GAP_MS
+      : postExpiry
+        ? sinceRefresh >= PAY_REFRESH_GAP_MS
+        : provider !== 'sandbox' && sinceRefresh >= PAY_AUTO_REFRESH_GAP_MS
     if (refresh) lastRefreshRef.current = now
     log.push(now)
     const gen = genRef.current
@@ -278,7 +312,8 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
   const expiredLocally = WAITING.has(state.screen) && state.order !== null && serviceOrderExpiredLocally(state.order, nowMs)
   // 本地倒计时归零时先保持核实态向服务端发一次 refresh=1，不直接切 timeout。
   const view: PayScreen = expiredLocally ? 'check' : state.screen
-  const polling = WAITING.has(state.screen) && !expiredLocally
+  // 已过 expiresAt 且经 refresh=1 收到服务端 checking:true 时保持轮询续查，不关死轮询。
+  const polling = WAITING.has(state.screen) && (!expiredLocally || state.postExpiryChecking)
 
   useEffect(() => {
     if (!polling) return undefined

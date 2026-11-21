@@ -213,7 +213,7 @@ export function closeServiceOrder(orderId: string, kioskSessionId: string): Prom
 export type ServiceOrderPhase =
   /** 待付：pending，本地还没过 expiresAt，渠道也没说失败。 */
   | 'awaiting'
-  /** 核实中：同上，但服务端刚向渠道查过、还没确认到账（checking:true）。 */
+  /** 核实中：pending 且未失败，服务端刚向渠道查过、还没确认到账（checking:true，即使本地时钟已过 expiresAt 也不抢判超时）。 */
   | 'checking'
   /** 付成，一次都还没用。 */
   | 'paid'
@@ -255,8 +255,9 @@ export function serviceOrderPhase(view: ServiceOrderView, nowMs: number): Servic
   switch (view.status) {
     case 'pending':
       if (view.paymentFailed) return 'not_paid'
+      if (view.checking) return 'checking'
       if (serviceOrderExpiredLocally(view, nowMs)) return 'timed_out'
-      return view.checking ? 'checking' : 'awaiting'
+      return 'awaiting'
     case 'paid':
       if (view.attemptsUsed === 0) return 'paid'
       return canRetryServiceOrderFree(view, nowMs) ? 'retry_free' : 'retry_expired'
