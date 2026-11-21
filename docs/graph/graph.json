@@ -2667,6 +2667,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -2688,6 +2689,7 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -3673,6 +3675,7 @@
         "method": "GET",
         "models": [
           "AuditLog",
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -8597,6 +8600,7 @@
         "handler": "KioskInvoiceSessionsController.create",
         "method": "POST",
         "models": [
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -8615,6 +8619,7 @@
         "handler": "KioskInvoiceSessionsController.poll",
         "method": "GET",
         "models": [
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -8633,6 +8638,7 @@
         "handler": "KioskInvoiceSessionsController.submit",
         "method": "POST",
         "models": [
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -8651,6 +8657,7 @@
         "handler": "KioskInvoiceSessionsController.resolve",
         "method": "POST",
         "models": [
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -9504,6 +9511,7 @@
         "handler": "MemberInvoiceController.list",
         "method": "GET",
         "models": [
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -9522,6 +9530,7 @@
         "handler": "MemberInvoiceController.create",
         "method": "POST",
         "models": [
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -9540,6 +9549,7 @@
         "handler": "MemberInvoiceController.getOne",
         "method": "GET",
         "models": [
+          "EndUser",
           "InvoiceRequest",
           "Order",
           "ServiceOrder"
@@ -19649,6 +19659,7 @@
           "services/api/src/common/auth/optional-end-user.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/common/guards/optional-end-user-auth.guard.ts",
+          "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/member-auth/member-auth.service.ts",
           "services/api/src/member-auth/member-phone-rebind.service.ts",
           "services/api/src/member-auth/member-restore.service.ts",
@@ -19940,6 +19951,7 @@
         "usedBy": [
           "services/api/src/invoices/admin-invoice.service.ts",
           "services/api/src/invoices/invoice-email-retention.ts",
+          "services/api/src/invoices/invoice-privacy.test.ts",
           "services/api/src/invoices/invoice-requests.service.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
@@ -26894,6 +26906,7 @@
       "services/api/scripts/verify-ai-usage-retention.ts"
     ],
     "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql": [
+      "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-http-exception-filter.ts"
     ],
     "services/api/prisma/postgres/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql": [
@@ -30844,6 +30857,7 @@
       "services/api/scripts/verify-member-restore.ts"
     ],
     "services/api/src/member-privacy/member-closure-retention.ts": [
+      "services/api/scripts/verify-invoice-real-db.ts",
       "services/api/scripts/verify-member-closure.ts"
     ],
     "services/api/src/member-privacy/member-closure.service.ts": [
@@ -44249,6 +44263,7 @@
           "services/api/prisma/postgres/migrations"
         ],
         "files": [
+          "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql",
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
           "services/api/src/prisma/create-client.ts"
@@ -44615,6 +44630,7 @@
           "services/api/src/invoices/admin-invoice.service.ts",
           "services/api/src/invoices/invoice-member-list.ts",
           "services/api/src/invoices/invoice-requests.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []

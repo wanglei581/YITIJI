@@ -87,7 +87,7 @@ flowchart TD
 | **ContractReviewTask** | 30 | EndUser | 8 个文件<br/>`contract-review/__tests__/contract-review-orchestrator.test.ts`<br/>`contract-review/contract-review-lifecycle.service.ts`<br/>`contract-review/contract-review-orchestrator.service.ts`<br/>… |
 | **CopyJob** | 21 | Order | 7 个文件<br/>`admin-print-scan/admin-fulfillment-lists.ts`<br/>`copy-jobs/copy-agent.service.ts`<br/>`copy-jobs/copy-authorization.ts`<br/>… |
 | **DocumentProcessTask** | 19 | EndUser、FileObject、PiiFinding | 6 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`materials/materials-manual-confirmation.service.ts`<br/>`materials/materials.service.ts`<br/>… |
-| **EndUser** | 35 | AiResumeResult、AiServiceLog、AiUsageRecord、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、InvoiceRequest、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、PrintTask、ScanTask、UserAiConsent、UserDataRequest | 15 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
+| **EndUser** | 35 | AiResumeResult、AiServiceLog、AiUsageRecord、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、InvoiceRequest、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、PrintTask、ScanTask、UserAiConsent、UserDataRequest | 16 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
 | **ExternalJumpLog** | 13 | EndUser | 6 个文件<br/>`activity/activity.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/resume/fair-visit-plan.service.ts`<br/>… |
 | **FairCompany** | 22 | FairCompanyPosition、FairVenueHallCompany、JobFair | 8 个文件<br/>`activity/activity.service.ts`<br/>`companies/companies.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **FairCompanyBooth** | 9 | — | **无代码读写** |
@@ -107,7 +107,7 @@ flowchart TD
 | **HelpItem** | 8 | — | **无代码读写** |
 | **ImportBatch** | 17 | ImportRecord、JobSource | 2 个文件<br/>`jobs/jobs-admin.service.ts`<br/>`jobs/jobs-excel.service.ts` |
 | **ImportRecord** | 10 | ImportBatch | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
-| **InvoiceRequest** | 18 | EndUser | 5 个文件<br/>`invoices/admin-invoice.service.ts`<br/>`invoices/invoice-email-retention.ts`<br/>`invoices/invoice-requests.service.ts`<br/>… |
+| **InvoiceRequest** | 18 | EndUser | 6 个文件<br/>`invoices/admin-invoice.service.ts`<br/>`invoices/invoice-email-retention.ts`<br/>`invoices/invoice-privacy.test.ts`<br/>… |
 | **Job** | 47 | CompanyProfile、JobAiRecommendation、JobApplication、JobDataQualitySnapshot、JobSource、OfflineAgencyBranch、OfflineJob、Organization | 21 个文件<br/>`activity/activity.service.ts`<br/>`ai/resume/job-fit.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **JobAiRecommendation** | 12 | Job、JobAiSession | 3 个文件<br/>`job-ai/governed-job-fit.service.ts`<br/>`job-ai/job-ai.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **JobAiSession** | 14 | EndUser、JobAiRecommendation | 5 个文件<br/>`ai/ai-result.cleanup.task.ts`<br/>`job-ai/governed-job-fit.service.ts`<br/>`job-ai/job-ai.service.ts`<br/>… |

@@ -525,26 +525,26 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/admin/invoice-requests/:id/issue` | AdminInvoiceController.issue | admin | AdminInvoiceService | AuditLog<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
-| POST | `/api/v1/admin/invoice-requests/:id/return` | AdminInvoiceController.returnRequest | admin | AdminInvoiceService | AuditLog<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
-| GET | `/api/v1/admin/orders/:id/invoice` | AdminInvoiceController.getByOrder | admin | AdminInvoiceService | AuditLog<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/admin/invoice-requests/:id/issue` | AdminInvoiceController.issue | admin | AdminInvoiceService | AuditLog<br/>EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/admin/invoice-requests/:id/return` | AdminInvoiceController.returnRequest | admin | AdminInvoiceService | AuditLog<br/>EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| GET | `/api/v1/admin/orders/:id/invoice` | AdminInvoiceController.getByOrder | admin | AdminInvoiceService | AuditLog<br/>EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
 
 ## `services/api/src/invoices/kiosk-invoice-sessions.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/invoice-sessions` | KioskInvoiceSessionsController.create | — | InvoiceSessionsService | InvoiceRequest<br/>Order<br/>ServiceOrder |
-| GET | `/api/v1/kiosk/invoice-sessions/:sessionId` | KioskInvoiceSessionsController.poll | — | InvoiceSessionsService | InvoiceRequest<br/>Order<br/>ServiceOrder |
-| POST | `/api/v1/kiosk/invoice-sessions/:sessionId/submit` | KioskInvoiceSessionsController.submit | — | InvoiceSessionsService | InvoiceRequest<br/>Order<br/>ServiceOrder |
-| POST | `/api/v1/kiosk/invoice-sessions/scene/resolve` | KioskInvoiceSessionsController.resolve | — | InvoiceSessionsService | InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/kiosk/invoice-sessions` | KioskInvoiceSessionsController.create | — | InvoiceSessionsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| GET | `/api/v1/kiosk/invoice-sessions/:sessionId` | KioskInvoiceSessionsController.poll | — | InvoiceSessionsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/kiosk/invoice-sessions/:sessionId/submit` | KioskInvoiceSessionsController.submit | — | InvoiceSessionsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/kiosk/invoice-sessions/scene/resolve` | KioskInvoiceSessionsController.resolve | — | InvoiceSessionsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
 
 ## `services/api/src/invoices/member-invoice.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/me/invoice-orders` | MemberInvoiceController.list | — | InvoiceRequestsService | InvoiceRequest<br/>Order<br/>ServiceOrder |
-| POST | `/api/v1/me/invoice-requests` | MemberInvoiceController.create | — | InvoiceRequestsService | InvoiceRequest<br/>Order<br/>ServiceOrder |
-| GET | `/api/v1/me/invoice-requests/:id` | MemberInvoiceController.getOne | — | InvoiceRequestsService | InvoiceRequest<br/>Order<br/>ServiceOrder |
+| GET | `/api/v1/me/invoice-orders` | MemberInvoiceController.list | — | InvoiceRequestsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| POST | `/api/v1/me/invoice-requests` | MemberInvoiceController.create | — | InvoiceRequestsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
+| GET | `/api/v1/me/invoice-requests/:id` | MemberInvoiceController.getOne | — | InvoiceRequestsService | EndUser<br/>InvoiceRequest<br/>Order<br/>ServiceOrder |
 
 ## `services/api/src/job-ai/job-ai.controller.ts`
 

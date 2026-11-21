@@ -2371,7 +2371,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/prisma/postgres/migrations/20260901090000_add_agent_release_observation/migration.sql` | `verify-release-observation-contract.mjs` |
 | `services/api/prisma/postgres/migrations/20260913210000_add_scan_input_lockout_telemetry/migration.sql` | `verify-scan-input-lockout-telemetry.ts` |
 | `services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql` | `verify-ai-usage-retention.ts` |
-| `services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql` | `verify-http-exception-filter.ts` |
+| `services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql` | `verify-first-order-migrations.ts`<br/>`verify-http-exception-filter.ts` |
 | `services/api/prisma/postgres/migrations/20261102090000_add_terminal_daily_free_print_sides/migration.sql` | `verify-free-print-quota.ts` |
 | `services/api/prisma/postgres/migrations/20261104150000_add_terminal_heartbeat_printer_queue/migration.sql` | `verify-terminal-printer-queue.ts` |
 | `services/api/prisma/postgres/migrations/20261111120000_add_terminal_heartbeat_print_completion/migration.sql` | `verify-print-completion-evidence.ts` |
@@ -3043,7 +3043,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/member-print-orders/pickup-code-reissue.service.ts` | `verify-member-closure.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-pickup-code-share.ts` |
 | `services/api/src/member-privacy/admin-member-privacy.controller.ts` | `verify-job-ai-privacy.ts`<br/>`verify-member-data-request-state-machine.ts` |
 | `services/api/src/member-privacy/member-closure-redis.service.ts` | `verify-member-closure.ts`<br/>`verify-member-restore.ts` |
-| `services/api/src/member-privacy/member-closure-retention.ts` | `verify-member-closure.ts` |
+| `services/api/src/member-privacy/member-closure-retention.ts` | `verify-invoice-real-db.ts`<br/>`verify-member-closure.ts` |
 | `services/api/src/member-privacy/member-closure.service.ts` | `verify-job-application-track.ts`<br/>`verify-member-closure.ts` |
 | `services/api/src/member-privacy/member-data-export-download.service.ts` | `verify-member-closure.ts`<br/>`verify-member-data-export-download.ts`<br/>`verify-member-data-request-truth.ts` |
 | `services/api/src/member-privacy/member-data-export-reconciler.service.ts` | `verify-member-data-export-download.ts`<br/>`verify-member-data-request-truth.ts` |
