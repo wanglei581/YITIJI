@@ -2,8 +2,14 @@ import { useSyncExternalStore } from 'react'
 import { createScanSession } from '../../services/api/scanTasks'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { getTerminalId } from '../../services/api/screensaver'
+import { errorCodeOf } from '../../services/api/userErrorMessage'
 import { postLocalScanCommand } from '../../services/scan/localScanApi'
 import { panelScanType, type ScanDeviceChoice, type ScanMaterial } from './scanMaterials'
+import {
+  SCAN_ORDER_IN_USE_NOTICE,
+  isScanOrderInUseError,
+  shouldReturnToScanPay,
+} from './scanPayModel'
 import { type ScanStage } from './scanWorkbenchModel'
 import {
   acknowledgeScanDelivery,
@@ -14,8 +20,10 @@ import { bumpScanDeviceEpoch } from './scanDeviceEpoch'
 import {
   patchScanWorkbenchSession,
   patchScanWorkbenchSessionWithDurableLive,
+  readScanWorkbenchSession,
   scanLifecycleGeneration,
 } from './scanWorkbenchSession'
+import { forgetScanServiceTrip, readScanServiceHeaders } from './useScanPayGate'
 
 const UNRESOLVED_MS = 60_000
 const UNRESOLVED_NOTICE = '状态未知。这一次没能确认有没有建成扫描，请先返回，过一会儿再试。不要再点开始。'
@@ -61,7 +69,9 @@ export interface DeviceStartRequest {
   material: ScanMaterial
   choice: ScanDeviceChoice
   memberToken: string | null
+  endUserId?: string | null
   onGoStage: (stage: ScanStage) => void
+  onNeedPay?: () => void
 }
 
 function holdUnresolved(): void {
@@ -92,6 +102,7 @@ export function beginDeviceScan(input: DeviceStartRequest): void {
 async function run(input: DeviceStartRequest): Promise<void> {
   const generation = scanLifecycleGeneration()
   const memberToken = input.memberToken
+  const serviceHeaders = readScanServiceHeaders(input.endUserId)
   let created: Awaited<ReturnType<typeof createScanSession>>
   try {
     created = await createScanSession({
@@ -100,11 +111,28 @@ async function run(input: DeviceStartRequest): Promise<void> {
       startMode: 'device',
       source: input.choice.source,
       colorMode: input.choice.colorMode,
-    }, memberToken)
+    }, memberToken, null, serviceHeaders)
   } catch (error) {
     if (scanLifecycleGeneration() !== generation) return
     if (error instanceof ApiHttpError && error.status === 0) {
       holdUnresolved()
+      return
+    }
+    if (isScanOrderInUseError(error)) {
+      // 409 SERVICE_ORDER_IN_USE：这一次已经在进行，绝不回付款屏、绝不让用户再付。
+      const current = readScanWorkbenchSession()
+      if (current?.live && current.deviceFlow) {
+        patchScanWorkbenchSession({ stage: 'progress' })
+        input.onGoStage('progress')
+        return
+      }
+      publish({ phase: 'starting', notice: SCAN_ORDER_IN_USE_NOTICE, locked: false })
+      return
+    }
+    if (shouldReturnToScanPay(error)) {
+      if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') forgetScanServiceTrip(input.endUserId)
+      publish({ phase: 'starting', notice: '', locked: false })
+      input.onNeedPay?.()
       return
     }
     publish({ phase: 'starting', notice: DEFINITE_NOTICE, locked: false })

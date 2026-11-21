@@ -30,7 +30,8 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
   const navigate = useNavigate()
   const cap = useScanDeviceCapability()
   const probe = useLocalScanProbe(true)
-  const { getToken } = useAuth()
+  const { getToken, user } = useAuth()
+  const endUserId = user?.id ?? null
   const pay = useScanPayState()
   const start = useScanDeviceStartState()
   const session = readScanWorkbenchSession()
@@ -69,9 +70,11 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
       material,
       choice,
       memberToken: getToken(),
+      endUserId,
       onGoStage: onGoStage ?? (() => undefined),
+      onNeedPay: goPay,
     })
-  }, [choice, getToken, material, onGoStage])
+  }, [choice, endUserId, getToken, goPay, material, onGoStage])
 
   useScanDevicePayResume({
     enabled: Boolean(material) && !recovery && !cap.loading && cap.allowed
@@ -131,7 +134,9 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
               material,
               choice,
               memberToken: getToken(),
+              endUserId,
               onGoStage: onGoStage ?? (() => undefined),
+              onNeedPay: goPay,
             })
           },
         },

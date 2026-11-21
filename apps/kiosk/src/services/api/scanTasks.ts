@@ -133,6 +133,7 @@ export async function createScanSession(
   input: ScanSessionCreateRequest,
   token?: string | null,
   rescan?: ScanRescanAuthorization | null,
+  extraHeaders?: Readonly<Record<string, string>> | null,
 ): Promise<ScanSessionCreateResponse> {
   const paired = assertPairedRescan(rescan)
   // body 按白名单重建：调用方传进来的 retryOfScanTaskId 一律不采信，
@@ -151,6 +152,13 @@ export async function createScanSession(
     body.colorMode = input.colorMode
   }
   const headers: Record<string, string> = {}
+  if (extraHeaders) {
+    for (const [key, value] of Object.entries(extraHeaders)) {
+      // 安全重扫头只能来自上面成对校验过的 rescan，绝不允许经可选头偷渡半对凭证。
+      if (key.toLowerCase() === SCAN_RETRY_CONTROL_HEADER.toLowerCase()) continue
+      if (value.trim().length > 0) headers[key] = value
+    }
+  }
   if (paired) {
     body.retryOfScanTaskId = paired.retryOfScanTaskId
     // 凭证只走 header：不进 body、不进 query string、不落任何浏览器存储、不进日志。

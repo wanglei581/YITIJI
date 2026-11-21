@@ -859,8 +859,8 @@ assert.equal(
 )
 assert.match(
   scanSettings,
-  /createScanSession\(\s*\n\s*\{ scanType, terminalId: getTerminalId\(\) \},\s*\n\s*identityToken,\s*\n\s*rescan,\s*\n\s*\)/,
-  '取到的授权必须真的传给创建请求；取了不传 = 白取一枚，重扫照旧退化。\n'
+  /createScanSession\(\s*\n\s*\{ scanType, terminalId: getTerminalId\(\) \},\s*\n\s*identityToken,\s*\n\s*rescan,\s*\n\s*serviceHeaders,\s*\n\s*\)/,
+  '取到的授权与这一趟服务单头必须真的传给创建请求；取了不传 = 白取一枚，重扫与重放照旧退化。\n'
     + '身份那一格必须是 identityToken（创建那一刻的快照），不是现取的 getToken()——见下一条。',
 )
 

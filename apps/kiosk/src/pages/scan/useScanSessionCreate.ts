@@ -1,11 +1,14 @@
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { getTerminalId } from '../../services/api/screensaver'
 import { createScanSession } from '../../services/api/scanTasks'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { payServicePath } from '../pay/payServiceModel'
 import { scanCleanupInProgress, trackScanSessionCreation } from './scanCleanupGate'
 import { replayCreateUntilOutcomeKnown } from './scanCreateReplay'
+import { isScanOrderInUseError, shouldReturnToScanPay } from './scanPayModel'
 import {
   classifyCreateFailure,
   isRescanRefusedByServer,
@@ -14,18 +17,22 @@ import {
 import {
   getCancellationCredentials,
   isValidCreatedSession,
+  liveSessionStillValid,
   SCAN_CLEANUP_HOLD_FAILURE,
   SCAN_LIVE_NOT_DURABLE_FAILURE,
 } from './scanSettingsModel'
 import { SCAN_TERMINAL_FAIL_COPY, scanShownText } from './scanShownText'
 import type { ScanType } from './scanWorkbench'
+import type { ScanStage } from './scanWorkbenchModel'
 import {
   discardTakenScanRescanAuthority,
   patchScanWorkbenchSessionWithDurableLive,
+  readScanWorkbenchSession,
   restoreScanRescanAuthority,
   scanLifecycleGeneration,
   takeScanRescanAuthority,
 } from './scanWorkbenchSession'
+import { forgetScanServiceTrip, readScanServiceHeaders } from './useScanPayGate'
 import type { ScanSettingsSession } from './useScanSettingsState'
 
 /**
@@ -43,10 +50,15 @@ import type { ScanSettingsSession } from './useScanSettingsState'
  * 它是 `useState` 的 setter，引用永远稳定，所以不改变这条 effect 何时重跑；补它只是因为
  * setter 现在经由交接值传进来，lint 认不出它是稳定的。
  */
-export function useScanSessionCreate(input: ScanSettingsSession & { scanType: ScanType | null }): void {
-  const { getToken } = useAuth()
+export function useScanSessionCreate(
+  input: ScanSettingsSession & { scanType: ScanType | null; onGoStage?: (stage: ScanStage) => void },
+): void {
+  const { getToken, user } = useAuth()
+  const navigate = useNavigate()
+  const endUserId = user?.id ?? null
   const {
     scanType,
+    onGoStage,
     terminalSession,
     rescanCredentialsLost, setRescanCredentialsLost,
     rescanRefusedByServer, setRescanRefusedByServer,
@@ -55,6 +67,7 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
     cleanupHolding,
     quietPeriodRemaining, setQuietPeriodRemaining,
     quietPeriodBlocked, setQuietPeriodBlocked,
+    setOrderInUse,
     setRescanRequested,
     setReplayingLostCreate,
     setLiveNotDurable,
@@ -193,12 +206,14 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
         return undefined
       }
       setRescanRequested(rescan !== null)
+      const serviceHeaders = readScanServiceHeaders(endUserId)
       /* 同一对请求的**唯一**发送口。重放必须复用这一个闭包 —— 另写一处调用就可能漏带
        * 那两半，而漏带的那一次是一个无签名的普通创建。 */
       const sendCreate = () => createScanSession(
         { scanType, terminalId: getTerminalId() },
         identityToken,
         rescan,
+        serviceHeaders,
       )
       /* 「结果未知」时把同一对请求重放到有答案为止（有界退避，只对配对请求）。
        * 服务端对配对创建是幂等的：重放拿回的是**同一条** child，不会多建一条。
@@ -344,6 +359,21 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
         if (rescanStillUsable) setRescanRetryable(true)
 
         if (cancelled) return
+        if (isScanOrderInUseError(error)) {
+          // 409 SERVICE_ORDER_IN_USE：这一次已经在进行，绝不回付款屏、绝不让用户再付。
+          const currentLive = readScanWorkbenchSession()?.live
+          if (liveSessionStillValid(currentLive)) {
+            onGoStage?.('progress')
+            return
+          }
+          setOrderInUse(true)
+        } else if (shouldReturnToScanPay(error)) {
+          // 402 或其它 SERVICE_*：回付款屏完成这一趟付款（404 旧单号先忘掉）。
+          if (code === 'SERVICE_ORDER_NOT_FOUND') forgetScanServiceTrip(endUserId)
+          sessionPromiseRef.current = null
+          navigate(payServicePath('scan', { next: 'settings', back: 'how' }), { replace: true })
+          return
+        }
         // 结论文案按失败码翻译，纯函数、不碰状态（scanRescanRecovery）。
         // 「服务端不认」那一支的授权已在上面丢弃，这里只负责把出路切成普通新会话。
         const verdict = classifyCreateFailure(error)
