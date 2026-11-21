@@ -253,6 +253,10 @@ async function mountFlowHarness({ initialOrder, onGet, storedTrip = null }) {
     )
     .replaceAll("from './payPollGuard'", `from '${guardUrl}'`)
     .replaceAll("from './payServiceModel'", `from '${modelUrl}'`)
+    .replaceAll(
+      "from './useMiniappCreditFlow'",
+      `from '${toDataUrl('export function useMiniappCreditFlow() { return { creditNotice: null, checkOwned: async () => false, onUseCredit: () => {} } }')}'`,
+    )
 
   const { usePayServiceFlow } = await import(toDataUrl(`${flowSrc}\n// ${envKey}`))
 

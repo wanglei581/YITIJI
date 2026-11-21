@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-11-21：小程序虚拟支付二期 P2d2（权益核销、失败退回与官方退款、后台页、一体机「手机上买过」，分支 `claude/miniapp-vpay-p2d2-1121`，未推送，未上线）
+
+- 来由：按任务包 P2d2 接在 `15f0b9e6c`（P2d1b3 + P2e-1c）之后完成小程序虚拟支付二期后端、管理员后台与一体机接线，保持所有开关默认关闭、仓库不放真实价格/道具 ID，且未触碰禁改目录与 `model ServiceOrder`。
+- ① 双库只增迁移 `20261121200000_virtual_pay_credit_use_refund`（SQLite + PostgreSQL 同步）：`VirtualPayOrder` 补 `refundOrderId`（`@unique`）、`wxRefundId`、`refundReason`、`refundedAt`；`MemberServiceCredit` 补非唯一索引列 `consumedServiceOrderId`；会员注销清理 `member-closure-retention.ts` 同步擦除 `VirtualPayOrder.refundReason`。`db:pg:sync:check`、`verify:first-order-migrations` 与空库 PG 16 `db:pg:deploy` + `migrate diff` 全绿。
+- ② 权益原子核销与失败/离场自动退回：`POST /api/v1/kiosk/service-orders/redeem-credit`（`VirtualPayCreditRedeemController/Service`）验终端会话+会员身份，公共点位/0 元机返 `409 SERVICE_FREE_ON_THIS_TERMINAL` 不扣权益，事务内 CAS 独占一条 `available` 权益并创建 `provider='miniapp_credit', amountCents=0, status='paid'` 的 `ServiceOrder`（写审计 `virtual_pay.credit_redeemed`）；`executeServiceOrderRefund` 加 3 行分派调 `restoreMiniappCreditForServiceOrder`，覆盖失败重试耗尽、主动取消、清场与机器中途改免费自动原子退回权益 `available`（绝不调微信 Native 退款）。PG 16 真 20 并发抢同一权益严格 1 成功 19 拒。
+- ③ 微信官方退款、推送与查单收敛及后台页：`VirtualPayRefundService` + `virtual-pay-xpay-refund.ts` + `virtual-pay-refund-notify.ts` + `virtual-pay-refund-reconcile.ts` 严格按核对表先 `query_order` 取 `left_fee`、事务先锁权益 `available→refunding` 并持久化同单可复用的 `refundOrderId`、`pay_sig` 签实际 body 且 `refund_reason`/`req_from` 为字符串、`refund_order` 受理保持 `refunding`、由 `xpay_refund_notify` 与 5 分钟定时查单收敛终态，拦拒超 365 天/已核销/注销无 `openId`，PG 16 10 轮退款 vs 核销并发竞态绝不同时成功；新增后台接口 `GET .../orders`、`:id`、`POST .../:id/refund`、`POST .../:id/sync`（仅 admin、零原始 `openId`）及 `docs/api/miniapp-virtual-pay.md`。管理员后台先拆出 `PersonalChargeSwitchCard.tsx`（`billing/index.tsx` 降至 396 行），新增「小程序虚拟支付」第 3 页签与 6 条审计中文标签，退款弹窗明示 iOS 需由用户向 App Store 申请。
+- ④ 一体机「手机上买过」`owned` 态接线：拆出 `useMiniappCreditFlow.ts` / `payCreditFlow.ts` / `virtualPayCredits.ts`（`usePayServiceFlow.ts` 480 行），`/pay/resume` 与 `/pay/interview` 照稿 `pay-1113.js:609-615` 展示「这次不用再付 / 手机上买过这一次 / 用这一次」，支持点击核销直通、并发被抢平滑切回现场扫码、机器变免费直通、查权益异常安静降级、`/pay/scan` 绝不查权益与 `miniapp_credit` 退回文案。Playwright `pay-service-owned.spec.ts` 7/7、既有 `pay-service.spec.ts` 26/26、`billing-virtual-pay.spec.ts` + `billing.spec.ts` 3/3 全绿；1080×1920 照稿并排对比图（`owned-resume` / `owned-interview`）paired 2/2。
+- ⑤ 全套验证：隔离端口 Redis 6674 / PG 16 5674 / API 3374 跑通 SQLite + PG 16 并发与全部既有回归，M1–M5 反向变异 0→1→0 逐字节还原复绿，改动/新增业务源码全部严格 `< 500` 行，图谱由生成器重生并通过 `--check`；所有隔离进程已停止，未推送，未上线。
+
 ## 2026-11-21：小程序微信虚拟支付后端极小收口返工 P2d1b3（分支 `claude/miniapp-vpay-p2d-1119`，未推送，未上线）
 
 - 来由：按 Codex 独立复收 `P2d1b2`（`f61d17b23`）复现出的 4 处阻塞/并发缺陷 + 1 处 XML 重复键收紧，接在 `f61d17b23` 之后逐项完成极小收口并提交（零新增数据库迁移）。

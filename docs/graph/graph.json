@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 700,
+    "endpointCount": 704,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -980,6 +980,82 @@
           "PlatformSetting"
         ],
         "path": "/api/v1/admin/billing/miniapp-virtual-pay/goods/:serviceKind",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-admin.service.ts"
+        ],
+        "services": [
+          "VirtualPayAdminService"
+        ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/virtual-pay-admin.controller.ts",
+        "handler": "VirtualPayAdminController.listOrders",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/billing/miniapp-virtual-pay/orders",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-admin.service.ts"
+        ],
+        "services": [
+          "VirtualPayAdminService"
+        ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/virtual-pay-admin.controller.ts",
+        "handler": "VirtualPayAdminController.getOrder",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/billing/miniapp-virtual-pay/orders/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-admin.service.ts"
+        ],
+        "services": [
+          "VirtualPayAdminService"
+        ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/virtual-pay-admin.controller.ts",
+        "handler": "VirtualPayAdminController.refundOrder",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/billing/miniapp-virtual-pay/orders/:id/refund",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/virtual-pay/virtual-pay-admin.service.ts"
+        ],
+        "services": [
+          "VirtualPayAdminService"
+        ]
+      },
+      {
+        "controller": "services/api/src/virtual-pay/virtual-pay-admin.controller.ts",
+        "handler": "VirtualPayAdminController.syncOrder",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "PlatformSetting"
+        ],
+        "path": "/api/v1/admin/billing/miniapp-virtual-pay/orders/:id/sync",
         "roles": [
           "admin"
         ],
@@ -20579,7 +20655,7 @@
         ]
       },
       {
-        "fieldCount": 10,
+        "fieldCount": 11,
         "name": "MemberServiceCredit",
         "relations": [
           "EndUser",
@@ -21604,7 +21680,7 @@
         ]
       },
       {
-        "fieldCount": 16,
+        "fieldCount": 20,
         "name": "VirtualPayOrder",
         "relations": [
           "EndUser",

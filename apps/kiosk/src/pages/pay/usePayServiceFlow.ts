@@ -22,6 +22,7 @@ import { getTerminalId, refreshKioskTerminalConfig } from '../../services/api/te
 import { errorCodeOf } from '../../services/api/userErrorMessage'
 import { forgetServiceTrip, readServiceTrip, serviceTripOwnerFor, type ServiceTrip } from '../../services/serviceTrip'
 import { keepServiceTripOrder, openServiceTripOrder, retireServiceTripOrder } from '../../services/serviceTripOrder'
+import { useMiniappCreditFlow } from './useMiniappCreditFlow'
 import {
   PAY_OK_ADVANCE_MS, PAY_POLL_MS, createPayPollGuardState, initialPollDelayMs, isRateLimitedError,
   noteOrderAnchor, planPollRequest, planRefreshOnlyRequest, recordGetRequest, recordGetSuccess, recordRateLimit,
@@ -52,10 +53,13 @@ export interface PayFlow extends FlowState {
   view: PayScreen
   remainMs: number | null
   busy: boolean
+  /** 权益被并发抢走或退回后切回扫码的诚实提示。 */
+  creditNotice: string | null
   onRefresh: () => void
   onRetry: () => void
   onLeave: (closeOrder: boolean) => void
   onStart: () => void
+  onUseCredit: () => void
 }
 
 const INITIAL: FlowState = { screen: 'loading', order: null, phase: null, error: null, checking: false, postExpiryChecking: false, rateLimited: false }
@@ -68,7 +72,7 @@ function settledPatch(screen: PayScreen, error: unknown = null, extra?: Partial<
 export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: string }): PayFlow {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { user } = useAuth()
+  const { user, getToken } = useAuth()
   const serviceKey = PAY_SERVICE_KEY[what]
   const endUserId = user?.id ?? null
   const [state, setState] = useState<FlowState>(INITIAL)
@@ -82,8 +86,17 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
   const rescheduleRef = useRef<((delayMs: number) => void) | null>(null)
   const leavingRef = useRef(false)
 
-  /** 这一次结果还算不算数：人没走，也没换成更新的一次。 */
   const current = useCallback((gen: number) => gen === genRef.current && !leavingRef.current, [])
+  const dropMissingOrder = useCallback((trip: ServiceTrip) => {
+    forgetServiceTrip(trip.serviceKey, trip.orderId); tripRef.current = null
+    setState(settledPatch('timeout', null, { phase: 'timed_out' }))
+  }, [])
+  const trackInflight = useCallback(async (task: () => Promise<void>) => {
+    const run = task(); inflightRef.current = run
+    try { await run } finally { if (inflightRef.current === run) inflightRef.current = null }
+  }, [])
+  const goNext = useCallback(() => { leavingRef.current = true; navigate(targets.next, { replace: true }) }, [navigate, targets.next])
+  const passFree = useCallback(() => { setState({ ...INITIAL, screen: 'free' }); goNext() }, [goNext])
 
   const applyView = useCallback((view: ServiceOrderView, fromRefresh: boolean) => {
     orderRef.current = view
@@ -106,32 +119,6 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       return { screen, order: view, phase, error: null, checking, postExpiryChecking, rateLimited: false }
     })
   }, [])
-
-  const dropMissingOrder = useCallback((trip: ServiceTrip) => {
-    forgetServiceTrip(trip.serviceKey, trip.orderId)
-    tripRef.current = null
-    setState(settledPatch('timeout', null, { phase: 'timed_out' }))
-  }, [])
-
-  const trackInflight = useCallback(async (task: () => Promise<void>) => {
-    const run = task()
-    inflightRef.current = run
-    try {
-      await run
-    } finally {
-      if (inflightRef.current === run) inflightRef.current = null
-    }
-  }, [])
-
-  const goNext = useCallback(() => {
-    leavingRef.current = true
-    navigate(targets.next, { replace: true })
-  }, [navigate, targets.next])
-
-  const passFree = useCallback(() => {
-    setState({ ...INITIAL, screen: 'free' })
-    goNext()
-  }, [goNext])
 
   const create = useCallback(async (gen: number) => {
     setState({ ...INITIAL, screen: 'loading' })
@@ -159,6 +146,19 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       setState({ ...INITIAL, screen: 'error', error })
     }
   }, [applyView, current, endUserId, passFree, pathname, serviceKey])
+
+  const { creditNotice, checkOwned, onUseCredit } = useMiniappCreditFlow({
+    what, serviceKey, pathname, endUserId, getToken, busy,
+    isLeaving: () => leavingRef.current,
+    nextGen: () => ++genRef.current,
+    isCurrent: current,
+    setBusy,
+    onClearError: () => setState((prev) => ({ ...prev, error: null })),
+    onRedeemError: (error) => setState((prev) => ({ ...prev, error })),
+    onRedeemed: (redeemedView, trip) => { tripRef.current = trip; orderRef.current = redeemedView; goNext() },
+    onFree: passFree,
+    onFallbackQr: create,
+  })
 
   const enter = useCallback(async (gen: number) => {
     const terminalId = getTerminalId()
@@ -220,8 +220,14 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
         }
       }
     }
+    if (await checkOwned()) {
+      if (!current(gen)) return
+      setState({ ...INITIAL, screen: 'owned' })
+      return
+    }
+    if (!current(gen)) return
     await create(gen)
-  }, [applyView, create, current, endUserId, passFree, serviceKey])
+  }, [applyView, checkOwned, create, current, endUserId, passFree, serviceKey])
 
   // 进屏即出码。挂上之后隔一拍再开始：开发模式下组件会挂两次，第一次在这一拍之前就被撤掉，不会多建一张单。
   useEffect(() => {
@@ -470,5 +476,5 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
 
   const remainMs = state.order && WAITING.has(view) ? Math.max(0, Date.parse(state.order.expiresAt) - nowMs) : null
 
-  return { ...state, view, remainMs, busy, onRefresh, onRetry, onLeave, onStart: goNext }
+  return { ...state, view, remainMs, busy, creditNotice, onRefresh, onRetry, onLeave, onStart: goNext, onUseCredit }
 }

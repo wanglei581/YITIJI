@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`700` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`704` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -1366,6 +1366,10 @@
 | GET | `/api/v1/admin/billing/miniapp-virtual-pay` | VirtualPayAdminController.getSettings | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
 | PUT | `/api/v1/admin/billing/miniapp-virtual-pay` | VirtualPayAdminController.setEnabled | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
 | PUT | `/api/v1/admin/billing/miniapp-virtual-pay/goods/:serviceKind` | VirtualPayAdminController.setGoods | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
+| GET | `/api/v1/admin/billing/miniapp-virtual-pay/orders` | VirtualPayAdminController.listOrders | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
+| GET | `/api/v1/admin/billing/miniapp-virtual-pay/orders/:id` | VirtualPayAdminController.getOrder | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
+| POST | `/api/v1/admin/billing/miniapp-virtual-pay/orders/:id/refund` | VirtualPayAdminController.refundOrder | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
+| POST | `/api/v1/admin/billing/miniapp-virtual-pay/orders/:id/sync` | VirtualPayAdminController.syncOrder | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
 
 ## `services/api/src/virtual-pay/virtual-pay-credits.controller.ts`
 
