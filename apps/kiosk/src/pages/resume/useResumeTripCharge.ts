@@ -5,7 +5,7 @@
 // 读本机记下的这一趟订单号并按需查单：诊断页看是否已付、优化/对照页带两个头并判免费再试、
 // 没诊断出来页看这一趟有没有已付可退的单。价读不到、总开关关、机构付、公共点位一律按不收费。
 // ============================================================
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TERMINAL_CHARGE_SERVICE_KEYS } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
@@ -124,6 +124,8 @@ export interface ResumeTripChargeState extends ResumeChargePricing {
   refreshOrder: () => Promise<ServiceOrderView | null>
 }
 
+const MAX_TIMER_MS = 2_147_483_647
+
 export function useResumeTripCharge(options?: { inspectOrder?: boolean }): ResumeTripChargeState {
   const inspectOrder = options?.inspectOrder ?? false
   const { user } = useAuth()
@@ -133,10 +135,13 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
   const [pricing, setPricing] = useState<ResumeChargePricing>(() => initialPricing(getTerminalId()))
   const [trip, setTrip] = useState<ServiceTrip | null>(() => readServiceTrip('resume_optimize', { owner }))
   const [order, setOrder] = useState<ServiceOrderView | null>(null)
-  const [phase, setPhase] = useState<ServiceOrderPhase | null>(null)
+  const [, setNowMs] = useState<number>(() => Date.now())
   const [checkingOrder, setCheckingOrder] = useState<boolean>(
     () => inspectOrder && API_MODE === 'http' && Boolean(getTerminalId()) && Boolean(readServiceTrip('resume_optimize', { owner })),
   )
+  const nowMs = Date.now()
+  const renderedNowRef = useRef<number>(nowMs)
+  renderedNowRef.current = nowMs
 
   useEffect(() => subscribeTerminalIdentity(() => {
     const next = getTerminalId()
@@ -165,7 +170,6 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
     setTrip(current)
     if (API_MODE !== 'http' || !terminalId || !current) {
       setOrder(null)
-      setPhase(null)
       setCheckingOrder(false)
       return null
     }
@@ -173,7 +177,6 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
     try {
       const view = await getServiceOrder(current.orderId, current.kioskSessionId)
       setOrder(view)
-      setPhase(serviceOrderPhase(view, Date.now()))
       return view
     } catch (error) {
       if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
@@ -181,7 +184,6 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
         setTrip(null)
       }
       setOrder(null)
-      setPhase(null)
       return null
     } finally {
       setCheckingOrder(false)
@@ -193,7 +195,6 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
     setTrip(current)
     if (!inspectOrder || API_MODE !== 'http' || !terminalId || !current) {
       setOrder(null)
-      setPhase(null)
       setCheckingOrder(false)
       return
     }
@@ -203,7 +204,6 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
       .then((view) => {
         if (cancelled) return
         setOrder(view)
-        setPhase(serviceOrderPhase(view, Date.now()))
       })
       .catch((error) => {
         if (cancelled) return
@@ -212,7 +212,6 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
           setTrip(null)
         }
         setOrder(null)
-        setPhase(null)
       })
       .finally(() => {
         if (!cancelled) setCheckingOrder(false)
@@ -220,9 +219,37 @@ export function useResumeTripCharge(options?: { inspectOrder?: boolean }): Resum
     return () => { cancelled = true }
   }, [inspectOrder, owner, terminalId])
 
+  useEffect(() => {
+    if (!order || order.status !== 'paid' || order.attemptsUsed < 1 || !order.retryUntil) return
+    const retryAt = Date.parse(order.retryUntil)
+    if (!Number.isFinite(retryAt)) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const schedule = () => {
+      const remaining = retryAt - Date.now()
+      if (remaining <= 0) {
+        if (renderedNowRef.current < retryAt) setNowMs(Date.now())
+        return
+      }
+      const delay = Math.min(remaining, MAX_TIMER_MS)
+      timer = setTimeout(() => {
+        timer = null
+        if (Date.now() < retryAt) {
+          schedule()
+          return
+        }
+        setNowMs(Date.now())
+      }, delay)
+    }
+    schedule()
+    return () => {
+      if (timer !== null) clearTimeout(timer)
+    }
+  }, [order])
+
   const headers = useMemo(() => (trip ? serviceOrderHeaders(trip) : undefined), [trip])
+  const phase = order ? serviceOrderPhase(order, nowMs) : null
   const alreadyPaidForOptimize = phase === 'paid' || phase === 'retry_free'
-  const canFreeRetry = order !== null && canRetryServiceOrderFree(order, Date.now())
+  const canFreeRetry = order !== null && canRetryServiceOrderFree(order, nowMs)
   const refundablePaid = phase === 'paid' || phase === 'retry_free' || phase === 'retry_expired' || phase === 'refunding'
 
   return {
