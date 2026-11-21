@@ -170,9 +170,15 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
           applyView(view, fromRefresh)
           return
         }
-        // 没付成、超时、退款中、已关的旧单：用不上了，关掉待付的、忘掉，再出一张。
-        await retireServiceTripOrder(stored, view.status)
+        // 没付成、超时、退款中、已关的旧单：用不上了，先确认关掉待付的，关不掉就留住原单号提示核实。
+        const retired = await retireServiceTripOrder(stored, view.status)
         if (!current(gen)) return
+        if (!retired.ok) {
+          tripRef.current = stored
+          orderRef.current = view
+          setState({ screen: 'close_failed', order: view, phase: serviceOrderPhase(view, Date.now()), error: retired.error, checking: false })
+          return
+        }
       } catch (error) {
         if (!current(gen)) return
         if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') forgetServiceTrip(serviceKey, stored.orderId)
@@ -320,8 +326,8 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     void (async () => {
       try {
         const old = tripRef.current
-        if (view === 'lookup') {
-          // 本机记着的单核实/查询失败：带 refresh=1 再核实一次，覆盖晚到已付结果，不另建新单。
+        if (view === 'lookup' || view === 'close_failed') {
+          // 本机记着的单核实或关单失败：带 refresh=1 再核实一次，覆盖晚到已付结果，不另建新单。
           const stored = old ?? readServiceTrip(serviceKey)
           if (!stored) {
             await enter(gen)
@@ -347,8 +353,21 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
           }
           return
         }
-        tripRef.current = null
-        if (old) await retireServiceTripOrder(old, orderRef.current?.status ?? null)
+        if (old) {
+          const retired = await retireServiceTripOrder(old, orderRef.current?.status ?? null)
+          if (!current(gen)) return
+          if (!retired.ok) {
+            // 关单失败：绝不静默删掉旧单号再建新单，留在屏上提示原单号已保留。
+            tripRef.current = old
+            setState((prev) => ({ ...prev, screen: 'close_failed', error: retired.error, checking: false }))
+            return
+          }
+          tripRef.current = null
+          if (retired.view && (retired.view.status === 'refunding' || retired.view.status === 'refunded' || retired.view.status === 'refund_failed')) {
+            applyView(retired.view, true)
+            return
+          }
+        }
         if (!current(gen)) return
         await create(gen)
       } finally {
@@ -364,9 +383,22 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     const trip = tripRef.current
     setBusy(true)
     void (async () => {
-      // 不付了：还在待付的关掉（万一已经付了，服务端会自动原路退）。付好了的返回不关，这一趟还能接着用。
-      if (closeOrder && trip) await retireServiceTripOrder(trip, orderRef.current?.status ?? 'pending')
-      navigate(targets.back, { replace: true })
+      try {
+        // 不付了：还在待付的关掉（万一已经付了，服务端会自动原路退）。付好了的返回不关，这一趟还能接着用。
+        if (closeOrder && trip) {
+          const retired = await retireServiceTripOrder(trip, orderRef.current?.status ?? 'pending')
+          if (!retired.ok) {
+            // 关单失败：保留本地单号不静默离开，回到可恢复态并允许先返回或再查一次。
+            leavingRef.current = false
+            tripRef.current = trip
+            setState((prev) => ({ ...prev, screen: 'close_failed', error: retired.error, checking: false }))
+            return
+          }
+        }
+        navigate(targets.back, { replace: true })
+      } finally {
+        setBusy(false)
+      }
     })()
   }, [navigate, targets.back])
 

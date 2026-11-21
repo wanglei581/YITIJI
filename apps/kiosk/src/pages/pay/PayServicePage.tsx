@@ -19,6 +19,7 @@ import {
   formatYuan,
   payChannelHead,
   payChrome,
+  payCloseErrorLine,
   payCreateErrorLine,
   payFailLine,
   payLookupErrorLine,
@@ -117,11 +118,16 @@ export function PayServicePage({ what }: { what: PayWhat }) {
       break
     case 'error':
     case 'lookup':
+    case 'close_failed':
       body = (
         <>
-          {flow.view === 'lookup' ? sum : null}
+          {flow.view === 'lookup' || flow.view === 'close_failed' ? sum : null}
           <p className="pys-chline" role="alert" data-testid="pay-service-line">
-            {flow.view === 'error' ? payCreateErrorLine(flow.error) : payLookupErrorLine(flow.error)}
+            {flow.view === 'error'
+              ? payCreateErrorLine(flow.error)
+              : flow.view === 'close_failed'
+                ? payCloseErrorLine(flow.error)
+                : payLookupErrorLine(flow.error)}
           </p>
         </>
       )

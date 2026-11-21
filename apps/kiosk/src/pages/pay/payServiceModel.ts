@@ -120,6 +120,12 @@ export function payLookupErrorLine(error: unknown): string {
   return `${reason.replace(/[。.]?$/, '。')}${PAY_WAIT_BACK}`
 }
 
+/** 返回或换码时关单失败：保留原单号，不静默丢单，引导先核实结果或返回后再恢复。 */
+export function payCloseErrorLine(error: unknown): string {
+  const reason = userMessageOf(error, '暂时没关掉上一张付款码。')
+  return `${reason.replace(/[。.]?$/, '。')}本机已保留原单号，请先点「再查一次」核实结果。${PAY_WAIT_BACK}`
+}
+
 /** 渠道照实写（裁决第 1 条）。 */
 export function payChannelHead(provider: string | null | undefined): string {
   if (provider === 'wechat') return '请用微信扫这张码'
@@ -139,8 +145,8 @@ export function formatRemain(ms: number): string {
 
 // ── 每一态的顶栏、底栏 ──────────────────────────────────────────────────
 
-/** error：没出成码（没有单，钱没有扣）。lookup：本机记着一张单，但这会儿查不到它的结果。 */
-export type PayScreen = 'loading' | 'wait' | 'check' | 'ok' | 'fail' | 'timeout' | 'refund' | 'free' | 'error' | 'lookup'
+/** error：没出成码（没有单，钱没有扣）。lookup：查不到结果。close_failed：关单失败，保留原单号。 */
+export type PayScreen = 'loading' | 'wait' | 'check' | 'ok' | 'fail' | 'timeout' | 'refund' | 'free' | 'error' | 'lookup' | 'close_failed'
 
 export interface PayChrome {
   eyebrow: string
@@ -177,6 +183,8 @@ export function payChrome(screen: PayScreen, name: string, refundPhase: ServiceO
       return { eyebrow: '这一次', title: '这台机器这项服务免费，不用付款', status: { text: '不收费', tone: 'ok' }, left: null, ask: false, primary: '马上开始' }
     case 'lookup':
       return { eyebrow, title: '暂时查不到这一次的付款结果', sub: '先别重复付款', status: { text: '先别重复付款', tone: 'warn' }, left: leave, ask: true, primary: '再查一次' }
+    case 'close_failed':
+      return { eyebrow, title: '暂时没关掉这一次的付款码', sub: '原单号已保留，先别重复付款', status: { text: '原单号已保留', tone: 'warn' }, left: leave, ask: true, primary: '再查一次' }
     case 'error':
     default:
       return { eyebrow, title: '这一次暂时出不了付款码', sub: '没有出码，钱没有扣', status: { text: '没有出码，钱没有扣', tone: 'warn' }, left: leave, ask: true, primary: '再试一次' }

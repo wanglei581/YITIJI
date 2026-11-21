@@ -54,24 +54,32 @@ export function keepServiceTripOrder(trip: ServiceTrip): void {
   rememberServiceTrip({ serviceKey: trip.serviceKey, orderId: trip.orderId, kioskSessionId: trip.kioskSessionId }, trip.savedAt)
 }
 
+export type RetireServiceTripResult =
+  | { ok: true; view: ServiceOrderView | null }
+  | { ok: false; error: unknown }
+
 /**
- * 不要这张单了（返回、再出一张码）：还在待付的先关掉，再从本机忘掉。
- * 关单失败不拦：待付码 5 分钟后自己失效，万一已经付了服务端会自动原路退。
+ * 不要这张单了（返回、再出一张码）：还在待付的先关掉，确认关掉或 404 不存在后才从本机忘掉。
+ * 关单失败时绝不静默删掉本机单号（防止孤儿单），由调用方保留凭据并提示用户核实/重试。
  * 已付、已开始的单不在这里关——那要退钱或已经在办，不是「换一张码」能处理的。
  */
 export async function retireServiceTripOrder(
   trip: ServiceTrip,
   lastSeenStatus: string | null,
   close: typeof closeServiceOrder = closeServiceOrder,
-): Promise<ServiceOrderView | null> {
+): Promise<RetireServiceTripResult> {
   let closed: ServiceOrderView | null = null
-  if (lastSeenStatus === 'pending') {
+  if (lastSeenStatus === 'pending' || lastSeenStatus === null) {
     try {
       closed = await close(trip.orderId, trip.kioskSessionId)
-    } catch {
-      closed = null
+    } catch (error) {
+      if (errorCodeOf(error) === 'SERVICE_ORDER_NOT_FOUND') {
+        forgetServiceTrip(trip.serviceKey, trip.orderId)
+        return { ok: true, view: null }
+      }
+      return { ok: false, error }
     }
   }
   forgetServiceTrip(trip.serviceKey, trip.orderId)
-  return closed
+  return { ok: true, view: closed }
 }

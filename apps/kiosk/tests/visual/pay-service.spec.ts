@@ -333,6 +333,63 @@ test.describe('付款屏 @kiosk', () => {
     expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toBeNull()
   })
 
+  test('返回关单失败：保留本机旧单号并提示恢复，不静默丢单 @kiosk', async ({ page, api }) => {
+    chargingMachine(api)
+    const order = { ...ORDER_A, createdAt: Date.now() }
+    api.respondWith('POST', SERVICE_ORDERS_PATH, () => ok(serviceOrderView(order)))
+    api.respondWith('GET', serviceOrderPath(order.id), () => ok(serviceOrderView(order)))
+    api.respond('POST', serviceOrderClosePath(order.id), apiError(503, 'UPSTREAM_UNAVAILABLE', '关单服务暂不可用'))
+    const calls = recordServiceOrderCalls(page)
+
+    await page.goto('/pay/resume?back=report')
+    await expectState(page, 'wait')
+    await page.getByRole('button', { name: '不付了，返回' }).click()
+    await expectState(page, 'close_failed')
+    await expect(payScreen(page)).toContainText('原单号已保留')
+    await expect(primary(page)).toHaveText('再查一次')
+    await expect(page).toHaveURL(/\/pay\/resume/)
+    expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toContain(order.id)
+    await expectNoForbiddenCopy(page)
+
+    // 点击「再查一次」可恢复原单继续等待支付，且没有另建新单。
+    await primary(page).click()
+    await expectState(page, 'wait')
+    expect(calls.filter((call) => call.method === 'POST' && call.path === SERVICE_ORDERS_PATH)).toHaveLength(1)
+    expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toContain(order.id)
+  })
+
+  test('换码关单失败：不删旧单号也不建第二单，关单恢复后才换新码 @kiosk', async ({ page, api }) => {
+    chargingMachine(api, { resume_optimize: 200 })
+    const first = { ...ORDER_A, createdAt: Date.now() }
+    const second = { ...ORDER_B, createdAt: Date.now() + 1_000 }
+    let closeAllowed = false
+    api.respondWith('POST', SERVICE_ORDERS_PATH, (n) => ok(serviceOrderView(n === 1 ? first : second)))
+    api.respondWith('GET', serviceOrderPath(first.id), () => ok(serviceOrderView(first, { paymentFailed: true })))
+    api.respondWith('POST', serviceOrderClosePath(first.id), () => (
+      closeAllowed
+        ? ok(serviceOrderView(first, { status: 'closed', closeReason: 'user_cancelled' }))
+        : apiError(503, 'UPSTREAM_UNAVAILABLE', '关单失败')
+    ))
+    respondOrder(api, second)
+    const calls = recordServiceOrderCalls(page)
+
+    await page.goto('/pay/resume')
+    await expectState(page, 'fail')
+    await primary(page).click()
+    await expectState(page, 'close_failed')
+    expect(await page.evaluate((key) => window.sessionStorage.getItem(key), TRIP_KEY)).toContain(first.id)
+    expect(calls.filter((call) => call.method === 'POST' && call.path === SERVICE_ORDERS_PATH)).toHaveLength(1)
+
+    // 先点「再查一次」回到没付成态，再恢复关单并换新码。
+    await primary(page).click()
+    await expectState(page, 'fail')
+    closeAllowed = true
+    await primary(page).click()
+    await expectState(page, 'wait')
+    await expect(page.getByTestId('pay-service-amount')).toHaveText('2.00 元')
+    expect(calls.filter((call) => call.method === 'POST' && call.path === SERVICE_ORDERS_PATH)).toHaveLength(2)
+  })
+
   test('重载找回同一单：不再建单，用建单时的会话号查同一张 @kiosk', async ({ page, api }) => {
     chargingMachine(api)
     const order = { ...ORDER_A, createdAt: Date.now() }
