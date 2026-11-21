@@ -11,10 +11,13 @@ import {
 import { releaseInterviewSession } from './service-order.sweep'
 import {
   SERVICE_ORDER_NAMES,
+  SERVICE_REFUND_REASON_REPORT_FAILED,
+  SERVICE_REFUND_REASON_REPORT_LEFT,
   SERVICE_REFUND_REASON_RETRY_EXPIRED,
   SERVICE_RETRY_WINDOW_MS,
   SERVICE_SWEEP_BATCH,
   classifyServiceOutcome,
+  decideInterviewReportFailure,
   failureReasonFor,
   isServiceOrderKey,
   type ServiceOrderKey,
@@ -67,9 +70,110 @@ export async function markServiceOrderNotMade(
 
 export async function finishServiceOrder(prisma: PrismaService, orderId: string): Promise<void> {
   await prisma.serviceOrder.updateMany({
-    where: { id: orderId, status: 'consumed' },
+    where: { id: orderId, status: 'consumed', reportState: null },
     data: { failureReason: null, retryUntil: null, settledAt: new Date() },
   })
+}
+
+/**
+ * 模拟面试报告已落库：把挂在这场上的 mock_interview 服务单锁成 reportState='done'，
+ * 清掉失败原因与再试窗口。带 status='consumed' 条件，已进退款的单绝不倒回做成。
+ */
+export async function markInterviewReportMade(prisma: PrismaService, sessionId: string): Promise<void> {
+  if (classifyServiceOutcome('mock_interview', 'interview_report_completed') !== 'made') return
+  const row = await prisma.serviceOrder.findFirst({
+    where: { serviceKey: 'mock_interview', consumedRef: sessionId, status: 'consumed' },
+    select: { id: true, settledAt: true, reportState: true },
+  })
+  if (!row || !row.settledAt || row.reportState === 'done') return
+  await prisma.serviceOrder.updateMany({
+    where: {
+      id: row.id,
+      status: 'consumed',
+      settledAt: { not: null },
+      OR: [{ reportState: null }, { reportState: 'retry' }],
+    },
+    data: { reportState: 'done', failureReason: null, retryUntil: null },
+  })
+}
+
+/**
+ * 模拟面试报告因系统原因没生成：
+ * 首次且会话未结束 → 留在 consumed、置 reportState='retry' + 10 分钟再试窗口（不可再开新场）；
+ * 再次失败或会话已结束 → 走原路退款（带 reportState 条件，与并发做成/清扫互斥，只退一次）。
+ */
+export async function markInterviewReportNotMade(deps: ServiceOrderSettleDeps, sessionId: string): Promise<void> {
+  const existingReport = await deps.prisma.mockInterviewReport.findUnique({
+    where: { sessionId },
+    select: { id: true },
+  })
+  if (existingReport) {
+    await markInterviewReportMade(deps.prisma, sessionId)
+    return
+  }
+  const row = await deps.prisma.serviceOrder.findFirst({
+    where: { serviceKey: 'mock_interview', consumedRef: sessionId, status: 'consumed' },
+    select: { id: true, serviceKey: true, status: true, settledAt: true, reportState: true, terminalId: true, kioskSessionId: true },
+  })
+  if (!row) return
+  const session = await deps.prisma.kioskSession.findUnique({
+    where: { terminalId_clientSessionId: { terminalId: row.terminalId, clientSessionId: row.kioskSessionId } },
+    select: { endedAt: true },
+  })
+  const action = decideInterviewReportFailure({
+    serviceKey: row.serviceKey,
+    status: row.status,
+    settledAt: row.settledAt,
+    reportState: row.reportState,
+    sessionEnded: Boolean(session?.endedAt),
+  })
+  if (action === 'ignore') return
+  const reason = failureReasonFor('interview_report_failed')
+  if (action === 'enter_retry') {
+    const entered = await deps.prisma.serviceOrder.updateMany({
+      where: { id: row.id, status: 'consumed', settledAt: { not: null }, reportState: null },
+      data: {
+        reportState: 'retry',
+        failureReason: reason,
+        retryUntil: new Date(Date.now() + SERVICE_RETRY_WINDOW_MS),
+      },
+    })
+    if (entered.count === 1) {
+      // 消除与 onSessionEnded 的并发窗口：写入 retry 期间会话刚结束则立即补退。
+      const afterSession = await deps.prisma.kioskSession.findUnique({
+        where: { terminalId_clientSessionId: { terminalId: row.terminalId, clientSessionId: row.kioskSessionId } },
+        select: { endedAt: true },
+      })
+      if (afterSession?.endedAt) {
+        await executeServiceOrderRefund(
+          deps.prisma, deps.registry, deps.audit, deps.redis, row.id, SERVICE_REFUND_REASON_REPORT_LEFT,
+          { requireConsumedReportState: 'retry' },
+        )
+      }
+      return
+    }
+    const fresh = await deps.prisma.serviceOrder.findUnique({
+      where: { id: row.id },
+      select: { status: true, reportState: true },
+    })
+    if (!fresh || fresh.status !== 'consumed' || fresh.reportState !== 'retry') return
+    await executeServiceOrderRefund(
+      deps.prisma, deps.registry, deps.audit, deps.redis, row.id, SERVICE_REFUND_REASON_REPORT_FAILED,
+      { requireConsumedReportState: 'retry' },
+    )
+    return
+  }
+  if (action === 'refund_left') {
+    await executeServiceOrderRefund(
+      deps.prisma, deps.registry, deps.audit, deps.redis, row.id, SERVICE_REFUND_REASON_REPORT_LEFT,
+      { requireConsumedReportState: null },
+    )
+    return
+  }
+  await executeServiceOrderRefund(
+    deps.prisma, deps.registry, deps.audit, deps.redis, row.id, SERVICE_REFUND_REASON_REPORT_FAILED,
+    { requireConsumedReportState: 'retry' },
+  )
 }
 
 /** 同一任务上还有没结案的旧单时，能判没做成就退掉，判不了就留给认领回 409。 */

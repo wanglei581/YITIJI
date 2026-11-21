@@ -114,6 +114,7 @@
     "verify:service-orders": "node -r @swc-node/register scripts/verify-service-orders.ts",
     "verify:service-orders-concurrency": "node -r @swc-node/register scripts/verify-service-orders-concurrency.ts",
     "verify:service-order-sandbox-simulate": "node -r @swc-node/register scripts/verify-service-order-sandbox-simulate.ts",
+    "verify:service-order-interview-report": "node -r @swc-node/register scripts/verify-service-order-interview-report.ts",
     "verify:service-order-open-ref:postgres": "node -r @swc-node/register scripts/verify-service-order-open-ref-postgres.ts",
     "verify:print-queue-timeout": "node -r @swc-node/register scripts/verify-print-queue-timeout.ts",
     "verify:print-completion-evidence": "node -r @swc-node/register scripts/verify-print-completion-evidence.ts",

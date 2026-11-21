@@ -53,6 +53,8 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261114120000_service_order_settlement/migration.sql')])
     // 没结案的同一任务只能一张单，并补退款通知与渠道关单重试列（20261114170000）。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261114170000_service_order_open_ref/migration.sql')])
+    // 模拟面试出报告失败免费再试与终态列（20261121120000）。当前客户端写 ServiceOrder 会带上 reportState，必须在第一次写 ServiceOrder 之前执行。
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261121120000_service_order_report_state/migration.sql')])
     // 绑定版本（20261115120000）。当前客户端写 Terminal 会带上 orgBindingGeneration，必须在第一次 terminal.create 之前执行。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261115120000_add_terminal_org_binding_generation/migration.sql')])
     // 批量预建批次号（20261117120000）。当前客户端读 Terminal.provisionBatchId，必须在第一次 terminal.create 之前执行。
@@ -173,6 +175,15 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     const nullable = kind === 'sqlite' ? Number(deadline.notnull) === 0 : deadline.notnull === 'YES'
     if (!nullable) throw new Error(`${kind}: PolicyPost.validThrough must stay nullable`)
     console.log(`PASS ${kind}: PolicyPost.validThrough exists and is nullable after upgrade`)
+
+    const reportStateColumn = kind === 'sqlite'
+      ? await client.$queryRawUnsafe<Array<{ name: string; notnull: number | bigint }>>(`SELECT "name", "notnull" FROM pragma_table_info('ServiceOrder') WHERE "name" = 'reportState'`)
+      : await client.$queryRawUnsafe<Array<{ name: string; notnull: string }>>(`SELECT column_name AS name, is_nullable AS notnull FROM information_schema.columns WHERE table_name = 'ServiceOrder' AND column_name = 'reportState'`)
+    const reportState = reportStateColumn[0]
+    if (!reportState) throw new Error(`${kind}: ServiceOrder.reportState missing after upgrade`)
+    const reportStateNullable = kind === 'sqlite' ? Number(reportState.notnull) === 0 : reportState.notnull === 'YES'
+    if (!reportStateNullable) throw new Error(`${kind}: ServiceOrder.reportState must stay nullable`)
+    console.log(`PASS ${kind}: ServiceOrder.reportState exists and is nullable after upgrade`)
   } finally { await client.$disconnect() }
 }
 

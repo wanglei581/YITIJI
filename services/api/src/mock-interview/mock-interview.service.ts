@@ -340,14 +340,18 @@ export class MockInterviewService {
   async end(
     sessionId: string,
     requester: InterviewRequester,
-    opts?: { includeAnswersInPrint?: boolean },
+    opts?: {
+      includeAnswersInPrint?: boolean
+      onReportMade?: () => Promise<void>
+      onReportFailed?: () => Promise<void>
+    },
   ) {
     await this.loadAuthorized(sessionId, requester)
     const includeAnswersInPrint = opts?.includeAnswersInPrint !== false
     return this.endLock.run(
       `ai:mock-interview:end:${this.coalesceKey(sessionId, requester)}`,
       120_000,
-      () => this.endOnce(sessionId, requester, includeAnswersInPrint),
+      () => this.endOnce(sessionId, requester, includeAnswersInPrint, opts?.onReportMade, opts?.onReportFailed),
     )
   }
 
@@ -355,10 +359,15 @@ export class MockInterviewService {
     sessionId: string,
     requester: InterviewRequester,
     includeAnswersInPrint: boolean,
+    onReportMade?: () => Promise<void>,
+    onReportFailed?: () => Promise<void>,
   ) {
     const session = await this.loadAuthorized(sessionId, requester)
     const existing = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
-    if (existing) return await this.reportDto(session, existing.payloadJson)
+    if (existing) {
+      await onReportMade?.()
+      return await this.reportDto(session, existing.payloadJson)
+    }
     if (session.status === 'configured') {
       throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_STARTED', message: '尚未开始面试，无法生成报告' } })
     }
@@ -369,6 +378,7 @@ export class MockInterviewService {
     if (claimed.count === 0) {
       const raced = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
       if (raced) {
+        await onReportMade?.()
         const latest = await this.loadAuthorized(sessionId, requester)
         return await this.reportDto(latest, raced.payloadJson)
       }
@@ -388,11 +398,20 @@ export class MockInterviewService {
       })
       throw new BadRequestException({ error: { code: 'INTERVIEW_NO_ANSWERS', message: '本场练习还没有任何回答，请至少回答一个问题后再生成报告' } })
     }
+    // 简历 AI 授权校验在调用模型前独立处理：未授权是用户前置条件，不算系统出报告失败。
+    try {
+      await this.requireResumeConsent(session)
+    } catch (error) {
+      await this.prisma.mockInterviewSession.updateMany({
+        where: { id: session.id, status: 'completed' },
+        data: { status: 'in_progress', endedAt: null },
+      })
+      throw error
+    }
     const rUsage = new AiUsageAccumulator()
     const rStartedAt = Date.now()
     let payload: InterviewReportPayload
     try {
-      await this.requireResumeConsent(session)
       payload = await this.llm.buildReport({
         ...this.llmCtx(session),
         transcript: turns.map((t) => ({
@@ -409,6 +428,7 @@ export class MockInterviewService {
         where: { id: session.id, status: 'completed' },
         data: { status: 'in_progress', endedAt: null },
       })
+      await onReportFailed?.()
       throw error
     }
     this.recordAiLog(session.id, 'interviewReport', rUsage, rStartedAt, 'success', session.endUserId)
@@ -424,14 +444,19 @@ export class MockInterviewService {
     } catch (error) {
       if (isUniqueConflict(error)) {
         const raced = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
-        if (raced) return await this.reportDto(session, raced.payloadJson)
+        if (raced) {
+          await onReportMade?.()
+          return await this.reportDto(session, raced.payloadJson)
+        }
       }
       await this.prisma.mockInterviewSession.updateMany({
         where: { id: session.id, status: 'completed' },
         data: { status: 'in_progress', endedAt: null },
       })
+      await onReportFailed?.()
       throw error
     }
+    await onReportMade?.()
     await this.audit.write({
       actorId: null,
       actorRole: session.endUserId ? 'enduser' : 'kiosk',
