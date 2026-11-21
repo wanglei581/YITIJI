@@ -253,6 +253,10 @@ async function mountFlowHarness({ initialOrder, onGet, storedTrip = null }) {
     )
     .replaceAll("from './payPollGuard'", `from '${guardUrl}'`)
     .replaceAll("from './payServiceModel'", `from '${modelUrl}'`)
+    .replaceAll(
+      "from './useMiniappCreditFlow'",
+      `from '${toDataUrl('export function useMiniappCreditFlow() { return { creditNotice: null, checkOwned: async () => false, onUseCredit: () => {} } }')}'`,
+    )
 
   const { usePayServiceFlow } = await import(toDataUrl(`${flowSrc}\n// ${envKey}`))
 
@@ -519,5 +523,207 @@ test('F4 到点核实遇 429 走同一退避并自动续查；未过期普通查
     assert.deepEqual(h.nav.map((n) => n.to), ['/resume/optimize'])
   } finally {
     h.destroy()
+  }
+})
+
+test('F5 切换用户（endUserId A→B）立即作废 A 的在途查权益与核销，晚到核销自动 /close 且不污染 B；同拍双击只发 1 次', async () => {
+  const hooks = []
+  let cursor = 0
+  const cleanups = new Map()
+  let pendingEffects = []
+  let latest = null
+  let unmounted = false
+  let rendering = false
+  let dirty = false
+  let currentUserId = 'user-a'
+  const nav = []
+  const closedOrders = []
+  const keptTrips = []
+  let redeemCalls = 0
+  let resolveCheckA
+  let resolveRedeemA
+  const timers = new Map()
+  let nextTimerId = 1
+
+  const react = {
+    useState(init) {
+      const idx = cursor++
+      if (hooks.length <= idx) hooks.push(typeof init === 'function' ? init() : init)
+      return [hooks[idx], (next) => {
+        const val = typeof next === 'function' ? next(hooks[idx]) : next
+        if (!Object.is(hooks[idx], val)) {
+          hooks[idx] = val
+          if (!rendering) render()
+          else dirty = true
+        }
+      }]
+    },
+    useRef(init) {
+      const idx = cursor++
+      if (hooks.length <= idx) hooks.push({ current: init })
+      return hooks[idx]
+    },
+    useCallback(fn, deps) {
+      const idx = cursor++
+      const prev = hooks[idx]
+      if (!prev || !deps || !prev.deps || deps.length !== prev.deps.length || deps.some((d, i) => !Object.is(d, prev.deps[i]))) {
+        hooks[idx] = { fn, deps }
+      }
+      return hooks[idx].fn
+    },
+    useEffect(fn, deps) {
+      const idx = cursor++
+      const prev = hooks[idx]
+      const changed = !prev || !deps || !prev.deps || deps.length !== prev.deps.length || deps.some((d, i) => !Object.is(d, prev.deps[i]))
+      hooks[idx] = { deps }
+      if (changed) pendingEffects.push({ idx, fn })
+    },
+  }
+
+  const prevWindow = globalThis.window
+  globalThis.window = {
+    setTimeout(fn, delay = 0) {
+      const id = nextTimerId++
+      timers.set(id, { fn, delay })
+      return id
+    },
+    clearTimeout(id) { timers.delete(id) },
+    setInterval() { return 0 },
+    clearInterval() {},
+  }
+
+  const envKey = `__P2D2B_SWITCH_${Math.random().toString(36).slice(2)}`
+  const initialOrder = makeView({ id: 'svc-user-b-cash', expiresAt: new Date(Date.now() + 300_000).toISOString() })
+  globalThis[envKey] = {
+    react,
+    navigate: (to, opts) => nav.push({ to, opts }),
+    getUser: () => (currentUserId ? { id: currentUserId } : null),
+    getToken: () => (currentUserId ? `tok-${currentUserId}` : null),
+    closeServiceOrder: async (orderId, kioskSessionId) => {
+      closedOrders.push({ orderId, kioskSessionId })
+      return makeView({ id: orderId, status: 'refunded', provider: 'miniapp_credit', amountCents: 0 })
+    },
+    keepServiceTripOrder: (trip) => keptTrips.push(trip),
+    openServiceTripOrder: async ({ endUserId }) => ({
+      trip: { serviceKey: 'resume_optimize', orderId: `${initialOrder.id}-${endUserId}`, kioskSessionId: 'sess-b', owner: { kind: 'member', endUserId }, savedAt: 1000 },
+      view: { ...initialOrder, id: `${initialOrder.id}-${endUserId}` },
+    }),
+    checkOwnedCreditForPayScreen: ({ endUserId }) => {
+      if (endUserId === 'user-a') return new Promise((resolve) => { resolveCheckA = resolve })
+      return Promise.resolve(false)
+    },
+    runMiniappCreditRedeem: ({ endUserId }) => {
+      redeemCalls += 1
+      return new Promise((resolve) => {
+        resolveRedeemA = () => resolve({
+          kind: 'redeemed',
+          view: makeView({ id: `vpcord-${endUserId}`, provider: 'miniapp_credit', amountCents: 0, status: 'paid' }),
+          trip: { serviceKey: 'resume_optimize', orderId: `vpcord-${endUserId}`, kioskSessionId: `sess-${endUserId}`, owner: { kind: 'member', endUserId }, savedAt: 1000 },
+        })
+      })
+    },
+  }
+
+  const modelUrl = toDataUrl(
+    transpile('src/pages/pay/payServiceModel.ts')
+      .replaceAll("from '../../copy/unattendedCopy'", `from '${toDataUrl('export const helpNeededLine = () => "联系客服"')}'`)
+      .replaceAll("from '../../services/api/userErrorMessage'", `from '${toDataUrl('export const errorCodeOf = (e) => e?.code; export const userMessageOf = (_e, f) => f')}'`),
+  )
+  const creditFlowUrl = toDataUrl(
+    transpile('src/pages/pay/useMiniappCreditFlow.ts')
+      .replaceAll("from 'react'", `from '${toDataUrl(`const r = globalThis.${envKey}.react; export const { useCallback, useEffect, useRef, useState } = r;`)}'`)
+      .replaceAll("from '../../services/api/serviceOrders'", `from '${toDataUrl(`export const closeServiceOrder = (...a) => globalThis.${envKey}.closeServiceOrder(...a);`)}'`)
+      .replaceAll("from '../../services/serviceTripOrder'", `from '${toDataUrl(`export const keepServiceTripOrder = (t) => globalThis.${envKey}.keepServiceTripOrder(t);`)}'`)
+      .replaceAll("from './payCreditFlow'", `from '${toDataUrl(`export const checkOwnedCreditForPayScreen = (...a) => globalThis.${envKey}.checkOwnedCreditForPayScreen(...a); export const runMiniappCreditRedeem = (...a) => globalThis.${envKey}.runMiniappCreditRedeem(...a);`)}'`),
+  )
+  const flowSrc = transpile('src/pages/pay/usePayServiceFlow.ts')
+    .replaceAll("from 'react'", `from '${toDataUrl(`const r = globalThis.${envKey}.react; export const { useCallback, useEffect, useRef, useState } = r;`)}'`)
+    .replaceAll("from 'react-router-dom'", `from '${toDataUrl(`export const useNavigate = () => globalThis.${envKey}.navigate; export const useLocation = () => ({ pathname: '/pay/resume' });`)}'`)
+    .replaceAll("from '../../auth/useAuth'", `from '${toDataUrl(`export const useAuth = () => ({ user: globalThis.${envKey}.getUser(), getToken: globalThis.${envKey}.getToken });`)}'`)
+    .replaceAll("from '../../contexts/KioskBusyContext'", `from '${toDataUrl('export const useBusyLock = () => {}')}'`)
+    .replaceAll("from '../../services/api/client'", `from '${toDataUrl('export const API_MODE = "http"')}'`)
+    .replaceAll("from '../../services/api/serviceOrders'", `from '${toDataUrl(`export { serviceOrderExpiredLocally, serviceOrderPhase } from '${serviceOrdersUrl}'; export const getServiceOrder = async () => { throw new Error('unexpected') };`)}'`)
+    .replaceAll("from '../../services/api/terminalConfig'", `from '${toDataUrl('export const getTerminalId = () => "term-1"; export const refreshKioskTerminalConfig = async () => ({ pricing: { effective: { resume_optimize: 100 } } })')}'`)
+    .replaceAll("from '../../services/api/userErrorMessage'", `from '${toDataUrl('export const errorCodeOf = (e) => e?.code')}'`)
+    .replaceAll("from '../../services/serviceTrip'", `from '${toDataUrl('export const serviceTripOwnerFor = (id) => (id ? { kind: "member", endUserId: id } : { kind: "guest" }); export const readServiceTrip = () => null; export const forgetServiceTrip = () => {};')}'`)
+    .replaceAll("from '../../services/serviceTripOrder'", `from '${toDataUrl(`export const keepServiceTripOrder = (t) => globalThis.${envKey}.keepServiceTripOrder(t); export const openServiceTripOrder = (...a) => globalThis.${envKey}.openServiceTripOrder(...a); export const retireServiceTripOrder = async () => ({ ok: true, view: null });`)}'`)
+    .replaceAll("from './payPollGuard'", `from '${guardUrl}'`)
+    .replaceAll("from './payServiceModel'", `from '${modelUrl}'`)
+    .replaceAll("from './useMiniappCreditFlow'", `from '${creditFlowUrl}'`)
+
+  const { usePayServiceFlow } = await import(toDataUrl(`${flowSrc}\n// ${envKey}`))
+
+  function render() {
+    if (unmounted) return
+    if (rendering) { dirty = true; return }
+    rendering = true
+    do {
+      dirty = false
+      cursor = 0
+      latest = usePayServiceFlow('resume', { next: '/resume/optimize', back: '/resume/report' })
+      while (pendingEffects.length > 0) {
+        const eff = pendingEffects.shift()
+        const oldCleanup = cleanups.get(eff.idx)
+        if (typeof oldCleanup === 'function') oldCleanup()
+        const cleanup = eff.fn()
+        if (typeof cleanup === 'function') cleanups.set(eff.idx, cleanup)
+        else cleanups.delete(eff.idx)
+      }
+    } while (dirty && !unmounted)
+    rendering = false
+  }
+  async function flushAll() {
+    for (let i = 0; i < 6; i += 1) {
+      for (const [id, entry] of [...timers.entries()]) {
+        if (entry.delay === 0) {
+          timers.delete(id)
+          entry.fn()
+        }
+      }
+      await Promise.resolve()
+      await Promise.resolve()
+      if (dirty) render()
+    }
+  }
+
+  try {
+    // 场景 A：用户 A 查权益挂起时切换为用户 B → A 晚到 true 绝不把 B 置为 owned
+    render()
+    await flushAll()
+    assert.equal(typeof resolveCheckA, 'function')
+    currentUserId = 'user-b'
+    render()
+    await flushAll()
+    resolveCheckA(true)
+    await flushAll()
+    assert.equal(latest.screen, 'wait', '用户 A 延迟返回的 owned 绝不能污染用户 B')
+    assert.equal(keptTrips.every((t) => t.owner?.endUserId === 'user-b'), true)
+
+    // 场景 B：切回用户 A 进入 owned，同一拍连点 2 次 onUseCredit 严格只发 1 次；在途切换为用户 B → A 晚到核销不存 trip、不跳 B、自动 /close 退回权益
+    currentUserId = 'user-a'
+    render()
+    await flushAll()
+    resolveCheckA(true)
+    await flushAll()
+    assert.equal(latest.screen, 'owned')
+
+    keptTrips.length = 0
+    latest.onUseCredit()
+    latest.onUseCredit()
+    assert.equal(redeemCalls, 1, '同一拍连续调用 onUseCredit 必须被同步锁拦成严格 1 次')
+
+    currentUserId = 'user-b'
+    render()
+    await flushAll()
+    resolveRedeemA()
+    await flushAll()
+    assert.equal(nav.length, 0, '用户 A 晚到核销绝不能替用户 B 跳转')
+    assert.equal(keptTrips.some((t) => t.orderId === 'vpcord-user-a'), false, '用户 A 晚到核销绝不能写入 sessionStorage')
+    assert.deepEqual(closedOrders, [{ orderId: 'vpcord-user-a', kioskSessionId: 'sess-user-a' }], '用户 A 晚到核销必须立即调 /close 退回权益')
+  } finally {
+    unmounted = true
+    for (const fn of cleanups.values()) if (typeof fn === 'function') fn()
+    globalThis.window = prevWindow
+    delete globalThis[envKey]
   }
 })

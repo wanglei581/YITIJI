@@ -92,6 +92,12 @@ const REQUIRED_COMMANDS = [
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters',
   // 服务单沙箱模拟付成：生产必须 404、只认沙箱通道。它一旦从 CI 摘掉，生产判断被删也不会有人发现。
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-sandbox-simulate',
+  // 模拟面试出报告失败免费再试与自动退款：防止并发退两次、退后倒回做成、做成后再退。
+  'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-interview-report',
+  // 自助开票二期：会员侧服务单列表、打印单开票态与真 HTTP 跨端开票闭环。
+  'VERIFICATION_DATABASE_TARGET=isolated VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-service-orders',
+  // 小程序虚拟支付二期：权益核销、失败退回、官方退款与后台鉴权，不得静默脱离 CI。
+  'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:miniapp-virtual-pay-p2',
 ]
 
 const workflowText = readFileSync(workflowPath, 'utf8')

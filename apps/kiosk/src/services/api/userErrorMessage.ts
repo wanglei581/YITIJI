@@ -221,6 +221,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   SERVICE_ORDER_IN_USE: '这一次已经开始了，请等它办完',
   SERVICE_ORDER_REF_OCCUPIED: '这一项已经算在另一张付款单上了，请返回重新开始',
   SERVICE_PAYMENT_REQUIRED: '这一次要先付款，付好了才会开始',
+  SERVICE_RETRY_EXPIRED: '免费再试时间已过，这一次的费用会自动退回原付款账户，到账时间以支付渠道为准',
+  SERVICE_ORDER_REFUNDED: '这一次已进入退款流程，不再继续生成练习报告',
 }
 
 /**

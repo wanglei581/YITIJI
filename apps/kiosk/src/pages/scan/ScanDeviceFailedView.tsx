@@ -6,11 +6,13 @@ import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import { DocStackArt } from '../print-scan/ToolArt'
 import { ScanPaperArt } from './ScanPaperArt'
 import { ScanWorkbenchShell } from './ScanWorkbenchChrome'
+import { SCAN_RETRY_FREE_LABEL, type ScanFailedOrderNotice } from './scanPayModel'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { type ScanStage } from './scanWorkbenchModel'
 import { beginDeviceScanSameSettings, type ScanOutcome } from './scanWorkbenchSession'
 import './styles/scan-device-qx.css'
 import './styles/scan-device-errors.css'
+import './styles/scan-pay.css'
 
 const AGAIN = '照原设置再扫一次'
 const AGAIN_DETAIL = '把原件重新放好，可以照原设置再扫一次。'
@@ -33,17 +35,21 @@ const NO_FILE_DETAIL = '同一份结果里没有带可用的文件信息（结�
 export function ScanDeviceFailedView({
   outcome,
   shownReason,
+  tripNotice,
   leaveScanFlow,
   onGoStage,
 }: {
   outcome: ScanOutcome
   shownReason: string | null
+  tripNotice?: ScanFailedOrderNotice
   leaveScanFlow: (destination: string, options?: NavigateOptions) => void
   onGoStage?: (stage: ScanStage) => void
 }) {
   const { getToken } = useAuth()
   const isNoFile = outcome === 'completed-no-file'
   const isExpired = outcome === 'expired'
+  const freeRetry = tripNotice?.kind === 'retry_free'
+  const againLabel = freeRetry ? SCAN_RETRY_FREE_LABEL : AGAIN
   const title = isNoFile ? '已完成 · 结果里没有文件' : isExpired ? '等待超时' : '扫描未完成'
   const reason = isNoFile
     ? '系统说已完成，但这次结果里没有可用文件'
@@ -74,7 +80,7 @@ export function ScanDeviceFailedView({
       dock={{
         askLabel: '问小青：扫描失败怎么办',
         left: { label: '返回打印扫描', leaveTo: '/print-scan' },
-        primary: { label: AGAIN, onClick: again, testId: 'scan-device-failed-primary' },
+        primary: { label: againLabel, onClick: again, testId: 'scan-device-failed-primary' },
       }}
     >
       <div className={`cs-sfail cs-err cs-err${ways}${ways === 1 ? ' cs-solo' : ''}`} data-testid="scan-device-failed">
@@ -85,8 +91,13 @@ export function ScanDeviceFailedView({
           </span>
           <div><b>{reason}</b><p>{isNoFile ? NO_FILE_DETAIL : AGAIN_DETAIL}</p></div>
         </div>
+        {tripNotice?.text ? (
+          <p className="fs-p" data-testid="scan-result-pay-notice" data-pay-notice={tripNotice.kind}>
+            {tripNotice.text}
+          </p>
+        ) : null}
         <div className="cs-ways">
-          {card(AGAIN, AGAIN_WAY, <ScanPaperArt />, again, 'scan-device-failed-again')}
+          {card(againLabel, AGAIN_WAY, <ScanPaperArt />, again, 'scan-device-failed-again')}
           {isNoFile ? null : card('返回首页', '结束这次等待', <DocStackArt />, () => leaveScanFlow('/'), 'scan-device-failed-home')}
         </div>
         <PhoneHelpLine />

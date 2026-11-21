@@ -196,10 +196,17 @@ export async function retainClosureRecords(tx: PrismaTransactionClient, endUserI
     })
   }
   counts.ServiceOrder = serviceOrders.length
-  // 虚拟支付订单是收款记录：行留下，账号和 openid 清掉。权益行留下，只断开账号。
+  // 虚拟支付订单是收款记录：行留下，账号、openid 清掉，退款备注做去标识。权益行留下，只断开账号。
   const virtualPayOrders = await tx.virtualPayOrder.findMany({ where: { endUserId } })
   for (const row of virtualPayOrders) {
-    await tx.virtualPayOrder.update({ where: { id: row.id }, data: { endUserId: null, openId: null } })
+    await tx.virtualPayOrder.update({
+      where: { id: row.id },
+      data: {
+        endUserId: null,
+        openId: null,
+        refundReason: row.refundReason ? scrub(row.refundReason) : null,
+      },
+    })
   }
   counts.VirtualPayOrder = virtualPayOrders.length
   const serviceCredits = await tx.memberServiceCredit.findMany({ where: { endUserId } })

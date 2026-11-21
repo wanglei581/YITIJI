@@ -8,6 +8,8 @@ import type { PaymentProviderRegistry } from './payment-provider.factory'
 import type { RefundNotifyEvent, RefundQueryResult } from './payment-provider.types'
 import { isChannelAbnormal } from './refund-abnormal'
 import { deliverServiceRefundAlert, noteServiceRefundAbnormal } from './service-order-refund-abnormal'
+import { MINIAPP_CREDIT_PROVIDER } from '../virtual-pay/virtual-pay.contract'
+import { restoreMiniappCreditForServiceOrder } from '../virtual-pay/virtual-pay-credit-redeem'
 import {
   SERVICE_REFUND_BACKOFF_MS,
   SERVICE_REFUND_LEASE_MS,
@@ -184,6 +186,8 @@ export async function refundIfEffectivePriceMoved(
 export interface ServiceRefundOptions {
   manual?: boolean
   actorId?: string | null
+  /** 仅当 consumed 单的 reportState 精确匹配时才允许进入退款（防并发做成后误退）。 */
+  requireConsumedReportState?: 'retry' | null
 }
 
 /**
@@ -203,15 +207,22 @@ export async function executeServiceOrderRefund(
   const existing = await db.serviceOrder.findUnique({ where: { id: orderId } })
   if (!existing) return 'skipped'
   if (existing.status === 'refunded') return 'refunded'
+  if (existing.provider === MINIAPP_CREDIT_PROVIDER) {
+    return restoreMiniappCreditForServiceOrder(db, audit, existing, reason, opts)
+  }
   const manual = opts?.manual === true
   const cap = manual ? SERVICE_REFUND_RETRY_CAP + 1 : SERVICE_REFUND_RETRY_CAP
   const retryable = existing.status === 'refunding' || existing.status === 'refund_failed'
   if (retryable && existing.refundAttempts >= cap) return 'skipped'
   if (existing.status !== 'paid' && existing.status !== 'consumed' && !retryable) return 'skipped'
+  if (existing.status === 'consumed' && existing.reportState === 'done') return 'skipped'
+  if (existing.status === 'consumed' && opts?.requireConsumedReportState !== undefined && existing.reportState !== opts.requireConsumedReportState) {
+    return 'skipped'
+  }
 
   const refundNo = existing.refundNo ?? serviceRefundNo(existing.id)
   const nextRefundAt = new Date(now.getTime() + SERVICE_REFUND_RETRY_INTERVAL_MS)
-  const claimed = await claimRefund(db, existing, reason, refundNo, nextRefundAt, now, cap, manual)
+  const claimed = await claimRefund(db, existing, reason, refundNo, nextRefundAt, now, cap, manual, opts?.requireConsumedReportState)
   if (claimed !== 1) {
     const fresh = await db.serviceOrder.findUnique({ where: { id: orderId } })
     if (fresh?.status === 'refunded') return 'refunded'
@@ -368,12 +379,18 @@ async function claimRefund(
   now: Date,
   cap: number,
   manual: boolean,
+  requireConsumedReportState?: 'retry' | null,
 ): Promise<number> {
   const refundLeaseUntil = new Date(now.getTime() + SERVICE_REFUND_LEASE_MS)
   if (existing.status === 'paid' || existing.status === 'consumed') {
+    const consumedReportGuard = existing.status === 'consumed'
+      ? (requireConsumedReportState !== undefined
+        ? { reportState: requireConsumedReportState }
+        : { OR: [{ reportState: null }, { reportState: { not: 'done' } }] })
+      : {}
     const res = await db.serviceOrder.updateMany({
-      where: { id: existing.id, status: existing.status },
-      data: { status: 'refunding', refundReason: reason, refundNo, nextRefundAt, refundLeaseUntil },
+      where: { id: existing.id, status: existing.status, ...consumedReportGuard },
+      data: { status: 'refunding', refundReason: reason, refundNo, nextRefundAt, refundLeaseUntil, retryUntil: null },
     })
     return res.count
   }

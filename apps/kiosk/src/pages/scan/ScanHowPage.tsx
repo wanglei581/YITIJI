@@ -15,7 +15,11 @@ import { SCAN_DEVICE_RAIL, ScanWorkbenchShell, type ScanDock } from './ScanWorkb
 import { type ScanStage } from './scanWorkbenchModel'
 import { patchScanWorkbenchSession, readScanWorkbenchSession } from './scanWorkbenchSession'
 import { useScanDeviceCapability } from './useScanDeviceCapability'
+import { payServicePath } from '../pay/payServiceModel'
+import { SCAN_PAY_BAR_DESC, scanPayBarTitle, scanPayButtonLabel } from './scanPayModel'
+import { clearScanDeviceAutoStartAfterPay, forgetEndedScanTrip, useScanPayState } from './useScanPayGate'
 import './styles/scan-device-qx.css'
+import './styles/scan-pay.css'
 
 function labelOf(material: ScanMaterial): string {
   return SCAN_MATERIALS.find((item) => item.material === material)?.label ?? ''
@@ -50,9 +54,14 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
   const { isLoggedIn } = useAuth()
   const cap = useScanDeviceCapability()
   const probe = useLocalScanProbe(true)
+  const pay = useScanPayState()
   const [material, setMaterial] = useState<ScanMaterial | null>(null)
   const [way, setWay] = useState<'screen' | 'panel'>('panel')
   const userPicked = useRef(false)
+
+  useEffect(() => {
+    clearScanDeviceAutoStartAfterPay()
+  }, [])
 
   useEffect(() => {
     const session = readScanWorkbenchSession()
@@ -105,11 +114,29 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
   const readyLabel = scanReadyChipText(screenAllowed && probe.freshReady && cap.allowed)
   const pending = cap.loading || (cap.allowed && probe.phase !== 'done')
   const createsOnNext = showOff || (!pending && !(screenAllowed && way === 'screen'))
+  const panelChargeCents = createsOnNext && !pay.loading && pay.needsPayment && pay.chargeCents !== null && pay.chargeCents > 0
+    ? pay.chargeCents
+    : null
   const goWhat = (): void => {
     patchScanWorkbenchSession({ stage: 'start' })
     onGoStage?.('start')
   }
+  const goPanelPay = (): void => {
+    forgetEndedScanTrip(pay.trip, pay.order)
+    patchScanWorkbenchSession({
+      stage: 'how',
+      material,
+      scanType: panelScanType(material),
+      live: undefined,
+      result: undefined,
+    })
+    navigate(payServicePath('scan', { next: 'settings', back: 'how' }))
+  }
   const goPanel = (): void => {
+    if (panelChargeCents !== null) {
+      goPanelPay()
+      return
+    }
     openPanelScanSettings(navigate, onGoStage, panelScanType(material))
   }
   const goNext = (): void => {
@@ -138,13 +165,19 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
   const dock: ScanDock = showOff
     ? {
         left: { label: '返回', leaveTo: '/print-scan' },
-        primary: { label: '到打印机面板上扫', onClick: goPanel },
+        primary: {
+          label: panelChargeCents !== null ? scanPayButtonLabel(panelChargeCents) : '到打印机面板上扫',
+          onClick: goPanel,
+        },
       }
     : {
         left: { label: '返回', onClick: goWhat },
         primary: pending
           ? { label: '正在检查扫描仪', onClick: () => undefined, disabled: true, noArrow: true }
-          : { label: '下一步', onClick: goNext },
+          : {
+              label: panelChargeCents !== null ? scanPayButtonLabel(panelChargeCents) : '下一步',
+              onClick: goNext,
+            },
       }
 
   return (
@@ -240,7 +273,14 @@ export function ScanHowPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => v
           <PhoneHelpLine />
         </div>
       )}
-      {createsOnNext ? <p className="cs-create" role="status">下一步会真实建立这次扫描</p> : null}
+      {panelChargeCents !== null ? (
+        <div className="fs-pay-bar" data-testid="scan-pay-bar">
+          <b>{scanPayBarTitle(panelChargeCents)}</b>
+          <span>{SCAN_PAY_BAR_DESC}</span>
+        </div>
+      ) : createsOnNext ? (
+        <p className="cs-create" role="status">下一步会真实建立这次扫描</p>
+      ) : null}
       </div>
     </ScanWorkbenchShell>
   )

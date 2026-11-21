@@ -69,6 +69,39 @@ type JsonMapperHost = {
   mapJson(method: string, path: string, map: (json: unknown) => unknown): void
 }
 
+/** 简历优化单价（默认 1.00 元），其余四项全 0。 */
+export function resumeOnlyMachinePricing(resumeCents = 100): Record<string, unknown> {
+  return machinePricing(0, 0, { resume_optimize: resumeCents })
+}
+
+/** 五项生效价全 0（开启个人收费但各项都是免费）。 */
+export function freeMachinePricing(): Record<string, unknown> {
+  return machinePricing(0, 0)
+}
+
+/** 扫一趟收费（扫描 1.00 元，其余 0），P2e-4 用例夹具。 */
+export function scanOnlyChargedPricing(scanCents = 100): Record<string, unknown> {
+  return machinePricing(0, 0, { scan: scanCents })
+}
+
+/** 全部 0 元（免费机器），P2e-4 用例夹具。 */
+export function allFreeMachinePricing(): Record<string, unknown> {
+  return machinePricing(0, 0)
+}
+
+/** 公共就业点位：永远不向个人收费（即使后台价格位非 0，页面仍按免费展示）。 */
+export function publicSiteMachinePricing(
+  input: number | MachineServicePrices = 100,
+): Record<string, unknown> {
+  const services: MachineServicePrices = typeof input === 'number'
+    ? { resume_optimize: input }
+    : input
+  return {
+    ...machinePricing(0, 0, services),
+    isPublicSite: true,
+  }
+}
+
 /** 在已经登记的终端配置上盖上本机价，不改托管、百宝箱等其它字段。 */
 export function attachMachinePricing(api: JsonMapperHost, bw: number, color: number, services: MachineServicePrices = {}): void {
   attachMachinePricingWith(api, machinePricing(bw, color, services))
@@ -78,6 +111,18 @@ export function attachMachinePricing(api: JsonMapperHost, bw: number, color: num
 export function attachMachinePricingWith(api: JsonMapperHost, pricing: Record<string, unknown>): void {
   api.mapJson('GET', KIOSK_CONFIG_PATH, (json) => {
     const base = json && typeof json === 'object' ? (json as Record<string, unknown>) : {}
+    return { ...base, pricing }
+  })
+}
+
+/** 在已经登记的终端配置上盖上指定价目对象（传 undefined 表示去掉 pricing，模拟读不到价）。 */
+export function attachRawMachinePricing(api: JsonMapperHost, pricing: Record<string, unknown> | undefined): void {
+  api.mapJson('GET', KIOSK_CONFIG_PATH, (json) => {
+    const base = json && typeof json === 'object' ? { ...(json as Record<string, unknown>) } : {}
+    if (pricing === undefined) {
+      delete base.pricing
+      return base
+    }
     return { ...base, pricing }
   })
 }

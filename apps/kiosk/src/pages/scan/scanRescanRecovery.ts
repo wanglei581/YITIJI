@@ -230,6 +230,12 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
         description: `上一位的扫描可能还在出纸，请等约 ${seconds} 秒再开始。倒计时结束后可以重新建立扫描。`,
       }
     }
+    if (code === 'SERVICE_ORDER_IN_USE') {
+      return {
+        title: '这一次扫描已经在进行',
+        description: '这一次已经付过款并且正在进行，不用再付。等刚才那场办完后，可直接点下方按钮接着这一次继续。',
+      }
+    }
     if (code === 'SCAN_TERMINAL_BUSY') {
       return { title: '本机正在扫描中', description: scanShownText(userMessageOf(error, '请等待当前扫描任务完成后再试。'), '请等待当前扫描任务完成后再试。') }
     }

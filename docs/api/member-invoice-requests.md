@@ -160,3 +160,47 @@ Authorization: Bearer <会员 token>
 | `createdAt` | 提交时间 |
 
 不导出操作人。税号和邮箱只给打码后的样子，与会员接口同一口径。
+
+## GET /api/v1/me/service-orders（自助开票二期）
+
+会员侧 AI/扫描服务单只读列表，供一体机「我的订单」混排与开发票入口使用。受 `EndUserAuthGuard` 保护（401 错误码同上），响应头带 `Cache-Control: no-store`。
+
+查询参数（多余参数 400 `VALIDATION_FAILED`）：
+
+| 参数 | 约束 |
+|---|---|
+| `pageSize` | 正整数，不传默认 20，超过 50 封顶 50；非正整数返回 400 `VALIDATION_FAILED` |
+| `cursor` | 上一页返回的 `nextCursor`，原样带回；非法游标返回 400 `VALIDATION_FAILED` |
+
+数据范围：仅返回当前登录会员名下、`amountCents > 0`、`paymentFailed = false`、且 `status` 属于 `paid` / `consumed` / `refunding` / `refunded` / `refund_failed` 的 `ServiceOrder`（不回未付草稿 `pending`、关闭单 `closed`、0 元单）。按 `createdAt DESC, id DESC` 排序。
+
+`data` 为 `{ "items": [...], "nextCursor": "..." | null, "total": number }`。`items` 每项只包含零 PII 安全字段：
+
+| 字段 | 取值 |
+|---|---|
+| `id` | 服务单编号 |
+| `serviceKey` | `resume_optimize` / `mock_interview` / `scan` |
+| `serviceName` | `AI 简历优化` / `AI 模拟面试` / `扫描` |
+| `status` | `paid` / `consumed` / `refunding` / `refunded` / `refund_failed` |
+| `amountCents` | 整数，单位分 |
+| `paidAt` / `settledAt` / `refundedAt` | ISO 8601 或 `null` |
+| `refundReason` | 退款原因码或 `null` |
+| `createdAt` | ISO 8601 |
+| `canInvoice` | 布尔，同源复用 `assessInvoiceEligibility` 判定 |
+| `invoiceStatus` | `none` / `submitted` / `issued` / `returned`（同一单优先取未退回申请 `submitted`/`issued`，否则取最近 `returned`） |
+| `invoiceRequestId` | 最新对应开票申请编号，无申请时为 `null` |
+
+绝不返回 `taxId`、`email`、`title`、`qrCodeContent`、`prepayId`、`channelTxnNo`、`providerOrderNo`、`wxOpenId`、`endUserId`。
+
+同源补齐：`GET /api/v1/me/print-orders` 对已关联 `Order` 且 `amountCents > 0` 的打印单，只增可选字段 `canInvoice`、`invoiceStatus`、`invoiceRequestId`（复用同一 `assessInvoiceEligibility` 判据，零 PII；免费单与无 `Order` 历史单不增加多余字段）。
+
+## 一体机自助开发票扫码屏（`/me/orders/invoice`）
+
+1. 用户在一体机 `/me/print-orders`（「我的订单」）点击某张可开票服务单或收费打印单右侧的「开发票」，进入 `/me/orders/invoice?kind=service|print&id=<orderId>`。
+2. 页面带会员 Bearer 与终端验签头调用 `POST /api/v1/kiosk/invoice-sessions`（入参 `{ orderKind, orderId }`），在头部白底码框展示返回的 `codeUrl`（`/k/i/<scene>`）二维码。
+3. 凭据 `controlToken` 仅保存在组件内存 ref 中，严禁写入 `localStorage`、`sessionStorage` 或 URL；屏幕绝不出现抬头、税号、邮箱输入框。
+4. 页面每 3 秒带终端验签头与 `x-invoice-control` 轮询 `GET /api/v1/kiosk/invoice-sessions/:sessionId`（遵守 60/min 限流、页面可见性暂停与 429 `Retry-After` 退避）：
+   - 变为 `已提交`：更新状态胶囊并展示确认句，立停轮询并清空内存 `controlToken`；点「填好了，返回订单」返回 `/me/print-orders` 刷新列表。
+   - 变为 `已过期` 或本地越过 `expiresAt`：隐藏失效二维码、立停轮询，主按钮切换为「重新生成开票码」。
+   - 离开页面、退出登录或换人时立停轮询并清空内存状态。
+5. 本机免费且直接无参访问，或服务端以 0 元实付拒单时，展示免费兜底屏；跨点位历史收费单在免费机上仍按订单自身事实允许开票。

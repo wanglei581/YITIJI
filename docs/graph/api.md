@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`700` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`706` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -853,7 +853,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | — | — |
-| GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | MemberPrintOrdersService | PrintTask<br/>Terminal |
+| GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | MemberPrintOrdersService | InvoiceRequest<br/>Order<br/>PrintTask<br/>Terminal |
 | POST | `/api/v1/me/print-orders` | MemberPrintOrdersController.create | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
@@ -861,7 +861,7 @@
 | POST | `/api/v1/me/print-orders/:orderId/reissue-pickup-code` | MemberPrintOrdersController.reissuePickupCode | — | PickupCodeReissueService | AuditLog<br/>FileObject<br/>Order<br/>Terminal |
 | GET | `/api/v1/me/print-orders/cloud` | MemberPrintOrdersController.listCloud | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/submissions/resolve` | MemberPrintOrdersController.resolveSubmissions | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
-| GET | `/api/v1/me/print-orders/timeline` | MemberPrintOrdersController.listTimeline | — | MemberOrderTimelineService | FileObject<br/>Order<br/>PrintTask<br/>Terminal |
+| GET | `/api/v1/me/print-orders/timeline` | MemberPrintOrdersController.listTimeline | — | MemberOrderTimelineService | FileObject<br/>InvoiceRequest<br/>Order<br/>PrintTask<br/>Terminal |
 
 ## `services/api/src/member-print-orders/package-orders.controller.ts`
 
@@ -908,19 +908,19 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/mock-interviews` | CreateInterviewDto.list | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| POST | `/api/v1/mock-interviews` | CreateInterviewDto.create | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| DELETE | `/api/v1/mock-interviews/:id` | CreateInterviewDto.remove | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| GET | `/api/v1/mock-interviews/:id` | CreateInterviewDto.get | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| POST | `/api/v1/mock-interviews/:id/answer` | CreateInterviewDto.answer | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| POST | `/api/v1/mock-interviews/:id/end` | CreateInterviewDto.end | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| POST | `/api/v1/mock-interviews/:id/practice-sheet` | CreateInterviewDto.practiceSheet | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| GET | `/api/v1/mock-interviews/:id/report` | CreateInterviewDto.report | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| POST | `/api/v1/mock-interviews/:id/report/print` | CreateInterviewDto.print | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| POST | `/api/v1/mock-interviews/:id/start` | CreateInterviewDto.start | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
-| POST | `/api/v1/mock-interviews/:id/transcribe` | CreateInterviewDto.transcribe | — | AiLogService<br/>AsrService<br/>MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| GET | `/api/v1/mock-interviews` | CreateInterviewDto.list | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| POST | `/api/v1/mock-interviews` | CreateInterviewDto.create | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| DELETE | `/api/v1/mock-interviews/:id` | CreateInterviewDto.remove | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| GET | `/api/v1/mock-interviews/:id` | CreateInterviewDto.get | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| POST | `/api/v1/mock-interviews/:id/answer` | CreateInterviewDto.answer | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| POST | `/api/v1/mock-interviews/:id/end` | CreateInterviewDto.end | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| POST | `/api/v1/mock-interviews/:id/practice-sheet` | CreateInterviewDto.practiceSheet | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| GET | `/api/v1/mock-interviews/:id/report` | CreateInterviewDto.report | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| POST | `/api/v1/mock-interviews/:id/report/print` | CreateInterviewDto.print | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| POST | `/api/v1/mock-interviews/:id/start` | CreateInterviewDto.start | — | MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
+| POST | `/api/v1/mock-interviews/:id/transcribe` | CreateInterviewDto.transcribe | — | AiLogService<br/>AsrService<br/>MockInterviewService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
 | POST | `/api/v1/mock-interviews/:id/transcript/print` | CreateInterviewDto.printTranscript | — | InterviewTranscriptPrintService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/turns/:idx/audio` | CreateInterviewDto.questionAudio | — | AiLogService<br/>MockInterviewService<br/>TtsService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| POST | `/api/v1/mock-interviews/:id/turns/:idx/audio` | CreateInterviewDto.questionAudio | — | AiLogService<br/>MockInterviewService<br/>TtsService | AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask<br/>RedemptionRecord<br/>ServiceOrder<br/>UserAiConsent |
 | GET | `/api/v1/mock-interviews/availability` | CreateInterviewDto.availability | — | — | — |
 | GET | `/api/v1/mock-interviews/capabilities/voice` | CreateInterviewDto.voiceCapability | — | — | — |
 
@@ -1042,6 +1042,12 @@
 | POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
 | POST | `/api/v1/admin/orders/:id/refund-after-paper-check` | AdminOrderActionsController.refundAfterPaperCheck | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
 
+## `services/api/src/payment/member-service-order.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/me/service-orders` | ListMemberServiceOrdersQueryDto.list | — | MemberServiceOrderService | InvoiceRequest<br/>ServiceOrder |
+
 ## `services/api/src/payment/order-quote.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
@@ -1067,8 +1073,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/admin/orders/:id/refund-service` | ServiceOrderAdminController.refund | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| POST | `/api/v1/admin/orders/:id/retry-service-refund` | ServiceOrderAdminController.retry | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/admin/orders/:id/refund-service` | ServiceOrderAdminController.refund | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/admin/orders/:id/retry-service-refund` | ServiceOrderAdminController.retry | admin | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/payment/service-order-sandbox.controller.ts`
 
@@ -1080,9 +1086,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/service-orders` | ServiceOrderController.create | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| GET | `/api/v1/kiosk/service-orders/:id` | ServiceOrderController.get | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
-| POST | `/api/v1/kiosk/service-orders/:id/close` | ServiceOrderController.close | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/service-orders` | ServiceOrderController.create | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| GET | `/api/v1/kiosk/service-orders/:id` | ServiceOrderController.get | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
+| POST | `/api/v1/kiosk/service-orders/:id/close` | ServiceOrderController.close | — | ServiceOrderService | AiResumeResult<br/>AuditLog<br/>KioskSession<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PlatformSetting<br/>ScanTask<br/>ServiceOrder<br/>Terminal |
 
 ## `services/api/src/policies/policies.controller.ts`
 
@@ -1363,9 +1369,19 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/billing/miniapp-virtual-pay` | VirtualPayAdminController.getSettings | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
-| PUT | `/api/v1/admin/billing/miniapp-virtual-pay` | VirtualPayAdminController.setEnabled | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
-| PUT | `/api/v1/admin/billing/miniapp-virtual-pay/goods/:serviceKind` | VirtualPayAdminController.setGoods | admin | VirtualPayAdminService | AuditLog<br/>PlatformSetting |
+| GET | `/api/v1/admin/billing/miniapp-virtual-pay` | VirtualPayAdminController.getSettings | admin | VirtualPayAdminService | AuditLog<br/>MemberServiceCredit<br/>PlatformSetting<br/>VirtualPayOrder |
+| PUT | `/api/v1/admin/billing/miniapp-virtual-pay` | VirtualPayAdminController.setEnabled | admin | VirtualPayAdminService | AuditLog<br/>MemberServiceCredit<br/>PlatformSetting<br/>VirtualPayOrder |
+| PUT | `/api/v1/admin/billing/miniapp-virtual-pay/goods/:serviceKind` | VirtualPayAdminController.setGoods | admin | VirtualPayAdminService | AuditLog<br/>MemberServiceCredit<br/>PlatformSetting<br/>VirtualPayOrder |
+| GET | `/api/v1/admin/billing/miniapp-virtual-pay/orders` | VirtualPayAdminController.listOrders | admin | VirtualPayAdminService | AuditLog<br/>MemberServiceCredit<br/>PlatformSetting<br/>VirtualPayOrder |
+| GET | `/api/v1/admin/billing/miniapp-virtual-pay/orders/:id` | VirtualPayAdminController.getOrder | admin | VirtualPayAdminService | AuditLog<br/>MemberServiceCredit<br/>PlatformSetting<br/>VirtualPayOrder |
+| POST | `/api/v1/admin/billing/miniapp-virtual-pay/orders/:id/refund` | VirtualPayAdminController.refundOrder | admin | VirtualPayAdminService | AuditLog<br/>MemberServiceCredit<br/>PlatformSetting<br/>VirtualPayOrder |
+| POST | `/api/v1/admin/billing/miniapp-virtual-pay/orders/:id/sync` | VirtualPayAdminController.syncOrder | admin | VirtualPayAdminService | AuditLog<br/>MemberServiceCredit<br/>PlatformSetting<br/>VirtualPayOrder |
+
+## `services/api/src/virtual-pay/virtual-pay-credit-redeem.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/kiosk/service-orders/redeem-credit` | VirtualPayCreditRedeemController.redeem | — | VirtualPayCreditRedeemService | AuditLog<br/>EndUser<br/>KioskSession<br/>MemberServiceCredit<br/>MockInterviewTurn<br/>ServiceOrder |
 
 ## `services/api/src/virtual-pay/virtual-pay-credits.controller.ts`
 

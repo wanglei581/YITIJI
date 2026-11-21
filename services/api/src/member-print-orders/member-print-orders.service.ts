@@ -6,6 +6,12 @@ import type {
 } from './member-print-orders.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+import { assessInvoiceEligibility } from '../invoices/invoice-eligibility'
+import {
+  pickLatestInvoiceRequestByOrder,
+  toInvoiceOpenStatus,
+  type MemberInvoiceStatus,
+} from '../invoices/invoice-request-summary'
 import { isPaidUnfulfilledRefundRequired } from '../payment/pending-refund-signal'
 import {
   arrivalViewsForOrders,
@@ -183,6 +189,35 @@ export function memberOrderPaymentFields(
   }
 }
 
+const PRINT_ORDER_LIST_SELECT = {
+  id: true,
+  orderNo: true,
+  endUserId: true,
+  // 任务上没记终端时用订单上的终端兜底显示网点名。
+  terminalId: true,
+  amountCents: true,
+  payStatus: true,
+  paymentSource: true,
+  billablePages: true,
+  billingPageSource: true,
+  pickupCodeHash: true,
+  pickupCodeEnc: true,
+  pickupStatus: true,
+  pickupCodeExpiresAt: true,
+  pickupClaimedAt: true,
+  paidAt: true,
+  printTaskId: true,
+  taskStatus: true,
+  refundedAt: true,
+  // C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）。
+  refundedAmountCents: true,
+  discountCents: true,
+  // API-20：只用来派生 refundRequired，不回传内部原因码。
+  refundReason: true,
+  // 自助开票二期：仅用于同源调用 assessInvoiceEligibility，不外露退款详情。
+  refunds: { select: { status: true } },
+} as const
+
 @Injectable()
 export class MemberPrintOrdersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -209,52 +244,75 @@ export class MemberPrintOrdersService {
         errorCode: true,
         // 出纸 / 领取的那台机器：小程序对账要显示网点名（2026-09-29 契约，只加不改）。
         terminal: { select: { id: true, displayName: true, locationLabel: true } },
-        order: {
-          select: {
-            id: true,
-            orderNo: true,
-            // 任务上没记终端时用订单上的终端兜底显示网点名。
-            terminalId: true,
-            amountCents: true,
-            payStatus: true,
-            paymentSource: true,
-            billablePages: true,
-            billingPageSource: true,
-            pickupCodeHash: true,
-            pickupCodeEnc: true,
-            pickupStatus: true,
-            pickupCodeExpiresAt: true,
-            pickupClaimedAt: true,
-            paidAt: true,
-            printTaskId: true,
-            taskStatus: true,
-            refundedAt: true,
-            // C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）。
-            refundedAmountCents: true,
-            discountCents: true,
-            // API-20：只用来派生 refundRequired，不回传内部原因码。
-            refundReason: true,
-          },
-        },
+        order: { select: PRINT_ORDER_LIST_SELECT },
       },
       ...memberPageArgs(page),
     })
+    // 材料包多任务共享同一 Order：Order.printTaskId 只指向当前任务，子任务仅在 PrintTask.orderId 挂钩；
+    // 按 endUserId 批量补查关联订单，确保同包全部任务的收费与开票态口径一致且不越权。
+    const linkedOrderIds = [...new Set(rows.flatMap((r) => (!r.order && r.orderId ? [r.orderId] : [])))]
+    const linkedOrders = linkedOrderIds.length > 0
+      ? new Map((await this.prisma.order.findMany({
+          where: { id: { in: linkedOrderIds }, endUserId, type: { not: 'copy' } },
+          select: PRINT_ORDER_LIST_SELECT,
+        })).map((o) => [o.id, o]))
+      : new Map<string, NonNullable<(typeof rows)[number]['order']>>()
+    const resolvedOrderOf = (r: (typeof rows)[number]) => r.order ?? (r.orderId ? linkedOrders.get(r.orderId) ?? null : null)
+    const uniqueResolvedOrders = [...new Map(
+      rows.flatMap((r) => {
+        const order = resolvedOrderOf(r)
+        return order ? [[order.id, order] as const] : []
+      }),
+    ).values()]
     const fallbackTerminalIds = [...new Set(rows
-      .filter((r) => !r.terminal && r.order?.terminalId)
-      .map((r) => r.order!.terminalId as string))]
+      .map((r) => (!r.terminal ? resolvedOrderOf(r)?.terminalId ?? null : null))
+      .filter((terminalId): terminalId is string => Boolean(terminalId)))]
     const fallbackTerminals = fallbackTerminalIds.length
       ? new Map((await this.prisma.terminal.findMany({
           where: { id: { in: fallbackTerminalIds } },
           select: { id: true, displayName: true, locationLabel: true },
         })).map((t) => [t.id, t]))
       : new Map<string, { id: string; displayName: string | null; locationLabel: string | null }>()
-    const arrivalViews = await arrivalViewsForOrders(
-      this.prisma,
-      rows.flatMap((row) => (row.order ? [row.order] : [])),
-    )
+    const arrivalViews = await arrivalViewsForOrders(this.prisma, uniqueResolvedOrders)
+    const chargedOrderIds = uniqueResolvedOrders.filter((o) => o.amountCents > 0).map((o) => o.id)
+    const invoiceByOrder = chargedOrderIds.length > 0
+      ? pickLatestInvoiceRequestByOrder(
+          await this.prisma.invoiceRequest.findMany({
+            where: { endUserId, orderKind: 'print', orderId: { in: chargedOrderIds } },
+            select: { id: true, orderId: true, status: true, createdAt: true },
+          }),
+        )
+      : new Map()
     return buildMemberPage(rows, page, total, (r) => {
-      const terminal = r.terminal ?? (r.order?.terminalId ? fallbackTerminals.get(r.order.terminalId) ?? null : null)
+      const order = resolvedOrderOf(r)
+      const terminal = r.terminal ?? (order?.terminalId ? fallbackTerminals.get(order.terminalId) ?? null : null)
       const params = parseSafeParams(r.paramsJson)
+      const invoiceFields = order && order.amountCents > 0
+        ? (() => {
+            const picked = invoiceByOrder.get(order.id)
+            const decision = assessInvoiceEligibility(
+              {
+                kind: 'print',
+                id: order.id,
+                endUserId: order.endUserId,
+                payStatus: order.payStatus,
+                amountCents: order.amountCents,
+                discountCents: order.discountCents,
+                refundedAmountCents: order.refundedAmountCents,
+                refundStatuses: order.refunds.map((refund) => refund.status),
+                openInvoiceStatus: toInvoiceOpenStatus(picked),
+              },
+              endUserId,
+            )
+            const invoiceStatus: MemberInvoiceStatus = picked?.status ?? 'none'
+            return {
+              payableAmountCents: decision.amountCents,
+              canInvoice: decision.ok,
+              invoiceStatus,
+              invoiceRequestId: invoiceStatus === 'none' ? null : (picked?.id ?? null),
+            }
+          })()
+        : null
       return {
         id: r.id,
         status: r.status,
@@ -266,12 +324,13 @@ export class MemberPrintOrdersService {
         duplex: params.duplex,
         paperSize: params.paperSize,
         pageRange: params.pageRange,
-        // 单件订单经 Order.printTaskId 关联本任务；材料包子任务才在 PrintTask.orderId 上。
-        orderId: r.order?.id ?? r.orderId ?? null,
-        orderNo: r.order?.orderNo ?? null,
+        // 只返回已经归属核验的本人订单标识；绝不回退透传未经归属校验的 r.orderId。
+        orderId: order?.id ?? null,
+        orderNo: order?.orderNo ?? null,
         terminal: terminal ? { id: terminal.id, displayName: terminal.displayName ?? null, locationLabel: terminal.locationLabel ?? null } : null,
         failureCode: r.status === 'failed' && r.errorCode && MEMBER_VISIBLE_FAILURE_CODES.has(r.errorCode) ? r.errorCode : null,
-        ...memberOrderPaymentFields(r.order, r.order ? arrivalViews.get(r.order.id) : null),
+        ...memberOrderPaymentFields(order, order ? arrivalViews.get(order.id) : null),
+        ...(invoiceFields ?? {}),
       }
     })
   }

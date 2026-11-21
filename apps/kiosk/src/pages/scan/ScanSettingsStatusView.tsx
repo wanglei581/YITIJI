@@ -64,11 +64,13 @@ export interface ScanSettingsStatusViewProps {
   cleanupHolding: boolean
   quietPeriodRemaining: number
   quietPeriodBlocked: boolean
+  orderInUse: boolean
   handleSafeReturn: () => void
   handlePlainRestart: () => void
   handleRescanRetry: () => void
   handleAckRetry: () => void
   handleQuietPeriodRetry: () => void
+  handleContinuePaidOrder: () => void
 }
 
 export function ScanSettingsStatusView({
@@ -86,11 +88,13 @@ export function ScanSettingsStatusView({
   cleanupHolding,
   quietPeriodRemaining,
   quietPeriodBlocked,
+  orderInUse,
   handleSafeReturn,
   handlePlainRestart,
   handleRescanRetry,
   handleAckRetry,
   handleQuietPeriodRetry,
+  handleContinuePaidOrder,
 }: ScanSettingsStatusViewProps) {
   /* 会话建成了，投递授权还没到手。它压在其它分支**之上**：phase 已经是 success，
    * 按旧判据这一屏会直接画出面板操作指引 —— 而那正是这次要挡掉的动作。 */
@@ -191,19 +195,21 @@ export function ScanSettingsStatusView({
         ? { label: '再试一次安全重扫', onClick: handleRescanRetry }
         : rescanCredentialsLost || rescanRefusedByServer || ackRefused
           ? { label: '重新开始一次扫描', onClick: handlePlainRestart }
-          : {
-              label: phase === 'loading'
-                ? '等系统返回这次扫描'
-                /* 这一支上任务**建过**（随后被本页撤掉），说「未创建」就是句假话。 */
-                : liveNotDurable
-                  ? '本机暂时存不下扫描记录，无法开始这次扫描'
-                  /* 这一支上一个请求都没发过，说「未创建扫描任务」不算错，但没说出
-                     为什么按不了 —— 用户会以为是自己哪一步做漏了。 */
-                  : cleanupHolding ? '等本机收完上一场的尾' : '未创建扫描任务',
-              onClick: noop,
-              disabled: true,
-              noArrow: true,
-            }
+          : orderInUse
+            ? { label: '接着这一次继续', onClick: handleContinuePaidOrder }
+            : {
+                label: phase === 'loading'
+                  ? '等系统返回这次扫描'
+                  /* 这一支上任务**建过**（随后被本页撤掉），说「未创建」就是句假话。 */
+                  : liveNotDurable
+                    ? '本机暂时存不下扫描记录，无法开始这次扫描'
+                    /* 这一支上一个请求都没发过，说「未创建扫描任务」不算错，但没说出
+                       为什么按不了 —— 用户会以为是自己哪一步做漏了。 */
+                    : cleanupHolding ? '等本机收完上一场的尾' : '未创建扫描任务',
+                onClick: noop,
+                disabled: true,
+                noArrow: true,
+              }
   const dock: ScanDock = {
     left: { label: '安全返回扫描首页', onClick: handleSafeReturn },
     primary,

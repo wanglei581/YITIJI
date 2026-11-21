@@ -11,7 +11,7 @@ export interface VirtualPayOpsAlertInput {
   fetchImpl?: typeof fetch
   outTradeNo: string
   episodeToken: string
-  type: 'virtual_pay_manual_review' | 'virtual_pay_closed_order_recovered'
+  type: 'virtual_pay_manual_review' | 'virtual_pay_closed_order_recovered' | 'virtual_pay_refund_failed'
   severity: 'error' | 'warning'
   title: string
   logger?: Pick<Logger, 'warn'>

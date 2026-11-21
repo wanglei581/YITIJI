@@ -25,6 +25,8 @@ export interface InterviewSetupDraft {
   aiOutage: string | null
   startFailed: boolean
   probed: boolean
+  step?: 1 | 2 | 3
+  autoStartAfterPay?: boolean
 }
 
 export interface InterviewLiveState {
@@ -44,6 +46,9 @@ export interface InterviewLiveState {
   omitPrintAnswers: boolean
   /** 本场至少一次非跳过的 answer 接口成功过。缺省当没有。 */
   answersRecorded?: boolean
+  /** 收费开场时绑定的服务单与建单会话号，供作答页报告失败时查同一张单。 */
+  paidOrderId?: string
+  paidKioskSessionId?: string
 }
 
 export interface InterviewReportHandle {
@@ -105,6 +110,8 @@ function parseSetupDraft(raw: unknown): InterviewSetupDraft | undefined {
     aiOutage: typeof raw.aiOutage === 'string' ? raw.aiOutage : null,
     startFailed: raw.startFailed === true,
     probed: raw.probed === true,
+    step: raw.step === 1 || raw.step === 2 || raw.step === 3 ? raw.step : undefined,
+    autoStartAfterPay: raw.autoStartAfterPay === true ? true : undefined,
   }
 }
 
@@ -139,6 +146,8 @@ function parseLive(raw: unknown): InterviewLiveState | undefined {
     deadlineSource: raw.deadlineSource === 'server' || raw.deadlineSource === 'local' ? raw.deadlineSource : undefined,
     omitPrintAnswers: raw.omitPrintAnswers === true,
     answersRecorded: raw.answersRecorded === true,
+    paidOrderId: typeof raw.paidOrderId === 'string' && raw.paidOrderId.length > 0 ? raw.paidOrderId : undefined,
+    paidKioskSessionId: typeof raw.paidKioskSessionId === 'string' && raw.paidKioskSessionId.length > 0 ? raw.paidKioskSessionId : undefined,
   }
 }
 

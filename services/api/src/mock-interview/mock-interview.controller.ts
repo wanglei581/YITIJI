@@ -21,7 +21,7 @@ import { AiLogService } from '../ai/ai-log.service'
 import { PaidAiThrottle, TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
 import { MOCK_INTERVIEW_NOT_CONFIGURED } from './mock-interview-availability'
 import { MockInterviewAvailability } from './mock-interview-availability.service'
-import { chargeInterviewStart } from '../payment/service-order.intercept'
+import { chargeInterviewStart, interviewReportHooks } from '../payment/service-order.intercept'
 import { ServiceOrderService } from '../payment/service-order.service'
 
 // ── DTO（全局 forbidNonWhitelisted：未知字段直接 400）─────────────────────────
@@ -305,6 +305,7 @@ export class MockInterviewController {
   async end(@Param('id') id: string, @Body() dto: EndInterviewDto, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.end(id, await this.requesterOf(req), {
       includeAnswersInPrint: dto?.includeAnswersInPrint !== false,
+      ...interviewReportHooks(this.serviceOrders, id),
     }))
   }
 

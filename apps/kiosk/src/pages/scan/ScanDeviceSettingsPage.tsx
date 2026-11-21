@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { useAuth } from '../../auth/useAuth'
 import { useLocalScanProbe } from '../../hooks/useTerminalDeviceStatus'
+import { payServicePath } from '../pay/payServiceModel'
 import { FeederArt, GlassArt } from './ScanGuideArt'
-import { SCAN_MATERIALS, defaultDeviceChoice, type ScanDeviceChoice, type ScanMaterial } from './scanMaterials'
+import { SCAN_MATERIALS, defaultDeviceChoice, panelScanType, type ScanDeviceChoice, type ScanMaterial } from './scanMaterials'
 import { scanReadyChipText } from './scanProbeCopy'
 import { SCAN_DEVICE_RAIL, ScanWorkbenchShell } from './ScanWorkbenchChrome'
 import { type ScanStage } from './scanWorkbenchModel'
@@ -11,8 +13,17 @@ import { patchScanWorkbenchSession, readScanWorkbenchSession } from './scanWorkb
 import { useScanDeviceCapability } from './useScanDeviceCapability'
 import { recoverDeviceSession } from './scanDeviceRecovery'
 import { beginDeviceScan, useScanDeviceStartState } from './useScanDeviceStart'
+import { SCAN_PAY_BAR_DESC, scanPayBarTitle, scanPayButtonLabel } from './scanPayModel'
+import {
+  armScanDeviceAutoStartAfterPay,
+  clearScanDeviceAutoStartAfterPay,
+  forgetEndedScanTrip,
+  useScanDevicePayResume,
+  useScanPayState,
+} from './useScanPayGate'
 import './styles/scan-device-qx.css'
 import './styles/scan-device-flow.css'
+import './styles/scan-pay.css'
 
 function labelOf(material: ScanMaterial): string {
   return SCAN_MATERIALS.find((item) => item.material === material)?.label ?? ''
@@ -22,9 +33,12 @@ function labelOf(material: ScanMaterial): string {
  * 放纸和颜色。点「开始扫描」才建会话，挂载时不发。
  */
 export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
+  const navigate = useNavigate()
   const cap = useScanDeviceCapability()
   const probe = useLocalScanProbe(true)
-  const { getToken } = useAuth()
+  const { getToken, user } = useAuth()
+  const endUserId = user?.id ?? null
+  const pay = useScanPayState()
   const start = useScanDeviceStartState()
   const session = readScanWorkbenchSession()
   const material = session?.material ?? null
@@ -38,6 +52,55 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
   const [choice, setChoice] = useState<ScanDeviceChoice>(() => (
     session?.deviceChoice ?? (material ? defaultDeviceChoice(material) : { source: 'feeder', colorMode: 'gray' })
   ))
+
+  const payLoading = !recovery && pay.loading
+  const chargeCents = !recovery && !pay.loading && pay.needsPayment && pay.chargeCents !== null && pay.chargeCents > 0
+    ? pay.chargeCents
+    : null
+  const openPayScreen = useCallback((armAutoStart: boolean): void => {
+    if (!material) return
+    patchScanWorkbenchSession({
+      stage: 'device-settings',
+      material,
+      scanType: panelScanType(material),
+      deviceChoice: choice,
+      live: undefined,
+      result: undefined,
+    })
+    if (armAutoStart) armScanDeviceAutoStartAfterPay()
+    else clearScanDeviceAutoStartAfterPay()
+    navigate(payServicePath('scan', { next: 'device', back: 'how' }))
+  }, [choice, material, navigate])
+
+  /** 用户亲手点击「付 X.XX 元开始扫描」：先清掉已终结旧单，再武装一次性自动续接并进付款屏。 */
+  const goPay = useCallback((): void => {
+    forgetEndedScanTrip(pay.trip, pay.order)
+    openPayScreen(true)
+  }, [openPayScreen, pay.order, pay.trip])
+
+  /** 服务端 402 / SERVICE_* 拒单回跳：绝不重新武装自动启动，防止与付款屏形成死循环。 */
+  const returnToPayOnReject = useCallback((): void => {
+    openPayScreen(false)
+  }, [openPayScreen])
+
+  const resumeAfterPay = useCallback((): void => {
+    if (!material) return
+    beginDeviceScan({
+      material,
+      choice,
+      memberToken: getToken(),
+      endUserId,
+      onGoStage: onGoStage ?? (() => undefined),
+      onNeedPay: returnToPayOnReject,
+    })
+  }, [choice, endUserId, getToken, material, onGoStage, returnToPayOnReject])
+
+  useScanDevicePayResume({
+    enabled: Boolean(material) && !recovery && !cap.loading && cap.allowed
+      && probe.phase === 'done' && probe.freshReady && start.phase !== 'starting' && !start.locked,
+    pay,
+    onResume: resumeAfterPay,
+  })
 
   useEffect(() => {
     if (!material) {
@@ -72,20 +135,30 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
       dock={{
         left: { label: '返回', disabled: recovering, onClick: back },
         primary: {
-          label: recovering || start.phase === 'starting' ? '正在开始' : '开始扫描',
+          label: recovering || start.phase === 'starting'
+            ? '正在开始'
+            : payLoading
+              ? '正在确认费用'
+              : chargeCents !== null
+                ? scanPayButtonLabel(chargeCents)
+                : '开始扫描',
           testId: 'scan-device-start',
-          disabled: (!recovery && !probe.freshReady) || !cap.allowed || recovering || start.phase === 'starting' || start.locked,
+          disabled: (!recovery && !probe.freshReady) || payLoading || !cap.allowed || recovering || start.phase === 'starting' || start.locked,
           onClick: () => {
             if (recovery) {
               setRecovering(true)
               void recoverDeviceSession({ action: 'retry', settings: choice, token: getToken(), onGoStage: onGoStage ?? (() => undefined) }).finally(() => setRecovering(false))
               return
             }
+            if (payLoading) return
+            if (chargeCents) { goPay(); return }
             beginDeviceScan({
-            material,
-            choice,
-            memberToken: getToken(),
-            onGoStage: onGoStage ?? (() => undefined),
+              material,
+              choice,
+              memberToken: getToken(),
+              endUserId,
+              onGoStage: onGoStage ?? (() => undefined),
+              onNeedPay: returnToPayOnReject,
             })
           },
         },
@@ -144,6 +217,12 @@ export function ScanDeviceSettingsPage({ onGoStage }: { onGoStage?: (stage: Scan
         <QxTouchIcon name="help" size={34} strokeWidth={2} />
         <span>多页单面材料用进纸器一次扫完；玻璃台适合证件、书本，一面一面扫</span>
       </div>
+      {chargeCents !== null ? (
+        <div className="fs-pay-bar" data-testid="scan-pay-bar">
+          <b>{scanPayBarTitle(chargeCents)}</b>
+          <span>{SCAN_PAY_BAR_DESC}</span>
+        </div>
+      ) : null}
       {start.notice ? <p className="cs-warn" role="status">{start.notice}</p> : null}
       </div>
     </ScanWorkbenchShell>
