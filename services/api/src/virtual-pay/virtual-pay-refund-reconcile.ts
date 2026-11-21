@@ -3,7 +3,7 @@ import { BadGatewayException, ConflictException } from '@nestjs/common'
 import type { AuditService } from '../audit/audit.service'
 import { resolveMiniappVirtualPayAppKeyForEnv } from '../config/production-runtime-gates'
 import type { PrismaService } from '../prisma/prisma.service'
-import type { VirtualPayAlertRedis } from './virtual-pay-alert'
+import { sendVirtualPayOpsAlert, type VirtualPayAlertRedis } from './virtual-pay-alert'
 import { confirmPaid } from './virtual-pay-delivery'
 import { VIRTUAL_PAY_DIAGNOSTIC_ACTION } from './virtual-pay-order.service'
 import { notifyWechatProvideGoods, queryWechatVirtualPayOrder } from './virtual-pay-xpay-client'
@@ -11,6 +11,12 @@ import {
   markVirtualPayRefundFailed,
   settleVirtualPayRefundSucceeded,
 } from './virtual-pay-xpay-refund'
+import {
+  WECHAT_VPAY_STATUS_CLOSED,
+  WECHAT_VPAY_STATUS_REFUND_DEDUCTED,
+  WECHAT_VPAY_STATUS_REFUND_FAILED,
+  WECHAT_VPAY_STATUS_REFUND_SUCCEEDED,
+} from './virtual-pay.contract'
 
 const PAID_STATUSES = new Set([2, 3, 4])
 const NEED_NOTIFY_PROVIDE_STATUSES = new Set([2, 3])
@@ -72,10 +78,12 @@ async function diagnoseOnce(
 }
 
 /**
- * 收敛 refunding 状态订单（定时查单或管理员同步查单共用）。核对表 3.7、3.13、3.15、5.5。
- * - status === 6（或 left_fee === 0 且已发过退款）→ 收敛为 refunded 并同步权益为 refunded
- * - status === 8（或 7）→ 标 refund_failed + 告警（不盲目解锁权益）
- * - status === 5 → 仍在退款中，继续等待
+ * 收敛 refunding 状态订单（定时查单或管理员同步查单共用）。按微信官方 query_order 定义：
+ * - status === 8（用户侧收款完成）→ 收敛为 refunded 并同步权益为 refunded（绝不凭 left_fee=0 提前判成功）
+ * - status === 7（退款失败）→ 标 refund_failed + 告警（权益维持锁定 refunding，不自动解锁）
+ * - status === 5（商户侧扣款完成）→ 退款进行中，即便 left_fee=0 也继续等待 refunding
+ * - status === 6（订单关闭）→ 绝不是退款成功，写诊断告警并保持需核查，不解锁权益
+ * - status === 2/3/4（旧支付态）→ 严禁改回 paid 或解锁权益（防先前超时请求晚到完成导致双损）
  */
 export async function reconcileRefundingOrder(
   deps: ReconcileRefundingDeps,
@@ -121,7 +129,7 @@ export async function reconcileRefundingOrder(
   const wxStatus = data.order.status
   const leftFee = typeof data.order.left_fee === 'number' ? data.order.left_fee : null
 
-  if (wxStatus === 6 || (leftFee === 0 && Boolean(order.refundOrderId))) {
+  if (wxStatus === WECHAT_VPAY_STATUS_REFUND_SUCCEEDED) {
     await settleVirtualPayRefundSucceeded(deps.prisma, deps.audit, {
       orderId: order.id,
       outTradeNo: order.outTradeNo,
@@ -132,7 +140,7 @@ export async function reconcileRefundingOrder(
     return { kind: 'refunded', wxStatus, leftFee }
   }
 
-  if (wxStatus === 8 || wxStatus === 7) {
+  if (wxStatus === WECHAT_VPAY_STATUS_REFUND_FAILED) {
     await markVirtualPayRefundFailed(
       deps.prisma,
       deps.audit,
@@ -148,7 +156,28 @@ export async function reconcileRefundingOrder(
     return { kind: 'refund_failed', wxStatus, leftFee }
   }
 
-  if (wxStatus === 5) {
+  if (wxStatus === WECHAT_VPAY_STATUS_REFUND_DEDUCTED) {
+    return { kind: 'refunding', wxStatus, leftFee }
+  }
+
+  if (wxStatus === WECHAT_VPAY_STATUS_CLOSED) {
+    await diagnoseOnce(deps.prisma, deps.audit, order, 'refund_query_order_closed_6')
+    await sendVirtualPayOpsAlert({
+      redis: deps.redis,
+      fetchImpl,
+      outTradeNo: order.outTradeNo,
+      episodeToken: 'refund_query_order_closed_6',
+      type: 'virtual_pay_refund_failed',
+      severity: 'error',
+      title: `小程序虚拟支付退款中查单见关单态 ${order.outTradeNo}（status=6，需人工核查）`,
+      logger: deps.logger,
+    })
+    return { kind: 'unchanged', wxStatus, leftFee, reason: 'refund_query_order_closed_6' }
+  }
+
+  if (PAID_STATUSES.has(wxStatus)) {
+    // 已发过退款的单查到旧支付态 2/3/4：严禁改回 paid 或解锁权益，防超时请求随后完成造成双损。
+    await diagnoseOnce(deps.prisma, deps.audit, order, `refund_query_still_paid_${wxStatus}`)
     return { kind: 'refunding', wxStatus, leftFee }
   }
 
@@ -162,8 +191,9 @@ export interface AdminSyncOrderRow extends RefundingOrderRow {
 
 /**
  * 管理员单笔主动同步（非 refunding 状态）。
- * 仅当微信明确回报已支付且 left_fee >= priceCents 时，才允许把 refund_failed 恢复回 paid + available
- * （保留 refundOrderId 以满足同参重发幂等）。
+ * - 仅微信官方 status === 8（用户侧收款完成）可收敛为 refunded；
+ * - status === 5（商户侧扣款完成）转入/保持 refunding 并锁权益；
+ * - 已发过退款的单查到旧支付态 2/3/4 严禁恢复 paid 或解锁权益回 available。
  */
 export async function syncNonRefundingOrderWithWechat(
   deps: {
@@ -224,13 +254,21 @@ export async function syncNonRefundingOrderWithWechat(
         timeoutMs: deps.timeoutMs,
       })
     }
-  } else if (order.status === 'pending' && (wxStatus === 5 || wxStatus === 6 || wxStatus === 8)) {
+  } else if (order.status === 'pending' && wxStatus === WECHAT_VPAY_STATUS_CLOSED) {
     await deps.prisma.virtualPayOrder.updateMany({
       where: { id: order.id, status: 'pending' },
-      data: { status: 'closed', lastDiagnosticReason: wxStatus === 6 ? 'order_closed' : 'refunded_before_grant' },
+      data: { status: 'closed', lastDiagnosticReason: 'order_closed' },
+    })
+  } else if (
+    order.status === 'pending' &&
+    (wxStatus === WECHAT_VPAY_STATUS_REFUND_DEDUCTED || wxStatus === WECHAT_VPAY_STATUS_REFUND_SUCCEEDED)
+  ) {
+    await deps.prisma.virtualPayOrder.updateMany({
+      where: { id: order.id, status: 'pending' },
+      data: { status: 'closed', lastDiagnosticReason: 'refunded_before_grant' },
     })
   } else if (order.status === 'refund_failed' || order.status === 'paid') {
-    if (wxStatus === 6 || (leftFee === 0 && Boolean(order.refundOrderId))) {
+    if (wxStatus === WECHAT_VPAY_STATUS_REFUND_SUCCEEDED) {
       await settleVirtualPayRefundSucceeded(deps.prisma, deps.audit, {
         orderId: order.id,
         outTradeNo: order.outTradeNo,
@@ -238,7 +276,7 @@ export async function syncNonRefundingOrderWithWechat(
         wxRefundId: queried.order.wx_refund_id ?? order.wxRefundId,
         source: 'admin_sync',
       })
-    } else if (wxStatus === 5) {
+    } else if (wxStatus === WECHAT_VPAY_STATUS_REFUND_DEDUCTED) {
       await deps.prisma.$transaction(async (tx) => {
         await tx.virtualPayOrder.updateMany({
           where: { id: order.id, status: order.status },
@@ -249,24 +287,11 @@ export async function syncNonRefundingOrderWithWechat(
           data: { status: 'refunding' },
         })
       })
-    } else if (
-      order.status === 'refund_failed' &&
-      PAID_STATUSES.has(wxStatus) &&
-      leftFee !== null &&
-      leftFee >= order.priceCents
-    ) {
-      await deps.prisma.$transaction(async (tx) => {
-        const restoredOrder = await tx.virtualPayOrder.updateMany({
-          where: { id: order.id, status: 'refund_failed' },
-          data: { status: 'paid', lastDiagnosticReason: null },
-        })
-        if (restoredOrder.count === 1) {
-          await tx.memberServiceCredit.updateMany({
-            where: { sourceOrderId: order.id, status: 'refunding' },
-            data: { status: 'available' },
-          })
-        }
-      })
+    } else if (wxStatus === WECHAT_VPAY_STATUS_CLOSED) {
+      await diagnoseOnce(deps.prisma, deps.audit, order, 'refund_query_order_closed_6')
+    } else if (order.refundOrderId && PAID_STATUSES.has(wxStatus)) {
+      // 严禁根据旧支付态 2/3/4 改回 paid 或解锁权益回 available，避免与先前在途/晚到退款冲突。
+      await diagnoseOnce(deps.prisma, deps.audit, order, `refund_query_still_paid_${wxStatus}`)
     }
   }
   return { wxStatus, leftFee }

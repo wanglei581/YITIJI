@@ -35,7 +35,11 @@ import { VirtualPayCreditRedeemController } from '../src/virtual-pay/virtual-pay
 import { VirtualPayCreditRedeemService } from '../src/virtual-pay/virtual-pay-credit-redeem.service'
 import { VirtualPayRefundService } from '../src/virtual-pay/virtual-pay-refund.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
-import { assertConcurrentCreditRedeem20 } from './support/miniapp-virtual-pay-p2-redeem'
+import {
+  assertConcurrentCreditRedeem20,
+  assertFinishVsRestoreRace,
+  assertSameSessionDoubleCreditRedeem,
+} from './support/miniapp-virtual-pay-p2-redeem'
 import { assertRefundVsRedeemRace } from './support/miniapp-virtual-pay-p2-refund'
 
 const API_ROOT = resolve(__dirname, '..')
@@ -145,14 +149,14 @@ async function main(): Promise<void> {
     const port = (app.getHttpServer().address() as AddressInfo).port
     const baseUrl = `http://127.0.0.1:${port}`
 
-    await assertConcurrentCreditRedeem20({
+    const pgCtx = {
       prisma,
       audit,
       sessions,
       serviceOrders,
       registry,
       http: {
-        async post(path, body, headers) {
+        async post(path: string, body: unknown, headers: Record<string, string>) {
           const res = await fetch(`${baseUrl}${path}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...headers },
@@ -161,7 +165,7 @@ async function main(): Promise<void> {
           const text = await res.text()
           return { status: res.status, json: text ? (JSON.parse(text) as Record<string, unknown>) : {} }
         },
-        async get(path, headers) {
+        async get(path: string, headers: Record<string, string>) {
           const res = await fetch(`${baseUrl}${path}`, { headers })
           const text = await res.text()
           return { status: res.status, json: text ? (JSON.parse(text) as Record<string, unknown>) : {} }
@@ -181,7 +185,11 @@ async function main(): Promise<void> {
         const { sessionToken } = await sessions.exchangeBootTicket(bootTicket)
         return { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken }
       },
-    })
+    }
+
+    await assertConcurrentCreditRedeem20(pgCtx)
+    await assertSameSessionDoubleCreditRedeem(pgCtx)
+    await assertFinishVsRestoreRace({ prisma, audit })
 
     await assertRefundVsRedeemRace({
       prisma,

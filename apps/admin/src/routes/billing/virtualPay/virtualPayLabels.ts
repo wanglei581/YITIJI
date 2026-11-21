@@ -82,6 +82,10 @@ const DIAGNOSTIC_LABELS: Record<string, string> = {
   refund_in_progress_268490014: '微信侧退款处理中，请稍后同步查单确认',
   refund_consumed_forbidden_268490013: '微信侧回报该单已核销，无法发起原路退款',
   refund_request_failed: '向微信提交退款请求失败，请先同步查单核实真实状态',
+  refund_request_timeout_unknown: '向微信提交退款超时，结果尚未确认，权益持续锁定，请稍后同步查单',
+  refund_retry_inflight: '同单退款重试请求正在发送中，请稍后同步查单确认',
+  refund_merchant_deducted_waiting_user_credit: '微信商户侧已扣款，等待用户侧收款完成',
+  refund_query_order_closed_6: '微信侧查单显示订单已关闭（非退款成功），请人工核查',
   refund_openid_missing: '对应会员已注销或缺少微信标识，无法向微信查单或退款',
   refund_query_failed: '向微信查询退款结果失败，请稍后重试',
   query_manual_review: '连续查单失败或超时未收敛，请人工核查',
@@ -99,6 +103,7 @@ export function vpayDiagnosticLabel(reason: string | null | undefined): string {
   if (DIAGNOSTIC_LABELS[reason]) return DIAGNOSTIC_LABELS[reason]
   if (reason.startsWith('refund_notify_failed_')) return '微信退款结果通知回报失败，请同步查单核实'
   if (reason.startsWith('refund_query_failed_status_')) return '微信查单回报退款失败，请核对后决定是否重发'
+  if (reason.startsWith('refund_query_still_paid_')) return '微信查单仍显示已支付，退款结果尚未最终确认，权益保持锁定'
   if (reason.startsWith('refund_wechat_err_')) return '微信退款接口返回拒绝，请先同步查单核实'
   return '存在异常诊断记录，请查看详情或同步查单'
 }

@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import type { AuditService } from '../../src/audit/audit.service'
 import type { PaymentProviderRegistry } from '../../src/payment/payment-provider.factory'
 import { executeServiceOrderRefund } from '../../src/payment/service-order.payment'
+import { finishServiceOrder, markServiceOrderNotMade } from '../../src/payment/service-order.settle'
 import { ServiceOrderService } from '../../src/payment/service-order.service'
 import { PERSONAL_CHARGE_SETTING_KEY } from '../../src/payment/terminal-charge.contract'
 import type { PrismaService } from '../../src/prisma/prisma.service'
@@ -10,6 +11,7 @@ import { TerminalSessionService } from '../../src/terminals/terminal-session.ser
 import {
   VIRTUAL_PAY_CREDIT_REDEEMED_AUDIT_ACTION,
   VIRTUAL_PAY_CREDIT_RESTORED_AUDIT_ACTION,
+  restoreMiniappCreditForServiceOrder,
 } from '../../src/virtual-pay/virtual-pay-credit-redeem'
 import { MINIAPP_CREDIT_PROVIDER } from '../../src/virtual-pay/virtual-pay.contract'
 
@@ -190,7 +192,7 @@ export async function assertVirtualPayRedeemFlow(ctx: RedeemVerifyContext): Prom
   assert.equal((zeroRes.json.error as { code?: string })?.code, 'SERVICE_FREE_ON_THIS_TERMINAL')
   assert.equal((await prisma.memberServiceCredit.findUniqueOrThrow({ where: { id: seeded.creditId } })).status, 'available')
 
-  // 4. 无效会话 400
+  // 4. 无效会话与已过期会话（expiresAt 在 1 小时前、endedAt=null）均 400 不扣权益
   const badSess = await http.post(
     '/api/v1/kiosk/service-orders/redeem-credit',
     { serviceKey: 'resume_optimize', kioskSessionId: 'missing-session' },
@@ -198,6 +200,24 @@ export async function assertVirtualPayRedeemFlow(ctx: RedeemVerifyContext): Prom
   )
   assert.equal(badSess.status, 400)
   assert.equal((badSess.json.error as { code?: string })?.code, 'SERVICE_SESSION_REQUIRED')
+
+  const expiredSessId = `ksess-expired-${randomBytes(4).toString('hex')}`
+  await prisma.kioskSession.create({
+    data: {
+      terminalId: charging.terminalId,
+      clientSessionId: expiredSessId,
+      expiresAt: new Date(Date.now() - 3_600_000),
+      endedAt: null,
+    },
+  })
+  const expiredRes = await http.post(
+    '/api/v1/kiosk/service-orders/redeem-credit',
+    { serviceKey: 'resume_optimize', kioskSessionId: expiredSessId },
+    authHeaders,
+  )
+  assert.equal(expiredRes.status, 400, '已过期 KioskSession（expiresAt < now）严禁核销权益')
+  assert.equal((expiredRes.json.error as { code?: string })?.code, 'SERVICE_SESSION_REQUIRED')
+  assert.equal((await prisma.memberServiceCredit.findUniqueOrThrow({ where: { id: seeded.creditId } })).status, 'available')
 
   // 5. 正常核销 → 产 provider='miniapp_credit', amountCents=0 的 ServiceOrder
   const redeemed = await http.post(
@@ -311,11 +331,49 @@ export async function assertVirtualPayRedeemFlow(ctx: RedeemVerifyContext): Prom
   assert.equal((await prisma.serviceOrder.findUniqueOrThrow({ where: { id: orderId4 } })).status, 'refunded')
   assert.equal((await prisma.memberServiceCredit.findUniqueOrThrow({ where: { id: seeded.creditId } })).status, 'available')
 
-  console.log('PASS P2 核销全链（鉴权/免费机409/原子核销/beginTrip/失败2次退回再核销/关单恢复/离场退回/中途改免费退回）')
+  // 10. 已完成服务（settledAt !== null）严禁被 executeServiceOrderRefund 或迟到 markServiceOrderNotMade 退回权益
+  await prisma.terminal.update({ where: { id: charging.terminalId }, data: { userChargeMode: 'user_pays' } })
+  const ksSettled = `ksess-settled-${randomBytes(4).toString('hex')}`
+  await prisma.kioskSession.create({
+    data: { terminalId: charging.terminalId, clientSessionId: ksSettled, expiresAt: new Date(Date.now() + 3_600_000) },
+  })
+  const redeemed5 = await http.post(
+    '/api/v1/kiosk/service-orders/redeem-credit',
+    { serviceKey: 'resume_optimize', kioskSessionId: ksSettled },
+    authHeaders,
+  )
+  assert.equal(redeemed5.status, 200)
+  const orderId5 = String((redeemed5.json.data as { id: string }).id)
+  const holdSettled = await serviceOrders.beginTrip(
+    {
+      'x-terminal-id': chgTermHeaders['x-terminal-id']!,
+      'x-terminal-session-token': chgTermHeaders['x-terminal-session-token']!,
+      'x-kiosk-session-id': ksSettled,
+      'x-service-order-id': orderId5,
+    },
+    'resume_optimize',
+  )
+  await holdSettled.consume('resume-task-settled-ok')
+  await finishServiceOrder(prisma, orderId5)
+  const settledOrderBefore = await prisma.serviceOrder.findUniqueOrThrow({ where: { id: orderId5 } })
+  assert.ok(settledOrderBefore.settledAt)
+  // 直接调 executeServiceOrderRefund → skipped，权益保持 consumed
+  const refundSettled = await executeServiceOrderRefund(prisma, registry, audit, null, orderId5, 'late_direct_refund')
+  assert.equal(refundSettled, 'skipped', '已完成单（settledAt !== null）绝不能被退回权益')
+  // 经真实 markServiceOrderNotMade 注入迟到失败（即使把 attemptsUsed 推到 2）→ 绝不退回权益
+  await prisma.serviceOrder.update({ where: { id: orderId5 }, data: { attemptsUsed: 2 } })
+  await markServiceOrderNotMade({ prisma, registry, audit, redis: null }, orderId5, 'optimize_failed')
+  const settledOrderAfter = await prisma.serviceOrder.findUniqueOrThrow({ where: { id: orderId5 } })
+  assert.equal(settledOrderAfter.status, 'consumed')
+  assert.ok(settledOrderAfter.settledAt)
+  assert.equal((await prisma.memberServiceCredit.findUniqueOrThrow({ where: { id: seeded.creditId } })).status, 'consumed')
+
+  console.log('PASS P2 核销全链（鉴权/免费机409/过期会话400/原子核销/beginTrip/失败2次退回再核销/关单恢复/离场退回/改免费退回/已完成单禁退）')
 }
 
 /**
- * PostgreSQL 20 并发抢同一张权益：严格 1 次成功、19 次 409 VPAY_CREDIT_UNAVAILABLE。
+ * PostgreSQL 20 并发跨会话抢同一张权益：严格 1 次成功、19 次 409 VPAY_CREDIT_UNAVAILABLE。
+ * 使用 20 个不同活跃 KioskSession 让 20 个事务真正并发竞争 MemberServiceCredit 行级 CAS。
  */
 export async function assertConcurrentCreditRedeem20(ctx: RedeemVerifyContext): Promise<void> {
   const { prisma, http } = ctx
@@ -341,15 +399,23 @@ export async function assertConcurrentCreditRedeem20(ctx: RedeemVerifyContext): 
     resumeCents: 100,
     interviewCents: 100,
   })
+  const sessionIds = [term.kioskSessionId]
+  for (let i = 1; i < 20; i += 1) {
+    const sid = `ksess-${term.terminalId}-${i}`
+    await prisma.kioskSession.create({
+      data: { terminalId: term.terminalId, clientSessionId: sid, expiresAt: new Date(Date.now() + 3_600_000) },
+    })
+    sessionIds.push(sid)
+  }
   const termHeaders = await ctx.issueTerminalHeaders(term.terminalId)
   const headers = { ...termHeaders, Authorization: `Bearer ${token}` }
   const seeded = await seedPaidCredit(prisma, member.id, 'mock_interview', 'pg20')
 
   const results = await Promise.all(
-    Array.from({ length: 20 }, () =>
+    sessionIds.map((kioskSessionId) =>
       http.post(
         '/api/v1/kiosk/service-orders/redeem-credit',
-        { serviceKey: 'mock_interview', kioskSessionId: term.kioskSessionId },
+        { serviceKey: 'mock_interview', kioskSessionId },
         headers,
       ),
     ),
@@ -366,8 +432,129 @@ export async function assertConcurrentCreditRedeem20(ctx: RedeemVerifyContext): 
   assert.equal(credit.status, 'consumed')
   assert.equal(credit.consumedServiceOrderId, winningOrderId)
   const createdOrders = await prisma.serviceOrder.count({
-    where: { terminalId: term.terminalId, kioskSessionId: term.kioskSessionId, provider: MINIAPP_CREDIT_PROVIDER },
+    where: { terminalId: term.terminalId, provider: MINIAPP_CREDIT_PROVIDER, endUserId: member.id },
   })
   assert.equal(createdOrders, 1)
-  console.log('PASS PostgreSQL 20 并发抢核销同一张权益：严格 1 成功 19 拒')
+  console.log('PASS PostgreSQL 20 并发跨会话抢核销同一张权益：严格 1 成功 19 拒')
+}
+
+/**
+ * PostgreSQL 同会话双权益并发核销：同一会员 2 张可用权益、同一终端会话并发 5 次核销，
+ * 借 KioskSession 行锁 + 同会话待用单拦截，严格只扣 1 张权益，第 2 张保持 available。
+ */
+export async function assertSameSessionDoubleCreditRedeem(ctx: RedeemVerifyContext): Promise<void> {
+  const { prisma, http } = ctx
+  const member = await prisma.endUser.create({
+    data: {
+      phoneHash: `p2-pg-dbl-hash-${randomBytes(6).toString('hex')}`,
+      phoneEnc: 'enc-pg-dbl',
+      wxOpenId: `wx-openid-pg-dbl-${randomBytes(6).toString('hex')}`,
+      status: 'active',
+      enabled: true,
+    },
+  })
+  const token = await ctx.issueMemberToken(member.id)
+  const term = await seedTerminalAndSession(prisma, {
+    id: `term-pg-dbl-${randomBytes(4).toString('hex')}`,
+    orgType: 'school',
+    userChargeMode: 'user_pays',
+    resumeCents: 100,
+    interviewCents: 100,
+  })
+  const termHeaders = await ctx.issueTerminalHeaders(term.terminalId)
+  const headers = { ...termHeaders, Authorization: `Bearer ${token}` }
+  const c1 = await seedPaidCredit(prisma, member.id, 'resume_optimize', 'dbl1')
+  const c2 = await seedPaidCredit(prisma, member.id, 'resume_optimize', 'dbl2')
+
+  const results = await Promise.all(
+    Array.from({ length: 5 }, () =>
+      http.post(
+        '/api/v1/kiosk/service-orders/redeem-credit',
+        { serviceKey: 'resume_optimize', kioskSessionId: term.kioskSessionId },
+        headers,
+      ),
+    ),
+  )
+  const okRows = results.filter((r) => r.status === 200)
+  const conflictRows = results.filter(
+    (r) => r.status === 409 && (r.json.error as { code?: string })?.code === 'SERVICE_ORDER_IN_USE',
+  )
+  assert.equal(okRows.length, 1, `同会话并发只能核销 1 张权益，实际成功 ${okRows.length}`)
+  assert.equal(conflictRows.length, 4, `其余并发必须返回 409 SERVICE_ORDER_IN_USE，实际 ${conflictRows.length}`)
+
+  const credits = await prisma.memberServiceCredit.findMany({ where: { id: { in: [c1.creditId, c2.creditId] } } })
+  assert.equal(credits.filter((c) => c.status === 'consumed').length, 1, '只能扣 1 张权益')
+  assert.equal(credits.filter((c) => c.status === 'available').length, 1, '第 2 张权益必须仍为 available')
+  const orderCount = await prisma.serviceOrder.count({
+    where: { terminalId: term.terminalId, kioskSessionId: term.kioskSessionId, provider: MINIAPP_CREDIT_PROVIDER },
+  })
+  assert.equal(orderCount, 1)
+  console.log('PASS PostgreSQL 同会话双权益 5 并发核销：严格只扣 1 张、第 2 张保留 available')
+}
+
+/**
+ * PostgreSQL 完成服务（finishServiceOrder）与退回权益（restoreMiniappCreditForServiceOrder）并发互斥。
+ */
+export async function assertFinishVsRestoreRace(deps: {
+  prisma: PrismaService
+  audit: AuditService
+}): Promise<void> {
+  const { prisma, audit } = deps
+  const term = await seedTerminalAndSession(prisma, {
+    id: `term-pg-fin-${randomBytes(4).toString('hex')}`,
+    orgType: 'school',
+    userChargeMode: 'user_pays',
+    resumeCents: 100,
+    interviewCents: 100,
+  })
+  for (let round = 0; round < 10; round += 1) {
+    const member = await prisma.endUser.create({
+      data: {
+        phoneHash: `p2-pg-fin-${round}-${randomBytes(4).toString('hex')}`,
+        phoneEnc: 'enc-fin',
+        wxOpenId: `wx-fin-${round}-${randomBytes(4).toString('hex')}`,
+        status: 'active',
+        enabled: true,
+      },
+    })
+    const seeded = await seedPaidCredit(prisma, member.id, 'resume_optimize', `fin${round}`)
+    const order = await prisma.serviceOrder.create({
+      data: {
+        id: `vpcord_fin_${randomBytes(8).toString('hex')}`,
+        terminalId: term.terminalId,
+        kioskSessionId: term.kioskSessionId,
+        endUserId: member.id,
+        serviceKey: 'resume_optimize',
+        provider: MINIAPP_CREDIT_PROVIDER,
+        providerOrderNo: `vpcfin${randomBytes(8).toString('hex')}`,
+        amountCents: 0,
+        status: 'consumed',
+        paidAt: new Date(),
+        consumedAt: new Date(),
+        consumedRef: `ref-fin-${round}`,
+        attemptsUsed: 2,
+        expiresAt: new Date(Date.now() + 300_000),
+      },
+    })
+    await prisma.memberServiceCredit.update({
+      where: { id: seeded.creditId },
+      data: { status: 'consumed', consumedAt: new Date(), consumedServiceOrderId: order.id },
+    })
+
+    await Promise.all([
+      finishServiceOrder(prisma, order.id),
+      restoreMiniappCreditForServiceOrder(prisma, audit, order, 'race_late_fail'),
+    ])
+
+    const finalOrder = await prisma.serviceOrder.findUniqueOrThrow({ where: { id: order.id } })
+    const finalCredit = await prisma.memberServiceCredit.findUniqueOrThrow({ where: { id: seeded.creditId } })
+    const finished = finalOrder.status === 'consumed' && finalOrder.settledAt !== null && finalCredit.status === 'consumed'
+    const restored = finalOrder.status === 'refunded' && finalOrder.settledAt === null && finalCredit.status === 'available'
+    assert.equal(
+      finished !== restored,
+      true,
+      `第 ${round + 1} 轮完成与退回必须严格互斥，实际 order=(${finalOrder.status}, settled=${Boolean(finalOrder.settledAt)}) credit=${finalCredit.status}`,
+    )
+  }
+  console.log('PASS PostgreSQL 10 轮 finishServiceOrder vs 退回权益并发：严格互斥')
 }

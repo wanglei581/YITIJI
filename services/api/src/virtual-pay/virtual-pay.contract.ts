@@ -15,8 +15,21 @@ export const MINIAPP_CREDIT_PROVIDER = 'miniapp_credit'
 export const VIRTUAL_PAY_REFUND_WINDOW_DAYS = 365
 export const VIRTUAL_PAY_REFUND_WINDOW_MS = VIRTUAL_PAY_REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000
 
-/** 微信 /xpay/refund_order 的 req_from（字符串）：2 = 商户后台发起。核对表 3.11、补充规则 18。 */
-export const VIRTUAL_PAY_REFUND_REQ_FROM_MERCHANT = '2' as const
+/** 微信 /xpay/refund_order 的 req_from（字符串）：1 = 人工客服/后台退款，2 = 用户自行发起，3 = 其他。 */
+export const VIRTUAL_PAY_REFUND_REQ_FROM_MERCHANT = '1' as const
+
+/**
+ * 微信 /xpay/query_order 官方订单状态：
+ * - 2/3/4：已支付（待发货 / 发货中 / 已发货）
+ * - 5：商户侧扣款完成（退款进行中，不可凭 left_fee=0 提前判成功）
+ * - 6：订单关闭（绝非退款成功）
+ * - 7：退款失败
+ * - 8：用户侧收款完成（渠道退款完成事实）
+ */
+export const WECHAT_VPAY_STATUS_REFUND_DEDUCTED = 5
+export const WECHAT_VPAY_STATUS_CLOSED = 6
+export const WECHAT_VPAY_STATUS_REFUND_FAILED = 7
+export const WECHAT_VPAY_STATUS_REFUND_SUCCEEDED = 8
 
 /** 微信 /xpay/refund_order 的 refund_reason（字符串 '0'–'5'）。核对表 3.11、补充规则 18。 */
 export const VIRTUAL_PAY_REFUND_REASONS = ['0', '1', '2', '3', '4', '5'] as const

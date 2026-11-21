@@ -14,6 +14,7 @@ import { resolveMiniappVirtualPayAppKeyForEnv } from '../config/production-runti
 import { MiniappAccessTokenService } from '../miniapp-access-token/miniapp-access-token.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { getVirtualPayOrderForAdmin, type VirtualPayAdminOrderView } from './virtual-pay-admin-orders'
+import { sendVirtualPayOpsAlert } from './virtual-pay-alert'
 import { VIRTUAL_PAY_DIAGNOSTIC_ACTION } from './virtual-pay-order.service'
 import { reconcileRefundingOrder, syncNonRefundingOrderWithWechat } from './virtual-pay-refund-reconcile'
 import { queryWechatVirtualPayOrder } from './virtual-pay-xpay-client'
@@ -22,16 +23,23 @@ import {
   VIRTUAL_PAY_REFUND_ERRCODE_CONSUMED,
   VIRTUAL_PAY_REFUND_ERRCODE_IN_PROGRESS,
   VIRTUAL_PAY_REFUND_INITIATED_AUDIT_ACTION,
+  assertVirtualPayRefundPreconditions,
+  formatFrozenRefundReason,
+  isRetryableIndeterminateOrder,
+  mapWechatEnvType,
   markVirtualPayRefundFailed,
   newVirtualPayRefundOrderId,
+  parseFrozenRefundReasonCode,
   refundWechatVirtualPayOrder,
+  resolveRefundReasonCode,
   settleVirtualPayRefundSucceeded,
 } from './virtual-pay-xpay-refund'
 import {
-  VIRTUAL_PAY_REFUND_REASONS,
   VIRTUAL_PAY_REFUND_REQ_FROM_MERCHANT,
-  VIRTUAL_PAY_REFUND_WINDOW_MS,
-  type VirtualPayRefundReasonCode,
+  WECHAT_VPAY_STATUS_CLOSED,
+  WECHAT_VPAY_STATUS_REFUND_DEDUCTED,
+  WECHAT_VPAY_STATUS_REFUND_FAILED,
+  WECHAT_VPAY_STATUS_REFUND_SUCCEEDED,
 } from './virtual-pay.contract'
 
 export interface VirtualPayRefundDeps {
@@ -44,19 +52,6 @@ export interface VirtualPaySyncResult {
   order: VirtualPayAdminOrderView
   wxStatus: number | null
   leftFee: number | null
-}
-
-function mapEnvType(envType: number | undefined): 0 | 1 | null {
-  if (envType === 1) return 0
-  if (envType === 2) return 1
-  return null
-}
-
-function resolveRefundReasonCode(code?: string): VirtualPayRefundReasonCode {
-  if (code && (VIRTUAL_PAY_REFUND_REASONS as readonly string[]).includes(code)) {
-    return code as VirtualPayRefundReasonCode
-  }
-  return '0'
 }
 
 @Injectable()
@@ -100,7 +95,7 @@ export class VirtualPayRefundService {
         error: { code: 'VPAY_ORDER_NOT_FOUND', message: '没有找到这笔虚拟支付订单' },
       })
     }
-    this.assertRefundPreconditions(order, now)
+    assertVirtualPayRefundPreconditions(order, now)
     const { appKey, token } = await this.requireWechatAuth(order.env, fetchImpl)
 
     let queried
@@ -124,13 +119,13 @@ export class VirtualPayRefundService {
         error: { code: 'VPAY_QUERY_FAILED', message: '向微信查询可退金额未成功，请稍后重试' },
       })
     }
-    const wxEnv = mapEnvType(queried.order.env_type)
+    const wxEnv = mapWechatEnvType(queried.order.env_type)
     if (wxEnv !== null && wxEnv !== order.env) {
       throw new ConflictException({
         error: { code: 'VPAY_ENV_MISMATCH', message: '微信订单环境与本地记录不一致，已拦截退款' },
       })
     }
-    if (queried.order.status === 6 || (queried.order.left_fee === 0 && Boolean(order.refundOrderId))) {
+    if (queried.order.status === WECHAT_VPAY_STATUS_REFUND_SUCCEEDED) {
       await settleVirtualPayRefundSucceeded(this.prisma, this.audit, {
         orderId: order.id,
         outTradeNo: order.outTradeNo,
@@ -140,6 +135,46 @@ export class VirtualPayRefundService {
       })
       return (await getVirtualPayOrderForAdmin(this.prisma, order.id))!
     }
+    if (queried.order.status === WECHAT_VPAY_STATUS_REFUND_DEDUCTED) {
+      // 微信 status=5（商户侧扣款完成）属于退款进行中，即便 left_fee=0 也绝不提前判 refunded，锁定/保持 refunding 等状态 8 或通知。
+      await this.prisma.$transaction(async (tx) => {
+        await tx.virtualPayOrder.updateMany({
+          where: { id: order.id, status: { in: ['paid', 'refunding'] } },
+          data: { status: 'refunding', lastDiagnosticReason: 'refund_merchant_deducted_waiting_user_credit' },
+        })
+        await tx.memberServiceCredit.updateMany({
+          where: { sourceOrderId: order.id, status: 'available' },
+          data: { status: 'refunding' },
+        })
+      })
+      return (await getVirtualPayOrderForAdmin(this.prisma, order.id))!
+    }
+    if (queried.order.status === WECHAT_VPAY_STATUS_CLOSED) {
+      await this.recordIndeterminateDiagnostic(order.id, order.outTradeNo, 'refund_query_order_closed_6', fetchImpl)
+      throw new ConflictException({
+        error: { code: 'VPAY_ORDER_NOT_REFUNDABLE', message: '微信侧该订单处于关闭态（status=6），不可判为退款成功或发起退款' },
+      })
+    }
+    if (queried.order.status === WECHAT_VPAY_STATUS_REFUND_FAILED) {
+      if (order.status === 'refunding') {
+        await markVirtualPayRefundFailed(
+          this.prisma,
+          this.audit,
+          { redis: this.redis, logger: this.logger, fetchImpl },
+          {
+            orderId: order.id,
+            outTradeNo: order.outTradeNo,
+            reason: 'refund_query_failed_status_7',
+            source: 'initiate',
+            extra: { refundOrderId: order.refundOrderId },
+          },
+        )
+        return (await getVirtualPayOrderForAdmin(this.prisma, order.id))!
+      }
+      throw new ConflictException({
+        error: { code: 'VPAY_ORDER_NOT_REFUNDABLE', message: '微信侧显示该订单上次退款失败，请先核查后再处理' },
+      })
+    }
     const leftFee = queried.order.left_fee
     if (typeof leftFee !== 'number' || !Number.isInteger(leftFee) || leftFee < order.priceCents) {
       throw new ConflictException({
@@ -147,8 +182,8 @@ export class VirtualPayRefundService {
       })
     }
 
-    const reasonText = input.reason?.trim().slice(0, 200) || '管理员原路退款'
-    const refundReasonCode = resolveRefundReasonCode(input.refundReasonCode)
+    const inputReasonText = input.reason?.trim().slice(0, 190) || '管理员原路退款'
+    const inputReasonCode = resolveRefundReasonCode(input.refundReasonCode)
 
     const locked = await this.prisma.$transaction(async (tx) => {
       const fresh = await tx.virtualPayOrder.findUnique({
@@ -160,7 +195,42 @@ export class VirtualPayRefundService {
           error: { code: 'VPAY_ORDER_NOT_FOUND', message: '没有找到这笔虚拟支付订单' },
         })
       }
-      this.assertRefundPreconditions(fresh, now)
+      assertVirtualPayRefundPreconditions(fresh, now)
+      if (isRetryableIndeterminateOrder(fresh)) {
+        const claimedRetry = await tx.virtualPayOrder.updateMany({
+          where: {
+            id: fresh.id,
+            status: 'refunding',
+            wxRefundId: null,
+            lastDiagnosticReason: fresh.lastDiagnosticReason,
+          },
+          data: { lastDiagnosticReason: 'refund_retry_inflight' },
+        })
+        if (claimedRetry.count !== 1) {
+          throw new ConflictException({
+            error: { code: 'VPAY_REFUND_IN_PROGRESS', message: '该订单退款重试正在处理中，请稍后同步查单确认' },
+          })
+        }
+        const frozenCode = parseFrozenRefundReasonCode(fresh.refundReason) ?? '0'
+        const frozenReason = fresh.refundReason ?? formatFrozenRefundReason(frozenCode, '管理员原路退款')
+        await this.audit.writeRequired(tx, {
+          actorId: input.operatorId,
+          actorRole: 'admin',
+          action: VIRTUAL_PAY_REFUND_INITIATED_AUDIT_ACTION,
+          targetType: 'virtual_pay_order',
+          targetId: fresh.outTradeNo,
+          payload: {
+            isRetry: true,
+            refundOrderId: fresh.refundOrderId!,
+            priceCents: fresh.priceCents,
+            leftFee,
+            reason: frozenReason,
+            refundReasonCode: frozenCode,
+          },
+        })
+        return { refundOrderId: fresh.refundOrderId!, refundReasonCode: frozenCode }
+      }
+
       const creditClaimed = await tx.memberServiceCredit.updateMany({
         where: {
           sourceOrderId: fresh.id,
@@ -176,12 +246,14 @@ export class VirtualPayRefundService {
         })
       }
       const refundOrderId = fresh.refundOrderId ?? newVirtualPayRefundOrderId()
+      const frozenCode = parseFrozenRefundReasonCode(fresh.refundReason) ?? inputReasonCode
+      const frozenReason = fresh.refundReason ?? formatFrozenRefundReason(frozenCode, inputReasonText)
       const orderClaimed = await tx.virtualPayOrder.updateMany({
         where: { id: fresh.id, status: 'paid' },
         data: {
           status: 'refunding',
           refundOrderId,
-          refundReason: reasonText,
+          refundReason: frozenReason,
           lastDiagnosticReason: null,
         },
       })
@@ -197,14 +269,15 @@ export class VirtualPayRefundService {
         targetType: 'virtual_pay_order',
         targetId: fresh.outTradeNo,
         payload: {
+          isRetry: false,
           refundOrderId,
           priceCents: fresh.priceCents,
           leftFee,
-          reason: reasonText,
-          refundReasonCode,
+          reason: frozenReason,
+          refundReasonCode: frozenCode,
         },
       })
-      return { refundOrderId }
+      return { refundOrderId, refundReasonCode: frozenCode }
     })
 
     try {
@@ -215,7 +288,7 @@ export class VirtualPayRefundService {
         leftFee,
         refundFee: order.priceCents,
         bizMeta: `vpay:${order.outTradeNo}`,
-        refundReason: refundReasonCode,
+        refundReason: locked.refundReasonCode,
         reqFrom: VIRTUAL_PAY_REFUND_REQ_FROM_MERCHANT,
         env: order.env,
         appKey,
@@ -224,14 +297,15 @@ export class VirtualPayRefundService {
         timeoutMs: deps?.timeoutMs,
       })
       if (response.errcode === 0) {
-        if (response.refund_wx_order_id) {
-          await this.prisma.virtualPayOrder.updateMany({
-            where: { id: order.id, status: 'refunding' },
-            data: { wxRefundId: response.refund_wx_order_id },
-          })
-        }
+        await this.prisma.virtualPayOrder.updateMany({
+          where: { id: order.id, status: 'refunding' },
+          data: {
+            ...(response.refund_wx_order_id ? { wxRefundId: response.refund_wx_order_id } : {}),
+            lastDiagnosticReason: null,
+          },
+        })
       } else if (response.errcode === VIRTUAL_PAY_REFUND_ERRCODE_IN_PROGRESS) {
-        await this.recordInProgressDiagnostic(order.id, order.outTradeNo, 'refund_in_progress_268490014')
+        await this.recordIndeterminateDiagnostic(order.id, order.outTradeNo, 'refund_in_progress_268490014', fetchImpl)
       } else {
         const reason = response.errcode === VIRTUAL_PAY_REFUND_ERRCODE_CONSUMED
           ? 'refund_consumed_forbidden_268490013'
@@ -250,18 +324,8 @@ export class VirtualPayRefundService {
         )
       }
     } catch {
-      await markVirtualPayRefundFailed(
-        this.prisma,
-        this.audit,
-        { redis: this.redis, logger: this.logger, fetchImpl },
-        {
-          orderId: order.id,
-          outTradeNo: order.outTradeNo,
-          reason: 'refund_request_failed',
-          source: 'initiate',
-          extra: { refundOrderId: locked.refundOrderId },
-        },
-      )
+      // 网络异常/超时无法证明微信未受理：严禁改回 paid 或标成终态解锁权益，保持 refunding + 权益锁定 + 告警。
+      await this.recordIndeterminateDiagnostic(order.id, order.outTradeNo, 'refund_request_timeout_unknown', fetchImpl)
     }
 
     return (await getVirtualPayOrderForAdmin(this.prisma, order.id))!
@@ -329,57 +393,6 @@ export class VirtualPayRefundService {
     return { order: updated!, wxStatus, leftFee }
   }
 
-  private assertRefundPreconditions(
-    order: {
-      status: string
-      openId: string | null
-      paidAt: Date | null
-      credit: { status: string } | null
-    },
-    now: Date,
-  ): void {
-    if (order.status === 'refunding') {
-      throw new ConflictException({
-        error: { code: 'VPAY_REFUND_IN_PROGRESS', message: '该订单正在退款处理中，请稍后同步查单确认结果' },
-      })
-    }
-    if (order.status === 'refunded') {
-      throw new ConflictException({
-        error: { code: 'VPAY_ALREADY_REFUNDED', message: '该订单已退款，请勿重复退款' },
-      })
-    }
-    if (order.status !== 'paid') {
-      throw new ConflictException({
-        error: { code: 'VPAY_ORDER_NOT_REFUNDABLE', message: '只有已支付订单才允许发起原路退款' },
-      })
-    }
-    if (!order.credit) {
-      throw new ConflictException({
-        error: { code: 'VPAY_CREDIT_NOT_AVAILABLE', message: '该订单没有可退回的可用权益' },
-      })
-    }
-    if (order.credit.status === 'consumed') {
-      throw new ConflictException({
-        error: { code: 'VPAY_CREDIT_CONSUMED', message: '该订单对应权益已核销，不允许退款' },
-      })
-    }
-    if (order.credit.status !== 'available') {
-      throw new ConflictException({
-        error: { code: 'VPAY_CREDIT_NOT_AVAILABLE', message: '该订单对应权益当前不可退' },
-      })
-    }
-    if (!order.openId) {
-      throw new ConflictException({
-        error: { code: 'VPAY_REFUND_OPENID_MISSING', message: '该会员账号已注销或缺少微信标识，无法发起微信原路退款' },
-      })
-    }
-    if (!order.paidAt || now.getTime() - order.paidAt.getTime() > VIRTUAL_PAY_REFUND_WINDOW_MS) {
-      throw new ConflictException({
-        error: { code: 'VPAY_REFUND_WINDOW_EXPIRED', message: '支付时间已超过 365 天，无法通过微信虚拟支付发起退款' },
-      })
-    }
-  }
-
   private async requireWechatAuth(orderEnv: number, fetchImpl: typeof fetch): Promise<{ appKey: string; token: string }> {
     if (process.env['NODE_ENV'] === 'production' && orderEnv === 1) {
       throw new ServiceUnavailableException({
@@ -402,9 +415,14 @@ export class VirtualPayRefundService {
     }
   }
 
-  private async recordInProgressDiagnostic(orderId: string, outTradeNo: string, reason: string): Promise<void> {
+  private async recordIndeterminateDiagnostic(
+    orderId: string,
+    outTradeNo: string,
+    reason: string,
+    fetchImpl: typeof fetch,
+  ): Promise<void> {
     await this.prisma.virtualPayOrder.updateMany({
-      where: { id: orderId, status: 'refunding' },
+      where: { id: orderId, status: { in: ['paid', 'refunding'] } },
       data: { lastDiagnosticReason: reason },
     })
     await this.audit.write({
@@ -414,6 +432,16 @@ export class VirtualPayRefundService {
       targetType: 'virtual_pay_order',
       targetId: outTradeNo,
       payload: { reason },
+    })
+    await sendVirtualPayOpsAlert({
+      redis: this.redis,
+      fetchImpl,
+      outTradeNo,
+      episodeToken: reason,
+      type: 'virtual_pay_refund_failed',
+      severity: 'warning',
+      title: `小程序虚拟支付退款结果待确认 ${outTradeNo}（${reason}）`,
+      logger: this.logger,
     })
   }
 }

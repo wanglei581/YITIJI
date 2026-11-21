@@ -92,14 +92,15 @@
 业务与并发约束：
 1. `serviceKey` 仅允许 `resume_optimize` 或 `mock_interview`（`scan` 等返回 `400 VPAY_SERVICE_KIND_INVALID`）。
 2. 若本机当前生效价 `effectiveCents <= 0`（公共就业点位、个人收费总开关关闭、机构承担或该项 0 元），返回 `409 SERVICE_FREE_ON_THIS_TERMINAL`，**绝不扣除任何权益**。
-3. 事务内按 `createdAt ASC, id ASC` 条件 CAS 抢占本人 `status = 'available'` 且 `consumedAt = null` 的权益（并发 20 次抢同一条权益严格 1 次成功、19 次 `409 VPAY_CREDIT_UNAVAILABLE`），同时在同一事务内创建 `ServiceOrder`（`provider: 'miniapp_credit'`, `amountCents: 0`, `status: 'paid'`）并写审计 `virtual_pay.credit_redeemed`。
+3. 事务内原子校验 `KioskSession` 未结束、未过期（`endedAt IS NULL AND isExpired = false AND expiresAt > now`）并借会话行锁串行化同会话并发请求：若本会话本项已有尚未占用的 `miniapp_credit` 已付单则拒扣第二张权益（`409 SERVICE_ORDER_IN_USE` 或无余量时 `409 VPAY_CREDIT_UNAVAILABLE`）；随后按 `createdAt ASC, id ASC` 条件 CAS 抢占本人 `status = 'available'` 且 `consumedAt = null` 的权益（跨会话 20 并发抢同一条权益严格 1 次成功、19 次 `409 VPAY_CREDIT_UNAVAILABLE`），同时在同一事务内创建 `ServiceOrder`（`provider: 'miniapp_credit'`, `amountCents: 0`, `status: 'paid'`）并写审计 `virtual_pay.credit_redeemed`。
 4. 成功返回标准 `{ "success": true, "data": ServiceOrderView }`（与 `POST /api/v1/kiosk/service-orders` 同形），前端写入 `keepServiceTripOrder` 后即可携带 `x-kiosk-session-id` 与 `x-service-order-id` 发起 AI 优化或模拟面试，跳过每日免费次数限制。
-5. **失败与离场自动退回**：若该次 AI 简历优化或模拟面试失败且免费再试耗尽、用户离场未用（`onSessionEnded`）、取消关单（`close`）、机器中途改免费或后台退回卡单，服务端自动在单事务内把 `ServiceOrder` 置为 `refunded` 并将对应 `MemberServiceCredit` 原子退回 `available`（`consumedAt = null`, `consumedServiceOrderId = null`），写审计 `virtual_pay.credit_restored`，该权益可再次核销。
+5. **失败与离场自动退回（已完成单严禁退回）**：若该次 AI 简历优化或模拟面试失败且免费再试耗尽、用户离场未用（`onSessionEnded`）、取消关单（`close`）、机器中途改免费或后台退回卡单，服务端在单事务内带 `settledAt = null` 条件把未完成 `ServiceOrder` 置为 `refunded` 并将对应 `MemberServiceCredit` 原子退回 `available`（`consumedAt = null`, `consumedServiceOrderId = null`），写审计 `virtual_pay.credit_restored`，该权益可再次核销；一旦服务已成功完成（`settledAt != null`），任何迟到失败或退回调用均不改态、不退回权益。
 
 错误码：
 - `400 VPAY_SERVICE_KIND_INVALID` / `SERVICE_SESSION_REQUIRED` / `PRICE_CONFIG_INVALID`
 - `401` 终端身份或会员登录态无效
 - `409 SERVICE_FREE_ON_THIS_TERMINAL`（免费机不扣权益）
+- `409 SERVICE_ORDER_IN_USE`（当前使用周期已核销过同项待用权益，防双击/并发双扣）
 - `409 ACCOUNT_UNAVAILABLE`（会员不可用或注销中）
 - `409 VPAY_CREDIT_UNAVAILABLE`（无可用权益或已被并发占用/退款锁定）
 
@@ -131,5 +132,5 @@
 ### 官方原路退款规则与约束
 1. **退款条件**：仅允许 `VirtualPayOrder.status === 'paid'` 且 `MemberServiceCredit.status === 'available'`、会员未注销（`openId` 存在）、且支付时间在 365 天内（超过返回 `409 VPAY_REFUND_WINDOW_EXPIRED`，注销无 `openId` 返回 `409 VPAY_REFUND_OPENID_MISSING`）。
 2. **渠道限制（iOS）**：iOS 订单苹果不支持开发者主动退款，需由用户向 App Store 申请。后台二次确认弹窗明确提示运营人员核实。
-3. **先查后锁再调微信**：先调 `/xpay/query_order` 获取最新 `left_fee`（若微信已退则直接收敛为 `refunded`）；随后在单事务内原子将 `MemberServiceCredit` 从 `available` 锁为 `refunding`（防在途并发核销），同时将订单置为 `refunding` 并持久化 `refundOrderId`（`vpr` + 24 位十六进制，重试同参幂等）；最后调 `/xpay/refund_order`（`pay_sig` 签实际 JSON 字节，`refund_reason` 与 `req_from` 按官方要求传字符串）。
-4. **终态收敛**：`/xpay/refund_order` 受理成功仅代表启动退款任务，保持 `refunding`，由 `xpay_refund_notify` 推送、每 5 分钟定时查单或管理员「同步查单」收敛至 `refunded` / `refund_failed`。
+3. **先查后锁再调微信与参数冻结**：先调 `/xpay/query_order` 获取最新 `left_fee`（仅官方 `status === 8` 用户侧收款完成才收敛为 `refunded`；`status === 5` 商户侧扣款完成即便 `left_fee === 0` 也继续保持 `refunding`；`status === 6` 订单关闭绝不判退款成功）；随后在单事务内原子将 `MemberServiceCredit` 从 `available` 锁为 `refunding`（防在途并发核销），同时将订单置为 `refunding` 并冻结持久化 `refundOrderId`（`vpr` + 24 位十六进制）与 `refundReason`（含 `refund_reason` 枚举码）；最后调 `/xpay/refund_order`（`pay_sig` 签实际 JSON 字节，`refund_reason` 传字符串 `'0'`–`'5'`，`req_from` 按官方枚举传字符串 `'1'` 表示人工客服/后台退款）。对 `268490014` 或网络超时保持 `refunding` 且权益持续锁定，后续同单重试严格复发逐字节一致的请求参数。
+4. **终态收敛与不解锁原则**：`/xpay/refund_order` 受理成功、返回 `268490014` 或发生网络超时均保持 `refunding` 且权益锁定；同步查单查到旧支付态 `2/3/4` 或商户扣款态 `5` 时**严禁**将订单改回 `paid` 或把权益解锁回 `available`。仅 `xpay_refund_notify`（`RetCode === 0`）或 `query_order` 官方 `status === 8`（用户侧收款完成）收敛为 `refunded`；`xpay_refund_notify`（`RetCode !== 0`）或 `query_order` `status === 7` 收敛为 `refund_failed`（严格从 `refunding` 单次转入、幂等不重复写审计，且保持权益锁定不自动解锁）。

@@ -117,7 +117,7 @@ function makeFakeFetch(handlers: {
       assert.equal(url.searchParams.get('pay_sig'), expectedSig, 'refund_order pay_sig 必须签实际 body')
       assert.equal(typeof parsed['refund_reason'], 'string', 'refund_reason 必须为字符串')
       assert.equal(typeof parsed['req_from'], 'string', 'req_from 必须为字符串')
-      assert.equal(parsed['req_from'], '2', '商户发起 req_from 必须为字符串 2')
+      assert.equal(parsed['req_from'], '1', '人工客服/后台退款 req_from 必须为微信官方枚举字符串 1')
       const res = handlers.refundOrder
         ? handlers.refundOrder(parsed, rawBody, url)
         : { errcode: 0, refund_wx_order_id: 'wx_rfd_default' }
@@ -258,7 +258,7 @@ export async function assertVirtualPayRefundAndAdmin(deps: {
   assert.ok(settled1.credit?.refundedAt)
   assert.equal(await prisma.auditLog.count({ where: { action: VIRTUAL_PAY_REFUND_SUCCEEDED_AUDIT_ACTION, targetId: s1.order.outTradeNo } }), 1)
 
-  // 2. xpay_refund_notify RetCode !== 0 → refund_failed 且不解锁权益
+  // 2. xpay_refund_notify RetCode !== 0 → refund_failed 且不解锁权益；重复推送严格幂等（仅 1 条审计）
   const sFailNotify = await seedOrder(prisma, {
     status: 'refunding',
     creditStatus: 'refunding',
@@ -279,35 +279,73 @@ export async function assertVirtualPayRefundAndAdmin(deps: {
     headers: { 'Content-Type': 'application/json' },
     body: failNotifyEnc.body,
   })
+  const failNotifyEnc2 = encryptWechatPayload(JSON.stringify({
+    Event: 'xpay_refund_notify',
+    MchOrderId: sFailNotify.order.outTradeNo,
+    WxOrderId: sFailNotify.order.wxOrderId,
+    MchRefundId: sFailNotify.order.refundOrderId,
+    WxRefundId: 'wxr_fail_001',
+    RefundFee: 200,
+    RetCode: -1,
+    RetMsg: 'bank rejected',
+  }))
+  await fetch(`${baseUrl}/api/v1/wechat/miniapp/message?${failNotifyEnc2.query}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: failNotifyEnc2.body,
+  })
   const afterFailNotify = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: sFailNotify.order.id }, include: { credit: true } })
   assert.equal(afterFailNotify.status, 'refund_failed')
   assert.equal(afterFailNotify.credit?.status, 'refunding', '退款失败绝不能盲目解锁权益回 available')
-  assert.equal(await prisma.auditLog.count({ where: { action: VIRTUAL_PAY_REFUND_FAILED_AUDIT_ACTION, targetId: sFailNotify.order.outTradeNo } }), 1)
+  assert.equal(
+    await prisma.auditLog.count({ where: { action: VIRTUAL_PAY_REFUND_FAILED_AUDIT_ACTION, targetId: sFailNotify.order.outTradeNo } }),
+    1,
+    '同一失败退款通知重复处理两次必须严格幂等、只写 1 条审计',
+  )
 
-  // 3. 定时查单收敛（5 继续等、6 收敛 refunded、8 标 refund_failed、单笔抛错不阻断批次）
-  const rWait = await seedOrder(prisma, { status: 'refunding', creditStatus: 'refunding', refundOrderId: `vpr${randomBytes(12).toString('hex')}` })
-  const rDone = await seedOrder(prisma, { status: 'refunding', creditStatus: 'refunding', refundOrderId: `vpr${randomBytes(12).toString('hex')}` })
-  const rErr = await seedOrder(prisma, { status: 'refunding', creditStatus: 'refunding', refundOrderId: `vpr${randomBytes(12).toString('hex')}` })
+  // 3. 定时查单收敛（官方状态：5+left_fee=0 仍等 refunding、6 订单关闭绝不标 refunded、7 标 refund_failed、8 用户收款完成标 refunded、单笔抛错不阻断批次）
+  const rWait5Zero = await seedOrder(prisma, { status: 'refunding', creditStatus: 'refunding', refundOrderId: `vpr${randomBytes(12).toString('hex')}` })
+  const rClosed6 = await seedOrder(prisma, { status: 'refunding', creditStatus: 'refunding', refundOrderId: `vpr${randomBytes(12).toString('hex')}` })
+  const rErr7 = await seedOrder(prisma, { status: 'refunding', creditStatus: 'refunding', refundOrderId: `vpr${randomBytes(12).toString('hex')}` })
+  const rDone8 = await seedOrder(prisma, { status: 'refunding', creditStatus: 'refunding', refundOrderId: `vpr${randomBytes(12).toString('hex')}` })
   const rThrow = await seedOrder(prisma, { status: 'refunding', creditStatus: 'refunding', refundOrderId: `vpr${randomBytes(12).toString('hex')}` })
   const batchFetch = makeFakeFetch({
     queryOrder: (body) => {
       const id = String(body['order_id'])
       if (id === rThrow.order.outTradeNo) throw new Error('network boom')
-      if (id === rWait.order.outTradeNo) return { errcode: 0, order: { status: 5, left_fee: 200, env_type: 2 } }
-      if (id === rDone.order.outTradeNo) return { errcode: 0, order: { status: 6, left_fee: 0, env_type: 2, wx_refund_id: 'wxr_rec_done' } }
-      if (id === rErr.order.outTradeNo) return { errcode: 0, order: { status: 8, left_fee: 200, env_type: 2 } }
+      if (id === rWait5Zero.order.outTradeNo) return { errcode: 0, order: { status: 5, left_fee: 0, env_type: 2 } }
+      if (id === rClosed6.order.outTradeNo) return { errcode: 0, order: { status: 6, left_fee: 0, env_type: 2 } }
+      if (id === rErr7.order.outTradeNo) return { errcode: 0, order: { status: 7, left_fee: 200, env_type: 2 } }
+      if (id === rDone8.order.outTradeNo) return { errcode: 0, order: { status: 8, left_fee: 0, env_type: 2, wx_refund_id: 'wxr_rec_done8' } }
       return { errcode: 0, order: { status: 5, left_fee: 200, env_type: 2 } }
     },
   })
   await reconcile.reconcileOnce(new Date(), batchFetch)
-  assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: rWait.order.id } })).status, 'refunding')
-  const doneRec = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: rDone.order.id }, include: { credit: true } })
-  assert.equal(doneRec.status, 'refunded')
-  assert.equal(doneRec.credit?.status, 'refunded')
-  assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: rErr.order.id } })).status, 'refund_failed')
+  assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: rWait5Zero.order.id } })).status, 'refunding', 'status=5 即便 left_fee=0 也严禁提前判 refunded')
+  const closedRec = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: rClosed6.order.id }, include: { credit: true } })
+  assert.equal(closedRec.status, 'refunding', 'status=6 订单关闭绝不能标为 refunded')
+  assert.equal(closedRec.lastDiagnosticReason, 'refund_query_order_closed_6')
+  assert.equal(closedRec.credit?.status, 'refunding')
+  const err7Rec = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: rErr7.order.id }, include: { credit: true } })
+  assert.equal(err7Rec.status, 'refund_failed')
+  assert.equal(err7Rec.credit?.status, 'refunding')
+  const done8Rec = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: rDone8.order.id }, include: { credit: true } })
+  assert.equal(done8Rec.status, 'refunded')
+  assert.equal(done8Rec.wxRefundId, 'wxr_rec_done8')
+  assert.equal(done8Rec.credit?.status, 'refunded')
   assert.equal((await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: rThrow.order.id } })).status, 'refunding')
 
-  // 4. 各种拦拒：365 天过期、已核销、注销无 openId、268490013、268490014 + 同 refundOrderId 幂等复发
+  // 预查 status=5 + left_fee=0 也绝不提前判 refunded
+  const sPre5 = await seedOrder(prisma)
+  const pre5View = await refunds.initiateRefund(
+    sPre5.order.id,
+    { confirm: true, operatorId: 'admin-1' },
+    { fetchImpl: makeFakeFetch({ queryOrder: () => ({ errcode: 0, order: { status: 5, left_fee: 0, env_type: 2 } }) }) },
+  )
+  assert.equal(pre5View.status, 'refunding', '预查见 status=5 且 left_fee=0 必须保持 refunding，严禁提前标 refunded')
+  assert.equal(pre5View.credit?.status, 'refunding')
+
+  // 4. 各种拦拒：365 天过期、已核销、注销无 openId、268490013、268490014 同单同参重试、超时同步不解锁+晚到通知收敛
   const old366 = await seedOrder(prisma, { paidAt: new Date(Date.now() - 366 * 24 * 60 * 60 * 1000) })
   await assert.rejects(
     () => refunds.initiateRefund(old366.order.id, { confirm: true, operatorId: 'admin-1' }, { fetchImpl: fetchOk }),
@@ -339,17 +377,17 @@ export async function assertVirtualPayRefundAndAdmin(deps: {
   assert.equal(res013.status, 'refund_failed')
   assert.equal(res013.credit?.status, 'refunding')
 
-  // 268490014 保持 refunding + 保留同 refundOrderId；经 sync 确认未退恢复 paid 后再次发起必须复发同 refundOrderId
+  // 268490014 同单同参重试：首调返 268490014 保持 refunding 且权益锁定，随后对同一单故意传不同 reason/refundReasonCode 重试，body 必须逐字节一致！
   const s014 = await seedOrder(prisma)
-  const seenRefundIds: string[] = []
+  const rawBodies014: string[] = []
   const first014 = await refunds.initiateRefund(
     s014.order.id,
-    { confirm: true, operatorId: 'admin-1' },
+    { confirm: true, reason: '首次退款备注', refundReasonCode: '0', operatorId: 'admin-1' },
     {
       fetchImpl: makeFakeFetch({
         queryOrder: () => ({ errcode: 0, order: { status: 4, paid_fee: 200, left_fee: 200, env_type: 2 } }),
-        refundOrder: (body) => {
-          seenRefundIds.push(String(body['refund_order_id']))
+        refundOrder: (_body, rawBody) => {
+          rawBodies014.push(rawBody)
           return { errcode: VIRTUAL_PAY_REFUND_ERRCODE_IN_PROGRESS, errmsg: 'in progress' }
         },
       }),
@@ -359,48 +397,85 @@ export async function assertVirtualPayRefundAndAdmin(deps: {
   assert.equal(first014.credit?.status, 'refunding')
   assert.equal(first014.lastDiagnosticReason, 'refund_in_progress_268490014')
 
-  // 同号复发场景：另一单首调网络失败变 refund_failed（持久化 refundOrderId）→ sync 确认微信侧未退恢复 paid → 重发必须同 refundOrderId
-  const sRetry = await seedOrder(prisma)
-  const retryIds: string[] = []
-  const failedAttempt = await refunds.initiateRefund(
-    sRetry.order.id,
-    { confirm: true, operatorId: 'admin-1' },
+  const retry014 = await refunds.initiateRefund(
+    s014.order.id,
+    { confirm: true, reason: '重试时改写原因', refundReasonCode: '1', operatorId: 'admin-1' },
     {
       fetchImpl: makeFakeFetch({
         queryOrder: () => ({ errcode: 0, order: { status: 4, paid_fee: 200, left_fee: 200, env_type: 2 } }),
-        refundOrder: (body) => {
-          retryIds.push(String(body['refund_order_id']))
-          throw new Error('timeout')
+        refundOrder: (_body, rawBody) => {
+          rawBodies014.push(rawBody)
+          return { errcode: 0, refund_wx_order_id: 'wxr_retry_014' }
         },
       }),
     },
   )
-  assert.equal(failedAttempt.status, 'refund_failed')
-  const syncedBack = await refunds.syncOrder(sRetry.order.id, 'admin-1', {
+  assert.equal(rawBodies014.length, 2)
+  assert.equal(rawBodies014[0], rawBodies014[1], '同一单 268490014 重试必须逐字节复发完全相同的请求体（冻结 refund_order_id 与 refund_reason）')
+  assert.equal(retry014.status, 'refunding')
+  assert.equal(retry014.wxRefundId, 'wxr_retry_014')
+  assert.equal(retry014.credit?.status, 'refunding')
+
+  // 网络超时后：保持 refunding 且权益持续锁定 → 同步查到旧支付态 4 严禁解锁权益 → 核销被拒 → 晚到 xpay_refund_notify 成功正常收敛为 refunded + 权益 refunded
+  const sTimeout = await seedOrder(prisma, { endUserId: member.id, openId: member.wxOpenId, priceCents: 200 })
+  const timeoutAttempt = await refunds.initiateRefund(
+    sTimeout.order.id,
+    { confirm: true, reason: '超时场景退款', refundReasonCode: '2', operatorId: 'admin-1' },
+    {
+      fetchImpl: makeFakeFetch({
+        queryOrder: () => ({ errcode: 0, order: { status: 4, paid_fee: 200, left_fee: 200, env_type: 2 } }),
+        refundOrder: () => {
+          throw new Error('network timeout')
+        },
+      }),
+    },
+  )
+  assert.equal(timeoutAttempt.status, 'refunding', '退款请求超时结果未知必须保持 refunding')
+  assert.equal(timeoutAttempt.credit?.status, 'refunding', '超时后权益必须保持 refunding 锁定')
+  assert.equal(timeoutAttempt.lastDiagnosticReason, 'refund_request_timeout_unknown')
+
+  const syncedAfterTimeout = await refunds.syncOrder(sTimeout.order.id, 'admin-1', {
     fetchImpl: makeFakeFetch({
       queryOrder: () => ({ errcode: 0, order: { status: 4, paid_fee: 200, left_fee: 200, env_type: 2 } }),
     }),
   })
-  assert.equal(syncedBack.order.status, 'paid')
-  assert.equal(syncedBack.order.credit?.status, 'available')
-  assert.equal(syncedBack.order.refundOrderId, failedAttempt.refundOrderId)
+  assert.equal(syncedAfterTimeout.order.status, 'refunding', '超时后同步查到旧支付态 2/3/4 严禁改回 paid')
+  assert.equal(syncedAfterTimeout.order.credit?.status, 'refunding', '超时后同步查到旧支付态 2/3/4 严禁解锁权益回 available')
 
-  const secondAttempt = await refunds.initiateRefund(
-    sRetry.order.id,
-    { confirm: true, operatorId: 'admin-1' },
-    {
-      fetchImpl: makeFakeFetch({
-        queryOrder: () => ({ errcode: 0, order: { status: 4, paid_fee: 200, left_fee: 200, env_type: 2 } }),
-        refundOrder: (body) => {
-          retryIds.push(String(body['refund_order_id']))
-          return { errcode: 0, refund_wx_order_id: 'wxr_retry_same_id' }
-        },
-      }),
-    },
+  await assert.rejects(
+    () => redeem.redeem(termId, member.id, { serviceKey: 'resume_optimize', kioskSessionId: ksId }),
+    (err: { getResponse?: () => { error?: { code?: string } } }) =>
+      err.getResponse?.().error?.code === 'VPAY_CREDIT_UNAVAILABLE',
   )
-  assert.equal(retryIds.length, 2)
-  assert.equal(retryIds[0], retryIds[1], '同单重发退款必须复用同一个 refundOrderId 满足 268490014 幂等规则')
-  assert.equal(secondAttempt.status, 'refunding')
+
+  const lateOkNotify = encryptWechatPayload(JSON.stringify({
+    Event: 'xpay_refund_notify',
+    MchOrderId: sTimeout.order.outTradeNo,
+    WxOrderId: sTimeout.order.wxOrderId,
+    MchRefundId: timeoutAttempt.refundOrderId,
+    WxRefundId: 'wxr_timeout_late_ok',
+    RefundFee: 200,
+    RetCode: 0,
+    RefundFinishTimestamp: Math.floor(Date.now() / 1000),
+  }))
+  const lateOkRes = await fetch(`${baseUrl}/api/v1/wechat/miniapp/message?${lateOkNotify.query}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: lateOkNotify.body,
+  })
+  assert.equal(lateOkRes.status, 200)
+  const convergedTimeout = await prisma.virtualPayOrder.findUniqueOrThrow({ where: { id: sTimeout.order.id }, include: { credit: true } })
+  assert.equal(convergedTimeout.status, 'refunded')
+  assert.equal(convergedTimeout.credit?.status, 'refunded')
+
+  // refund_failed 同步查到旧支付态 4 同样严禁解锁权益
+  const syncedErr013 = await refunds.syncOrder(err013.order.id, 'admin-1', {
+    fetchImpl: makeFakeFetch({
+      queryOrder: () => ({ errcode: 0, order: { status: 4, paid_fee: 200, left_fee: 200, env_type: 2 } }),
+    }),
+  })
+  assert.equal(syncedErr013.order.status, 'refund_failed')
+  assert.equal(syncedErr013.order.credit?.status, 'refunding')
 
   // 5. 管理员 HTTP 接口：非 admin 403、confirm!==true 400、零原始 openId 泄露
   const partnerList = await fetch(`${baseUrl}/api/v1/admin/billing/miniapp-virtual-pay/orders`, { headers: partnerHeaders })

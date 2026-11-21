@@ -88,11 +88,12 @@ export class VirtualPayCreditRedeemService {
       })
     }
 
+    const precheckNow = new Date()
     const session = await this.prisma.kioskSession.findUnique({
       where: { terminalId_clientSessionId: { terminalId, clientSessionId: kioskSessionId } },
-      select: { endedAt: true },
+      select: { endedAt: true, isExpired: true, expiresAt: true },
     })
-    if (!session || session.endedAt) {
+    if (!session || session.endedAt || session.isExpired || session.expiresAt <= precheckNow) {
       throw new BadRequestException({
         error: { code: 'SERVICE_SESSION_REQUIRED', message: '请先开始这一次使用' },
       })
@@ -110,6 +111,24 @@ export class VirtualPayCreditRedeemService {
 
     const serviceKey = input.serviceKey
     const row = await this.prisma.$transaction(async (tx) => {
+      const now = new Date()
+      // 事务内原子复核 KioskSession 未结束且未过期，同时借行锁串行化同会话并发核销，防双击/并发连扣两张不同权益。
+      const touchedSession = await tx.kioskSession.updateMany({
+        where: {
+          terminalId,
+          clientSessionId: kioskSessionId,
+          endedAt: null,
+          isExpired: false,
+          expiresAt: { gt: now },
+        },
+        data: { lastActiveAt: now },
+      })
+      if (touchedSession.count !== 1) {
+        throw new BadRequestException({
+          error: { code: 'SERVICE_SESSION_REQUIRED', message: '请先开始这一次使用' },
+        })
+      }
+
       const freshMember = await tx.endUser.findUnique({
         where: { id: endUserId },
         select: { status: true, enabled: true },
@@ -119,7 +138,34 @@ export class VirtualPayCreditRedeemService {
           error: { code: 'ACCOUNT_UNAVAILABLE', message: '账号当前不可用，暂不能使用权益' },
         })
       }
-      const now = new Date()
+
+      const existingOpen = await tx.serviceOrder.findFirst({
+        where: {
+          terminalId,
+          kioskSessionId,
+          endUserId,
+          serviceKey,
+          provider: MINIAPP_CREDIT_PROVIDER,
+          status: 'paid',
+          consumedAt: null,
+          settledAt: null,
+        },
+        select: { id: true },
+      })
+      if (existingOpen) {
+        const remaining = await tx.memberServiceCredit.count({
+          where: { endUserId, serviceKind: serviceKey, status: 'available', consumedAt: null },
+        })
+        if (remaining === 0) {
+          throw new ConflictException({
+            error: { code: 'VPAY_CREDIT_UNAVAILABLE', message: '当前没有可用的小程序权益' },
+          })
+        }
+        throw new ConflictException({
+          error: { code: 'SERVICE_ORDER_IN_USE', message: '这一次已经核销过权益，请勿重复核销' },
+        })
+      }
+
       const orderId = `vpcord_${randomBytes(12).toString('hex')}`
       let claimedCreditId: string | null = null
 

@@ -11,11 +11,12 @@ export interface MiniappCreditServiceOrderRow {
   status: string
   serviceKey: string
   amountCents: number
+  settledAt?: Date | null
 }
 
 /**
  * 失败/离场/关单/改免费时，把已关联到该一体机服务单的小程序权益原子退回 available。
- * 绝不调微信 Native 退款接口；重复调用幂等，不会重复恢复或抛错。
+ * 绝不调微信 Native 退款接口；重复调用幂等；已完成服务（settledAt !== null）严禁退回。
  */
 export async function restoreMiniappCreditForServiceOrder(
   db: PrismaService,
@@ -25,6 +26,7 @@ export async function restoreMiniappCreditForServiceOrder(
 ): Promise<'refunded' | 'skipped'> {
   if (order.provider !== MINIAPP_CREDIT_PROVIDER) return 'skipped'
   if (order.status === 'refunded') return 'refunded'
+  if (order.settledAt) return 'skipped'
   if (order.status !== 'paid' && order.status !== 'consumed') return 'skipped'
 
   const now = new Date()
@@ -34,6 +36,7 @@ export async function restoreMiniappCreditForServiceOrder(
         id: order.id,
         provider: MINIAPP_CREDIT_PROVIDER,
         status: { in: ['paid', 'consumed'] },
+        settledAt: null,
       },
       data: {
         status: 'refunded',
