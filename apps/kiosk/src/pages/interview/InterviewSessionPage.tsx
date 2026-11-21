@@ -40,6 +40,7 @@ import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import type { InterviewFinishRecovery } from './session/interviewAnswerRecovery'
 import { finishInterview, submitInterviewAnswer } from './session/interviewTurnActions'
 import { useInterviewDeadlineSeal } from './session/useInterviewDeadlineSeal'
+import { useInterviewReportCharge } from './session/useInterviewReportCharge'
 
 const INTERVIEWER_LABEL: Record<string, string> = {
   hr: 'HR 面试',
@@ -54,7 +55,7 @@ const MAX_RECORD_SEC = 58
 export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { getToken } = useAuth()
+  const { getToken, user } = useAuth()
   const contact = useSupportContact()
   const capabilities = useInterviewAiCapabilities()
   const storedLive = readInterviewWorkbenchSession()?.live
@@ -170,20 +171,19 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     setSpeaking(false)
   }
 
+  const reportCharge = useInterviewReportCharge({ sessionId: state?.sessionId ?? null, storedLive, endUserId: user?.id ?? null })
   const deadline = useInterviewDeadlineSeal({
     state, live: storedLive, getToken, access, phase, omitPrintAnswers, answersRecorded, onGoStage, navigate,
     recorderRef, recordTimerRef, recordStartedAtRef, pendingAnswerRef, stopPlayback,
     setDraft, setVoice, setRecordSec, setPhase, setAssistantDown,
+    paidReportError: reportCharge.errorMessage, paidReportRetryFree: reportCharge.canFreeRetry, paidReportLocked: reportCharge.reportLocked,
+    onReportSucceeded: reportCharge.onReportSucceeded, onReportFailed: reportCharge.onReportFailed,
   })
   useInterviewLivePersist({
-    state,
-    messages,
-    questionIndex,
-    remainingSec: deadline.remainingSec,
-    deadlineAtLocalMs: deadline.deadlineAtLocalMs,
-    deadlineSource: deadline.deadlineSource,
-    omitPrintAnswers,
-    answersRecorded,
+    state, messages, questionIndex,
+    remainingSec: deadline.remainingSec, deadlineAtLocalMs: deadline.deadlineAtLocalMs,
+    deadlineSource: deadline.deadlineSource, omitPrintAnswers, answersRecorded,
+    paidOrderId: reportCharge.paidTrip?.orderId, paidKioskSessionId: reportCharge.paidTrip?.kioskSessionId,
   })
 
   useEffect(() => {
@@ -318,7 +318,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   }
 
   const submit = (args: { text: string; skip: boolean; voiceMeta?: { transcript: string; edited: boolean; durationSec: number } }) => {
-    if (deadline.sealedRef.current) return
+    if (deadline.sealedRef.current || reportCharge.reportLocked) return
+    reportCharge.clearFailure()
     const job = submitInterviewAnswer({
       args, state, access, messages, draft, voiceKind: voice.kind, questionShownAtRef,
       sealedRef: deadline.sealedRef, sealAtDeadline: deadline.sealAtDeadline,
@@ -332,11 +333,13 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   }
 
   const finish = () => {
-    if (deadline.sealedRef.current) return
+    if (deadline.sealedRef.current || reportCharge.reportLocked) return
+    reportCharge.clearFailure()
     void finishInterview({
       state, access, phase, voiceKind: voice.kind, messages, answersRecorded, omitPrintAnswers,
       onGoStage, navigate, stopPlayback, resetVoiceState,
       setPhase, setError, setMicError, setFinishRecovery, setAssistantDown,
+      onReportSucceeded: reportCharge.onReportSucceeded, onReportFailed: reportCharge.onReportFailed,
     })
   }
 
@@ -373,7 +376,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     : !asrEnabled ? '语音转写服务未启用，请用文字作答'
     : null
   const shownVoiceHint = interviewMicLine(voiceHint, contact)
-  const shownError = interviewMicLine(error, contact)
+  const shownError = reportCharge.errorMessage ?? interviewMicLine(error, contact)
   const shownMicBlocked = interviewMicLine(micBlockedReason, contact)
 
   const copy = INTERVIEW_STAGE_COPY.session
@@ -399,6 +402,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
           phase={phase}
           voiceKind={voice.kind}
           busy={busyTurn || voiceLocked}
+          reportRetryFree={reportCharge.canFreeRetry}
+          reportLocked={reportCharge.reportLocked}
           onFinish={() => void finish()}
           onSubmit={() => void submit({ text: draft, skip: false })}
           onStart={() => void startRecording()}
@@ -480,6 +485,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         onRetryReport={() => void finish()}
         omitPrintAnswers={omitPrintAnswers}
         onOmitPrintAnswersChange={setOmitPrintAnswers}
+        reportLocked={reportCharge.reportLocked}
         transcriptTakeaway={<InterviewTranscriptTakeaway look="act" sessionId={state.sessionId} getAccess={() => accessRef.current} disabled={busyTurn} />}
       />
       </InterviewSessionPanels>

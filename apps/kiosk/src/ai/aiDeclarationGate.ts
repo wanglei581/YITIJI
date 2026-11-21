@@ -182,6 +182,12 @@ function scopesFromMissing(missing: readonly DeclarationScope[], kind: AiUseKind
   return [AGE_14_PLUS_SCOPE, VOICE_RECORDING_SCOPE]
 }
 
+export async function ensureAge14DeclaredForPay(bearer: string | null = null): Promise<void> {
+  const epochAtStart = aiDeclarationEpoch()
+  await ensureScopes([AGE_14_PLUS_SCOPE], bearer, epochAtStart)
+  assertStillThisVisit(epochAtStart)
+}
+
 export async function prepareAiDeclaration(
   input: RequestInfo | URL,
   init: RequestInit,

@@ -26,6 +26,7 @@ import {
   SERVICE_PAY_TTL_MS,
   SERVICE_REFUND_REASON_LEFT,
   SERVICE_REFUND_REASON_NOW_FREE,
+  SERVICE_REFUND_REASON_REPORT_LEFT,
   SERVICE_REFUND_REASON_USER_CANCELLED,
   isServiceOrderKey,
   type ServiceOrderKey,
@@ -44,9 +45,12 @@ import {
   replayOpenScanOrder,
 } from './service-order.scan'
 import {
+  assertInterviewReportAdmitted,
   closeExpiredServiceOrders,
   consumePaidServiceOrder,
   finishServiceOrder,
+  markInterviewReportMade,
+  markInterviewReportNotMade,
   markServiceOrderNotMade,
   type ServiceOrderSettleDeps,
 } from './service-order.settle'
@@ -351,6 +355,32 @@ export class ServiceOrderService {
         // 一张退款抛错不能挡住同一会话里其余已付未用的单。会话已经结束，不会再进这里。
       }
     }
+    const reportRetries = await this.prisma.serviceOrder.findMany({
+      where: { terminalId, kioskSessionId, status: 'consumed', reportState: 'retry' },
+      select: { id: true },
+    })
+    for (const row of reportRetries) {
+      try {
+        await executeServiceOrderRefund(
+          this.prisma, this.registry, this.audit, this.redis ?? null, row.id, SERVICE_REFUND_REASON_REPORT_LEFT,
+          { requireConsumedReportState: 'retry' },
+        )
+      } catch {
+        // 一张退款抛错不能挡住同一会话里其余待退的单。
+      }
+    }
+  }
+
+  async assertInterviewReportAdmitted(sessionId: string): Promise<string | null> {
+    return assertInterviewReportAdmitted(this.settleDeps(), sessionId)
+  }
+
+  async noteInterviewReportMade(sessionId: string): Promise<void> {
+    await markInterviewReportMade(this.prisma, sessionId)
+  }
+
+  async noteInterviewReportFailed(sessionId: string): Promise<void> {
+    await markInterviewReportNotMade(this.settleDeps(), sessionId)
   }
 
   async sweep(now = new Date()): Promise<void> {
@@ -362,6 +392,10 @@ export class ServiceOrderService {
       now,
       refund: (orderId, reason) => executeServiceOrderRefund(
         this.prisma, this.registry, this.audit, this.redis ?? null, orderId, reason,
+      ),
+      refundConsumedRetry: (orderId, reason) => executeServiceOrderRefund(
+        this.prisma, this.registry, this.audit, this.redis ?? null, orderId, reason,
+        { requireConsumedReportState: 'retry' },
       ),
       markNotMade: (orderId, event) => markServiceOrderNotMade(deps, orderId, event),
       finishMade: (orderId) => finishServiceOrder(this.prisma, orderId),

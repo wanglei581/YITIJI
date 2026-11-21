@@ -118,6 +118,7 @@
     "verify:pickup-arrival-price": "node -r @swc-node/register scripts/verify-pickup-arrival-price.ts",
     "verify:pickup-arrival-price:postgres": "node -r @swc-node/register scripts/verify-pickup-arrival-price-postgres.ts",
     "verify:service-order-sandbox-simulate": "node -r @swc-node/register scripts/verify-service-order-sandbox-simulate.ts",
+    "verify:service-order-interview-report": "node -r @swc-node/register scripts/verify-service-order-interview-report.ts",
     "verify:service-order-open-ref:postgres": "node -r @swc-node/register scripts/verify-service-order-open-ref-postgres.ts",
     "verify:print-queue-timeout": "node -r @swc-node/register scripts/verify-print-queue-timeout.ts",
     "verify:print-completion-evidence": "node -r @swc-node/register scripts/verify-print-completion-evidence.ts",

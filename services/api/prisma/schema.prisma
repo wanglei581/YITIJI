@@ -126,6 +126,8 @@ model ServiceOrder {
   retryUntil      DateTime?
   /// 做成了才写。清扫只看还没结案的单，避免做成的扫描一直占着名额。
   settledAt       DateTime?
+  /// 模拟面试开场后出报告的状态：null 未请求报告或非面试 / retry 首次报告失败可免费再试 / done 报告已做成。
+  reportState     String?
   refundReason    String?
   refundedAt      DateTime?
   refundAttempts  Int       @default(0)
@@ -160,6 +162,7 @@ model ServiceOrder {
   @@index([terminalId, kioskSessionId, status])
   @@index([status, expiresAt])
   @@index([status, nextRefundAt])
+  @@index([status, reportState, retryUntil])
 }
 
 // ── TerminalCredential ───────────────────────────────────────────────────────

@@ -157,3 +157,30 @@ export async function resumeTripCover(
   const orderId = await orders.coversTrip(headers, 'resume_optimize')
   return { orderId, skipDailyQuota: Boolean(orderId) }
 }
+
+type ReportOrders = Partial<
+  Pick<ServiceOrderService, 'assertInterviewReportAdmitted' | 'noteInterviewReportMade' | 'noteInterviewReportFailed'>
+>
+
+/** 模拟面试结束出报告的服务单回调：挂了服务单才做准入与结果结算，不收费机器或测试替身不碰。 */
+export function interviewReportHooks(
+  orders: ReportOrders | undefined,
+  sessionId: string,
+): {
+  beforeReportGenerate?: () => Promise<string | null>
+  onReportMade?: () => Promise<void>
+  onReportFailed?: () => Promise<void>
+} {
+  if (!orders) return {}
+  return {
+    ...(typeof orders.assertInterviewReportAdmitted === 'function'
+      ? { beforeReportGenerate: () => orders.assertInterviewReportAdmitted!(sessionId) }
+      : {}),
+    ...(typeof orders.noteInterviewReportMade === 'function'
+      ? { onReportMade: () => orders.noteInterviewReportMade!(sessionId) }
+      : {}),
+    ...(typeof orders.noteInterviewReportFailed === 'function'
+      ? { onReportFailed: () => orders.noteInterviewReportFailed!(sessionId) }
+      : {}),
+  }
+}

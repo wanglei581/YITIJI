@@ -5,6 +5,7 @@ import {
   SERVICE_CONSUMED_REVIEW_AFTER_MS,
   SERVICE_REFUND_REASON_DISPLACED,
   SERVICE_REFUND_REASON_LEFT,
+  SERVICE_REFUND_REASON_REPORT_LEFT,
   SERVICE_REFUND_REASON_RETRY_EXPIRED,
   SERVICE_REFUND_RETRY_CAP,
   SERVICE_SCAN_JUDGE_AFTER_MS,
@@ -19,6 +20,7 @@ export interface ServiceOrderSweepDeps {
   prisma: Db
   now: Date
   refund(orderId: string, reason: string): Promise<unknown>
+  refundConsumedRetry(orderId: string, reason: string): Promise<unknown>
   markNotMade(orderId: string, event: ServiceTripEvent): Promise<void>
   finishMade(orderId: string): Promise<void>
 }
@@ -32,6 +34,7 @@ const SCAN_TERMINAL = ['failed', 'cancelled', 'expired'] as const
  */
 export async function drainServiceOrderSweep(deps: ServiceOrderSweepDeps): Promise<void> {
   await sweepRetryExpired(deps)
+  await sweepConsumedReportRetry(deps)
   await sweepPaidWithoutRetryWindow(deps)
   await sweepRefunding(deps)
   await sweepRefundNeedsPerson(deps)
@@ -39,6 +42,36 @@ export async function drainServiceOrderSweep(deps: ServiceOrderSweepDeps): Promi
   await sweepConsumedTrips(deps)
   await releaseStuckInterviews(deps)
   await sweepScans(deps)
+}
+
+/** 模拟面试报告失败进入免费再试后：再试窗口到期、或使用会话已结束/过期仍未出报告，自动原路退。 */
+async function sweepConsumedReportRetry(deps: ServiceOrderSweepDeps): Promise<void> {
+  await eachBatch(async (cursor) => {
+    const rows = await deps.prisma.serviceOrder.findMany({
+      where: {
+        status: 'consumed',
+        reportState: 'retry',
+        ...(cursor ? { id: { gt: cursor } } : {}),
+      },
+      select: { id: true, terminalId: true, kioskSessionId: true, retryUntil: true },
+      orderBy: { id: 'asc' },
+      take: SERVICE_SWEEP_BATCH,
+    })
+    for (const row of rows) {
+      if (!row.retryUntil || row.retryUntil.getTime() <= deps.now.getTime()) {
+        await deps.refundConsumedRetry(row.id, SERVICE_REFUND_REASON_RETRY_EXPIRED)
+        continue
+      }
+      const session = await deps.prisma.kioskSession.findUnique({
+        where: { terminalId_clientSessionId: { terminalId: row.terminalId, clientSessionId: row.kioskSessionId } },
+        select: { endedAt: true, expiresAt: true },
+      })
+      if (!session || session.endedAt || session.expiresAt.getTime() < deps.now.getTime()) {
+        await deps.refundConsumedRetry(row.id, SERVICE_REFUND_REASON_REPORT_LEFT)
+      }
+    }
+    return rows.map((row) => row.id)
+  })
 }
 
 async function sweepRetryExpired(deps: ServiceOrderSweepDeps): Promise<void> {

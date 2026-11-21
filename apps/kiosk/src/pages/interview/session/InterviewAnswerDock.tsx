@@ -37,6 +37,8 @@ interface InterviewAnswerDockProps {
   onRetryReport: () => void
   omitPrintAnswers: boolean
   onOmitPrintAnswersChange: (value: boolean) => void
+  /** 收费场次已进入退款中/已退款/退款失败或再试窗已过期：禁止再次触发生成报告。 */
+  reportLocked?: boolean
   /** 报告生成不了时「带走本场问答」。只在见过回答提交成功时显示。 */
   transcriptTakeaway?: ReactNode
 }
@@ -51,12 +53,12 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
     draft, voiceAvailable, micBlockedReason, onRecheckMic, onDraftChange, onReviewChange,
     onRetryVoice, onUseText, onUseVoice, onSkip,
     onFinish, finishRecovery, onContinueAnswering, onLeaveInterview,
-    onOpenTips, onRetryReport, omitPrintAnswers, onOmitPrintAnswersChange, transcriptTakeaway,
+    onOpenTips, onRetryReport, omitPrintAnswers, onOmitPrintAnswersChange, reportLocked, transcriptTakeaway,
   } = props
   const turnBusy = phase === 'thinking' || phase === 'finishing'
   const pending = phase === 'thinking' || phase === 'finishing' || voice.kind === 'transcribing'
   const task = useAiTask({ availability: 'available', pending, failed: false, hasResult: false })
-  const done = phase === 'done_suggest'
+  const done = phase === 'done_suggest' || Boolean(reportLocked)
   const outageRow = (finishRecovery === 'outage' || (aiOutage && !finishRecovery)) && !micError
   // 模型临时报错（不算停用）时没有出路行，只有一句错误；有已保存的回答就也给「带走本场问答」。
   const takeawayAfterError = !outageRow && Boolean(error) && !micError && answersRecorded && finishRecovery !== 'no-answers'
@@ -86,7 +88,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
       {outageRow && (
         <div className="qxt-iv-acts" data-testid="interview-finish-recovery">
           <button type="button" className="is-go" disabled={busyTurn} onClick={onOpenTips}>看面试要点</button>
-          {answersRecorded ? <button type="button" disabled={busyTurn} onClick={onRetryReport}>稍后再试生成报告</button> : <button type="button" disabled={busyTurn} onClick={onLeaveInterview}>离开</button>}
+          {answersRecorded && !reportLocked ? <button type="button" disabled={busyTurn} onClick={onRetryReport}>稍后再试生成报告</button> : <button type="button" disabled={busyTurn} onClick={onLeaveInterview}>离开</button>}
           {answersRecorded ? transcriptTakeaway : null}
         </div>
       )}
@@ -136,7 +138,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
         </label>
       ))}
 
-      {!turnBusy && (
+      {!turnBusy && !reportLocked && (
         <div className="qxt-iv-acts">
           <label className="interview-session__omit-print qxt-iv-toggle">
             <input

@@ -38,12 +38,17 @@ export class InterviewApiError extends Error {
   }
 }
 
-async function call<T>(path: string, access: InterviewAccess, init?: { method?: string; body?: unknown }): Promise<T> {
+async function call<T>(
+  path: string,
+  access: InterviewAccess,
+  init?: { method?: string; body?: unknown; headers?: Record<string, string> },
+): Promise<T> {
   let res: Response
   try {
     res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       method: init?.method ?? 'GET',
       headers: {
+        ...(init?.headers ?? {}),
         Accept: 'application/json',
         ...(access.token ? { Authorization: `Bearer ${access.token}` } : {}),
         ...(!access.token && access.accessToken ? { 'x-interview-access-token': access.accessToken } : {}),
@@ -116,12 +121,20 @@ export function createInterview(
   return call<CreateInterviewResponse>('/mock-interviews', access, { method: 'POST', body: input })
 }
 
-export function startInterview(sessionId: string, access: InterviewAccess): Promise<InterviewQuestionResponse> {
+export function startInterview(
+  sessionId: string,
+  access: InterviewAccess,
+  options?: { headers?: Record<string, string> },
+): Promise<InterviewQuestionResponse> {
   if (API_MODE !== 'http') {
     mockIdx = 1
     return Promise.resolve({ done: false, question: MOCK_QUESTIONS[0], qType: 'intro', questionIndex: 1, questionTarget: MOCK_QUESTIONS.length })
   }
-  return call<InterviewQuestionResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/start`, access, { method: 'POST', body: { hardDeadline: true } })
+  return call<InterviewQuestionResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/start`, access, {
+    method: 'POST',
+    body: { hardDeadline: true },
+    headers: options?.headers,
+  })
 }
 
 export function getInterviewSession(sessionId: string, access: InterviewAccess): Promise<InterviewSessionDetail> {
