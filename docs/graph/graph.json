@@ -43065,6 +43065,7 @@
           "services/api/src/ai/llm/llm-chat.service.ts"
         ],
         "missing": [
+          "services/api/aiHttpAdapter.ts",
           "services/api/aiSessionForget.ts"
         ]
       },

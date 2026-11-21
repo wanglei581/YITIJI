@@ -22,7 +22,10 @@ interface AdvisorMemory {
   accessToken?: string
 }
 
+let assistantEpoch = 0
 const assistantIds: string[] = []
+const confirmedAssistantIds = new Set<string>()
+const inflightProvisionalCounts = new Map<string, number>()
 const advisorSessions: AdvisorMemory[] = []
 
 function rememberLimited<T>(list: T[], item: T, same: (entry: T) => boolean): void {
@@ -31,9 +34,60 @@ function rememberLimited<T>(list: T[], item: T, same: (entry: T) => boolean): vo
   list.splice(0, list.length, ...next.slice(-MAX_REMEMBERED))
 }
 
+function validAssistantId(id: string | null | undefined): string | null {
+  return typeof id === 'string' && ASSISTANT_SESSION_ID_RE.test(id) ? id : null
+}
+
+function pruneAssistantState(): void {
+  const active = new Set(assistantIds)
+  for (const id of confirmedAssistantIds) if (!active.has(id)) confirmedAssistantIds.delete(id)
+  for (const id of inflightProvisionalCounts.keys()) if (!active.has(id)) inflightProvisionalCounts.delete(id)
+}
+
+function drainAssistantIds(): string[] {
+  assistantEpoch += 1
+  confirmedAssistantIds.clear()
+  inflightProvisionalCounts.clear()
+  return assistantIds.splice(0, assistantIds.length)
+}
+
 export function rememberAssistantSession(id: string): void {
-  if (typeof id !== 'string' || !ASSISTANT_SESSION_ID_RE.test(id)) return
-  rememberLimited(assistantIds, id, (entry) => entry === id)
+  const valid = validAssistantId(id)
+  if (!valid) return
+  confirmedAssistantIds.add(valid)
+  rememberLimited(assistantIds, valid, (entry) => entry === valid)
+  pruneAssistantState()
+}
+
+/** 发起 /assistant/chat 前暂记带出的 32 位号，离场可作废在途；失败保留（fail-closed）；回不同号时撤掉未确认的暂记。 */
+export function trackAssistantSessionRequest(
+  requestSessionId: string | null | undefined,
+): (responseSessionId?: string | null) => void {
+  const reqId = validAssistantId(requestSessionId)
+  const epochAtStart = assistantEpoch
+  if (reqId) {
+    inflightProvisionalCounts.set(reqId, (inflightProvisionalCounts.get(reqId) ?? 0) + 1)
+    rememberLimited(assistantIds, reqId, (entry) => entry === reqId)
+    pruneAssistantState()
+  }
+  let settled = false
+  return (responseSessionId?: string | null) => {
+    if (settled) return
+    settled = true
+    const resId = validAssistantId(responseSessionId)
+    if (reqId && assistantEpoch === epochAtStart) {
+      const left = (inflightProvisionalCounts.get(reqId) ?? 0) - 1
+      if (left > 0) inflightProvisionalCounts.set(reqId, left)
+      else inflightProvisionalCounts.delete(reqId)
+      if (resId && resId !== reqId && !confirmedAssistantIds.has(reqId) && left <= 0) {
+        const index = assistantIds.indexOf(reqId)
+        if (index >= 0) assistantIds.splice(index, 1)
+      }
+    }
+    if (resId && (assistantEpoch === epochAtStart || resId !== reqId)) {
+      rememberAssistantSession(resId)
+    }
+  }
 }
 
 /** 作业号沿用作业面 parseId。匿名令牌有的话记下；没有则沿用这个号上一次记下的。 */
@@ -240,7 +294,7 @@ async function sendWithRetry(
  */
 export function forgetAiSessions(memberToken: string | null): void {
   try {
-    const assistants = assistantIds.splice(0, assistantIds.length)
+    const assistants = drainAssistantIds()
     const advisors = advisorSessions.splice(0, advisorSessions.length)
     if (API_MODE !== 'http') return
     const token = typeof memberToken === 'string' && memberToken.trim() ? memberToken.trim() : null
@@ -263,7 +317,7 @@ export function forgetAiSessions(memberToken: string | null): void {
       fireForget(`/advisor/sessions/${encodeURIComponent(advisor.id)}/forget`, headers)
     }
   } catch {
-    assistantIds.splice(0, assistantIds.length)
+    drainAssistantIds()
     advisorSessions.splice(0, advisorSessions.length)
   }
 }

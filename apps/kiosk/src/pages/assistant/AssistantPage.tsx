@@ -37,15 +37,9 @@ import {
 import { AssistantSheets, type AssistantSheetKind } from './AssistantSheets'
 import { buildNonAiNotice, isAiGeneratedReply } from './advisorProvider'
 import {
-  COCKPIT_COPY,
-  CONSULTATION_TASKS,
-  GENERAL_QUESTIONS,
-  TOOLBOX_ASSISTANT_SCENES,
-  deriveCockpitState,
-  newSessionId,
-  normalizeToolboxSkill,
-  type CockpitVoiceState,
-  type ConsultationTask,
+  COCKPIT_COPY, CONSULTATION_TASKS, GENERAL_QUESTIONS, TOOLBOX_ASSISTANT_SCENES,
+  deriveCockpitState, newSessionId, normalizeToolboxSkill,
+  type CockpitVoiceState, type ConsultationTask,
 } from './advisorScenes'
 import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useAssistantDraftHandoff } from '../../services/assistantDraft'
@@ -149,7 +143,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   useBusyLock(loading)
   useInkRipple('.kassist .assistant-task, .kassist .assistant-direct-question, .kassist .assistant-context-chip, .kassist .assistant-quick-questions button, .kassist .assistant-tool-button, .kassist .assistant-send, .kassist .action-chip, .kassist .assistant-manual-entry, .kassist .assistant-hold-talk-btn, .kassist .assistant-summary-save, .kassist .assistant-turn-action')
 
-  const sessionIdRef = useRef(newSessionId())
+  const [initialSessionId] = useState(newSessionId)
+  const sessionIdRef = useRef(initialSessionId)
   const cancelledRef = useRef(false)
   const previousContextRef = useRef(`${toolboxSkill ?? 'general'}:${selectedTaskId ?? 'none'}`)
   const requestTokenRef = useRef(0)

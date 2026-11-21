@@ -150,7 +150,8 @@ for (const [token, label] of [
   ['function isAllowedRoute(route: string): boolean', '白名单校验'],
   ['const LazyCallPanel = USE_VOICE_CALL', '条件式 TRTC 懒加载'],
   ["import('./AssistantCallPanel')", 'TRTC 面板导入'],
-  ['const sessionIdRef = useRef(newSessionId())', '每次进入的新会话'],
+  ['const [initialSessionId] = useState(newSessionId)', '每次进入的新会话（惰性初始化，避免每次渲染重复铸号）'],
+  ['const sessionIdRef = useRef(initialSessionId)', '每次进入的新会话引用'],
   ['useState<Message[]>(() => [welcomeMessage])', '首次进入按 URL intent 初始化欢迎语'],
   ['const requestTokenRef = useRef(0)', '请求令牌锁'],
   ['sessionId: requestSessionId', '请求会话标识'],
@@ -166,6 +167,7 @@ for (const [token, label] of [
 ]) {
   expectIncludes(assistantModule, token, `助手对话合同保留：${label}`)
 }
+expect(!assistantPage.includes('useRef(newSessionId())'), '会话号不得在 useRef 参数里直接调用 newSessionId()，避免每次重渲染铸号')
 expectMatches(
   assistantPage,
   /const ALLOWED_ROUTE_PREFIXES\s*=\s*\[[^\]]*['"]\/interview['"]/,

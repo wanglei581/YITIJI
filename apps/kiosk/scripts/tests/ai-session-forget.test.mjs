@@ -409,10 +409,8 @@ test('接线：重载前等清场结果，拆页时停下还在睡的重试', ()
 async function loadSessionClear() {
   seed += 1
   const hosting = toDataUrl(`export function isRecruitmentRoute() { return false }\n// ${seed}`)
-  const forget = toDataUrl(`export function rememberAssistantSession() {}\n// ${seed}`)
   const scenes = `${transpile('src/pages/assistant/advisorScenes.ts')}\n// ${seed}\n`
     .replaceAll("from '../../hooks/useRecruitmentHosting'", `from '${hosting}'`)
-    .replaceAll("from '../../services/api/aiSessionForget'", `from '${forget}'`)
   const clear = `${transpile('src/pages/assistant/assistantSessionClear.ts')}\n// ${seed}\n`
     .replaceAll("from './advisorScenes'", `from '${toDataUrl(scenes)}'`)
   return import(toDataUrl(clear))
@@ -420,6 +418,10 @@ async function loadSessionClear() {
 
 test('清场时小青页换掉会话号，页面不卸载也不再送上一位的号', async () => {
   const page = readFileSync(join(root, 'src/pages/assistant/AssistantPage.tsx'), 'utf8')
+  assert.doesNotMatch(page, /useRef\(\s*newSessionId\(\)\s*\)/, '不得在每次渲染里调 newSessionId()')
+  assert.match(page, /useState\(newSessionId\)/, '会话号只在进页挂载时惰性铸一次')
+  const scenesSrc = readFileSync(join(root, 'src/pages/assistant/advisorScenes.ts'), 'utf8')
+  assert.doesNotMatch(scenesSrc, /rememberAssistantSession/, '纯铸号不带登记副作用，避免进页/换号/清场污染名单')
   const start = page.indexOf('subscribeKioskSensitiveSessionClear')
   assert.ok(start > 0, '小青页没有订阅清场')
   const effect = page.slice(start, page.indexOf('}, [])', start))
@@ -491,4 +493,59 @@ test('接线：小青总结回了作业号也登记（aiHttpAdapter 的 summariz
   const end = src.indexOf('\n  },', start)
   assert.ok(end > start, '找不到 summarizeAssistantSession 的结尾')
   assert.match(src.slice(start, end), /rememberAdvisorSession\(res\.advisorSessionId\)/)
+})
+
+test('发 /assistant/chat 前暂记请求号：在途离场能清掉、回不同号时撤掉未确认暂记、失败保留、清场后不复染', async () => {
+  const adapterSrc = readFileSync(join(root, 'src/services/api/aiHttpAdapter.ts'), 'utf8')
+  const chatStart = adapterSrc.indexOf('async chatWithAssistant(')
+  const chatBody = adapterSrc.slice(chatStart, adapterSrc.indexOf('\n  },', chatStart))
+  assert.ok(
+    chatBody.includes('trackAssistantSessionRequest(req.sessionId)')
+      && chatBody.indexOf('trackAssistantSessionRequest(req.sessionId)') < chatBody.indexOf("post<AssistantChatResponse>('/assistant/chat'")
+      && chatBody.includes('settle(res.sessionId)'),
+    'chatWithAssistant 必须在 post 之前暂记请求号并在返回后落定',
+  )
+
+  const { mod, calls, restore } = await loadForget()
+  try {
+    // 1. 请求在途时清场：直接忘掉 reqId；随后迟到的同号回包不把已清过的号重新塞回列表。
+    const settleInflight = mod.trackAssistantSessionRequest(HEX(30))
+    mod.forgetAiSessions(null)
+    assert.equal(assistantCalls(calls).length, 1)
+    assert.deepEqual(bodyOf(assistantCalls(calls)[0]).sessionIds, [HEX(30)])
+    settleInflight(HEX(30))
+    mod.forgetAiSessions(null)
+    assert.equal(assistantCalls(calls).length, 1, '已清过的同号迟到回包不复染名单')
+
+    // 2. 在途清场后，若服务端实际上另铸了新号并返回，须记下那个漏清的新号。
+    const settleMinted = mod.trackAssistantSessionRequest(HEX(31))
+    mod.forgetAiSessions(null)
+    assert.deepEqual(bodyOf(assistantCalls(calls)[1]).sessionIds, [HEX(31)])
+    settleMinted(HEX(32))
+    mod.forgetAiSessions(null)
+    assert.deepEqual(bodyOf(assistantCalls(calls)[2]).sessionIds, [HEX(32)])
+
+    // 3. 首次请求的 reqId 未被服务端沿用（服务端或夹具返回不同 resId）：撤掉未确认暂记，只忘 resId。
+    const settleReplaced = mod.trackAssistantSessionRequest(HEX(33))
+    settleReplaced(HEX(34))
+    mod.forgetAiSessions(null)
+    assert.deepEqual(bodyOf(assistantCalls(calls)[3]).sessionIds, [HEX(34)])
+
+    // 4. 服务端沿用 reqId：只留一条，后续轮次若换了新号，仍同时忘掉已确认的旧号与新号。
+    const settleTurn1 = mod.trackAssistantSessionRequest(HEX(35))
+    settleTurn1(HEX(35))
+    const settleTurn2 = mod.trackAssistantSessionRequest(HEX(35))
+    settleTurn2(HEX(36))
+    mod.forgetAiSessions(null)
+    assert.deepEqual(bodyOf(assistantCalls(calls)[4]).sessionIds, [HEX(35), HEX(36)])
+
+    // 5. 请求异常/超时未调用 settle（fail-closed）：保留暂记；即便随后同号重试拿到别号，仍两号都忘。
+    mod.trackAssistantSessionRequest(HEX(37))
+    const settleRetry = mod.trackAssistantSessionRequest(HEX(37))
+    settleRetry(HEX(38))
+    mod.forgetAiSessions(null)
+    assert.deepEqual(bodyOf(assistantCalls(calls)[5]).sessionIds, [HEX(37), HEX(38)])
+  } finally {
+    restore()
+  }
 })

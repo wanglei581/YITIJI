@@ -3,7 +3,8 @@
  *
  * 一体机登出先清场再注销会员（AuthContext.logout → clearKioskSensitiveSession →
  * forgetAiSessions，然后 memberLogout）。游客登录不走清场。
- * 小青会话号在进页时就铸成 32 位十六进制并登记，服务端沿用没被占用的这个号；
+ * 小青会话号在进页时就铸成 32 位十六进制，发 /assistant/chat 请求前登记（不等回复，
+ * 且不在每次渲染或清场换新号时乱登记），服务端沿用没被占用的这个号；
  * 清场先按会员令牌发，再按同一来源地址匿名发。别的归属沿用或清掉这个号都失败。
  * 作业追问一体机没有调用点。已经用 getAdvisorSession 登记过令牌的，清场带会员令牌和
  * 游客作业令牌，在途写回作废。没登记令牌的不在清场请求里，登出只按会员归属清，不动它。
@@ -145,6 +146,8 @@ export async function runGuestLoginLogoutScenarios(ctx: InflightForgetContext): 
   const logoutBody = between(authSrc, 'const logout = useCallback', 'useEffect')
   const forgetSrc = readKiosk('services/api/aiSessionForget.ts')
   const scenes = readKiosk('pages/assistant/advisorScenes.ts')
+  const aiAdapter = readKiosk('services/api/aiHttpAdapter.ts')
+  const chatAdapterBody = between(aiAdapter, 'async chatWithAssistant(', '\n  },')
   const chatSrc = readFileSync(resolve(__dirname, '../src/ai/llm/llm-chat.service.ts'), 'utf8')
   check(!guestBranch.includes('clearKioskSensitiveSession'), '游客登录不调用清场，这次到访的对话还留着')
   check(
@@ -160,8 +163,13 @@ export async function runGuestLoginLogoutScenarios(ctx: InflightForgetContext): 
   )
   check(forgetSrc.includes('if (!token && !advisor.accessToken) continue'), '作业号没记下令牌、当前也不是会员时，清场不发这个号')
   check(
-    scenes.includes('rememberAssistantSession(id)') && scenes.includes('getRandomValues'),
-    '一体机进页就铸 32 位会话号并登记，不等回复',
+    scenes.includes('getRandomValues')
+      && !scenes.includes('rememberAssistantSession(')
+      && chatAdapterBody.includes('trackAssistantSessionRequest(req.sessionId)')
+      && chatAdapterBody.indexOf('trackAssistantSessionRequest(req.sessionId)')
+        < chatAdapterBody.indexOf("post<AssistantChatResponse>('/assistant/chat'")
+      && chatAdapterBody.includes('settle(res.sessionId)'),
+    '一体机铸 32 位会话号，发 /assistant/chat 前登记不等回复，且铸号本身不乱登记',
   )
   check(
     chatSrc.includes('unusedVisitId') && chatSrc.includes('!this.inflight.has(requestedId)'),
