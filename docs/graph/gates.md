@@ -795,12 +795,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
 | `apps/kiosk/src/pages/profile/me/feedback/types.ts` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
 | `apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-profile-activity-inkpaper.mjs`<br/>`verify-profile-ai-records-inkpaper.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs` |
-| `apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx` | `verify-lightflow-profile-entry.mjs` |
-| `apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx` | `verify-lightflow-profile-entry.mjs` |
-| `apps/kiosk/src/pages/profile/me/orders/order-invoice.css` | `verify-lightflow-profile-entry.mjs` |
-| `apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-profile-entry.mjs` |
-| `apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts` | `verify-lightflow-profile-entry.mjs` |
-| `apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts` | `verify-lightflow-profile-entry.mjs` |
+| `apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
+| `apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
+| `apps/kiosk/src/pages/profile/me/orders/order-invoice.css` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
+| `apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
+| `apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
+| `apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
 | `apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-member-print-orders-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs` |
 | `apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
 | `apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx` | `verify-lightflow-profile-entry.mjs`<br/>`verify-member-print-orders-ui.mjs`<br/>`verify-pickup-claim-error-coverage.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs` |
@@ -3201,7 +3201,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/service-order.settle.ts` | `verify-backend-error-copy-coverage.mjs` |
 | `services/api/src/payment/terminal-charge-public-reset.ts` | `verify-terminal-charge-public-reset.ts` |
 | `services/api/src/payment/terminal-charge-settings.ts` | `verify-service-orders-concurrency.ts`<br/>`verify-terminal-charge-binding-race.ts`<br/>`verify-terminal-charge-public-reset.ts`<br/>`verify-terminal-charge-settings.ts` |
-| `services/api/src/payment/terminal-charge.contract.ts` | `verify-admin-billing.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-miniapp-virtual-pay.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-service-orders-settle.ts`<br/>`verify-terminal-charge-binding-race.ts`<br/>`verify-terminal-charge-public-reset.ts`<br/>`verify-terminal-charge-settings.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
+| `services/api/src/payment/terminal-charge.contract.ts` | `verify-admin-billing.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-miniapp-virtual-pay-p2-postgres.ts`<br/>`verify-miniapp-virtual-pay.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-service-orders-settle.ts`<br/>`verify-terminal-charge-binding-race.ts`<br/>`verify-terminal-charge-public-reset.ts`<br/>`verify-terminal-charge-settings.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/policies/dto/policy.dto.ts` | `verify-policies.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-policy-publish-gates.ts` |
 | `services/api/src/policies/policies.controller.ts` | `verify-license-state.ts`<br/>`verify-policies.ts`<br/>`verify-policy-scope.ts` |
 | `services/api/src/policies/policies.module.ts` | `verify-background-task-safety.ts`<br/>`verify-policy-scope.ts` |

@@ -497,6 +497,13 @@ const allowedPrintOrdersInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx',
   // S15c2（2026-11-19）：有待取单、没有打印任务时的两张出路卡。只加白名单行。
   'apps/kiosk/src/pages/profile/me/printOrders/pendingPickupExits.ts',
+  // P2c2（2026-11-21）：我的订单自助开票与 AI/扫描服务单混排子模块。只加白名单行，不改上面的行为断言。
+  'apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx',
+  'apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx',
+  'apps/kiosk/src/pages/profile/me/orders/order-invoice.css',
+  'apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts',
+  'apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts',
+  'apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts',
 ])
 /** 2026-07-25：冻结项诚实文案 / 合规入口收口（允许主入口标签与 toast，不做视觉换装）。 */
 const allowedHonestCopyChanged = new Set([

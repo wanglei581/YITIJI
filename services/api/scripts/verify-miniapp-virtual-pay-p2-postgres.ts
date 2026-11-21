@@ -27,6 +27,7 @@ import { RedisService } from '../src/common/redis/redis.service'
 import { installBodyParsers } from '../src/config/body-parsers'
 import { MiniappAccessTokenService } from '../src/miniapp-access-token/miniapp-access-token.service'
 import type { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
+import { PERSONAL_CHARGE_SETTING_KEY } from '../src/payment/terminal-charge.contract'
 import { ServiceOrderService } from '../src/payment/service-order.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
@@ -95,6 +96,7 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
+  const priorPersonalCharge = await prisma.platformSetting.findUnique({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
 
   let realRedis: RedisService | null = null
   let redisLike: unknown
@@ -210,6 +212,15 @@ async function main(): Promise<void> {
     console.log(`=== ALL PASS verify-miniapp-virtual-pay-p2:postgres (port=${port}, redis=${realRedis ? 'real' : 'memory'}) ===`)
   } finally {
     await app.close()
+    if (priorPersonalCharge == null) {
+      await prisma.platformSetting.deleteMany({ where: { key: PERSONAL_CHARGE_SETTING_KEY } })
+    } else {
+      await prisma.platformSetting.upsert({
+        where: { key: PERSONAL_CHARGE_SETTING_KEY },
+        create: { key: PERSONAL_CHARGE_SETTING_KEY, value: priorPersonalCharge.value },
+        update: { value: priorPersonalCharge.value },
+      })
+    }
     await prisma.onModuleDestroy()
     if (realRedis) await realRedis.onModuleDestroy()
   }

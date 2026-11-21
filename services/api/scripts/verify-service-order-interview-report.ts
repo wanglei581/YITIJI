@@ -81,7 +81,7 @@ import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
 import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from '../src/terminals/terminal-session.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { createRaceBarrier } from './support/serializable-race-barrier'
-import { setTerminalUserPrintPrices } from './support/terminal-charge-fixture'
+import { restoreTerminalChargeFixture, setTerminalUserPrintPrices } from './support/terminal-charge-fixture'
 
 const API_ROOT = resolve(__dirname, '..')
 
@@ -1002,6 +1002,7 @@ async function main(): Promise<void> {
     await prisma.kioskSession.deleteMany({ where: { terminalId: { in: [termCharge, termFree] } } }).catch(() => undefined)
     await prisma.terminalServicePrice.deleteMany({ where: { terminalId: { in: [termCharge, termFree] } } }).catch(() => undefined)
     await prisma.terminal.deleteMany({ where: { id: { in: [termCharge, termFree] } } }).catch(() => undefined)
+    await restoreTerminalChargeFixture(prisma)
     await prisma.onModuleDestroy().catch(() => undefined)
     if (redisClient) await redisClient.quit().catch(() => undefined)
     if (sqliteDir) rmSync(sqliteDir, { recursive: true, force: true })

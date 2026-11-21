@@ -5,6 +5,7 @@ import { LicenseLock } from '../../../layouts/LicenseLock'
 // 我的订单 / 打印订单 — /me/print-orders（本人，只读）。
 // 免费机且无收费/服务单时保持「打印订单」原口径；收费机或存在服务单/实付打印单时升级为
 // 「我的订单」并混排 AI/扫描服务单与「开发票」入口（对照 pay-1113.js:516-537）。
+// 到机码（取件码）仅后端返回时展示，前端不做可见性推断。
 // ============================================================
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'

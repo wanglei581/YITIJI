@@ -24446,23 +24446,29 @@
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx": [
-      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx": [
-      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/orders/order-invoice.css": [
-      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
-      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts": [
-      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts": [
-      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs"
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -32519,6 +32525,7 @@
     "services/api/src/payment/terminal-charge.contract.ts": [
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
+      "services/api/scripts/verify-miniapp-virtual-pay-p2-postgres.ts",
       "services/api/scripts/verify-miniapp-virtual-pay.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
@@ -38129,6 +38136,12 @@
           "apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts",
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+          "apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx",
+          "apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx",
+          "apps/kiosk/src/pages/profile/me/orders/order-invoice.css",
+          "apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts",
+          "apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts",
+          "apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PendingPickupSection.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
@@ -48089,6 +48102,7 @@
           "services/api/src/miniapp-access-token/miniapp-access-token.service.ts",
           "services/api/src/payment/payment-provider.factory.ts",
           "services/api/src/payment/service-order.service.ts",
+          "services/api/src/payment/terminal-charge.contract.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/terminal-identity.guard.ts",
           "services/api/src/terminals/terminal-session.service.ts",
