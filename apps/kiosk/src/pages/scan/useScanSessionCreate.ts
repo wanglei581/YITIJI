@@ -1,11 +1,18 @@
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { getTerminalId } from '../../services/api/screensaver'
 import { createScanSession } from '../../services/api/scanTasks'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { payServicePath } from '../pay/payServiceModel'
 import { scanCleanupInProgress, trackScanSessionCreation } from './scanCleanupGate'
 import { replayCreateUntilOutcomeKnown } from './scanCreateReplay'
+import {
+  isScanOrderInUseError,
+  shouldForgetScanTripOnPayError,
+  shouldReturnToScanPay,
+} from './scanPayModel'
 import {
   classifyCreateFailure,
   isRescanRefusedByServer,
@@ -14,18 +21,32 @@ import {
 import {
   getCancellationCredentials,
   isValidCreatedSession,
+  liveSessionStillValid,
   SCAN_CLEANUP_HOLD_FAILURE,
   SCAN_LIVE_NOT_DURABLE_FAILURE,
 } from './scanSettingsModel'
 import { SCAN_TERMINAL_FAIL_COPY, scanShownText } from './scanShownText'
 import type { ScanType } from './scanWorkbench'
+import type { ScanStage } from './scanWorkbenchModel'
 import {
   discardTakenScanRescanAuthority,
   patchScanWorkbenchSessionWithDurableLive,
+  readScanWorkbenchSession,
   restoreScanRescanAuthority,
   scanLifecycleGeneration,
   takeScanRescanAuthority,
 } from './scanWorkbenchSession'
+import {
+  forgetEndedScanTrip,
+  forgetScanServiceTrip,
+  markScanPanelOrderRejected,
+  readPendingScanPromiseOrder,
+  readScanServiceHeaders,
+  recordScanTaskOrder,
+  rememberPendingScanPromiseOrder,
+  useScanPayState,
+  wasScanPanelOrderRejected,
+} from './useScanPayGate'
 import type { ScanSettingsSession } from './useScanSettingsState'
 
 /**
@@ -43,10 +64,15 @@ import type { ScanSettingsSession } from './useScanSettingsState'
  * 它是 `useState` 的 setter，引用永远稳定，所以不改变这条 effect 何时重跑；补它只是因为
  * setter 现在经由交接值传进来，lint 认不出它是稳定的。
  */
-export function useScanSessionCreate(input: ScanSettingsSession & { scanType: ScanType | null }): void {
-  const { getToken } = useAuth()
+export function useScanSessionCreate(
+  input: ScanSettingsSession & { scanType: ScanType | null; onGoStage?: (stage: ScanStage) => void },
+): void {
+  const { getToken, user } = useAuth()
+  const navigate = useNavigate()
+  const endUserId = user?.id ?? null
   const {
     scanType,
+    onGoStage,
     terminalSession,
     rescanCredentialsLost, setRescanCredentialsLost,
     rescanRefusedByServer, setRescanRefusedByServer,
@@ -55,6 +81,8 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
     cleanupHolding,
     quietPeriodRemaining, setQuietPeriodRemaining,
     quietPeriodBlocked, setQuietPeriodBlocked,
+    setOrderInUse,
+    setCreateDispatched,
     setRescanRequested,
     setReplayingLostCreate,
     setLiveNotDurable,
@@ -82,6 +110,9 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
     abandonCreatedSession,
     discardCreatedSession,
   } = input
+  const pay = useScanPayState({
+    enabled: Boolean(scanType) && !skipCreateRef.current && terminalSession === 'ready',
+  })
 
   /* 复水进来的那一场没走过创建，身份快照是空的。挂载这一刻补一份：撤销与确认都要用
    * 「建这一场的那个身份」发（服务端按 endUserId 校验），而复水之后当前身份就是它 ——
@@ -165,6 +196,21 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
     terminalFailClosedRef.current = false
     let cancelled = false
 
+    // 前置付款闸门：面板设置页直达或刷新时，建会话前先核验本机扫描价与有效已付单。
+    // 仍在核验时等待，收费且无可用已付/免费再试单则绝不发 POST /scan/sessions，直接跳付款屏。
+    if (!sessionPromiseRef.current && pay.loading) return undefined
+    if (!sessionPromiseRef.current && pay.needsPayment) {
+      forgetEndedScanTrip(pay.trip, pay.order)
+      navigate(payServicePath('scan', { next: 'settings', back: 'how' }), { replace: true })
+      return undefined
+    }
+    if (!sessionPromiseRef.current && pay.order && wasScanPanelOrderRejected(pay.order.id)) {
+      const verdict = classifyCreateFailure(new ApiHttpError('SERVICE_PAYMENT_REQUIRED', '这一次要先付款', 402))
+      setFailure(verdict.failure)
+      setPhase('error')
+      return undefined
+    }
+
     if (!sessionPromiseRef.current) {
       setFailure(null)
       setPhase('loading')
@@ -193,12 +239,14 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
         return undefined
       }
       setRescanRequested(rescan !== null)
+      const serviceHeaders = readScanServiceHeaders(endUserId)
       /* 同一对请求的**唯一**发送口。重放必须复用这一个闭包 —— 另写一处调用就可能漏带
        * 那两半，而漏带的那一次是一个无签名的普通创建。 */
       const sendCreate = () => createScanSession(
         { scanType, terminalId: getTerminalId() },
         identityToken,
         rescan,
+        serviceHeaders,
       )
       /* 「结果未知」时把同一对请求重放到有答案为止（有界退避，只对配对请求）。
        * 服务端对配对创建是幂等的：重放拿回的是**同一条** child，不会多建一条。
@@ -214,6 +262,8 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
          * 代次，而那条路径上执行环境还在，重放领回来的 child 会被当场撤掉，更干净。 */
         shouldContinue: () => !scanCleanupInProgress(),
       })
+      rememberPendingScanPromiseOrder(sessionPromiseRef.current, serviceHeaders?.['x-service-order-id'] ?? null)
+      setCreateDispatched(true)
       /* 把这一次创建交给收尾闸看着，连同身份快照。
        *
        * 清场发生在创建在飞的那一刻时，本机登记里还没有 live —— 闸从登记里读不到任何
@@ -313,6 +363,7 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
           ackRequestedForRef.current = created.scanTaskId
           setAckState('pending')
         }
+        recordScanTaskOrder(created.scanTaskId, readPendingScanPromiseOrder(sessionPromiseRef.current))
       })
       .catch((error: unknown) => {
         const code = errorCodeOf(error)
@@ -344,6 +395,27 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
         if (rescanStillUsable) setRescanRetryable(true)
 
         if (cancelled) return
+        if (isScanOrderInUseError(error)) {
+          // 409 SERVICE_ORDER_IN_USE：这一次已经在进行，绝不回付款屏、绝不让用户再付。
+          const currentLive = readScanWorkbenchSession()?.live
+          if (liveSessionStillValid(currentLive)) {
+            onGoStage?.('progress')
+            return
+          }
+          setOrderInUse(true)
+        } else if (shouldReturnToScanPay(error)) {
+          // 402 或其它 SERVICE_*：回付款屏完成这一趟付款（不可复用旧单先忘掉）。
+          const sentOrderId = readScanServiceHeaders(endUserId)?.['x-service-order-id'] ?? pay.trip?.orderId ?? null
+          if (shouldForgetScanTripOnPayError(error)) {
+            forgetScanServiceTrip(endUserId)
+          } else if (sentOrderId && pay.order?.id === sentOrderId) {
+            markScanPanelOrderRejected(sentOrderId)
+          }
+          sessionPromiseRef.current = null
+          setCreateDispatched(false)
+          navigate(payServicePath('scan', { next: 'settings', back: 'how' }), { replace: true })
+          return
+        }
         // 结论文案按失败码翻译，纯函数、不碰状态（scanRescanRecovery）。
         // 「服务端不认」那一支的授权已在上面丢弃，这里只负责把出路切成普通新会话。
         const verdict = classifyCreateFailure(error)
@@ -382,7 +454,7 @@ export function useScanSessionCreate(input: ScanSettingsSession & { scanType: Sc
     // 订阅把它打回 false，这一次创建才发得出去。不进依赖的话页面会永远停在
     // 「还在收上一场的尾」，而收尾其实早就结束了。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding, quietPeriodBlocked])
+  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding, quietPeriodBlocked, pay.loading, pay.needsPayment])
 
   useEffect(() => {
     if (!quietPeriodBlocked || quietPeriodRemaining <= 0) return undefined

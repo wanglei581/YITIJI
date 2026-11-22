@@ -450,6 +450,13 @@ const allowedMeChanges = new Set([
   // 只加行，不动断言逻辑。
   'apps/kiosk/src/pages/profile/me/feedback/types.ts',
   'apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts',
+  // 自助开票二期（P2c2，2026-11-21）：我的订单拆出的服务单渲染、文案、钩子与 /me/orders/invoice 扫码屏。只加行，不动断言逻辑。
+  'apps/kiosk/src/pages/profile/me/orders/MyOrderInvoicePage.tsx',
+  'apps/kiosk/src/pages/profile/me/orders/ServiceOrderRow.tsx',
+  'apps/kiosk/src/pages/profile/me/orders/order-invoice.css',
+  'apps/kiosk/src/pages/profile/me/orders/orderInvoiceCopy.ts',
+  'apps/kiosk/src/pages/profile/me/orders/useMemberServiceOrders.ts',
+  'apps/kiosk/src/pages/profile/me/orders/useOrderInvoiceSession.ts',
 ])
 const forbiddenMeChanges = changedFiles().filter(
   (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),

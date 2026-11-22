@@ -45,9 +45,23 @@ const SHARED_USER_MESSAGES = {
   RATE_LIMITED: '尝试过于频繁，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
   MEMBER_MISSING_TOKEN: '登录已失效，请重新登录',
+  MEMBER_TOKEN_INVALID: '登录已失效，请重新登录',
   MEMBER_SESSION_EXPIRED: '登录已失效，请重新登录',
+  MEMBER_SESSION_STORE_UNAVAILABLE: '登录状态暂时无法核验，请稍后重试',
   AUTH_REQUIRED: '请先登录后再操作',
   VALIDATION_FAILED: '提交内容有误，请检查后重试',
+
+  // ── 会员自助开票（docs/api/member-invoice-requests.md）──
+  INVOICE_ALREADY_REQUESTED: '这一单已经提交过开票申请',
+  INVOICE_REQUEST_NOT_FOUND: '没有找到这份开票申请',
+
+  // ── 小程序微信虚拟支付（virtual-pay-order.service.ts）──
+  VPAY_DISABLED: '当前暂未开放手机端购买，请在一体机现场按屏上提示使用',
+  VPAY_GOODS_UNCONFIGURED: '当前暂未开放手机端购买，请在一体机现场按屏上提示使用',
+  VPAY_CONFIG_MISSING: '当前暂未开放手机端购买，请在一体机现场按屏上提示使用',
+  VPAY_SANDBOX_FORBIDDEN: '当前暂未开放手机端购买，请在一体机现场按屏上提示使用',
+  VPAY_OPENID_MISMATCH: '当前微信与登录账号不一致，请退出后用本人账号重新登录',
+  VPAY_SERVICE_KIND_INVALID: '仅支持购买 AI 简历优化或 AI 模拟面试单次服务',
 
   // ── AI 使用门禁与合规（服务端 ai-access.service.ts、llm-guard.ts、legal-docs-published-guard.ts）──
   // 这几句不透传服务端原话：LEGAL_DOCS_NOT_PUBLISHED 服务端写的是「请联系现场工作人员」，
@@ -146,6 +160,14 @@ const PASSTHROUGH_MESSAGE_CODES = [
   'ACCOUNT_UNAVAILABLE',             // 账号当前不可用
   'DATA_REQUEST_INVALID_TRANSITION', // 只能撤回尚未执行的注销申请 / 申请状态已变化
   'DATA_REQUEST_NOT_FOUND',          // 数据请求不存在
+
+  // 会员自助开票：服务端逐条写好面向求职者的中文阻断/字段校验句（invoice-title.ts、invoice-eligibility.ts）
+  'INVOICE_NOT_ALLOWED',             // 7 种明确阻断句（非本人/未付/已退/退款中/部分退/无实付/已申请）
+  'INVOICE_TITLE_INVALID',           // 抬头要选个人或单位 / 抬头不能为空或超 80 字
+  'INVOICE_TAX_ID_FORBIDDEN',        // 个人不用填税号
+  'INVOICE_TAX_ID_REQUIRED',         // 单位请填写名称和统一社会信用代码
+  'INVOICE_TAX_ID_INVALID',          // 统一社会信用代码需为 18 位（数字与大写字母，末位校验位正确）
+  'INVOICE_EMAIL_INVALID',           // 接收邮箱格式不对。电子发票发到这个邮箱
 ];
 
 /**

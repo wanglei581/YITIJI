@@ -683,6 +683,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-settings
           # 小程序虚拟支付开关与道具配置：默认关，价格不进仓库，缺变量或生产沙箱不拒启动。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:miniapp-virtual-pay
+          # 小程序虚拟支付二期：权益原子核销、失败退回、官方退款、推送与查单收敛、后台接口。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:miniapp-virtual-pay-p2
           # 保存收费设置撞上改绑：绑定版本过期回 409，不把旧价写进新机构，也不关改绑之后才出现的待付单。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:terminal-charge-binding-race
           # 机构改成公共就业点位：名下终端价目清空、版本加一；改回非公共不复活旧价。
@@ -694,6 +696,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pickup-arrival-price
           # 服务单沙箱模拟付成（开发与联调用）：生产 404、只认沙箱通道、付成 / 付失败、重复调用幂等。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-sandbox-simulate
+          # 模拟面试出报告失败：免费再试一次（不可开新场）、再不成/过期/离场自动退、并发只退一次、开场不出报告离场不退。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-interview-report
           # 排队打印单的时效（超时判失败、过期单领不走）与心跳里的打印完成判据。
           # 前两条直接调服务方法、各自建临时库；第三条起真服务走 HTTP（入参校验、鉴权、
           # 真实的重新提交路径）——心跳多一个服务端不认识的字段会被整条拒收，只有这样测得出。
@@ -875,6 +879,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:invoice-real-db
           # 开票真 HTTP：只挂开票两个控制器，真守卫、真 Redis 会话、与 main.ts 同参的校验管道。
           VERIFICATION_DATABASE_TARGET=isolated VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:invoice-http
+          # 自助开票二期：会员侧服务单列表、打印单开票态联查、零 PII 与一体机/手机跨端开票闭环。
+          VERIFICATION_DATABASE_TARGET=isolated VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-service-orders
           # 贴牌第一步：品牌与备案默认值 = 现状、机构覆盖只影响该机构终端、Logo 只收 PNG / WebP（按文件头判、禁 SVG、
           # 清洗元数据）、一体机 kiosk-profile 只认已验签终端（防枚举）。写隔离库，结束恢复平台设置。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:branding
@@ -1218,6 +1224,7 @@ jobs:
         run: |
           createdb -h localhost -U ci vpay_verify
           pnpm verify:miniapp-virtual-pay:postgres
+          pnpm verify:miniapp-virtual-pay-p2:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
@@ -1374,6 +1381,7 @@ jobs:
           # 开票真库（见 build-and-verify 同名条目）：PostgreSQL 上同一组事实再跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:invoice-real-db
           VERIFICATION_DATABASE_TARGET=isolated VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:invoice-http
+          VERIFICATION_DATABASE_TARGET=isolated VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-service-orders
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
@@ -1392,6 +1400,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-open-ref:postgres
           # 到机补价与明确没出纸自动退，在 PostgreSQL 上再跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pickup-arrival-price:postgres
+          # 模拟面试出报告失败的免费再试、自动退款与并发互斥在 PostgreSQL 上同样成立。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:service-order-interview-report
           # 排队超时的清扫与领单时间上限在 PostgreSQL 上同样成立（线上每 30 秒清扫一次）。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-reliability-http
           pnpm --filter @ai-job-print/api verify:terminal-bind-code

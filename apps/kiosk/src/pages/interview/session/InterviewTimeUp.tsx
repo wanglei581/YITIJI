@@ -14,6 +14,9 @@ export function InterviewTimeUp({
   getAccess,
   answersRecorded,
   busy,
+  paidReportError,
+  paidReportRetryFree,
+  paidReportLocked,
   onLeave,
   onRestart,
   onRetry,
@@ -25,6 +28,9 @@ export function InterviewTimeUp({
   /** 本场亲眼见过非跳过的回答提交成功。没见过就不说「已保存」。 */
   answersRecorded: boolean
   busy?: boolean
+  paidReportError?: string | null
+  paidReportRetryFree?: boolean
+  paidReportLocked?: boolean
   onLeave: () => void
   onRestart: () => void
   onRetry: () => void
@@ -33,9 +39,20 @@ export function InterviewTimeUp({
   const noAnswers = variant === 'no-answers'
   const subtitle = noAnswers
     ? '没有记下的回答就没有报告。可以再练一场，或直接离开。'
-    : answersRecorded
-      ? '报告现在生成不了。到点前提交的回答已保存，可以再试一次。'
-      : '报告现在生成不了，可以再试一次。'
+    : paidReportError
+      ? paidReportError
+      : answersRecorded
+        ? '报告现在生成不了。到点前提交的回答已保存，可以再试一次。'
+        : '报告现在生成不了，可以再试一次。'
+  const blockRetry = noAnswers || Boolean(paidReportLocked) || (Boolean(paidReportError) && !paidReportRetryFree)
+  const primaryLabel = busy
+    ? '正在生成练习报告…'
+    : blockRetry
+      ? '再练一场'
+      : paidReportRetryFree
+        ? '免费再试一次'
+        : '再试一次生成报告'
+  const primaryAction = blockRetry ? onRestart : onRetry
   return (
     <InterviewShell
       eyebrow="练面试 · 到点"
@@ -51,8 +68,8 @@ export function InterviewTimeUp({
             draft: '这场模拟面试已经结束。请告诉我怎样再练一场，不要替我创建练习，也不要替我编造回答。',
           }}
           primary={{
-            label: busy ? '正在生成练习报告…' : noAnswers ? '再练一场' : '再试一次生成报告',
-            onClick: noAnswers ? onRestart : onRetry,
+            label: primaryLabel,
+            onClick: primaryAction,
             disabled: busy,
           }}
         />

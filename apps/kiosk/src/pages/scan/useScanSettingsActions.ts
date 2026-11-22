@@ -38,6 +38,7 @@ export function useScanSettingsActions(
     setStarting,
     quietPeriodRemaining,
     setQuietPeriodBlocked,
+    setCreateDispatched,
     setRescanCredentialsLost,
     setRescanRefusedByServer,
     setRescanRetryable,
@@ -104,6 +105,7 @@ export function useScanSettingsActions(
     // 不复位的话，创建 effect 会在 `if (ackRefused) return` 处早退，按钮按下去毫无反应。
     setAckRefused(false)
     setAckState('idle')
+    setCreateDispatched(false)
     setFailure(null)
     setPhase('loading')
   }
@@ -112,6 +114,7 @@ export function useScanSettingsActions(
     if (!scanType || quietPeriodRemaining > 0) return
     sessionPromiseRef.current = null
     setQuietPeriodBlocked(false)
+    setCreateDispatched(false)
     setFailure(null)
     setPhase('loading')
   }
@@ -144,6 +147,7 @@ export function useScanSettingsActions(
     setRescanRetryable(false)
     // 新一轮请求从「还没开始重放」起算；上一轮的进度不许挂在这一轮的等待屏上。
     setReplayingLostCreate(false)
+    setCreateDispatched(false)
     setFailure(null)
     setPhase('loading')
   }

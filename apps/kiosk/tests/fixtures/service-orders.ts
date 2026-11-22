@@ -19,6 +19,8 @@ const NAMES: Record<FixtureServiceKey, string> = {
 
 /** 服务单有效期，与后端 SERVICE_PAY_TTL_MS 一致。 */
 export const SERVICE_PAY_TTL_MS = 5 * 60 * 1000
+/** 首次未做成后的免费再试窗口，与后端 SERVICE_RETRY_WINDOW_MS 一致。 */
+export const SERVICE_RETRY_WINDOW_MS = 10 * 60 * 1000
 
 export interface FixtureOrder {
   id: string
@@ -54,6 +56,77 @@ export const ORDER_WECHAT: Omit<FixtureOrder, 'createdAt'> = {
   provider: 'wechat',
 }
 
+export const ORDER_SCAN: Omit<FixtureOrder, 'createdAt'> = {
+  id: 'cmi5kp4n80027s6h9m1z8w4r2f',
+  providerOrderNo: 'svc9c42e81b7f03a6d5e1920bc4',
+  serviceKey: 'scan',
+  amountCents: 100,
+  provider: 'sandbox',
+}
+
+export const ORDER_SCAN_WECHAT: Omit<FixtureOrder, 'createdAt'> = {
+  id: 'cmi5kq9r20031s6h9t6y3n8p5d',
+  providerOrderNo: 'svc2a85f10c4d96b7e3a1048fe1',
+  serviceKey: 'scan',
+  amountCents: 100,
+  provider: 'wechat',
+}
+
+export type FixtureOrderStateKind = 'paid' | 'retry_free' | 'consumed' | 'refunding' | 'refunded' | 'refund_failed'
+
+/** 扫描等服务单常用状态夹具：paid / 可免费再试 / consumed / refunding / refunded / refund_failed。 */
+export function serviceOrderViewByState(
+  order: FixtureOrder,
+  kind: FixtureOrderStateKind,
+  nowMs = Date.now(),
+): Record<string, unknown> {
+  const paidAt = new Date(nowMs - 30_000).toISOString()
+  switch (kind) {
+    case 'paid':
+      return serviceOrderView(order, { status: 'paid', paidAt, attemptsUsed: 0 })
+    case 'retry_free':
+      return serviceOrderView(order, {
+        status: 'paid',
+        paidAt,
+        attemptsUsed: 1,
+        failureReason: '扫描没出文件',
+        retryUntil: new Date(nowMs + 10 * 60 * 1000).toISOString(),
+      })
+    case 'consumed':
+      return serviceOrderView(order, {
+        status: 'consumed',
+        paidAt,
+        attemptsUsed: 1,
+        consumedAt: new Date(nowMs - 5_000).toISOString(),
+      })
+    case 'refunding':
+      return serviceOrderView(order, {
+        status: 'refunding',
+        paidAt,
+        attemptsUsed: 2,
+        failureReason: '扫描没出文件',
+        refundReason: '扫描没出文件',
+      })
+    case 'refunded':
+      return serviceOrderView(order, {
+        status: 'refunded',
+        paidAt,
+        attemptsUsed: 2,
+        failureReason: '扫描没出文件',
+        refundReason: '扫描没出文件',
+        refundedAt: new Date(nowMs - 2_000).toISOString(),
+      })
+    case 'refund_failed':
+      return serviceOrderView(order, {
+        status: 'refund_failed',
+        paidAt,
+        attemptsUsed: 2,
+        failureReason: '扫描没出文件',
+        refundReason: '扫描没出文件',
+      })
+  }
+}
+
 function qrFor(order: FixtureOrder): string {
   if (order.provider === 'wechat') return 'weixin://wxpay/bizpayurl?pr=K9dQ2xT'
   const prepay = `sbx_${order.providerOrderNo.slice(3, 27)}`
@@ -84,6 +157,40 @@ export function serviceOrderView(order: FixtureOrder, overrides: Partial<Record<
     provider: order.provider,
     ...overrides,
   }
+}
+
+/** 已付、尚未消费的服务单视图。 */
+export function paidServiceOrderView(order: FixtureOrder, nowMs = order.createdAt + 10_000): Record<string, unknown> {
+  return serviceOrderView(order, {
+    status: 'paid',
+    paidAt: new Date(nowMs).toISOString(),
+    attemptsUsed: 0,
+    retryUntil: null,
+  })
+}
+
+/** 第一次没做成、10 分钟内可免费再试一次的服务单视图。 */
+export function retryFreeServiceOrderView(order: FixtureOrder, nowMs = order.createdAt + 15_000): Record<string, unknown> {
+  return serviceOrderView(order, {
+    status: 'paid',
+    paidAt: new Date(order.createdAt + 10_000).toISOString(),
+    attemptsUsed: 1,
+    failureReason: 'optimize_failed',
+    retryUntil: new Date(nowMs + SERVICE_RETRY_WINDOW_MS).toISOString(),
+  })
+}
+
+/** 已触发原路退款（退款中）的服务单视图。 */
+export function refundingServiceOrderView(order: FixtureOrder, nowMs = order.createdAt + 20_000): Record<string, unknown> {
+  return serviceOrderView(order, {
+    status: 'refunding',
+    paidAt: new Date(order.createdAt + 10_000).toISOString(),
+    attemptsUsed: 2,
+    failureReason: 'optimize_failed',
+    refundReason: 'optimize_failed',
+    retryUntil: null,
+    consumedAt: new Date(nowMs - 5_000).toISOString(),
+  })
 }
 
 export function ok(json: Record<string, unknown>): { status: number; json: unknown } {

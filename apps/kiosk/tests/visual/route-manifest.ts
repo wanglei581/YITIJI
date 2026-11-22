@@ -8,7 +8,7 @@ export const productionRoutePatterns = [
   '/interview/setup',
   '/interview/session', '/interview/report', '/interview/tips',
   '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
-  '/assistant', '/profile', '/me/resumes', '/me/print-orders', '/me/documents',
+  '/assistant', '/profile', '/me/resumes', '/me/print-orders', '/me/orders/invoice', '/me/documents',
   '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity',
   '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
   '/me/privacy-requests',

@@ -71,9 +71,15 @@ export type ServiceTripEvent =
   | 'interview_opened'
   | 'interview_not_opened'
   | 'interview_followup_failed'
+  | 'interview_report_completed'
+  | 'interview_report_failed'
   | 'scan_file_produced'
   | 'scan_no_file'
   | 'layout_failed'
+
+/** 模拟面试已开场后，报告阶段的附加状态：retry 可免费再试出报告；done 报告已做成，不再退。 */
+export const SERVICE_REPORT_STATES = ['retry', 'done'] as const
+export type ServiceReportState = (typeof SERVICE_REPORT_STATES)[number]
 
 /** made：做成了，不退。not_made：没做成，走再试或退款。layout_only：成品之后的排版失败，不退。 */
 export type ServiceOutcome = 'made' | 'not_made' | 'layout_only'
@@ -84,7 +90,7 @@ export function isServiceOrderKey(value: string): value is ServiceOrderKey {
 
 /**
  * 这一趟算不算做成。对不上的事件按没做成，避免把说不清的失败留成已消费不退。
- * 面试追问失败仍算做成：场已经开起来了。
+ * 面试追问失败仍算做成：场已经开起来了；请求出报告因系统原因没生成则算没做成（先免费再试一次，再不成或离开或过期自动退）。
  */
 export function classifyServiceOutcome(serviceKey: ServiceOrderKey, event: ServiceTripEvent): ServiceOutcome {
   if (event === 'layout_failed') return 'layout_only'
@@ -93,6 +99,8 @@ export function classifyServiceOutcome(serviceKey: ServiceOrderKey, event: Servi
   if (serviceKey === 'resume_optimize' && event === 'optimize_failed') return 'not_made'
   if (serviceKey === 'mock_interview' && event === 'interview_opened') return 'made'
   if (serviceKey === 'mock_interview' && event === 'interview_not_opened') return 'not_made'
+  if (serviceKey === 'mock_interview' && event === 'interview_report_completed') return 'made'
+  if (serviceKey === 'mock_interview' && event === 'interview_report_failed') return 'not_made'
   if (serviceKey === 'scan' && event === 'scan_file_produced') return 'made'
   if (serviceKey === 'scan' && event === 'scan_no_file') return 'not_made'
   return 'not_made'
@@ -101,12 +109,67 @@ export function classifyServiceOutcome(serviceKey: ServiceOrderKey, event: Servi
 export function failureReasonFor(event: ServiceTripEvent): string {
   if (event === 'optimize_failed') return '优化稿没做出来'
   if (event === 'interview_not_opened') return '面试没开起来'
+  if (event === 'interview_report_failed') return '报告没生成'
   if (event === 'scan_no_file') return '扫描没出文件'
   return '这一次没做成'
 }
 
+export type InterviewReportFailureAction = 'enter_retry' | 'refund_failed' | 'refund_left' | 'ignore'
+
+/**
+ * 已开场的模拟面试，出报告因系统原因失败时的下一步决定。
+ * 首次且会话未结束 → 进 10 分钟免费再试（单留在 consumed，不可被新面试认领）；
+ * 首次但会话已结束 → 按离开退；已在再试中再次失败 → 按报告没生成退；已做成或非 consumed → 忽略。
+ */
+export function decideInterviewReportFailure(input: {
+  serviceKey: string
+  status: string
+  settledAt: Date | null
+  reportState: string | null
+  sessionEnded: boolean
+}): InterviewReportFailureAction {
+  if (input.serviceKey !== 'mock_interview' || input.status !== 'consumed' || !input.settledAt) return 'ignore'
+  if (classifyServiceOutcome('mock_interview', 'interview_report_failed') !== 'not_made') return 'ignore'
+  if (input.reportState === 'done') return 'ignore'
+  if (input.reportState === 'retry') return 'refund_failed'
+  if (input.sessionEnded) return 'refund_left'
+  return 'enter_retry'
+}
+
+export type InterviewReportAdmission = 'allow' | 'retry_expired' | 'refunded'
+
+/**
+ * 收费面试场次调模型出报告前的准入判定：
+ * - 服务单已进退款中/已退款/退款失败 → 拒绝，不再调模型或落报告；
+ * - 服务单在免费再试中但窗口已过期（清扫尚未跑）→ 按过期走退款收口并拒绝，绝不翻回做成；
+ * - 其余（首次出报告、窗口内再试、已做成幂等重读）→ 放行。
+ */
+export function decideInterviewReportAdmission(input: {
+  serviceKey: string
+  status: string
+  reportState: string | null
+  retryUntil: Date | null
+  now: Date
+}): InterviewReportAdmission {
+  if (input.serviceKey !== 'mock_interview') return 'allow'
+  if (input.status === 'refunding' || input.status === 'refunded' || input.status === 'refund_failed') {
+    return 'refunded'
+  }
+  if (input.status === 'consumed' && input.reportState === 'retry') {
+    if (!input.retryUntil || input.retryUntil.getTime() <= input.now.getTime()) {
+      return 'retry_expired'
+    }
+  }
+  return 'allow'
+}
+
+export const SERVICE_ERROR_RETRY_EXPIRED_MESSAGE = '免费再试时间已过，这一次的费用会自动退回原付款账户'
+export const SERVICE_ERROR_ORDER_REFUNDED_MESSAGE = '这一次已进入退款流程，不再继续生成练习报告'
+
 export const SERVICE_REFUND_REASON_LEFT = '人已离开，这一次还没用'
 export const SERVICE_REFUND_REASON_RETRY_EXPIRED = '免费再试已过期'
+export const SERVICE_REFUND_REASON_REPORT_FAILED = '报告没生成'
+export const SERVICE_REFUND_REASON_REPORT_LEFT = '人已离开，报告没生成'
 export const SERVICE_REFUND_REASON_USER_CANCELLED = '用户取消，这一次还没用'
 export const SERVICE_REFUND_REASON_LATE_PAYMENT = '付款时这一单已经关闭'
 export const SERVICE_REFUND_REASON_NOW_FREE = '这台机器已改为免费'

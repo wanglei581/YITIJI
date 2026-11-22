@@ -1,6 +1,6 @@
 // 付款屏（稿 pay-1113.js 的 pay-service）：AI 简历优化、AI 模拟面试、扫描共用，样子照打印收银台。
 // 三条路由 /pay/resume、/pay/interview、/pay/scan 各管一种服务，服务种类由路由定，不读查询串；
-// 查询串只认 next / back 两个名字（白名单见 payServiceModel）。「手机上买过」这一态后端还没有核销接口，不接。
+// 查询串只认 next / back 两个名字（白名单见 payServiceModel）。简历与面试支持「手机上买过」权益核销态。
 import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { QxTouchArtReport, QxTouchArtResume } from '../../components/qingxu/touch/QxTouchArt'
@@ -12,6 +12,8 @@ import { useSupportContact } from '../../hooks/useSupportContact'
 import { PrintArt } from '../print/art/PrintArt'
 import { PayServiceQr } from './PayServiceQr'
 import {
+  PAY_OWNED_BODY,
+  PAY_OWNED_HEAD,
   PAY_RATE_LIMIT_LINE,
   PAY_SERVICE_NAME,
   PAY_TIMEOUT_LINE,
@@ -22,6 +24,7 @@ import {
   payChrome,
   payCloseErrorLine,
   payCreateErrorLine,
+  payCreditRedeemErrorLine,
   payFailLine,
   payLookupErrorLine,
   payMissLine,
@@ -70,7 +73,8 @@ export function PayServicePage({ what }: { what: PayWhat }) {
   const flow = usePayServiceFlow(what, targets)
   const name = flow.order?.serviceName || PAY_SERVICE_NAME[what]
   const amount = flow.order ? formatYuan(flow.order.amountCents) : ''
-  const chrome = payChrome(flow.view, name, flow.phase)
+  const provider = flow.order?.provider ?? null
+  const chrome = payChrome(flow.view, name, flow.phase, provider)
   const leave = () => {
     if (!chrome.left) {
       navigate(targets.back, { replace: true })
@@ -78,19 +82,41 @@ export function PayServicePage({ what }: { what: PayWhat }) {
     }
     flow.onLeave(chrome.left.close)
   }
-  const primary = flow.view === 'ok' || flow.view === 'free'
-    ? flow.onStart
-    : flow.view === 'wait' || flow.view === 'check' || flow.view === 'loading'
-      ? flow.onRefresh
-      : flow.onRetry
+  const primary = flow.view === 'owned'
+    ? flow.onUseCredit
+    : flow.view === 'ok' || flow.view === 'free'
+      ? flow.onStart
+      : flow.view === 'wait' || flow.view === 'check' || flow.view === 'loading'
+        ? flow.onRefresh
+        : flow.onRetry
   const sum = flow.order ? <PaySum name={name} amount={amount} /> : null
+  const creditNotice = flow.creditNotice ? (
+    <p className="qxt-fine" role="status" data-testid="pay-service-credit-notice">{flow.creditNotice}</p>
+  ) : null
 
   let body
   switch (flow.view) {
+    case 'owned':
+      body = (
+        <>
+          <p className="pys-chline" data-testid="pay-service-owned-line">
+            <b>{PAY_OWNED_HEAD}</b>
+            {PAY_OWNED_BODY}
+          </p>
+          <p className="qxt-fine">{PAY_TRIP[what]}</p>
+          {flow.error ? (
+            <p className="qxt-fine" role="alert" data-testid="pay-service-owned-error">
+              {payCreditRedeemErrorLine(flow.error)}
+            </p>
+          ) : null}
+        </>
+      )
+      break
     case 'wait':
     case 'check':
       body = (
         <>
+          {creditNotice}
           <p className="pys-chline" data-testid="pay-service-channel">
             <b>{payChannelHead(flow.order?.provider)}</b>这一次 {amount}。{PAY_TRIP[what]}
           </p>
@@ -116,13 +142,14 @@ export function PayServicePage({ what }: { what: PayWhat }) {
       body = <>{sum}<p className="qxt-fine" data-testid="pay-service-line">{PAY_TIMEOUT_LINE}</p></>
       break
     case 'refund':
-      body = <>{sum}<p className="qxt-fine" data-testid="pay-service-line">{payRefundLine(flow.phase)}</p></>
+      body = <>{sum}<p className="qxt-fine" data-testid="pay-service-line">{payRefundLine(flow.phase, provider)}</p></>
       break
     case 'error':
     case 'lookup':
     case 'close_failed':
       body = (
         <>
+          {creditNotice}
           {flow.view === 'lookup' || flow.view === 'close_failed' ? sum : null}
           <p className="pys-chline" role="alert" data-testid="pay-service-line">
             {flow.view === 'error'
@@ -138,7 +165,7 @@ export function PayServicePage({ what }: { what: PayWhat }) {
       )
       break
     case 'loading':
-      body = <p className="pys-chline" role="status"><b>正在出这一次的付款码</b>出好以后请扫码支付，付好了才会开始。</p>
+      body = <>{creditNotice}<p className="pys-chline" role="status"><b>正在出这一次的付款码</b>出好以后请扫码支付，付好了才会开始。</p></>
       break
     default:
       body = null

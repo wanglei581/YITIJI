@@ -222,7 +222,7 @@ const WAVE_ROUTES = new Map([
     '/k/u/:scene', '/k/l/:ticketId',
     // 2026-11-19 开票手机页与短链中转。
     '/invoice/phone', '/k/i/:scene',
-    '/session-timeout', '/error-offline', '/profile', '/me/resumes', '/me/print-orders',
+    '/session-timeout', '/error-offline', '/profile', '/me/resumes', '/me/print-orders', '/me/orders/invoice',
     '/me/documents', '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity',
     '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
     '/me/privacy-requests', '/help',

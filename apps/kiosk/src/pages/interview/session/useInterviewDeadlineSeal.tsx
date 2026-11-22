@@ -50,6 +50,11 @@ export function useInterviewDeadlineSeal(args: {
   setRecordSec: Dispatch<SetStateAction<number>>
   setPhase: Dispatch<SetStateAction<InterviewSessionPhase>>
   setAssistantDown: Dispatch<SetStateAction<boolean>>
+  paidReportError?: string | null
+  paidReportRetryFree?: boolean
+  paidReportLocked?: boolean
+  onReportSucceeded?: () => void
+  onReportFailed?: (err?: unknown) => Promise<boolean>
 }) {
   const [deadline, setDeadline] = useState(() => initialDeadline(args.state, args.live))
   const [remainingSec, setRemainingSec] = useState(() => remainingSecAt(deadline.deadlineAtLocalMs, Date.now()))
@@ -58,6 +63,10 @@ export function useInterviewDeadlineSeal(args: {
   const sealedRef = useRef(false)
   const phaseRef = useRef(args.phase)
   phaseRef.current = args.phase
+  const paidReportLockedRef = useRef(Boolean(args.paidReportLocked))
+  paidReportLockedRef.current = Boolean(args.paidReportLocked)
+  const answersRecordedRef = useRef(args.answersRecorded)
+  answersRecordedRef.current = args.answersRecorded
   const sealRef = useRef<() => void>(() => {})
   const getTokenRef = useRef(args.getToken)
   getTokenRef.current = args.getToken
@@ -101,7 +110,7 @@ export function useInterviewDeadlineSeal(args: {
   }, [sessionId, accessToken])
 
   const requestReport = () => {
-    if (!args.state?.sessionId) return
+    if (!args.state?.sessionId || paidReportLockedRef.current) return
     setReportBusy(true)
     args.setPhase('finishing')
     void endInterviewAtDeadline({
@@ -112,6 +121,8 @@ export function useInterviewDeadlineSeal(args: {
       onGoStage: args.onGoStage,
       navigate: args.navigate,
       setAssistantDown: args.setAssistantDown,
+      onReportSucceeded: args.onReportSucceeded,
+      onReportFailed: args.onReportFailed,
     }).then((result) => {
       setReportBusy(false)
       if (result !== 'reported') setTimeUpStop(result)
@@ -133,6 +144,11 @@ export function useInterviewDeadlineSeal(args: {
     setDraft('')
     setVoice({ kind: 'idle' })
     stopPlayback()
+    // 付费报告因退款或免费再试过期已锁定时，保留到点封场体验，但严禁自动再请求生成报告。
+    if (paidReportLockedRef.current) {
+      setTimeUpStop(answersRecordedRef.current ? 'report-failed' : 'no-answers')
+      return
+    }
     if (phaseRef.current === 'finishing') return
     requestReport()
   }
@@ -145,10 +161,13 @@ export function useInterviewDeadlineSeal(args: {
       getAccess={() => ({ token: getTokenRef.current(), accessToken: args.state?.accessToken ?? null })}
       answersRecorded={args.answersRecorded}
       busy={reportBusy}
+      paidReportError={args.paidReportError}
+      paidReportRetryFree={args.paidReportRetryFree}
+      paidReportLocked={args.paidReportLocked}
       onLeave={() => args.navigate('/interview-service')}
       onRestart={() => (args.onGoStage ? args.onGoStage('setup') : args.navigate('/interview/setup'))}
       onRetry={() => {
-        if (reportBusy || timeUpStop === 'no-answers') return
+        if (reportBusy || timeUpStop === 'no-answers' || args.paidReportLocked) return
         requestReport()
       }}
       onOpenTips={() => (args.onGoStage ? args.onGoStage('tips') : args.navigate('/interview/tips'))}

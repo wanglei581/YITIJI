@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ScanSettingsSessionFacts, ScanSettingsStatusView } from './ScanSettingsStatusView'
 import { liveSessionStillValid } from './scanSettingsModel'
@@ -31,6 +32,23 @@ interface LocationState {
  * 按拆分前同一个顺序把这些 hook 调起来、再据结果渲染。
  */
 export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
+  const [continueRound, setContinueRound] = useState(0)
+  return (
+    <ScanSettingsInner
+      key={continueRound}
+      onGoStage={onGoStage}
+      onContinuePaidOrder={() => setContinueRound((round) => round + 1)}
+    />
+  )
+}
+
+function ScanSettingsInner({
+  onGoStage,
+  onContinuePaidOrder,
+}: {
+  onGoStage?: (stage: ScanStage) => void
+  onContinuePaidOrder: () => void
+}) {
   const location = useLocation()
   const state = (location.state ?? {}) as LocationState
   const stored = readScanWorkbenchSession()
@@ -54,6 +72,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     countdown,
     quietPeriodRemaining,
     quietPeriodBlocked,
+    orderInUse,
+    createDispatched,
     controlToken,
     rescanRequested,
     plainRestartChosen,
@@ -69,7 +89,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     restoredFromStorageRef,
   } = session
 
-  useScanSessionCreate({ ...session, scanType })
+  useScanSessionCreate({ ...session, scanType, onGoStage })
   useScanSettingsDeliveryAck(session)
   useScanSettingsExpiry(session)
   const {
@@ -89,8 +109,9 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     return <ScanSettingsStatusView {...{
       phase, ackState, scanType, terminalSession, failure, replayingLostCreate,
       rescanRetryable, rescanCredentialsLost, rescanRefusedByServer, ackRefused, liveNotDurable,
-      cleanupHolding, quietPeriodRemaining, quietPeriodBlocked,
+      cleanupHolding, quietPeriodRemaining, quietPeriodBlocked, orderInUse, createDispatched,
       handleSafeReturn, handlePlainRestart, handleRescanRetry, handleAckRetry, handleQuietPeriodRetry,
+      handleContinuePaidOrder: onContinuePaidOrder,
     }} />
   }
 

@@ -25,7 +25,7 @@ import {
   colorModeDisplay,
   copiesDisplay,
   duplexDisplay,
-  formatAmountCents,
+  formatYuanText,
   isFreeMemberOrder,
   memberPayStatusLabel,
   netPaidDisplay,
@@ -76,7 +76,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
         <div className="me-payment-grid">
           <DetailRow
             label="下单金额"
-            value={typeof item.amountCents === 'number' ? formatAmountCents(item.amountCents) : '未记录'}
+            value={typeof item.amountCents === 'number' ? formatYuanText(item.amountCents) : '未记录'}
           />
           <DetailRow label="优惠/权益抵扣" value={recordedAmountDisplay(item.discountCents)} />
           <DetailRow label="已退款" value={recordedAmountDisplay(item.refundedAmountCents)} />

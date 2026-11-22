@@ -107,12 +107,18 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261114120000_service_order_settlement/migration.sql')])
     // 没结案的同一任务只能一张单，并补退款通知与渠道关单重试列（20261114170000）。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261114170000_service_order_open_ref/migration.sql')])
+    // 模拟面试出报告失败免费再试与终态列（20261121120000）。当前客户端写 ServiceOrder 会带上 reportState，必须在第一次写 ServiceOrder 之前执行。
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261121120000_service_order_report_state/migration.sql')])
     // 绑定版本（20261115120000）。当前客户端写 Terminal 会带上 orgBindingGeneration，必须在第一次 terminal.create 之前执行。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261115120000_add_terminal_org_binding_generation/migration.sql')])
     // 批量预建批次号（20261117120000）。当前客户端读 Terminal.provisionBatchId，必须在第一次 terminal.create 之前执行。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261117120000_add_terminal_provision_batch/migration.sql')])
     // 开票申请（20261119120000）。当前客户端写 InvoiceRequest 之前表必须已存在，且未退回申请的条件唯一索引已建上。
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261119120000_add_invoice_request/migration.sql')])
+    // 小程序微信虚拟支付一/二期（20261119120000 + 20261121120000 + 20261121200000）。
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261119120000_add_miniapp_virtual_pay/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261121120000_virtual_pay_reconcile_state/migration.sql')])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261121200000_virtual_pay_credit_use_refund/migration.sql')])
     // 屏上扫描会话字段（20261102230000，排在上一条之后）。升级前已有的扫描任务升级后要取默认值：此时库里的 ScanTask 还是旧结构，
     // 而当前客户端的模型已含新列，所以旧行只能用原生 SQL 写，且必须在执行这条迁移之前写；扫描任务要挂在终端下，先建一个专用终端。
     const legacyScanId = 'legacy-scan-before-device-fields'
@@ -283,6 +289,42 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     }
     if (!closedWriteRejected) throw new Error(`${kind}: InvoiceRequest closed-member write trigger must reject inserts for closed members`)
     console.log(`PASS ${kind}: invoice request table rejects a second open application, frees the slot after return, and rejects closed-member writes`)
+
+    const reportStateColumn = kind === 'sqlite'
+      ? await client.$queryRawUnsafe<Array<{ name: string; notnull: number | bigint }>>(`SELECT "name", "notnull" FROM pragma_table_info('ServiceOrder') WHERE "name" = 'reportState'`)
+      : await client.$queryRawUnsafe<Array<{ name: string; notnull: string }>>(`SELECT column_name AS name, is_nullable AS notnull FROM information_schema.columns WHERE table_name = 'ServiceOrder' AND column_name = 'reportState'`)
+    const reportState = reportStateColumn[0]
+    if (!reportState) throw new Error(`${kind}: ServiceOrder.reportState missing after upgrade`)
+    const reportStateNullable = kind === 'sqlite' ? Number(reportState.notnull) === 0 : reportState.notnull === 'YES'
+    if (!reportStateNullable) throw new Error(`${kind}: ServiceOrder.reportState must stay nullable`)
+    console.log(`PASS ${kind}: ServiceOrder.reportState exists and is nullable after upgrade`)
+
+    const vpayOrder = await client.virtualPayOrder.create({
+      data: {
+        endUserId: invoiceMember.id,
+        serviceKind: 'mock_interview',
+        productId: 'MIGRATION_TEST_ITEM',
+        priceCents: 100,
+        env: 1,
+        status: 'paid',
+        outTradeNo: `vpmig_${kind}`,
+        paidAt: new Date(),
+        refundOrderId: null,
+      },
+    })
+    const vpayCredit = await client.memberServiceCredit.create({
+      data: {
+        endUserId: invoiceMember.id,
+        serviceKind: 'mock_interview',
+        sourceOrderId: vpayOrder.id,
+        status: 'available',
+        consumedServiceOrderId: null,
+      },
+    })
+    if (vpayOrder.refundOrderId !== null || vpayCredit.consumedServiceOrderId !== null) {
+      throw new Error(`${kind}: VirtualPayOrder.refundOrderId / MemberServiceCredit.consumedServiceOrderId must stay nullable`)
+    }
+    console.log(`PASS ${kind}: VirtualPayOrder refund columns and MemberServiceCredit.consumedServiceOrderId round-trip after upgrade`)
   } finally { await client.$disconnect() }
 }
 

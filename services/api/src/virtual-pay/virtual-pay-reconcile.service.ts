@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { sendVirtualPayOpsAlert } from './virtual-pay-alert'
 import { confirmPaid } from './virtual-pay-delivery'
 import { VIRTUAL_PAY_DIAGNOSTIC_ACTION } from './virtual-pay-order.service'
+import { reconcileRefundingOrder } from './virtual-pay-refund-reconcile'
 import { notifyWechatProvideGoods, queryWechatVirtualPayOrder } from './virtual-pay-xpay-client'
 
 /** 超过 2 分钟仍待支付才查，避免刚下单就打微信。核对表补充规则 8。 */
@@ -75,7 +76,9 @@ export class VirtualPayReconcileService {
   ): Promise<void> {
     const runtime = evaluateMiniappVirtualPayRuntime()
     if (!runtime.ready || !runtime.appKey) {
-      const pendingCount = await this.prisma.virtualPayOrder.count({ where: { status: 'pending' } })
+      const pendingCount = await this.prisma.virtualPayOrder.count({
+        where: { status: { in: ['pending', 'refunding'] } },
+      })
       if (pendingCount === 0) {
         this.lastGlobalDiagnostic = null
         return
@@ -95,7 +98,12 @@ export class VirtualPayReconcileService {
       orderBy: { createdAt: 'asc' },
       take: QUERY_TAKE,
     })
-    if (due.length === 0 && expired.length === 0) {
+    const refunding = await this.prisma.virtualPayOrder.findMany({
+      where: { status: 'refunding' },
+      orderBy: { createdAt: 'asc' },
+      take: QUERY_TAKE,
+    })
+    if (due.length === 0 && expired.length === 0 && refunding.length === 0) {
       this.lastGlobalDiagnostic = null
       return
     }
@@ -112,6 +120,19 @@ export class VirtualPayReconcileService {
     }
     for (const order of expired) {
       await this.reconcileOrder(order, token, true, now, fetchImpl, options?.httpTimeoutMs)
+    }
+    for (const order of refunding) {
+      try {
+        await reconcileRefundingOrder(
+          { prisma: this.prisma, audit: this.audit, redis: this.redis, logger: this.logger, source: 'reconcile' },
+          order,
+          token,
+          fetchImpl,
+          options?.httpTimeoutMs,
+        )
+      } catch {
+        // 单笔失败不阻断批次。
+      }
     }
   }
 

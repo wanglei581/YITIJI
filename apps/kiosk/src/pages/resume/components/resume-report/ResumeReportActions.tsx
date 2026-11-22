@@ -9,10 +9,12 @@ interface Props {
   onRetry: () => void
   onOptimize: () => void
   issueCount?: number
+  payLabel?: string | null
+  onPay?: () => void
 }
 
 export function useReportDockPrimary({
-  viewState, canOptimize, intent, onRetry, onOptimize, issueCount = 0,
+  viewState, canOptimize, intent, onRetry, onOptimize, issueCount = 0, payLabel, onPay,
 }: Props): QxTouchPrimary {
   const navigate = useNavigate()
   const qx = (label: string, onClick: () => void, extra?: Partial<QxTouchPrimary>): QxTouchPrimary => ({
@@ -25,6 +27,7 @@ export function useReportDockPrimary({
     return qx(viewState === 'report-empty' ? '重新诊断' : '去上传简历', () => navigate('/resume/source'), { testId: 'resume-report-primary' })
   }
   if (canOptimize) {
+    if (payLabel && onPay) return qx(payLabel, onPay, { testId: 'resume-report-primary' })
     return qx(intent === 'optimize' ? '继续生成优化版简历' : `查看优化建议（${issueCount} 条）`, onOptimize, { testId: 'resume-report-primary' })
   }
   return qx('继续优化这份简历', () => {}, { disabled: true, testId: 'resume-report-primary' })

@@ -114,14 +114,23 @@ export function publicOrderNo(value: string | null | undefined): string | null {
 
 /**
  * 实付：0 元是记下的真实金额，写成「0 元（免费试运营）」。
- * 其余没有单独的实付字段，仍标未记录，不用应付减优惠来推算。
+ * 服务端显式下发实付真源字段 payableAmountCents 时，按无货币符号「X.XX 元」展示；
+ * 缺失该字段时仍标未记录，绝不按应付减优惠来推算。
  */
 export function netPaidDisplay(item: {
   amountCents?: number | null
   paymentSource?: string | null
+  payableAmountCents?: number | null
 }): { value: string; hint?: string } {
   if (item.amountCents === 0 || item.paymentSource === 'free') {
     return { value: '0 元（免费试运营）' }
+  }
+  if (
+    typeof item.payableAmountCents === 'number'
+    && Number.isInteger(item.payableAmountCents)
+    && item.payableAmountCents >= 0
+  ) {
+    return { value: formatYuanText(item.payableAmountCents) }
   }
   return { value: NET_PAID_UNRECORDED, hint: NET_PAID_UNRECORDED_HINT }
 }
@@ -139,7 +148,15 @@ export function formatRecordedCents(amountCents: number): string {
 
 export function recordedAmountDisplay(amountCents: number | null | undefined): string {
   if (typeof amountCents !== 'number') return UNRECORDED
-  return formatRecordedCents(amountCents)
+  return formatYuanText(amountCents)
+}
+
+/** 金额（整数分）→ 无货币符号「X.XX 元」，0 分亦输出「0.00 元」；非法返回「未记录」。 */
+export function formatYuanText(amountCents: number): string {
+  if (!Number.isInteger(amountCents) || amountCents < 0) return UNRECORDED
+  const yuan = Math.floor(amountCents / 100)
+  const fen = String(amountCents % 100).padStart(2, '0')
+  return `${yuan}.${fen} 元`
 }
 
 /** 实付无独立真源字段，禁止用应付减优惠推算。 */

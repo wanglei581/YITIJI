@@ -88,6 +88,7 @@ export function MeRow({
   open,
   onToggle,
   actions,
+  aside,
   extra,
   foot,
   toggleLabel,
@@ -100,19 +101,24 @@ export function MeRow({
   open: boolean
   onToggle: () => void
   actions?: ReactNode
+  /** 行首右侧独立操作按钮（如「开发票」），与展开按钮平级，避免按钮嵌套。 */
+  aside?: ReactNode
   extra?: ReactNode
   /** 不管开没开都显示的一行（例如「该文件格式暂不支持打印」）。 */
   foot?: ReactNode
   toggleLabel?: string
   dim?: boolean
 } & Omit<HTMLAttributes<HTMLDivElement>, 'title' | 'onToggle' | 'children'>) {
+  const openBtn = (
+    <button type="button" className="me-open" aria-expanded={open} aria-label={toggleLabel} onClick={onToggle}>
+      <b>{title}</b>
+      {lines.map((line, index) => <small key={index}>{line}</small>)}
+      {chips}
+    </button>
+  )
   return (
     <div className="me-line" data-open={open ? 'true' : undefined} data-dim={dim ? 'true' : undefined} {...rest}>
-      <button type="button" className="me-open" aria-expanded={open} aria-label={toggleLabel} onClick={onToggle}>
-        <b>{title}</b>
-        {lines.map((line, index) => <small key={index}>{line}</small>)}
-        {chips}
-      </button>
+      {aside ? <div className="me-bill-head">{openBtn}{aside}</div> : openBtn}
       {foot}
       {open ? <>{actions}{extra}</> : null}
     </div>

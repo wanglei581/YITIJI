@@ -52,7 +52,7 @@ export function ResumeFormatChooser(props: {
   exportVersion: number
   pricing: ResumeExportPricing | null
   pricingLoading: boolean
-  blockedReason: string | null
+  blockedReason: string | null; machineCharged?: boolean
   guest: boolean
   synthetic: boolean
   printNavigating: boolean
@@ -251,7 +251,7 @@ export function ResumeFormatChooser(props: {
           </p>
           <p className="qx-rg-note">导出后给你的是一条有时效的下载链接，过期后重导一次就有新链接。打印走另一条链接，下载链接进不了打印。</p>
           <p className="qx-rg-note" data-testid="resume-export-aigc-note">{resumeExportAigcNote(props.format)}</p>
-          <ResumePricingBar pricing={props.pricing} loading={props.pricingLoading} blockedReason={props.blockedReason} />
+          <ResumePricingBar pricing={props.pricing} loading={props.pricingLoading} blockedReason={props.blockedReason} machineCharged={props.machineCharged} />
         </div>
       )}
 

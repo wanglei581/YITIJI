@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { sendVirtualPayOpsAlert } from './virtual-pay-alert'
 import { confirmPaid } from './virtual-pay-delivery'
 import { VIRTUAL_PAY_DIAGNOSTIC_ACTION } from './virtual-pay-order.service'
+import { VIRTUAL_PAY_REFUND_EVENT, handleVirtualPayRefundNotify } from './virtual-pay-refund-notify'
 import {
   WechatMessageCryptoError,
   decryptWechatMessage,
@@ -83,6 +84,20 @@ export class WechatMiniappMessageService {
       return
     }
     const event = readString(payload['Event']) ?? 'unknown'
+    if (event === VIRTUAL_PAY_REFUND_EVENT) {
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: VIRTUAL_PAY_MESSAGE_AUDIT_ACTION,
+        targetType: 'virtual_pay_message',
+        payload: { event },
+      })
+      await handleVirtualPayRefundNotify(
+        { prisma: this.prisma, audit: this.audit, redis: this.redis, logger: this.logger },
+        payload,
+      )
+      return
+    }
     if (event !== DELIVER_EVENT) {
       await this.audit.write({
         actorId: null,
