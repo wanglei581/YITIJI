@@ -13,13 +13,20 @@ function mockUnavailable(what) {
 
 /**
  * 读取本人仍可用的一体机 AI 服务次数（开关关着时同样返回 200）。
- * @returns {Promise<{ items: Array<{ serviceKind: string, createdAt: string }> }>}
+ * 兼容旧版后端：purchaseEnabled 仅在服务端显式返回布尔值时透传。
+ * @returns {Promise<{ items: Array<{ serviceKind: string, createdAt: string }>, purchaseEnabled?: boolean }>}
  */
 function listServiceCredits() {
   if (config.USE_MOCK) return Promise.reject(mockUnavailable('一体机服务次数'));
-  return request('/member/service-credits', { method: 'GET', needAuth: true }).then((res) => ({
-    items: Array.isArray(res && res.items) ? res.items : [],
-  }));
+  return request('/member/service-credits', { method: 'GET', needAuth: true }).then((res) => {
+    const out = {
+      items: Array.isArray(res && res.items) ? res.items : [],
+    };
+    if (res && typeof res.purchaseEnabled === 'boolean') {
+      out.purchaseEnabled = res.purchaseEnabled;
+    }
+    return out;
+  });
 }
 
 /**

@@ -302,6 +302,24 @@ test('页面行为：开关关时已购次数照常展示、切换用户或退�
   await flush()
   assert.equal(page2.data.purchaseUnavailable, true)
   assert.equal(page2.data.purchaseUnavailableText, '当前暂未开放手机端购买，请在一体机现场按屏上提示使用')
+
+  // FG-3：服务端列表首屏直接透传 purchaseEnabled: false 时，不展示购买按钮、无需点出 403
+  const vpayApiPreDisabled = {
+    listServiceCredits: () => Promise.resolve({ items: [], purchaseEnabled: false }),
+    createVirtualPayOrder: () => { throw new Error('purchaseEnabled=false 时不应再发起下单') },
+  }
+  const page3 = instantiate(loadPageDefinition('pages/service-credits/service-credits.js', {
+    wx,
+    modules: { auth: makeAuth('user-C'), 'api-virtual-pay': vpayApiPreDisabled },
+  }))
+  page3.onLoad()
+  page3.onShow()
+  await flush()
+  assert.equal(page3.data.purchaseUnavailable, true)
+  assert.equal(page3.data.purchaseUnavailableText, '当前暂未开放手机端购买，请在一体机现场按屏上提示使用')
+  await page3.tapBuy({ currentTarget: { dataset: { kind: 'resume_optimize' } } })
+  await flush()
+  assert.equal(page3.data.buyingKind, '')
 })
 
 test('合规与入口静态守卫：零硬编码价格/道具 ID、零外部付款引导、me 入口对齐', () => {

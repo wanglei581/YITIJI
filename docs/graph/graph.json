@@ -10486,7 +10486,8 @@
         "handler": "VirtualPayCreditsController.list",
         "method": "GET",
         "models": [
-          "MemberServiceCredit"
+          "MemberServiceCredit",
+          "PlatformSetting"
         ],
         "path": "/api/v1/member/service-credits",
         "roles": [],
@@ -15964,7 +15965,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 347
+      "sourceFileCount": 348
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -53721,6 +53722,17 @@
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/partners/licenseValidation.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/partners/orgFormState.test.ts",
         "kind": "test",
         "mentions": [
           "apps/admin/package.json"

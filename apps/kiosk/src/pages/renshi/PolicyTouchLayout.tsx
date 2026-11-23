@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchBand, type QxTouchStatus } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
@@ -10,6 +10,20 @@ import { useKioskLicense } from '../../layouts/KioskLicenseContext'
 import { IS_MOCK_MODE } from '../../services/api/client'
 import { POLICY_ASK_HOME } from './policyModel'
 import '../service-hubs/policy-touch.css'
+
+/**
+ * 政策各屏顶栏状态胶囊：按实际读取与内容态诚实映射，避免漏传 status 回落为「状态未知」（PlanA-3）。
+ */
+export function policyBandStatus(state: string): QxTouchStatus {
+  if (state === 'loading') return { text: '正在读取', tone: 'reading' }
+  if (state === 'failed') return { text: '读取失败', tone: 'warn' }
+  if (state === 'missing' || state === 'withdrawn') return { text: '当前不可查看', tone: 'warn' }
+  if (state === 'too-long') return { text: '关键词过长', tone: 'warn' }
+  if (state === 'empty') return { text: '暂无已发布政策', tone: 'unknown' }
+  if (state === 'none') return { text: '未找到匹配政策', tone: 'unknown' }
+  if (state === 'idle') return { text: '等待输入关键词', tone: 'unknown' }
+  return { text: '机构发布 · 仅作指引', tone: 'ok' }
+}
 
 export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home = false, compact = false,
   ask = true, askPrompt = POLICY_ASK_HOME, path, pathLabel, nav = true, primary, alert, overlay, bodyClass }: {
@@ -31,7 +45,7 @@ export function PolicyTouchLayout({ title, eyebrow, sub, state, children, home =
     <QxTouchScreen page="policy-min" testId={home ? 'policy-touch-hub' : 'renshi-page'} stateId={state}
       className={compact ? 'policy-min-compact' : ''} bodyClassName="qxt-body-scroll"
       band={<QxTouchBand kind={compact ? 'compact' : 'std'} seal={home ? 'idle' : null} title={title} eyebrow={eyebrow}
-        sub={sub} onBack={() => navigate(home ? '/' : '/policy-service')}
+        sub={sub} status={policyBandStatus(state)} onBack={() => navigate(home ? '/' : '/policy-service')}
         path={path ?? (home ? ['选类别', '看条件和材料', '打印清单或扫码看原文'] : undefined)} pathLabel={pathLabel ?? '查一条政策'} />}
       dock={<QxTouchDock onBack={() => navigate(home ? '/' : '/policy-service')} backLabel="返回"
         ask={!ask ? false : winding || capabilities.state('assistant_chat') !== 'available'

@@ -329,6 +329,11 @@ test('打印参数页：执行完整底栏按钮表达式，没文件、普通�
   const idle = { priceStatus: 'idle', amountCents: null, hasFile: false }
   assert.equal(run(label, idle), '')
   assert.equal(Boolean(run(dashIf, idle)), false)
+  // FG-1：选机前 amountCents=0 不得提前许诺「免费试运营」，应诚实提示「页数已核定」
+  assert.equal(run(label, { priceStatus: 'ready', amountCents: 0, hasFile: true }), '页数已核定')
+  const amtExpr = bar.match(/class="ab-amt">\{\{([\s\S]*?)\}\}</)[1]
+  assert.equal(run(amtExpr, { priceStatus: 'ready', amountCents: 0, total: '0.00' }), '选终端确认')
+  assert.equal(run(amtExpr, { priceStatus: 'ready', amountCents: 100, total: '1.00' }), '¥1.00')
   const text = (data) => run(button[1], data)
   assert.equal(text({ wordFile: false, hasFile: false, privacyStatus: 'idle', priceStatus: 'idle' }), '请先选择文件')
   assert.equal(text({ wordFile: false, hasFile: true, privacyStatus: 'ready', priceStatus: 'ready' }), '选终端和参数')

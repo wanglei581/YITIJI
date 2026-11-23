@@ -70,6 +70,7 @@ export async function assertVirtualPayCredits(options: {
   const ownerHeaders = await memberHeaders(redis, jwt, OWNER, 'vpay-credit-owner-jti')
   const listed = await call('GET', '/api/v1/member/service-credits', undefined, ownerHeaders)
   assert.equal(listed.status, 200)
+  assert.equal(listed.json.purchaseEnabled, false, '开关关闭时应透传 purchaseEnabled=false')
   const items = listed.json.items ?? []
   assert.equal(items.length, 2)
   assert.equal(items[0]?.serviceKind, 'mock_interview')
@@ -89,7 +90,26 @@ export async function assertVirtualPayCredits(options: {
   const empty = await call('GET', '/api/v1/member/service-credits', undefined, emptyHeaders)
   assert.equal(empty.status, 200)
   assert.deepEqual(empty.json.items, [])
-  console.log('PASS 开关关着也只回本人可用权益')
+  assert.equal(empty.json.purchaseEnabled, false)
+
+  // FG-3：两个总开关均开启且已有已配置商品时 purchaseEnabled=true；仅开个人收费总开关时仍为 false
+  await prisma.platformSetting.upsert({
+    where: { key: PERSONAL_CHARGE_SETTING_KEY },
+    create: { key: PERSONAL_CHARGE_SETTING_KEY, value: 'true' },
+    update: { value: 'true' },
+  })
+  const halfOn = await call('GET', '/api/v1/member/service-credits', undefined, emptyHeaders)
+  assert.equal(halfOn.status, 200)
+  assert.equal(halfOn.json.purchaseEnabled, false)
+  await prisma.platformSetting.upsert({
+    where: { key: MINIAPP_VIRTUAL_PAY_ENABLED_KEY },
+    create: { key: MINIAPP_VIRTUAL_PAY_ENABLED_KEY, value: 'true' },
+    update: { value: 'true' },
+  })
+  const fullOn = await call('GET', '/api/v1/member/service-credits', undefined, emptyHeaders)
+  assert.equal(fullOn.status, 200)
+  assert.equal(fullOn.json.purchaseEnabled, true, '两项总开关均开启且已配置商品时应透传 purchaseEnabled=true')
+  console.log('PASS 开关关着也只回本人可用权益，并如实透传 purchaseEnabled')
 }
 
 async function grant(

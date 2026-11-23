@@ -988,8 +988,11 @@ else bad('打印报价竞态保护', '递增请求序号和 loading 状态必须
 if (
   !/print-store\?[^`]*\b(?:amountCents|total)=/.test(printUploadJs) &&
   // 2026-09-30：价目为 0 时不出现钱的字眼，付费分支改挂在「已报出大于 0 的金额」下（free-pilot-copy.test.mjs）
-  // 2026-10-17 FLOW1a：第 1 步只按 1 份黑白单面核定，付费分支改叫「1 份黑白参考价」；免费分支不变
-  printUploadWxml.includes("amountCents > 0 ? '1 份黑白参考价' : (priceStatus === 'ready' ? '免费试运营'") &&
+  // 2026-10-17 FLOW1a：第 1 步只按 1 份黑白单面核定，付费分支改叫「1 份黑白参考价」
+  // 2026-11-23 FG-1：第 1 步尚未选定终端，服务端不带终端一律返 0；不提前写「免费试运营 / 免费」，改为「页数已核定 / 选终端确认」，免费/收费分流在第 2、3 步选定终端后按服务端真值展示
+  printUploadWxml.includes("amountCents > 0 ? '1 份黑白参考价' : (priceStatus === 'ready' ? '页数已核定'") &&
+  printUploadWxml.includes("amountCents > 0 ? '¥' + total : '选终端确认'") &&
+  !printUploadWxml.includes('免费试运营') &&
   printStoreJs.includes('const isFreeOrder = amountCents === 0') &&
   printStoreWxml.includes("quoteState === 'ready' && !isFreeOrder") &&
   printStoreWxml.includes('机端支付') && printStoreWxml.includes('现场打印') &&

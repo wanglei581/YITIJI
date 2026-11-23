@@ -1,14 +1,14 @@
-/** 一体机还没有服务单付款屏。设了这三项价，用户会在一体机上被拦住。 */
+/** AI 简历优化、AI 模拟面试、扫描在一体机上已接入独立服务单收银屏（已购小程序服务次数的用户可直接抵扣）。 */
 export const KIOSK_PAY_SCREEN_NOTE =
-  '一体机付款屏还没上线。这几项设了价，用户在一体机上会用不了，现在请保持 0。'
+  'AI 与扫描服务在一体机收银屏按次收费（已购小程序服务次数的用户可直接抵扣）。'
 
 const PRINT_CHARGE_KEYS = ['print_bw_page', 'print_color_page'] as const
-const KIOSK_GAP_KEYS = ['resume_optimize', 'mock_interview', 'scan'] as const
+const SERVICE_CHARGE_KEYS = ['resume_optimize', 'mock_interview', 'scan'] as const
 
-/** 打印价大于 0 归「打印在收费」（含同时设了 AI 或扫描）。只有后三项大于 0 才单独标出。 */
-export function chargeListKind(prices: Partial<Record<string, number>>): 'print' | 'kiosk_gap' | 'none' {
+/** 打印价大于 0 归「打印在收费」（含同时设了 AI 或扫描）。只有 AI/扫描三项大于 0 时单独列在「AI / 扫描服务在收费」。 */
+export function chargeListKind(prices: Partial<Record<string, number>>): 'print' | 'service_only' | 'none' {
   const print = PRINT_CHARGE_KEYS.some((key) => (prices[key] ?? 0) > 0)
   if (print) return 'print'
-  const gap = KIOSK_GAP_KEYS.some((key) => (prices[key] ?? 0) > 0)
-  return gap ? 'kiosk_gap' : 'none'
+  const serviceOnly = SERVICE_CHARGE_KEYS.some((key) => (prices[key] ?? 0) > 0)
+  return serviceOnly ? 'service_only' : 'none'
 }

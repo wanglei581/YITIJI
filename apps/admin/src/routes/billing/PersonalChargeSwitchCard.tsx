@@ -26,7 +26,7 @@ function ChargeTerminalLine({ terminal }: { terminal: PersonalChargeTerminalRow 
 
 function ChargeTerminalLists({ terminals }: { terminals: PersonalChargeTerminalRow[] }) {
   const printing = terminals.filter((terminal) => chargeListKind(terminal.prices) === 'print')
-  const kioskGap = terminals.filter((terminal) => chargeListKind(terminal.prices) === 'kiosk_gap')
+  const serviceOnly = terminals.filter((terminal) => chargeListKind(terminal.prices) === 'service_only')
   return (
     <div className="mt-1 space-y-3">
       <section aria-label="打印在收费">
@@ -35,10 +35,11 @@ function ChargeTerminalLists({ terminals }: { terminals: PersonalChargeTerminalR
           <ul className="mt-1 space-y-2">{printing.map((terminal) => <ChargeTerminalLine key={terminal.terminalCode} terminal={terminal} />)}</ul>
         )}
       </section>
-      {kioskGap.length === 0 ? null : (
-        <section aria-label="一体机付款屏还没上线">
-          <p className="font-medium">{KIOSK_PAY_SCREEN_NOTE}</p>
-          <ul className="mt-1 space-y-2">{kioskGap.map((terminal) => <ChargeTerminalLine key={terminal.terminalCode} terminal={terminal} />)}</ul>
+      {serviceOnly.length === 0 ? null : (
+        <section aria-label="AI / 扫描服务在收费">
+          <p className="font-medium">AI / 扫描服务在收费</p>
+          <p className="mt-0.5 text-xs text-neutral-500">{KIOSK_PAY_SCREEN_NOTE}</p>
+          <ul className="mt-1 space-y-2">{serviceOnly.map((terminal) => <ChargeTerminalLine key={terminal.terminalCode} terminal={terminal} />)}</ul>
         </section>
       )}
     </div>

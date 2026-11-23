@@ -137,8 +137,8 @@ test.describe('设备 / 终端 / 打印机（mock 口径）', () => {
     await expect(resetNotice).toHaveCount(0)
   })
 
-  test('只给扫描设价时写明付款屏未上线，清单不和打印在收费混在一起', async ({ page }) => {
-    const note = '一体机付款屏还没上线。这几项设了价，用户在一体机上会用不了，现在请保持 0。'
+  test('只给扫描设价时提示一体机服务收银屏，清单归在 AI / 扫描服务在收费', async ({ page }) => {
+    const note = 'AI 与扫描服务在一体机收银屏按次收费（已购小程序服务次数的用户可直接抵扣）。'
     const guards = await openAuthed(page, '/devices')
     await settleAdminPage(page, guards)
     await page.getByRole('button', { name: '终端', exact: true }).click()
@@ -159,13 +159,13 @@ test.describe('设备 / 终端 / 打印机（mock 口径）', () => {
     await page.getByRole('link', { name: '计费与对账' }).click()
     await expect(page.getByRole('heading', { name: '计费与对账' })).toBeVisible()
     await expect(page.getByRole('region', { name: '打印在收费' })).not.toContainText('QD-SN-SELF')
-    const gap = page.getByRole('region', { name: '一体机付款屏还没上线' })
-    await expect(gap).toContainText('QD-SN-SELF')
-    await expect(gap).toContainText(note)
+    const serviceOnly = page.getByRole('region', { name: 'AI / 扫描服务在收费' })
+    await expect(serviceOnly).toContainText('QD-SN-SELF')
+    await expect(serviceOnly).toContainText(note)
   })
 
-  test('只给打印设价时不出现付款屏未上线，清单归在打印在收费', async ({ page }) => {
-    const note = '一体机付款屏还没上线。这几项设了价，用户在一体机上会用不了，现在请保持 0。'
+  test('只给打印设价时不出现服务收银提示，清单归在打印在收费', async ({ page }) => {
+    const note = 'AI 与扫描服务在一体机收银屏按次收费（已购小程序服务次数的用户可直接抵扣）。'
     const guards = await openAuthed(page, '/devices')
     await settleAdminPage(page, guards)
     await page.getByRole('button', { name: '终端', exact: true }).click()
@@ -188,6 +188,6 @@ test.describe('设备 / 终端 / 打印机（mock 口径）', () => {
     await expect(page.getByRole('heading', { name: '计费与对账' })).toBeVisible()
     await expect(page.getByText(note)).toHaveCount(0)
     await expect(page.getByRole('region', { name: '打印在收费' })).toContainText('QD-SN-SELF')
-    await expect(page.getByRole('region', { name: '一体机付款屏还没上线' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'AI / 扫描服务在收费' })).toHaveCount(0)
   })
 })
