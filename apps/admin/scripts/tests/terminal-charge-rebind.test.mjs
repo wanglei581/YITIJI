@@ -606,7 +606,7 @@ test('保存撞上过期绑定版本时提示并重读，不留下旧价', async
   view.unmount()
 })
 
-const PAY_NOTE = '一体机付款屏还没上线。这几项设了价，用户在一体机上会用不了，现在请保持 0。'
+const PAY_NOTE = 'AI 与扫描服务在一体机收银屏按次收费（已购小程序服务次数的用户可直接抵扣）。'
 const SCAN_ONLY_CENTS = {
   resume_optimize: 0,
   mock_interview: 0,
@@ -625,7 +625,7 @@ function assertServerScanCharge(tree) {
   const line = actualChargeText(tree)
   assert.match(line, /扫描（每次） ¥1\.00（按上面的价收）/)
   assert.equal(line.includes('扫描（每次） ¥0.00'), false, '实际收费行不能改成还没保存的 0 元')
-  assert.equal(line.includes(PAY_NOTE), true, '实际收费行上的付款屏警告必须仍按服务端生效价')
+  assert.equal(line.includes(PAY_NOTE), true, '实际收费行上的服务收银提示必须仍按服务端生效价')
 }
 
 function setScanInput(tree, value) {

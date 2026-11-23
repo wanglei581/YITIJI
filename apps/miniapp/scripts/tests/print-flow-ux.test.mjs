@@ -136,3 +136,16 @@ test('B2 模板：信息卡三行的标签不被挤扁、值可断行；换码�
   }
   assert.match(wxml, /class="btn-retry-sub tap" style="\{\{reissuing \? 'opacity: \.5;' : ''\}\}"[^>]*bindtap="reissueCode"/)
 })
+
+test('FG-2 订单列表到机码条：标签与 8 位到机码同行不折断，提示语独立折行', () => {
+  const wxss = fs.readFileSync(path.join(MINIAPP, 'pages/orders/orders.wxss'), 'utf8')
+  const strip = wxss.match(/\.pk-strip\s*\{[^}]*\}/)
+  const label = wxss.match(/\.pk-label\s*\{[^}]*\}/)
+  const code = wxss.match(/\.pk-code\s*\{[^}]*\}/)
+  const hint = wxss.match(/\.pk-hint\s*\{[^}]*\}/)
+  assert.ok(strip && label && code && hint, 'orders.wxss 必须保留 .pk-strip/.pk-label/.pk-code/.pk-hint 样式')
+  assert.match(strip[0], /flex-wrap:\s*wrap/, '.pk-strip 应允许提示语换行')
+  assert.match(label[0], /white-space:\s*nowrap/, '.pk-label 不能被挤折成两行')
+  assert.match(code[0], /white-space:\s*nowrap/, '.pk-code 的 8 位数字不能折成两行')
+  assert.match(hint[0], /flex:\s*1\s+0\s+100%/, '.pk-hint 应独占下一行，不挤压到机码')
+})

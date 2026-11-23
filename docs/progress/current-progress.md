@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-23：商用化终审 6 项 P2 体验收口与小程序 v1.0.5 升版（分支 `claude/polish-final-gate-1123`，接 `origin/main@4382647ac`）
+
+- 来由：依据方案 A 四端联调与商用化最后一关全栈终审验收中实测发现的 6 项非阻断 P2 体验问题（FG-1~3、PlanA-1~3），按产品负责人指示在干净隔离分支一次性修净、补齐单测与真实微信模拟器截图复验，并升版小程序至 `v1.0.5` 上传微信公众平台开发版。未触碰合规红线与主仓本地未提交文件，0 新增 Prisma 迁移。
+- ① 小程序打印第 1 步去误导（FG-1）：`apps/miniapp/pages/print-upload/print-upload.wxml` 在尚未选定终端（服务端无 `terminalId` 一律返 `0`）时不再提前显示「免费试运营 · 免费」，改为诚实显示「页数已核定 / 选终端确认」与第 4 步「到机完成」，免费/收费分流在第 2、3 步选定终端后按服务端真值展示；同步更新 `verify-miniapp-static.mjs` 与 `free-pilot-copy.test.mjs`。
+- ② 小程序订单列表到机码防折行（FG-2）：`apps/miniapp/pages/orders/orders.wxss` 将 `.pk-strip` 改为 `flex-wrap: wrap`、`.pk-label/.pk-code` 设为 `flex-shrink: 0; white-space: nowrap`、`.pk-hint` 设为 `flex: 1 0 100%`，确保「到机码」与 8 位到机码同行不折断，提示语独立折行；补充 `print-flow-ux.test.mjs` 回归守卫。
+- ③ 小程序虚拟支付服务次数首屏诚实隐藏（FG-3）：后端 `services/api/src/virtual-pay/virtual-pay-credits.service.ts` 在 `GET /api/v1/member/service-credits` 响应中透传 `purchaseEnabled: settings.canSell && hasConfiguredGoods`（向后兼容旧客户端）；小程序 `utils/api-virtual-pay.js` 与 `pages/service-credits/service-credits.js` 首屏消费该字段，开关未开或无已配商品时直接诚实隐藏「购买 1 次」按钮并展示不可购买说明，不再等点击后报 `403 VPAY_DISABLED`；同步补齐 `miniapp-virtual-pay-credits.ts` 与 `virtual-pay-credits.test.mjs` 回归用例。
+- ④ 管理后台存量机构档案编辑补齐只读场景模板（PlanA-1）：`apps/admin/src/routes/partners/orgFormState.ts` 新增 `normalizeOrgEditScene()`，`OrgDetailDrawer.tsx` 打开 `sceneTemplate` 为空或与矩阵不对齐的存量机构时自动按机构类型补齐标准 `sceneTemplate`（已有模块原样保留、空模块补默认值）并提示保存后生效，消除只改联系人/名称即报 `400 ORG_TYPE_MATRIX_VIOLATION` 的阻碍；新增 `orgFormState.test.ts` 并接入 `test:admin-state-units`。
+- ⑤ 管理后台替换过时「一体机付款屏还没上线」旧提示（PlanA-2）：`apps/admin/src/lib/kioskPayScreenNote.ts`、`PersonalChargeSwitchCard.tsx` 与 `TerminalChargeSettingsSection.tsx` 对齐已上线的一体机服务单收银屏事实，改为「AI / 扫描服务在收费」与「AI 与扫描服务在一体机收银屏按次收费（已购小程序服务次数的用户可直接抵扣）」，并同步更新 `terminal-charge-rebind.test.mjs` 与 `devices.spec.ts`。
+- ⑥ 一体机政策页顶栏与我的页打印中金额口径修复（PlanA-3）：`apps/kiosk/src/pages/renshi/PolicyTouchLayout.tsx` 导出 `policyBandStatus(state)` 并显式传入 `<QxTouchBand status={...} />`，消除漏传回落「状态未知」；`apps/kiosk/src/pages/profile/components/ProfileContinueCard.tsx` 在「你的文件正在打印（`!isPayment`）」分支不再显示「应付 ¥0.00」，改为 `免费`（0 元）或 `订单金额 ¥X.XX`（付费）；补充 `policy-min.test.mjs` 断言。
+- ⑦ 升版与全量验证：小程序版本号由 `1.0.4` 升至 `1.0.5`（`package.json`、`settings.wxml`、`about.wxml`）；已通过 `apps/miniapp` `verify:static` 100% + 41 项单测、真实微信开发者工具模拟器 4 屏截图复验（FG-1/FG-2/FG-3/`v1.0.5`）、`services/api` 构建与 `verify:miniapp-virtual-pay`、`apps/admin` 正式 HTTP 构建与全套后台单测/文案门禁、`apps/kiosk` 正式 HTTP 构建与政策/个人页 5 项门禁，以及全仓合规、CI 覆盖率、仓库完整性、`pnpm lint` 与项目图谱校验。
+
 ## 2026-11-21：微信小程序自助开票与虚拟支付返工收口 P2m-b（分支 `claude/miniapp-invoice-vpay-p2m`，未推送，未上线）
 
 - 来由：依据 Codex 独立收货复现的 6 项运行时竞态与状态缺陷（D1–D8），在 `d6e30ce23` 之上追加极小返工收口提交；零后端改动，未触碰禁止目录与停放页，全部改动代码/配置/测试文件 `< 500` 行（本进度文档为历史累计文档例外）。

@@ -86,23 +86,27 @@
 
 .pk-strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14rpx;
+  row-gap: 8rpx;
+  column-gap: 14rpx;
   padding: 18rpx 20rpx;
   border-radius: var(--r);
   background: var(--teal-wash);
   border: 1rpx solid #dce9ff;
   margin-bottom: 18rpx;
 }
-.pk-label { font-size: 23rpx; color: var(--teal-deep); font-weight: 600; }
+.pk-label { font-size: 23rpx; color: var(--teal-deep); font-weight: 600; flex-shrink: 0; white-space: nowrap; }
 .pk-code {
   font-size: 34rpx;
   font-weight: 700;
-  letter-spacing: 6rpx;
+  letter-spacing: 4rpx;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
-.pk-hint { font-size: 21rpx; color: var(--muted); margin-left: auto; }
+.pk-hint { font-size: 21rpx; color: var(--muted); flex: 1 0 100%; line-height: 1.4; }
 
 .oc-foot {
   display: flex;

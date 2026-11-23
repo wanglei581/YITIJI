@@ -226,7 +226,7 @@ export function TerminalChargeSettingsSection({
                 />
               </label>
             ))}
-            {showsDraftKioskPayGap(yuan) ? <p className="text-xs leading-relaxed text-warning-fg">{KIOSK_PAY_SCREEN_NOTE}</p> : null}
+            {showsDraftKioskPayGap(yuan) ? <p className="text-xs leading-relaxed text-neutral-600">{KIOSK_PAY_SCREEN_NOTE}</p> : null}
           </div>
           <p className="text-xs leading-relaxed text-neutral-600">{effectiveLine(view)}</p>
           {locked ? null : (

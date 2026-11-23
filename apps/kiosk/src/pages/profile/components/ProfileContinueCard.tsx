@@ -69,7 +69,11 @@ export function ProfileContinueCard({
       <small>
         <b>{fileName}</b>
         {orderNo ? <> · 订单 <b>{orderNo}</b></> : null}
-        {typeof amount === 'number' ? <> · 应付 <b>{formatYuan(amount)}</b></> : null}
+        {typeof amount === 'number' ? (
+          isPayment ? <> · 应付 <b>{formatYuan(amount)}</b></>
+            : amount === 0 ? <> · <b>免费</b></>
+              : <> · 订单金额 <b>{formatYuan(amount)}</b></>
+        ) : null}
       </small>
       <small>
         {isPayment

@@ -92,3 +92,23 @@ test('读取有截止时间，失败或超时不伪造空数据', async () => {
   await assert.rejects(m.policyRead(Promise.reject(new Error('offline')), 100), /offline/)
   await assert.rejects(m.policyRead(new Promise(() => {}), 5), /policy read timeout/)
 })
+
+test('PlanA-3: PolicyTouchLayout 顶栏显式传 status，不再回落为「状态未知」', () => {
+  const layoutSrc = readFileSync(join(root, 'src/pages/renshi/PolicyTouchLayout.tsx'), 'utf8')
+  assert.match(layoutSrc, /<QxTouchBand[\s\S]*status=\{policyBandStatus\(state\)\}/, 'QxTouchBand 必须显式传 status')
+  const fnMatch = layoutSrc.match(/export function policyBandStatus[\s\S]*?\n\}/)
+  assert.ok(fnMatch, '必须导出 policyBandStatus')
+  const out = ts.transpileModule(fnMatch[0], {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+  const mod = { exports: {} }
+  new Function('exports', 'module', out)(mod.exports, mod)
+  const bandStatus = mod.exports.policyBandStatus
+  assert.deepEqual(bandStatus('loading'), { text: '正在读取', tone: 'reading' })
+  assert.deepEqual(bandStatus('failed'), { text: '读取失败', tone: 'warn' })
+  assert.deepEqual(bandStatus('withdrawn'), { text: '当前不可查看', tone: 'warn' })
+  assert.deepEqual(bandStatus('empty'), { text: '暂无已发布政策', tone: 'unknown' })
+  assert.deepEqual(bandStatus('ready'), { text: '机构发布 · 仅作指引', tone: 'ok' })
+  assert.deepEqual(bandStatus('list'), { text: '机构发布 · 仅作指引', tone: 'ok' })
+  assert.deepEqual(bandStatus('notice'), { text: '机构发布 · 仅作指引', tone: 'ok' })
+})

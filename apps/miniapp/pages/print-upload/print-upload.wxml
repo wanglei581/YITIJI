@@ -16,7 +16,7 @@
     <view class="line"></view>
     <view class="st"><text class="n">3</text><text class="nl">确认提交</text></view>
     <view class="line"></view>
-    <view class="st"><text class="n">4</text><text class="nl">{{priceStatus === 'ready' && amountCents > 0 ? '机端支付' : (priceStatus === 'ready' ? '现场打印' : '到机完成')}}</text></view>
+    <view class="st"><text class="n">4</text><text class="nl">{{priceStatus === 'ready' && amountCents > 0 ? '机端支付' : '到机完成'}}</text></view>
   </view>
 
   <!-- 文件：标题只放主名，扩展名在 fc-tag 里，「.pdf」不会被拆到下一行。点整卡或「查看原文」直接打开原文。 -->
@@ -74,9 +74,9 @@
 
 <view class="actionbar">
   <view class="ab-price">
-    <!-- 第 1 步只按 1 份黑白单面核定，付费时不能叫这一单的「精确报价」；最终金额在第 2、3 步按所选参数核定 -->
-    <text class="ab-label">{{priceStatus === 'ready' && amountCents > 0 ? '1 份黑白参考价' : (priceStatus === 'ready' ? '免费试运营' : (priceStatus === 'loading' ? '正在核定页数' : (hasFile ? '页数待核定' : '')))}}</text>
-    <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">{{priceStatus === 'ready' && amountCents > 0 ? '¥' + total : '免费'}}</text>
+    <!-- 第 1 步尚未选定具体终端，服务端不带终端一律返 0；只诚实报「页数已核定 / 选终端确认」，不提前许诺免费（FG-1）。 -->
+    <text class="ab-label">{{priceStatus === 'ready' && amountCents > 0 ? '1 份黑白参考价' : (priceStatus === 'ready' ? '页数已核定' : (priceStatus === 'loading' ? '正在核定页数' : (hasFile ? '页数待核定' : '')))}}</text>
+    <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">{{priceStatus === 'ready' && amountCents > 0 ? '¥' + total : '选终端确认'}}</text>
     <text wx:elif="{{hasFile}}" class="ab-amt pending">—</text>
   </view>
   <view class="btn primary lg {{!wordFile && (priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready') ? 'disabled' : ''}}" bindtap="toStore">{{wordFile ? '回到我的文档' : (!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选终端和参数'))}}</view>

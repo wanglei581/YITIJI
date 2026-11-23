@@ -1387,7 +1387,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/member/service-credits` | VirtualPayCreditsController.list | — | VirtualPayCreditsService | MemberServiceCredit |
+| GET | `/api/v1/member/service-credits` | VirtualPayCreditsController.list | — | VirtualPayCreditsService | MemberServiceCredit<br/>PlatformSetting |
 
 ## `services/api/src/virtual-pay/virtual-pay-order.controller.ts`
 

@@ -214,6 +214,12 @@ Page({
         // 共享版本守卫：购买发起或更新结果落地后，更早发起的普通列表迟到响应一律丢弃。
         if (readSeq < this._creditsSeq || readSeq < this._appliedCreditsSeq) return;
         this._applyCredits(vpayModel.summarizeCredits(res), readSeq);
+        if (res && typeof res.purchaseEnabled === 'boolean') {
+          this.setData({
+            purchaseUnavailable: !res.purchaseEnabled,
+            purchaseUnavailableText: res.purchaseEnabled ? '' : vpayModel.VPAY_COPY.unavailableNotice,
+          });
+        }
       })
       .catch((err) => {
         this._enforceIdentity();

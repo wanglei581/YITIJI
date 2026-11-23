@@ -38,7 +38,7 @@
     "verify:admin-phone-transfer-ui": "node scripts/verify-admin-phone-transfer-ui.mjs",
     "verify:partner-account-action-ui": "node scripts/verify-partner-account-action-ui.mjs",
     "verify:admin-partner-contact-phone-ui": "node scripts/verify-admin-partner-contact-phone-ui.mjs",
-    "test:admin-state-units": "pnpm --filter @ai-job-print/api exec node --import tsx --test ../../apps/admin/src/routes/screensaver/terminalConfigState.test.ts ../../apps/admin/src/routes/toolbox/toolboxActionState.test.ts ../../apps/admin/src/routes/member-benefits/grantFormModel.test.ts ../../apps/admin/src/routes/partners/licenseValidation.test.ts",
+    "test:admin-state-units": "pnpm --filter @ai-job-print/api exec node --import tsx --test ../../apps/admin/src/routes/screensaver/terminalConfigState.test.ts ../../apps/admin/src/routes/toolbox/toolboxActionState.test.ts ../../apps/admin/src/routes/member-benefits/grantFormModel.test.ts ../../apps/admin/src/routes/partners/licenseValidation.test.ts ../../apps/admin/src/routes/partners/orgFormState.test.ts",
     "verify:admin-alert-auto-refresh": "pnpm --filter @ai-job-print/api exec node --import tsx --test ../../apps/admin/src/routes/alerts/useAutoRefresh.test.ts",
     "verify:admin-alerts-refresh-e2e": "node scripts/run-e2e.mjs --config=playwright.alerts-refresh.config.ts",
     "verify:admin-files-actions-e2e": "node scripts/run-e2e.mjs --config=playwright.files-actions.config.ts",

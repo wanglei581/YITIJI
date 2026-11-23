@@ -1,4 +1,4 @@
-import { sceneFieldsForType } from './orgFormState'
+import { normalizeOrgEditScene, sceneFieldsForType } from './orgFormState'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PARTNER_TYPE_LABELS } from '@ai-job-print/shared'
 import { Drawer, LoadingState, ErrorState } from '@ai-job-print/ui'
@@ -44,6 +44,7 @@ export function OrgDetailDrawer({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [profileSaved, setProfileSaved] = useState(false)
+  const [sceneBackfilled, setSceneBackfilled] = useState(false)
   const mounted = useRef(false)
 
   useEffect(() => {
@@ -57,14 +58,20 @@ export function OrgDetailDrawer({
     try {
       const d = await orgsAdminService.getOrgDetail(orgId)
       if (!mounted.current) return
+      const normalizedScene = normalizeOrgEditScene({
+        type: d.type,
+        sceneTemplate: d.sceneTemplate,
+        enabledModules: d.enabledModules,
+      })
       setDetail(d)
+      setSceneBackfilled(normalizedScene.backfilled)
       setForm({
         name: d.name,
         type: d.type,
         contact: d.contact ?? '',
         contactPhone: d.contactPhone ?? '',
-        sceneTemplate: d.sceneTemplate,
-        enabledModules: d.enabledModules,
+        sceneTemplate: normalizedScene.sceneTemplate,
+        enabledModules: normalizedScene.enabledModules,
       })
       setState('ready')
     } catch {
@@ -152,6 +159,9 @@ export function OrgDetailDrawer({
               </Field>
               <SceneTemplateReadonly sceneTemplate={form.sceneTemplate ?? null} />
             </div>
+            {sceneBackfilled && (
+              <p className="text-xs text-neutral-500">历史档案未配置场景模板，已按当前机构类型自动补齐，保存后生效。</p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="联系人">
                 <input className={inputCls} value={form.contact ?? ''} onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))} />
