@@ -166,10 +166,19 @@ export function TerminalDetailDrawer({
 
         <Section title="基本信息">
           {profileEditing ? (
-            <div className="space-y-2">
-              <input value={profileDraft.displayName ?? ''} onChange={(e) => onProfileDraftChange({ displayName: e.target.value })} disabled={profileSaving} placeholder="设备名称" className="h-9 w-full rounded-md border border-neutral-200 px-3 text-sm" />
-              <input value={profileDraft.macAddress ?? ''} onChange={(e) => onProfileDraftChange({ macAddress: e.target.value })} disabled={profileSaving} placeholder="MAC 地址" className="h-9 w-full rounded-md border border-neutral-200 px-3 font-mono text-xs" />
-              <input value={profileDraft.locationLabel ?? ''} onChange={(e) => onProfileDraftChange({ locationLabel: e.target.value })} disabled={profileSaving} placeholder="摆放位置" className="h-9 w-full rounded-md border border-neutral-200 px-3 text-sm" />
+            <div className="space-y-3">
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-neutral-600">设备名称</span>
+                <input value={profileDraft.displayName ?? ''} onChange={(e) => onProfileDraftChange({ displayName: e.target.value })} disabled={profileSaving} placeholder="设备名称" className="h-9 w-full rounded-md border border-neutral-200 px-3 text-sm" />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-neutral-600">MAC 地址</span>
+                <input value={profileDraft.macAddress ?? ''} onChange={(e) => onProfileDraftChange({ macAddress: e.target.value })} disabled={profileSaving} placeholder="MAC 地址" className="h-9 w-full rounded-md border border-neutral-200 px-3 font-mono text-xs" />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-neutral-600">摆放位置</span>
+                <input value={profileDraft.locationLabel ?? ''} onChange={(e) => onProfileDraftChange({ locationLabel: e.target.value })} disabled={profileSaving} placeholder="摆放位置" className="h-9 w-full rounded-md border border-neutral-200 px-3 text-sm" />
+              </label>
               <label className="flex items-center gap-2 text-sm text-neutral-600"><input type="checkbox" checked={profileDraft.enabled ?? true} onChange={(e) => onProfileDraftChange({ enabled: e.target.checked })} disabled={profileSaving || terminal.lifecycleStatus === 'retired'} />启用终端</label>
               <div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={onCancelProfileEdit} disabled={profileSaving}><XIcon className="mr-1 h-3.5 w-3.5" />取消</Button><Button size="sm" onClick={() => onSaveProfile(terminal)} disabled={profileSaving}><CheckIcon className="mr-1 h-3.5 w-3.5" />保存档案</Button></div>
             </div>

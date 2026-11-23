@@ -88,7 +88,8 @@
 
 [data-qx-page='print-confirm'] .pct-row b {
   font-weight: 700;
-  word-break: break-all;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 /* 稿 .fee：费用条 */

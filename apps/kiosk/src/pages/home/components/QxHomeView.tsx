@@ -212,7 +212,7 @@ export function QxHomeView({
           {/* 本机没开语音入口时不画麦克风、不说「说一句」：点进去只能打字。 */}
           <span className="qx-home-voice-icon">{ASSISTANT_VOICE_ENTRY ? <MicIcon aria-hidden="true" /> : <MessageSquareTextIcon aria-hidden="true" />}</span>
           <span>{ASSISTANT_VOICE_ENTRY ? '问小青：说一句你想办的事' : '问小青：打一句你想办的事'}</span>
-          <span className="qx-home-voice-tag">AI 数字人</span>
+          <span className="qx-home-voice-tag">{ASSISTANT_VOICE_ENTRY ? 'AI 数字人' : 'AI 助手'}</span>
           {ASSISTANT_VOICE_ENTRY ? <small>可打字；语音以本机检测为准</small> : null}
         </button>
 

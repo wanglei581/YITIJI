@@ -199,7 +199,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/components/AiDriverBanner.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/kiosk-resume-context-ai-assist-audit-2026-08-06.md |
 | `apps/kiosk/src/components/KioskNumPad.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md |
 | `apps/kiosk/src/pages/home/components/HomeTile.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/kiosk/tests/visual/human-journey.spec.ts |
-| `apps/kiosk/src/pages/home/components/QxHomeView.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/device/onsite-acceptance-runsheet-2026-09.md、docs/device/onsite-failure-recovery-runsheet-2026-09.md、docs/progress/next-tasks.md |
+| `apps/kiosk/src/pages/home/components/QxHomeView.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/device/onsite-acceptance-runsheet-2026-09.md、docs/device/onsite-failure-recovery-runsheet-2026-09.md、docs/progress/current-progress.md |
 | `apps/kiosk/src/pages/home/components/V6HomeView.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/current-progress.md |
 | `apps/kiosk/src/pages/interview/InterviewTopbar.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
 | `apps/kiosk/src/pages/jobs-fairs-prototype.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/reviews/launch-audit-2026-09-05.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md |

@@ -85,40 +85,44 @@
   height: 280px;
 }
 
-/* 稿 .py-sample：剩下的高度画这一次要办的事的小样，两张各占 46%，扫描三张各占三分之一。 */
+/* 稿 .py-sample：剩下的高度横向并排画这一次要办的事的小样，避免竖排拉长留空。 */
 [data-qx-page='pay-service'] .pys-sample {
   flex: 1;
   min-height: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 0;
+  gap: 24px;
+  padding: 12px 0;
   overflow: hidden;
 }
 
 [data-qx-page='pay-service'] .pys-sample > svg,
 [data-qx-page='pay-service'] .pys-sample > .pa {
   flex: none;
-  height: 46%;
-  max-height: 580px;
+  height: auto;
+  max-height: min(360px, 88%);
   width: auto;
-  max-width: 100%;
+  max-width: 44%;
 }
 
 [data-qx-page='pay-service'] .pys-sample > .pa {
   display: flex;
   justify-content: center;
+  align-items: center;
 }
 
 [data-qx-page='pay-service'] .pys-sample > .pa > svg {
-  height: 100%;
+  height: auto;
+  max-height: 100%;
   width: auto;
+  max-width: 100%;
 }
 
 [data-qx-page='pay-service'] .pys-sample-scan > .pa {
-  height: 33.33%;
-  max-height: 420px;
+  max-width: 30%;
+  max-height: min(300px, 84%);
 }
 
 /* 手机宽度关掉 1080 舞台后：码框和摘要不压扁，整页不横向溢出。 */

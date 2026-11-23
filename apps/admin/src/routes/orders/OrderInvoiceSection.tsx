@@ -13,9 +13,9 @@ const TITLE_LABEL: Record<string, string> = {
   company: '单位',
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, fullWidth = false }: { label: string; value: string; fullWidth?: boolean }) {
   return (
-    <div>
+    <div className={fullWidth ? 'col-span-2 min-w-0' : 'min-w-0'}>
       <p className="text-xs font-bold text-neutral-500">{label}</p>
       <p className="mt-1 break-words text-sm font-semibold text-neutral-900">{value}</p>
     </div>
@@ -47,11 +47,11 @@ export function OrderInvoiceSection({
             <Field label="抬头类型" value={TITLE_LABEL[view.titleType] ?? view.titleType} />
             <Field label="抬头" value={view.title} />
             <Field label="税号" value={view.taxId?.trim() || '—'} />
-            <Field label="邮箱" value={view.email?.trim() || '—'} />
             <Field label="金额" value={amountText(view.amountCents, 'CNY')} />
+            <Field label="邮箱" value={view.email?.trim() || '—'} fullWidth />
             <Field label="状态" value={STATUS_LABEL[view.status] ?? view.status} />
             {view.invoiceNo ? <Field label="发票号码" value={view.invoiceNo} /> : null}
-            {view.returnReason ? <Field label="退回原因" value={view.returnReason} /> : null}
+            {view.returnReason ? <Field label="退回原因" value={view.returnReason} fullWidth /> : null}
           </div>
           {submitted && mode === 'idle' && (
             <div className="mt-3 flex gap-2">
