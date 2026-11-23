@@ -185,7 +185,7 @@ export function HomeTouchView({
             voice={ASSISTANT_VOICE_ENTRY}
             prompt={ASSISTANT_VOICE_ENTRY ? '问小青：说一句你想办的事' : '问小青：打一句你想办的事'}
             hint={ASSISTANT_VOICE_ENTRY ? '可打字；语音以本机检测为准' : undefined}
-            mark="AI 数字人"
+            mark={ASSISTANT_VOICE_ENTRY ? 'AI 数字人' : 'AI 助手'}
             onClick={() => {
               rememberAssistantDraft(HOME_ASK_DRAFT)
               onAction('assistant')

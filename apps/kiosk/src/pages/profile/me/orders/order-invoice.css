@@ -83,35 +83,39 @@
   line-height: 1.45;
 }
 
-/* 稿 .py-sample：空处放简历小样，两张各占 46% 高度且不超过 580px */
+/* 稿 .py-sample：空处横向并排展示手机扫码与订单单据示意，避免无关简历竖排堆叠 */
 [data-qx-page='my-orders-invoice'] .oinv-sample {
   flex: 1;
   min-height: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 0;
+  gap: 32px;
+  padding: 12px 0;
   overflow: hidden;
 }
 
 [data-qx-page='my-orders-invoice'] .oinv-sample > svg,
 [data-qx-page='my-orders-invoice'] .oinv-sample > .pa {
   flex: none;
-  height: 46%;
-  max-height: 580px;
+  height: auto;
+  max-height: min(340px, 84%);
   width: auto;
-  max-width: 100%;
+  max-width: 44%;
 }
 
 [data-qx-page='my-orders-invoice'] .oinv-sample > .pa {
   display: flex;
   justify-content: center;
+  align-items: center;
 }
 
 [data-qx-page='my-orders-invoice'] .oinv-sample > .pa > svg {
-  height: 100%;
+  height: auto;
+  max-height: 100%;
   width: auto;
+  max-width: 100%;
 }
 
 /* ── 我的订单页收费单与「开发票」主按钮（稿 .fe-line.py-bill） ── */

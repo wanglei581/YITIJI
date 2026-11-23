@@ -54357,12 +54357,13 @@
         "mentions": [
           "docs/device/onsite-acceptance-runsheet-2026-09.md",
           "docs/device/onsite-failure-recovery-runsheet-2026-09.md",
+          "docs/progress/current-progress.md",
           "docs/progress/next-tasks.md",
           "docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/device/onsite-acceptance-runsheet-2026-09.md、docs/device/onsite-failure-recovery-runsheet-2026-09.md、docs/progress/next-tasks.md"
+        "why": "仅被文档提及：docs/device/onsite-acceptance-runsheet-2026-09.md、docs/device/onsite-failure-recovery-runsheet-2026-09.md、docs/progress/current-progress.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

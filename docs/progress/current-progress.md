@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-11-23：全栈隔离商用演练 8 项体验细节精修（UX-1 ～ UX-8，分支 `claude/ux-polish-rehearsal-1123`，接 `origin/main@06cdc8fc5`）
+
+- 来由：在最新 `main`（`06cdc8fc5`）搭建的本地全真隔离商用环境（独立 PG 16 / Redis / 真实 DeepSeek / 四端生产构建 / 模拟奔图 Agent）完成全功能手工录数与模拟用户实操后，逐屏核查 30+ 张真实截图，汇总 8 项 P2/P3 级非阻断视觉与文案细节并一次性收口，零后端与迁移改动。
+- ① 一体机端 5 处精修（UX-1 / UX-2 / UX-4 / UX-5 / UX-6）：`HomeTouchView.tsx` 与 `QxHomeView.tsx` 在未启用数字人音视频通话（`!ASSISTANT_VOICE_ENTRY`）时将首页问小青标签改为「AI 助手」；`pay-service.css`、`order-invoice.css` 与 `MyOrderInvoicePage.tsx` 将收银/开票示意图由竖排改为横向并排且开票页换为手机+订单单据示意；`print-confirm-touch.css` 改用 `word-break: normal; overflow-wrap: anywhere` 防止 `.pdf` 被拆断，`print-progress-touch.css` 将底部帮助句与「查看联系方式」居中同行对齐；`home-touch.css` 放宽主卡角标宽度至 `calc(100% - 84px)` 保持「先选材料再出纸 · 带走：打印件」单行不拆；`me-touch.css` 对展开态列表保持 `flex: 0 0 auto` 消除展开卡片后的大片留白。
+- ② 管理后台 3 处精修（UX-3 / UX-7 / UX-8）：`TerminalDetailDrawer.tsx` 终端档案编辑态为设备名称 / MAC 地址 / 摆放位置补齐常驻字段标题；`OrderInvoiceSection.tsx` 让邮箱与退回原因跨两列展示防孤字折行；`auditActionLabels.ts` 补齐 `invoice_request`、`FeedbackTicket`、`payment_attempt`、`mock_interview_session`、`platform_setting`、`user_data_request` 等全部后端审计 `targetType` 中文对象名，并新增 `auditActionLabels.test.ts` 回归单测。
+- ③ 验证：已通过 Kiosk / Admin `typecheck`、`lint`（0 error）、正式 HTTP 生产构建、全量单测、全仓合规文案/时间/列表/错误渲染门禁，以及 5 套受影响的一体机 27 寸 Playwright 视觉与布局回归（37/37 全绿）。
+
 ## 2026-11-23：商用化终审 6 项 P2 体验收口与小程序 v1.0.5 升版（分支 `claude/polish-final-gate-1123`，接 `origin/main@4382647ac`）
 
 - 来由：依据方案 A 四端联调与商用化最后一关全栈终审验收中实测发现的 6 项非阻断 P2 体验问题（FG-1~3、PlanA-1~3），按产品负责人指示在干净隔离分支一次性修净、补齐单测与真实微信模拟器截图复验，并升版小程序至 `v1.0.5` 上传微信公众平台开发版。未触碰合规红线与主仓本地未提交文件，0 新增 Prisma 迁移。

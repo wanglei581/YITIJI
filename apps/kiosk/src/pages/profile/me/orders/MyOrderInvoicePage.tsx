@@ -10,7 +10,6 @@ import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../../../../auth/useAuth'
-import { QxTouchArtResume } from '../../../../components/qingxu/touch/QxTouchArt'
 import { QxTouchBand, type QxTouchStatus } from '../../../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../../../components/qingxu/touch/QxTouchDock'
 import { QxTouchNav } from '../../../../components/qingxu/touch/QxTouchNav'
@@ -41,8 +40,8 @@ const INVOICE_STEPS = ['手机扫码', '填写开票信息', '发票发到邮箱
 function InvoiceSample() {
   return (
     <div className="oinv-sample" aria-hidden="true">
-      <PrintArt name="resume" size={420} />
-      <QxTouchArtResume width={420} />
+      <PrintArt name="phone" size={320} />
+      <PrintArt name="stack" size={320} />
     </div>
   )
 }
