@@ -1,0 +1,611 @@
+/* pages/job-tracker/job-tracker.wxss
+   青绪 · 墨翠鎏金白瓷：严格使用 app.wxss 的 --fs-* 与 --r-* 刻度令牌 */
+
+.jt-page {
+  min-height: 100vh;
+  background: var(--paper);
+  padding-bottom: calc(48rpx + var(--sab));
+}
+
+.jt-body {
+  padding: 12rpx 32rpx 32rpx;
+}
+
+/* 常驻合规声明条 */
+.jt-compliance {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx 22rpx;
+  margin-bottom: 20rpx;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1rpx solid var(--gold-line);
+  box-shadow: var(--sh-xs);
+}
+.jt-comp-ic {
+  width: 28rpx;
+  height: 28rpx;
+  color: var(--gold-deep);
+  flex-shrink: 0;
+}
+.jt-comp-tx {
+  flex: 1;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+/* 墨翠深松鎏金概览主卡 */
+.jt-hero {
+  padding: 32rpx 30rpx 26rpx;
+  border-radius: var(--r-lg);
+  background: linear-gradient(150deg, #16483E 0%, #0C2B24 55%, #071915 100%);
+  border: 1rpx solid rgba(223, 198, 147, .26);
+  box-shadow: var(--sh-md);
+  color: #FFFFFF;
+}
+.jt-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+.jt-hero-copy {
+  flex: 1;
+  min-width: 0;
+}
+.jt-hero-kicker {
+  font-size: var(--fs-xs);
+  letter-spacing: 2rpx;
+  font-weight: 700;
+  color: var(--gold-bright);
+  opacity: .92;
+}
+.jt-hero-title {
+  margin-top: 8rpx;
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  line-height: 1.25;
+  color: #FFFFFF;
+}
+.jt-hero-sub {
+  margin-top: 8rpx;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, .74);
+}
+.jt-hero-stat {
+  min-width: 120rpx;
+  padding: 14rpx 18rpx;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, .07);
+  border: 1rpx solid rgba(223, 198, 147, .25);
+  text-align: center;
+  flex-shrink: 0;
+}
+.jt-hero-num {
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+}
+.jt-hero-unit {
+  margin-top: 6rpx;
+  font-size: var(--fs-xs);
+  color: rgba(255, 255, 255, .78);
+}
+
+.jt-hero-foot {
+  margin-top: 26rpx;
+  padding-top: 22rpx;
+  border-top: 1rpx solid rgba(223, 198, 147, .18);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.jt-add-btn {
+  min-height: 88rpx;
+  padding: 0 32rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #EAD4A6 0%, #C6A468 100%);
+  color: #10241E;
+  font-size: var(--fs-base);
+  font-weight: 750;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, .2);
+}
+.jt-add-ic {
+  width: 26rpx;
+  height: 26rpx;
+}
+.jt-hero-link {
+  min-height: 88rpx;
+  padding: 0 22rpx;
+  border-radius: var(--r-full);
+  border: 1rpx solid rgba(223, 198, 147, .36);
+  background: rgba(255, 255, 255, .06);
+  color: var(--gold-bright);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 筛选胶囊 */
+.jt-tabs-scroll {
+  margin: 24rpx -32rpx 0;
+  width: calc(100% + 64rpx);
+  white-space: nowrap;
+}
+.jt-tabs {
+  display: inline-flex;
+  gap: 14rpx;
+  padding: 4rpx 32rpx 12rpx;
+}
+.jt-tab {
+  min-height: 76rpx;
+  padding: 0 26rpx;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  box-shadow: var(--sh-xs);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.jt-tab.on {
+  background: linear-gradient(140deg, #16483E 0%, #0B2A23 100%);
+  border-color: rgba(223, 198, 147, .35);
+  color: var(--gold-bright);
+  font-weight: 700;
+}
+
+/* 超时核对提示 */
+.jt-warn-bar {
+  margin-top: 16rpx;
+  padding: 20rpx 22rpx;
+  border-radius: var(--r-md);
+  background: var(--warn-soft);
+  border: 1rpx solid var(--gold-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.jt-warn-tx {
+  flex: 1;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--wheat-deep);
+}
+.jt-warn-btn {
+  min-height: 76rpx;
+  padding: 0 22rpx;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--teal-deep);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 空态 / 引导态 / 加载态 */
+.jt-state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 36rpx;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.jt-state-ic {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: var(--r-full);
+  background: radial-gradient(circle at 30% 28%, #ECF7F3 0%, #D9EEE6 100%);
+  color: var(--teal-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20rpx;
+}
+.jt-state-ic .ficon {
+  width: 44rpx;
+  height: 44rpx;
+}
+.jt-state-ic.warn {
+  background: var(--warn-soft);
+  color: var(--wheat-deep);
+}
+.jt-state-t {
+  font-size: var(--fs-lg);
+  font-weight: 750;
+  color: var(--ink);
+}
+.jt-state-d {
+  margin-top: 10rpx;
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 540rpx;
+}
+.jt-state-cta {
+  margin-top: 28rpx;
+  min-height: 96rpx;
+  padding: 0 44rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--sh-sm);
+}
+
+.jt-spinner {
+  width: 56rpx;
+  height: 56rpx;
+  border: 4rpx solid var(--line);
+  border-top-color: var(--teal);
+  border-radius: var(--r-full);
+  margin-bottom: 18rpx;
+  animation: jt-spin .8s linear infinite;
+}
+@keyframes jt-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 白瓷条目卡片列表 */
+.jt-list {
+  margin-top: 18rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+.jt-card {
+  padding: 28rpx 26rpx 24rpx;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
+}
+.jt-card.is-busy {
+  opacity: .62;
+  pointer-events: none;
+}
+.jt-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.jt-card-head {
+  flex: 1;
+  min-width: 0;
+}
+.jt-pos {
+  font-size: var(--fs-md);
+  font-weight: 750;
+  line-height: 1.35;
+  color: var(--ink);
+  word-break: break-word;
+}
+.jt-comp {
+  margin-top: 6rpx;
+  font-size: var(--fs-base);
+  color: var(--muted);
+  word-break: break-word;
+}
+.jt-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+.jt-status {
+  padding: 6rpx 16rpx;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+  border: 1rpx solid var(--line);
+}
+.jt-status.st-intention {
+  background: var(--surface-2);
+  color: var(--ink-soft);
+}
+.jt-status.st-applied {
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+}
+.jt-status.st-interviewing {
+  background: var(--gold-soft);
+  border-color: var(--gold-line);
+  color: var(--gold-deep);
+}
+.jt-status.st-offered {
+  background: linear-gradient(135deg, #16483E 0%, #0B2A23 100%);
+  border-color: var(--gold-line);
+  color: var(--gold-bright);
+}
+.jt-status.st-rejected {
+  background: var(--surface-2);
+  color: var(--faint);
+}
+.jt-self-tag {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+.jt-note {
+  margin-top: 16rpx;
+  padding: 16rpx 18rpx;
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--ink-soft);
+  word-break: break-word;
+}
+
+.jt-meta-row {
+  margin-top: 18rpx;
+  padding-top: 14rpx;
+  border-top: 1rpx solid var(--line-faint);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+.jt-meta-tx {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+.jt-meta-ops {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.jt-mini-op {
+  min-height: 64rpx;
+  padding: 0 18rpx;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.jt-mini-op.next {
+  background: var(--gold-soft);
+  color: var(--gold-deep);
+  border: 1rpx solid var(--gold-line);
+}
+.jt-mini-op.del {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+/* 双真闭环联动按钮 */
+.jt-loops {
+  margin-top: 18rpx;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+}
+.jt-loop-btn {
+  min-height: 88rpx;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.jt-loop-btn.outline {
+  background: var(--teal-wash);
+  border: 1rpx solid rgba(15, 106, 87, .24);
+  color: var(--teal-deep);
+}
+.jt-loop-btn.solid {
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  border: 1rpx solid rgba(223, 198, 147, .3);
+  color: var(--gold-bright);
+}
+.jt-loop-ic {
+  width: 28rpx;
+  height: 28rpx;
+}
+
+.jt-more-tip {
+  padding: 20rpx 0 12rpx;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+/* 底部高定抽屉 */
+.jt-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  background: rgba(11, 33, 28, .48);
+  display: flex;
+  align-items: flex-end;
+}
+.jt-sheet {
+  width: 100%;
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  padding: 30rpx 32rpx calc(28rpx + var(--sab));
+  box-shadow: var(--sh-lg);
+}
+.jt-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+.jt-sheet-t {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  color: var(--ink);
+}
+.jt-sheet-s {
+  margin-top: 6rpx;
+  font-size: var(--fs-xs);
+  color: var(--gold-deep);
+}
+.jt-sheet-close {
+  color: var(--muted);
+}
+
+.jt-field {
+  margin-top: 20rpx;
+}
+.jt-label {
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  color: var(--ink-soft);
+  margin-bottom: 10rpx;
+}
+.jt-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 88rpx;
+  padding: 0 22rpx;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  border: 1rpx solid var(--line);
+  font-size: var(--fs-base);
+  color: var(--ink);
+}
+.jt-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 156rpx;
+  padding: 18rpx 22rpx;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  border: 1rpx solid var(--line);
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.jt-status-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+.jt-st-chip {
+  min-height: 76rpx;
+  padding: 0 24rpx;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  border: 1rpx solid var(--line);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.jt-st-chip.on {
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  border-color: var(--gold-line);
+  color: var(--gold-bright);
+  font-weight: 700;
+}
+
+.jt-date-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+.jt-date-picker {
+  flex: 1;
+}
+.jt-date-box {
+  height: 88rpx;
+  padding: 0 22rpx;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  border: 1rpx solid var(--line);
+  font-size: var(--fs-base);
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+}
+.jt-date-clear {
+  min-height: 88rpx;
+  padding: 0 22rpx;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jt-sheet-acts {
+  margin-top: 28rpx;
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 16rpx;
+}
+.jt-cancel-btn,
+.jt-save-btn {
+  min-height: 96rpx;
+  border-radius: var(--r-md);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.jt-cancel-btn {
+  background: var(--surface-2);
+  color: var(--ink-soft);
+}
+.jt-save-btn {
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  border: 1rpx solid rgba(223, 198, 147, .34);
+  box-shadow: var(--sh-sm);
+}
+.jt-save-btn.disabled {
+  opacity: .55;
+  pointer-events: none;
+}

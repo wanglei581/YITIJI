@@ -1,39 +1,70 @@
+/* pages/print-store/print-store.wxss  选择终端与参数（墨翠鎏金白瓷） */
 .page-wrap { min-height: 100vh; background: var(--paper); }
-.store-list { display: flex; flex-direction: column; gap: 16rpx; }
-.store-card { padding: 28rpx; background: var(--surface); border-radius: var(--r-lg); border: 2rpx solid var(--line-soft); }
-.store-card.selected { border-color: var(--teal); background: var(--teal-wash); }
-.sc-top { display: flex; align-items: center; justify-content: space-between; }
-.sc-name { font-size: 29rpx; font-weight: 600; color: var(--ink); }
-.sc-radio { width: 40rpx; height: 40rpx; border-radius: 50%; border: 2rpx solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 24rpx; color: #fff; flex-shrink: 0; }
-.store-card.selected .sc-radio { background: var(--teal); border-color: var(--teal); }
+.store-list { display: flex; flex-direction: column; gap: 18rpx; }
+.store-card {
+  padding: 28rpx;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  border: 2rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
+}
+.store-card.selected {
+  border-color: var(--teal);
+  background: linear-gradient(180deg, #FFFFFF 0%, #F1F8F5 100%);
+  box-shadow: var(--sh-md);
+}
+.sc-top { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.sc-name { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.sc-radio {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: var(--r-full);
+  border: 2rpx solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  color: #fff;
+  flex-shrink: 0;
+}
+.store-card.selected .sc-radio { background: var(--teal-deep); border-color: var(--teal-deep); color: var(--gold-bright); }
 .sc-radio .ficon { width: 22rpx; height: 22rpx; }
-.sc-addr { font-size: 24rpx; color: var(--ink-soft); margin-top: 8rpx; }
+.sc-addr { font-size: var(--fs-sm); color: var(--muted); margin-top: 8rpx; line-height: 1.5; }
 .sc-badges { display: flex; gap: 12rpx; margin-top: 18rpx; flex-wrap: wrap; }
-.badge { display: flex; align-items: center; gap: 6rpx; font-size: 22rpx; padding: 8rpx 16rpx; border-radius: 999rpx; background: var(--paper); color: var(--muted); }
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: var(--fs-sm);
+  padding: 8rpx 16rpx;
+  border-radius: var(--r-full);
+  background: var(--paper);
+  color: var(--muted);
+}
 .badge .ficon { width: 26rpx; height: 26rpx; }
-.badge.status .dot { width: 14rpx; height: 14rpx; border-radius: 50%; background: var(--line); }
-.badge.status.ok { color: var(--teal-deep); background: var(--teal-wash); }
+.badge.status .dot { width: 14rpx; height: 14rpx; border-radius: var(--r-full); background: var(--line); }
+.badge.status.ok { color: var(--teal-deep); background: var(--teal-soft); font-weight: 600; }
 .badge.status.ok .dot { background: var(--teal); }
 
 .summary { display: flex; flex-direction: column; gap: 16rpx; }
-.summary-row { display: flex; align-items: center; justify-content: space-between; font-size: 26rpx; color: var(--muted); }
-.summary-row text:last-child { color: var(--ink); font-weight: 500; text-align: right; max-width: 60%; }
+.summary-row { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-base); color: var(--muted); }
+.summary-row text:last-child { color: var(--ink); font-weight: 600; text-align: right; max-width: 60%; }
 .summary-row.total { padding-top: 16rpx; border-top: 1rpx solid var(--line); }
-.summary-row.total .amt { color: var(--clay-deep); font-weight: 700; font-size: 32rpx; }
+.summary-row.total .amt { color: var(--gold-deep); font-weight: 800; font-size: var(--fs-lg); }
 
-.ab-label { font-size: 22rpx; color: var(--ink-soft); display: block; }
-.ab-amt { font-size: 40rpx; font-weight: 700; color: var(--teal); font-variant-numeric: tabular-nums; }
+.ab-label { font-size: var(--fs-sm); color: var(--muted); display: block; }
+.ab-amt { font-size: var(--fs-xl); font-weight: 800; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
 
 /* 门店徽章变体 */
 .badge.org-pref { background: var(--gold-soft); border: 1rpx solid var(--gold-line); color: var(--gold-deep); font-weight: 700; }
-.badge.dist { background: var(--surface); color: var(--muted); }
-.badge.time { background: var(--surface); color: var(--muted); }
-.store-list .empty { margin: 0; border: 1rpx solid var(--line-soft); border-radius: 26rpx; background: var(--surface); }
+.badge.dist { background: var(--surface-2); color: var(--muted); }
+.badge.time { background: var(--surface-2); color: var(--muted); }
+.store-list .empty { margin: 0; border: 1rpx solid var(--line-soft); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--sh-sm); }
 .store-list .empty .e-ic { color: var(--teal); }
 .store-list .empty .e-ic .ficon { width: 58rpx; height: 58rpx; }
 
-/* 打印参数：放进 card flat card-inner（全局左右边距和内边距）；选项触控区不小于 96rpx，选中态沿用终端卡片的青色 */
-.param-label { margin-top: 20rpx; font-size: var(--fs-base); color: var(--muted); }
+/* 打印参数 */
+.param-label { margin-top: 20rpx; font-size: var(--fs-base); font-weight: 600; color: var(--muted); }
 .param-box .param-label:first-child { margin-top: 0; }
 .param-options { display: flex; gap: 16rpx; margin-top: 12rpx; }
 .param-opt {
@@ -42,28 +73,49 @@
   min-height: 96rpx;
   flex: 1;
   padding: 16rpx 20rpx;
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
   border: 2rpx solid var(--line-soft);
-  background: var(--surface);
+  background: var(--paper);
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   font-size: var(--fs-base);
   line-height: 1.35;
-  color: var(--ink);
+  color: var(--ink-soft);
 }
-.param-opt.on { border-color: var(--teal); background: var(--teal-wash); color: var(--ink); font-weight: 600; }
+.param-opt.on {
+  border-color: var(--gold-line);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  font-weight: 700;
+  box-shadow: var(--sh-xs);
+}
 .param-opt.disabled { opacity: 0.45; }
 .param-opt.on.disabled { opacity: 1; border-color: var(--clay-deep); background: var(--surface); color: var(--clay-deep); }
 .param-hint { margin-top: 16rpx; font-size: var(--fs-base); line-height: 1.5; color: var(--clay-deep); }
 
-/* 份数步进器（原在打印参数页，随参数一起挪到这里）；加减按钮 96rpx（48px），达到最小可点击尺寸 */
-.param-stepper { display: flex; align-items: center; gap: 10rpx; margin-top: 12rpx; }
-.s-btn { width: 96rpx; height: 96rpx; border-radius: var(--r-sm); background: var(--surface-2);
-  border: 1rpx solid var(--line-soft);
-  display: flex; align-items: center; justify-content: center; font-size: 40rpx; color: var(--ink); }
+/* 份数步进器 */
+.param-stepper { display: flex; align-items: center; gap: 12rpx; margin-top: 12rpx; }
+.s-btn {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1rpx solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-xl);
+  color: var(--ink);
+}
 .s-btn.off { color: var(--ghost); background: var(--surface-3); }
-.s-val { min-width: 88rpx; text-align: center; font-size: 32rpx; font-weight: 700; color: var(--ink);
-  font-variant-numeric: tabular-nums; }
+.s-val {
+  min-width: 88rpx;
+  text-align: center;
+  font-size: var(--fs-lg);
+  font-weight: 750;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
 .actionbar .btn.lg { min-height: 96rpx; }

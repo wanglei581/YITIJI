@@ -27,9 +27,10 @@ const FS_SCALE = new Set([20, 22, 26, 30, 34, 40, 52])
 const RADIUS_SCALE = new Set([12, 18, 24, 32, 40, 48, 999])
 
 // 实测基线（2026-09-02 为 439/181；2026-09-26 简历对照去掉等级块、「我的」去掉权益条后降到 415/168；
-// 2026-11-12 包 1 打印流程页改用字阶后字号降到 403；2026-11-24 青绪轻移动版升级首页/AI/打印/我的/小青对话后降至 368/133）。
+// 2026-11-12 包 1 打印流程页改用字阶后字号降到 403；2026-11-24 青绪轻移动版升级首页/AI/打印/我的/小青对话后降至 368/133；
+// 同日 Batch C-1 新增求职备忘本并统一 12 个高频核心子页字阶与圆角令牌后进一步降至 277/101）。
 // 只允许降，不允许升。
-const BASELINE = { fontSize: 368, radius: 133 }
+const BASELINE = { fontSize: 277, radius: 101 }
 
 const pageDirs = readdirSync(join(ROOT, 'pages'), { withFileTypes: true })
   .filter((e) => e.isDirectory())

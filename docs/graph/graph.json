@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 706,
+    "endpointCount": 709,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -12258,6 +12258,30 @@
         ]
       },
       {
+        "controller": "services/api/src/miniapp-code/miniapp-org-entry.controller.ts",
+        "handler": "MiniappOrgEntryController.getPartnerEntry",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/partner/miniapp-entry",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/miniapp-code/miniapp-org-entry.controller.ts",
+        "handler": "MiniappOrgEntryController.generatePartnerEntryCode",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/partner/miniapp-entry-code",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
         "controller": "services/api/src/official-channels/official-channels.controller.ts",
         "handler": "OfficialChannelsController.listOwn",
         "method": "GET",
@@ -13433,6 +13457,16 @@
         "services": [
           "KioskProfileService"
         ]
+      },
+      {
+        "controller": "services/api/src/miniapp-code/miniapp-org-entry.controller.ts",
+        "handler": "MiniappOrgEntryController.getPublicEntry",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/public/miniapp-org-entry",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/support-contact/support-contact.public.controller.ts",
@@ -15965,7 +15999,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 348
+      "sourceFileCount": 349
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -19265,7 +19299,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 103,
+      "reachableFileCount": 105,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -19789,7 +19823,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 106
+      "sourceFileCount": 108
     }
   },
   "dataModel": {
@@ -21044,6 +21078,7 @@
           "services/api/src/licenses/license-queries.ts",
           "services/api/src/licenses/license-write.ts",
           "services/api/src/licenses/license.service.ts",
+          "services/api/src/miniapp-code/miniapp-org-entry.service.ts",
           "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/orgs/admin-org-account-security.ts",
           "services/api/src/orgs/admin-org-content-trust.service.ts",
@@ -21557,6 +21592,7 @@
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
+          "services/api/src/miniapp-code/miniapp-org-entry.service.ts",
           "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/effective-user-prices.ts",
@@ -53429,6 +53465,15 @@
   ],
   "orphans": {
     "entries": [
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/lib/auditActionLabels.test.ts",
+        "kind": "test",
+        "mentions": [],
+        "risk": "low",
+        "scope": "admin",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/account-settings/PhoneBindingCard.tsx",

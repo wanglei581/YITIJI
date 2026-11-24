@@ -1,62 +1,139 @@
+/* pages/resumes/resumes.wxss  我的简历（墨翠鎏金白瓷） */
 .page-wrap { min-height: 100vh; background: var(--paper); }
-/* 导航栏右上角原有一个「上传」，被微信胶囊（···⊙）完全遮挡且与页内两处上传入口重复，
-   已删除；上传统一走 section-head 的「上传新简历」与空态的「上传第一份简历」。 */
-.resume-content { padding-top: 8rpx; }
+.resume-content { padding-top: 12rpx; }
 
 .resume-hero {
   min-height: 210rpx;
   margin: 0 32rpx;
-  padding: 30rpx;
-  border-radius: 32rpx;
-  border: 1rpx solid var(--teal-soft);
-  background: var(--teal-wash);
+  padding: 32rpx 30rpx;
+  border-radius: var(--r-lg);
+  border: 1rpx solid rgba(223, 198, 147, .28);
+  background: linear-gradient(150deg, #16483E 0%, #0C2B24 58%, #071915 100%);
+  box-shadow: var(--sh-md);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24rpx;
 }
 .rh-copy { flex: 1; min-width: 0; }
-.rh-kicker { font-size: 21rpx; font-weight: 650; color: var(--teal-deep); }
-.rh-title { margin-top: 10rpx; font-size: 34rpx; font-weight: 760; color: var(--ink); }
-.rh-num { font-size: 48rpx; font-weight: 800; color: var(--teal); }
-.rh-sub { margin-top: 7rpx; font-size: 22rpx; color: var(--muted); }
+.rh-kicker { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 2rpx; color: var(--gold-bright); }
+.rh-title { margin-top: 10rpx; font-size: var(--fs-lg); font-weight: 800; color: #FFFFFF; }
+.rh-num { font-size: var(--fs-2xl); font-weight: 800; color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+.rh-sub { margin-top: 8rpx; font-size: var(--fs-sm); color: rgba(255, 255, 255, .74); }
 .rh-icon {
   width: 96rpx;
   height: 96rpx;
-  border-radius: 30rpx;
-  background: var(--teal);
-  color: #fff;
+  border-radius: var(--r-full);
+  background: rgba(223, 198, 147, .16);
+  border: 1rpx solid rgba(223, 198, 147, .4);
+  color: var(--gold-bright);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12rpx 28rpx rgba(15, 110, 92, .18);
+  flex-shrink: 0;
 }
-.rh-icon .ficon { width: 47rpx; height: 47rpx; }
+.rh-icon .ficon { width: 46rpx; height: 46rpx; }
 
-.section-head { padding: 34rpx 36rpx 18rpx; display: flex; align-items: flex-end; justify-content: space-between; gap: 20rpx; }
-.section-title { font-size: 31rpx; font-weight: 750; color: var(--ink); }
-.section-sub { margin-top: 5rpx; font-size: 21rpx; color: var(--muted); }
-/* 删掉导航栏那个被胶囊遮挡的「上传」后，本按钮成为列表态唯一上传入口，
-   触控区提到 96rpx = 48px，满足 CLAUDE.md §9 最小可点击尺寸。 */
-.upload-button { min-height: 96rpx; padding: 0 26rpx; border-radius: 22rpx; background: var(--surface); border: 1rpx solid var(--line); color: var(--teal); display: flex; align-items: center; gap: 9rpx; font-size: 25rpx; font-weight: 650; flex-shrink: 0; }
+.section-head { padding: 34rpx 32rpx 18rpx; display: flex; align-items: flex-end; justify-content: space-between; gap: 20rpx; }
+.section-title { font-size: var(--fs-md); font-weight: 750; color: var(--ink); }
+.section-sub { margin-top: 6rpx; font-size: var(--fs-xs); color: var(--muted); }
+.upload-button {
+  min-height: 96rpx;
+  padding: 0 28rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  border: 1rpx solid rgba(223, 198, 147, .35);
+  color: var(--gold-bright);
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: var(--sh-xs);
+}
 .upload-button .ficon { width: 28rpx; height: 28rpx; }
 
-.resume-list { margin: 0 32rpx; display: flex; flex-direction: column; gap: 16rpx; }
-.resume-card { padding: 24rpx; border-radius: 28rpx; background: var(--surface); border: 1rpx solid var(--line-soft); display: flex; align-items: flex-start; gap: 20rpx; }
-.resume-file-icon { width: 82rpx; height: 82rpx; border-radius: 24rpx; background: var(--teal-soft); color: var(--teal); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.resume-list { margin: 0 32rpx; display: flex; flex-direction: column; gap: 18rpx; }
+.resume-card {
+  padding: 26rpx;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+}
+.resume-file-icon {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: var(--r-full);
+  background: radial-gradient(circle at 30% 28%, #ECF7F3 0%, #D9EEE6 100%);
+  color: var(--teal-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 .resume-file-icon .ficon { width: 40rpx; height: 40rpx; }
 .resume-main { flex: 1; min-width: 0; }
 .resume-title-row { display: flex; align-items: center; gap: 12rpx; }
-.resume-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 29rpx; font-weight: 700; color: var(--ink); }
-.resume-meta { margin-top: 6rpx; font-size: 22rpx; color: var(--muted); }
+.resume-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--ink);
+}
+.resume-meta { margin-top: 6rpx; font-size: var(--fs-sm); color: var(--muted); }
 .resume-status { margin-top: 12rpx; }
 .resume-actions { margin-top: 18rpx; display: flex; gap: 12rpx; }
-.action-button { min-height: 60rpx; padding: 0 22rpx; border-radius: 18rpx; background: var(--surface-2); color: var(--ink-soft); border: 1rpx solid var(--line-soft); display: flex; align-items: center; justify-content: center; font-size: 23rpx; font-weight: 650; }
-.action-button.primary { color: var(--teal-deep); background: var(--teal-soft); border-color: var(--teal-soft); }
-.resume-arrow { width: 22rpx; height: 22rpx; color: var(--ghost); margin-top: 29rpx; }
+.action-button {
+  min-height: 68rpx;
+  padding: 0 24rpx;
+  border-radius: var(--r-full);
+  background: var(--paper);
+  color: var(--ink-soft);
+  border: 1rpx solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: 650;
+}
+.action-button.primary {
+  color: var(--gold-bright);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  border-color: rgba(223, 198, 147, .35);
+}
+.resume-arrow { width: 22rpx; height: 22rpx; color: var(--ghost); margin-top: 28rpx; }
 
-.empty-card { margin: 30rpx 32rpx 0; padding: 60rpx 40rpx; border-radius: 30rpx; background: var(--surface); border: 1rpx solid var(--line-soft); display: flex; flex-direction: column; align-items: center; text-align: center; }
-.empty-icon { width: 94rpx; height: 94rpx; border-radius: 29rpx; background: var(--teal-soft); color: var(--teal); display: flex; align-items: center; justify-content: center; }
-.empty-icon .ficon { width: 45rpx; height: 45rpx; }
-.empty-title { margin-top: 22rpx; font-size: 31rpx; font-weight: 750; color: var(--ink); }
-.empty-desc { margin: 10rpx 0 30rpx; max-width: 540rpx; font-size: 24rpx; color: var(--muted); line-height: 1.65; }
+.empty-card {
+  margin: 30rpx 32rpx 0;
+  padding: 60rpx 40rpx;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.empty-icon {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: var(--r-full);
+  background: radial-gradient(circle at 30% 28%, #ECF7F3 0%, #D9EEE6 100%);
+  color: var(--teal-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.empty-icon .ficon { width: 46rpx; height: 46rpx; }
+.empty-title { margin-top: 22rpx; font-size: var(--fs-lg); font-weight: 750; color: var(--ink); }
+.empty-desc { margin: 10rpx 0 30rpx; max-width: 540rpx; font-size: var(--fs-base); color: var(--muted); line-height: 1.65; }

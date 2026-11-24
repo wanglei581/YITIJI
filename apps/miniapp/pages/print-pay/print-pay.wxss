@@ -1,58 +1,124 @@
+/* pages/print-pay/print-pay.wxss  确认提交（墨翠鎏金白瓷） */
 .page-wrap { min-height: 100vh; background: var(--paper); }
 .store-mini { display: flex; align-items: center; gap: 20rpx; }
-.sm-ic { width: 72rpx; height: 72rpx; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sm-ic {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 .sm-ic .ficon { width: 38rpx; height: 38rpx; }
-.sm-name { font-size: 28rpx; font-weight: 600; color: var(--ink); }
-.sm-sub { font-size: 23rpx; color: var(--ink-soft); margin-top: 4rpx; }
+.sm-name { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.sm-sub { font-size: var(--fs-sm); color: var(--muted); margin-top: 4rpx; }
 
 .order-file { display: flex; align-items: center; gap: 20rpx; }
-.order-file + .order-file { margin-top: 20rpx; padding-top: 20rpx; border-top: 1rpx solid var(--line); }
+.order-file + .order-file { margin-top: 20rpx; padding-top: 20rpx; border-top: 1rpx solid var(--line-faint); }
 .of-ic { width: 68rpx; height: 68rpx; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .of-ic .ficon { width: 34rpx; height: 34rpx; }
-.of-main { flex: 1; }
-.of-name { font-size: 27rpx; font-weight: 600; color: var(--ink); }
-.of-desc { font-size: 23rpx; color: var(--ink-soft); margin-top: 4rpx; }
-.of-price { font-size: 27rpx; font-weight: 600; color: var(--clay-deep); }
+.of-main { flex: 1; min-width: 0; }
+.of-name { font-size: var(--fs-base); font-weight: 700; color: var(--ink); }
+.of-desc { font-size: var(--fs-sm); color: var(--muted); margin-top: 4rpx; }
+.of-price { font-size: var(--fs-base); font-weight: 700; color: var(--gold-deep); }
 
 .fee { display: flex; flex-direction: column; gap: 16rpx; }
-.fee-row { display: flex; align-items: center; justify-content: space-between; font-size: 26rpx; color: var(--muted); }
-.fee-row text:last-child { color: var(--ink); }
+.fee-row { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-base); color: var(--muted); }
+.fee-row text:last-child { color: var(--ink); font-weight: 600; }
 .fee-row .minus { color: var(--teal-deep); }
 .fee-row.total { padding-top: 16rpx; border-top: 1rpx solid var(--line); }
-.fee-row.total .amt { color: var(--teal); font-weight: 700; font-size: 32rpx; }
+.fee-row.total .amt { color: var(--teal-deep); font-weight: 800; font-size: var(--fs-lg); }
 
 .pay-list { display: flex; flex-direction: column; gap: 16rpx; }
-.pay-opt { display: flex; align-items: center; gap: 20rpx; padding: 24rpx 28rpx; background: var(--surface); border-radius: var(--r-lg); border: 2rpx solid transparent; box-shadow: var(--sh-sm); }
-.pay-opt.on { border-color: var(--teal); }
+.pay-opt {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx 28rpx;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  border: 2rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
+}
+.pay-opt.on { border-color: var(--teal); background: linear-gradient(180deg, #FFFFFF 0%, #F1F8F5 100%); }
 .po-ic { width: 64rpx; height: 64rpx; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .po-ic.wx { background: #07c160; }
-.po-ic.bal { background: var(--wheat-deep); }
+.po-ic.bal { background: var(--gold-deep); }
 .po-ic .ficon { width: 34rpx; height: 34rpx; color: #fff; }
 .po-main { flex: 1; }
-.po-title { font-size: 28rpx; font-weight: 600; color: var(--ink); }
-.po-sub { font-size: 23rpx; color: var(--ink-soft); margin-top: 4rpx; }
-.po-radio { width: 40rpx; height: 40rpx; border-radius: 50%; border: 2rpx solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 24rpx; color: #fff; flex-shrink: 0; }
-.pay-opt.on .po-radio { background: var(--teal); border-color: var(--teal); }
+.po-title { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.po-sub { font-size: var(--fs-sm); color: var(--muted); margin-top: 4rpx; }
+.po-radio {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: var(--r-full);
+  border: 2rpx solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  color: #fff;
+  flex-shrink: 0;
+}
+.pay-opt.on .po-radio { background: var(--teal-deep); border-color: var(--teal-deep); color: var(--gold-bright); }
 
-.ab-label { font-size: 22rpx; color: var(--ink-soft); display: block; }
-.ab-amt { font-size: 40rpx; font-weight: 700; color: var(--teal); font-variant-numeric: tabular-nums; }
+.ab-label { font-size: var(--fs-sm); color: var(--muted); display: block; }
+.ab-amt { font-size: var(--fs-xl); font-weight: 800; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
 
-/* 门店迷你卡主内容区 */
-.sm-main { flex: 1; }
+.sm-main { flex: 1; min-width: 0; }
 
-/* 报价失败 / 核价中：如实说明 + 一条可执行的重试。绝不在这里补一个本地算出来的金额。 */
 .fee-row.quote-fail { align-items: flex-start; gap: 20rpx; }
-.qf-text { flex: 1; font-size: 23rpx; line-height: 1.6; color: var(--muted); }
-/* 实测 ≥48px 触控下限（CLAUDE.md §9） */
-.qf-retry { flex-shrink: 0; display: inline-flex; min-height: 96rpx; padding: 0 28rpx; border-radius: 20rpx; border: 1rpx solid var(--line); background: var(--surface); color: var(--ink-soft); font-size: 24rpx; font-weight: 600; align-items: center; justify-content: center; }
+.qf-text { flex: 1; font-size: var(--fs-sm); line-height: 1.6; color: var(--muted); }
+.qf-retry {
+  flex-shrink: 0;
+  display: inline-flex;
+  min-height: 96rpx;
+  padding: 0 28rpx;
+  border-radius: var(--r-full);
+  border: 1rpx solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  align-items: center;
+  justify-content: center;
+}
 
-/* 报价 fail-closed 的登录出口：与「重新核价」同一尺寸，主色以示这是有效的那一条。 */
-.qf-login { flex-shrink: 0; display: inline-flex; min-height: 96rpx; padding: 0 28rpx; border-radius: 20rpx; border: 1rpx solid var(--teal); background: var(--surface); color: var(--teal); font-size: 24rpx; font-weight: 600; align-items: center; justify-content: center; }
+.qf-login {
+  flex-shrink: 0;
+  display: inline-flex;
+  min-height: 96rpx;
+  padding: 0 28rpx;
+  border-radius: var(--r-full);
+  border: 1rpx solid var(--teal);
+  background: var(--teal-wash);
+  color: var(--teal-deep);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+}
 
-/* 订单已建成但没跳走：说清它在哪，并给出唯一正确的下一步（去找回它，而不是再提交一次）。 */
 .locked-main { flex: 1; }
-.locked-t { font-size: 27rpx; font-weight: 700; color: var(--ink); }
-.locked-d { margin-top: 8rpx; font-size: 23rpx; line-height: 1.65; color: var(--muted); }
-.locked-btn { display: flex; width: fit-content; min-height: 96rpx; margin-top: 18rpx; padding: 0 32rpx; border-radius: 22rpx; background: var(--teal); color: #fff; font-size: 26rpx; font-weight: 650; align-items: center; justify-content: center; }
-/* 同时出现两个动作时（重新下单 / 重新核对 + 去我的打印订单），第二个降为次要样式：两个同样重的实心按钮会让用户分不清该点哪个。尺寸不降，触控面积与主按钮一致。 */
-.locked-btn.ghost { background: transparent; color: var(--teal); border: 2rpx solid var(--teal); }
+.locked-t { font-size: var(--fs-base); font-weight: 750; color: var(--ink); }
+.locked-d { margin-top: 8rpx; font-size: var(--fs-sm); line-height: 1.65; color: var(--muted); }
+.locked-btn {
+  display: flex;
+  width: fit-content;
+  min-height: 96rpx;
+  margin-top: 18rpx;
+  padding: 0 32rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+}
+.locked-btn.ghost {
+  background: var(--surface);
+  color: var(--teal-deep);
+  border: 2rpx solid var(--teal);
+}

@@ -67,6 +67,7 @@ Page({
       { id: 'docs',      icon: 'folder',    title: '我的文档',      sub: '可再次发起打印',       accent: 'teal'  },
       { id: 'orders',    icon: 'printer',   title: '打印订单',      sub: '到机码与出纸状态',     accent: 'clay'  },
       { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'cyan'  },
+      { id: 'tracker',   icon: 'calendar',  title: '求职备忘本',    sub: '本人自填记录 · 仅本人可见', accent: 'teal'  },
       { id: 'invoice',   icon: 'form',      title: '自助开票',      sub: '付费订单申请电子发票', accent: 'wheat' },
       { id: 'credits',   icon: 'thunder',   title: '一体机服务次数', sub: '已购 AI 服务与单次购买', accent: 'plum' },
       // 我的收藏 / 招聘会提醒 / 浏览与跳转记录只装岗位、招聘会、企业、政策四类内容，
@@ -145,6 +146,7 @@ Page({
       docs:       '/pages/documents/documents',
       orders:     '/pages/orders/orders',
       ai:         '/pages/ai-records/ai-records',
+      tracker:    '/pages/job-tracker/job-tracker',
       invoice:    '/pages/invoice-center/invoice-center',
       credits:    '/pages/service-credits/service-credits',
       feedback:   '/pages/feedback/feedback',

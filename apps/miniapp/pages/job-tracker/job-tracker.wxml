@@ -1,0 +1,197 @@
+<!-- pages/job-tracker/job-tracker.wxml -->
+<view class="jt-page">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回上一页">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <view class="nav-title">本人求职备忘本</view>
+  </view>
+
+  <view class="jt-body">
+    <!-- 常驻合规边界声明条（§4.4A，不可关闭） -->
+    <view class="jt-compliance">
+      <text class="ficon i-info jt-comp-ic" aria-hidden="true"></text>
+      <text class="jt-comp-tx">本人自填备忘 · 仅本人可见，不向任何企业或第三方回传</text>
+    </view>
+
+    <!-- 墨翠深松鎏金概览主卡 -->
+    <view class="jt-hero">
+      <view class="jt-hero-top">
+        <view class="jt-hero-copy">
+          <view class="jt-hero-kicker">PERSONAL CAREER NOTEBOOK</view>
+          <view class="jt-hero-title">我的求职备忘</view>
+          <view class="jt-hero-sub">记录意向公司与面试节奏，手机与终端随时查阅</view>
+        </view>
+        <view wx:if="{{isLoggedIn}}" class="jt-hero-stat">
+          <view class="jt-hero-num">{{total === null ? '—' : total}}</view>
+          <view class="jt-hero-unit">{{activeFilterLabel}}</view>
+        </view>
+      </view>
+      <view class="jt-hero-foot">
+        <view class="jt-add-btn tap" hover-class="tap-press" bindtap="openCreate" role="button" aria-label="记录一笔求职备忘">
+          <text class="ficon i-plus jt-add-ic" aria-hidden="true"></text>
+          <text>记录一笔</text>
+        </view>
+        <view class="jt-hero-link tap" hover-class="tap-press" bindtap="tapQuickInterview" role="button" aria-label="3分钟模拟面试快练">
+          <text>3 分钟练面 ›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 阶段筛选胶囊 -->
+    <scroll-view wx:if="{{isLoggedIn}}" class="jt-tabs-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="jt-tabs">
+        <view
+          class="jt-tab tap {{activeFilter === item.key ? 'on' : ''}}"
+          wx:for="{{filterTabs}}"
+          wx:key="key"
+          data-key="{{item.key}}"
+          bindtap="tapFilter"
+          hover-class="tap-press"
+          role="button"
+        >{{item.label}}</view>
+      </view>
+    </scroll-view>
+
+    <!-- POST 超时未确认提示条 -->
+    <view wx:if="{{isLoggedIn && uncertainSubmit}}" class="jt-warn-bar" role="alert">
+      <text class="jt-warn-tx">刚才提交超时，请先核对下方列表是否已记上，确认未记上再重新记录。</text>
+      <view class="jt-warn-btn tap" bindtap="reloadList" role="button">刷新核对</view>
+    </view>
+
+    <!-- 未登录引导态（不发任何请求） -->
+    <view wx:if="{{!isLoggedIn}}" class="jt-state-card">
+      <view class="jt-state-ic"><text class="ficon i-calendar" aria-hidden="true"></text></view>
+      <view class="jt-state-t">登录后跨设备同步本人求职备忘</view>
+      <view class="jt-state-d">记录仅归本人账号所有，随时可改可删，随账号注销一并清理。</view>
+      <view class="jt-state-cta tap" hover-class="tap-press" bindtap="tapLogin" role="button">手机号快捷登录</view>
+    </view>
+
+    <!-- 首次加载中 -->
+    <view wx:elif="{{loading && items.length === 0}}" class="jt-state-card">
+      <view class="jt-spinner"></view>
+      <view class="jt-state-d">正在读取你的个人备忘…</view>
+    </view>
+
+    <!-- 加载失败 -->
+    <view wx:elif="{{loadError && items.length === 0}}" class="jt-state-card" role="alert">
+      <view class="jt-state-ic warn"><text class="ficon i-info" aria-hidden="true"></text></view>
+      <view class="jt-state-t">暂时没读到备忘列表</view>
+      <view class="jt-state-d">{{loadError}}</view>
+      <view class="jt-state-cta tap" hover-class="tap-press" bindtap="reloadList" role="button">重新读取</view>
+    </view>
+
+    <!-- 空态 -->
+    <view wx:elif="{{items.length === 0}}" class="jt-state-card">
+      <view class="jt-state-ic"><text class="ficon i-edit" aria-hidden="true"></text></view>
+      <view class="jt-state-t">{{activeFilter ? '这个阶段还没有记录' : '还没有求职备忘'}}</view>
+      <view class="jt-state-d">把心仪的单位、岗位与准备节点记下来，方便随时打印简历或突击面试。</view>
+      <view class="jt-state-cta tap" hover-class="tap-press" bindtap="openCreate" role="button">记录一笔</view>
+    </view>
+
+    <!-- 条目列表 -->
+    <view wx:else class="jt-list">
+      <view class="jt-card {{busyMap[item.id] ? 'is-busy' : ''}}" wx:for="{{items}}" wx:key="id">
+        <view class="jt-card-top">
+          <view class="jt-card-head">
+            <view class="jt-pos">{{item.positionTitle}}</view>
+            <view class="jt-comp">{{item.companyName}}</view>
+          </view>
+          <view class="jt-badges">
+            <text class="jt-status st-{{item.status}}">{{item.statusLabel}}</text>
+            <text class="jt-self-tag">{{item.sourceBadge}}</text>
+          </view>
+        </view>
+
+        <view wx:if="{{item.note}}" class="jt-note">{{item.note}}</view>
+
+        <view class="jt-meta-row">
+          <text class="jt-meta-tx">{{item.selfReportedDate ? ('记录日期 ' + item.selfReportedDate) : ('更新于 ' + (item.updatedText || '刚刚'))}}</text>
+          <view class="jt-meta-ops">
+            <view wx:if="{{item.nextStatus}}" class="jt-mini-op next tap" data-id="{{item.id}}" data-next="{{item.nextStatus}}" bindtap="tapAdvance" role="button">{{item.nextLabel}}</view>
+            <view class="jt-mini-op tap" data-id="{{item.id}}" bindtap="openEdit" role="button">编辑</view>
+            <view class="jt-mini-op del tap" data-id="{{item.id}}" bindtap="tapDelete" role="button">删除</view>
+          </view>
+        </view>
+
+        <!-- 双真闭环联动按钮 -->
+        <view class="jt-loops">
+          <view class="jt-loop-btn outline tap" hover-class="tap-press" bindtap="tapGoPrint" role="button" aria-label="去打印简历">
+            <text class="ficon i-printer jt-loop-ic" aria-hidden="true"></text>
+            <text>去打印简历</text>
+          </view>
+          <view class="jt-loop-btn solid tap" hover-class="tap-press" data-position="{{item.positionTitle}}" bindtap="tapQuickInterview" role="button" aria-label="3 分钟模拟面试快练">
+            <text class="ficon i-comment jt-loop-ic" aria-hidden="true"></text>
+            <text>3 分钟练面</text>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{loadingMore}}" class="jt-more-tip">正在加载更多…</view>
+      <view wx:elif="{{nextCursor}}" class="jt-more-tip">上拉加载更多</view>
+      <view wx:else class="jt-more-tip">已展示全部 {{total}} 条本人自填记录</view>
+    </view>
+  </view>
+
+  <!-- 底部新增 / 编辑高定抽屉 -->
+  <view wx:if="{{sheetOpen}}" class="jt-mask" bindtap="closeSheet">
+    <view class="jt-sheet" catchtap="noop">
+      <view class="jt-sheet-head">
+        <view>
+          <view class="jt-sheet-t">{{sheetMode === 'edit' ? '编辑求职备忘' : '记录一笔求职备忘'}}</view>
+          <view class="jt-sheet-s">本人自填 · 仅存于你的个人账号</view>
+        </view>
+        <view class="jt-sheet-close icon-action tap" bindtap="closeSheet" role="button" aria-label="关闭弹窗">
+          <text class="ficon i-close"></text>
+        </view>
+      </view>
+
+      <view class="jt-field">
+        <view class="jt-label">目标公司 / 单位 *</view>
+        <input class="jt-input" maxlength="120" placeholder="例如：某科技有限公司 / 某区属国企" value="{{form.companyName}}" bindinput="onCompanyInput" />
+      </view>
+
+      <view class="jt-field">
+        <view class="jt-label">目标岗位 *</view>
+        <input class="jt-input" maxlength="120" placeholder="例如：产品经理、行政专员、前端开发" value="{{form.positionTitle}}" bindinput="onPositionInput" />
+      </view>
+
+      <view class="jt-field">
+        <view class="jt-label">当前阶段（本人自填）</view>
+        <view class="jt-status-grid">
+          <view
+            class="jt-st-chip tap {{form.status === item.key ? 'on' : ''}}"
+            wx:for="{{formStatuses}}"
+            wx:key="key"
+            data-key="{{item.key}}"
+            bindtap="tapFormStatus"
+            role="button"
+          >{{item.label}}</view>
+        </view>
+      </view>
+
+      <view class="jt-field">
+        <view class="jt-label">记录日期（选填）</view>
+        <view class="jt-date-row">
+          <picker mode="date" value="{{form.selfReportedDate}}" bindchange="onDateChange" class="jt-date-picker">
+            <view class="jt-date-box">{{form.selfReportedDate || '点击选择日期（可留空）'}}</view>
+          </picker>
+          <view wx:if="{{form.selfReportedDate}}" class="jt-date-clear tap" bindtap="clearDate" role="button">清除</view>
+        </view>
+      </view>
+
+      <view class="jt-field">
+        <view class="jt-label">个人备注（选填，最多 500 字）</view>
+        <textarea class="jt-textarea" maxlength="500" placeholder="如：二面重点复习项目复盘、带两份彩色简历去现场…" value="{{form.note}}" bindinput="onNoteInput" />
+      </view>
+
+      <view class="jt-sheet-acts">
+        <view class="jt-cancel-btn tap" bindtap="closeSheet" role="button">取消</view>
+        <view class="jt-save-btn tap {{saving ? 'disabled' : ''}}" bindtap="submitForm" role="button">
+          {{saving ? '保存中…' : (sheetMode === 'edit' ? '保存修改' : '记入备忘本')}}
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

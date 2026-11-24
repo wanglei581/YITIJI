@@ -1,60 +1,102 @@
+/* pages/interview-result/interview-result.wxss  模拟面试报告（墨翠鎏金白瓷） */
 .page-wrap { min-height: 100vh; background: var(--paper); }
 
 /* ── 状态：loading / failed ── */
-.ri-state { display: flex; flex-direction: column; align-items: center;
-  justify-content: center; padding: 80rpx 40rpx; gap: 24rpx; }
-.state-tip { font-size: 28rpx; color: var(--muted); text-align: center; line-height: 1.7; }
-.ri-fail-ic { font-size: 72rpx; color: var(--error); }
+.ri-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80rpx 40rpx; gap: 24rpx; }
+.state-tip { font-size: var(--fs-base); color: var(--muted); text-align: center; line-height: 1.7; }
+.ri-fail-ic { font-size: var(--fs-2xl); color: var(--error); }
 .ri-retry-btn { margin-top: 8rpx; }
 
-.spinner { width: 56rpx; height: 56rpx; border: 4rpx solid var(--line);
-  border-top-color: var(--teal); border-radius: 50%;
-  animation: spin .8s linear infinite; }
+.spinner {
+  width: 56rpx;
+  height: 56rpx;
+  border: 4rpx solid var(--line);
+  border-top-color: var(--teal);
+  border-radius: var(--r-full);
+  animation: spin .8s linear infinite;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── 总评卡 ── */
-.ri-hero { background: var(--surface); border: 1rpx solid var(--teal-soft); border-radius: var(--r-lg);
-  padding: 36rpx 32rpx; margin: 16rpx 32rpx 0; box-shadow: var(--sh-xs); }
-.rh-level { font-size: 44rpx; font-weight: 800; line-height: 1; }
-.rh-pos { font-size: 28rpx; color: var(--ink); font-weight: 600; margin-top: 12rpx; }
-.rh-iv { font-size: 26rpx; color: var(--muted); font-weight: 400; }
-.rh-summary { font-size: 28rpx; color: var(--muted); line-height: 1.7; margin-top: 16rpx; }
+/* ── 墨翠深松鎏金报告头卡（合规：不展示等级，只呈岗位与练习总结） ── */
+.ri-hero {
+  background: linear-gradient(150deg, #16483E 0%, #0C2B24 58%, #071915 100%);
+  border: 1rpx solid rgba(223, 198, 147, .3);
+  border-radius: var(--r-lg);
+  padding: 36rpx 32rpx;
+  margin: 16rpx 32rpx 0;
+  box-shadow: var(--sh-md);
+}
+.rh-pos { font-size: var(--fs-lg); color: #FFFFFF; font-weight: 800; line-height: 1.35; }
+.rh-iv { font-size: var(--fs-sm); color: var(--gold-bright); font-weight: 600; margin-left: 8rpx; }
+.rh-summary { font-size: var(--fs-base); color: rgba(255, 255, 255, .82); line-height: 1.7; margin-top: 16rpx; }
 
 /* ── 维度点评 & 通用 section ── */
-.ri-section { background: var(--surface); border: 1rpx solid var(--line-soft);
-  border-radius: 28rpx; padding: 24rpx 28rpx; margin: 16rpx 32rpx 0; }
-.rs-title { font-size: 28rpx; font-weight: 700; color: var(--ink); margin-bottom: 16rpx; }
-.rs-point { display: flex; align-items: flex-start; gap: 10rpx; margin-bottom: 10rpx; }
-.rs-dot { width: 10rpx; height: 10rpx; margin-top: 18rpx; border-radius: 50%;
-  background: var(--teal); flex-shrink: 0; }
-.rs-text { font-size: 28rpx; color: var(--ink); line-height: 1.6; flex: 1; }
+.ri-section {
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+  padding: 28rpx 28rpx;
+  margin: 18rpx 32rpx 0;
+}
+.rs-title { font-size: var(--fs-md); font-weight: 750; color: var(--ink); margin-bottom: 16rpx; }
+.rs-point { display: flex; align-items: flex-start; gap: 12rpx; margin-bottom: 12rpx; }
+.rs-dot {
+  width: 10rpx;
+  height: 10rpx;
+  margin-top: 18rpx;
+  border-radius: var(--r-full);
+  background: var(--gold);
+  flex-shrink: 0;
+}
+.rs-text { font-size: var(--fs-base); color: var(--ink-soft); line-height: 1.65; flex: 1; }
 
 /* ── 高概率追问 ── */
-.ri-pred-item { background: var(--paper); border-radius: 10rpx; padding: 20rpx 24rpx;
-  margin-bottom: 16rpx; }
+.ri-pred-item {
+  background: var(--paper);
+  border: 1rpx solid var(--line-faint);
+  border-radius: var(--r-md);
+  padding: 22rpx 24rpx;
+  margin-bottom: 16rpx;
+}
 .ri-pred-item:last-child { margin-bottom: 0; }
-.rp-q { font-size: 28rpx; font-weight: 600; color: var(--ink); line-height: 1.5; margin-bottom: 10rpx; }
-.rp-why { font-size: 24rpx; color: var(--muted); line-height: 1.5; margin-bottom: 6rpx; }
-.rp-app { font-size: 24rpx; color: var(--teal); line-height: 1.5; }
+.rp-q { font-size: var(--fs-base); font-weight: 700; color: var(--ink); line-height: 1.55; margin-bottom: 10rpx; }
+.rp-why { font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; margin-bottom: 6rpx; }
+.rp-app { font-size: var(--fs-sm); color: var(--teal-deep); font-weight: 600; line-height: 1.55; }
 
 /* ── STAR 建议 ── */
-.ri-star { display: flex; flex-direction: column; gap: 12rpx; }
+.ri-star { display: flex; flex-direction: column; gap: 14rpx; }
 .star-row { display: flex; align-items: flex-start; gap: 16rpx; }
-.star-k { font-size: 28rpx; font-weight: 800; color: var(--teal); width: 36rpx;
-  flex-shrink: 0; line-height: 1.6; }
-.star-v { font-size: 28rpx; color: var(--ink); line-height: 1.6; flex: 1; }
-.star-reminder { font-size: 26rpx; color: var(--muted); line-height: 1.6;
-  padding: 18rpx 20rpx; border-radius: 20rpx; background: var(--wheat-wash);
-  display: flex; align-items: flex-start; gap: 12rpx; }
-.star-reminder-icon { width: 27rpx; height: 27rpx; color: var(--wheat-deep);
-  margin-top: 5rpx; flex-shrink: 0; }
+.star-k { font-size: var(--fs-md); font-weight: 800; color: var(--gold-deep); width: 36rpx; flex-shrink: 0; line-height: 1.6; }
+.star-v { font-size: var(--fs-base); color: var(--ink-soft); line-height: 1.6; flex: 1; }
+.star-reminder {
+  font-size: var(--fs-sm);
+  color: var(--wheat-deep);
+  line-height: 1.6;
+  padding: 18rpx 20rpx;
+  border-radius: var(--r-md);
+  background: var(--gold-soft);
+  border: 1rpx solid var(--gold-line);
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+.star-reminder-icon { width: 27rpx; height: 27rpx; color: var(--gold-deep); margin-top: 4rpx; flex-shrink: 0; }
 
 /* ── 行动清单 ── */
 .ri-check-item { display: flex; align-items: flex-start; gap: 14rpx; margin-bottom: 12rpx; }
 .ri-check-item:last-child { margin-bottom: 0; }
-.chk-box { width: 27rpx; height: 27rpx; padding: 5rpx; border-radius: 8rpx;
-  color: var(--teal); background: var(--teal-soft); flex-shrink: 0; margin-top: 4rpx; }
-.chk-text { font-size: 28rpx; color: var(--ink); line-height: 1.5; }
+.chk-box {
+  width: 28rpx;
+  height: 28rpx;
+  padding: 5rpx;
+  border-radius: var(--r-xs);
+  color: var(--teal-deep);
+  background: var(--teal-soft);
+  flex-shrink: 0;
+  margin-top: 4rpx;
+}
+.chk-text { font-size: var(--fs-base); color: var(--ink-soft); line-height: 1.55; }
 
 /* ── 免责声明间距 ── */
 .ri-disc { margin-top: 24rpx; }
@@ -64,4 +106,4 @@
 .flex-1-4 { flex: 1.4; }
 
 /* A′ 出门前看一眼：行首标签 */
-.rs-k { font-weight: 600; margin-right: 8rpx; }
+.rs-k { font-weight: 700; color: var(--teal-deep); margin-right: 8rpx; }

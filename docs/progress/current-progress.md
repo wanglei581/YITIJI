@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 2026-11-24：Batch C-1「本人求职备忘本」、3 分钟微面试快练与 12 个高频核心子页「墨翠鎏金白瓷」视觉统一（分支 `claude/miniapp-batch-c`，接 Batch B `f44eaee18`，未上传微信公众平台，未动线上 `zyidai.cn`）
+
+- 来由：按产品负责人拍板路线推进 Batch C-1，由 Antigravity × Codex CLI（`gpt-6.1-terra`）× Claude Code（Sonnet）三方联合完成 `compliance-boundary.md §4.4A` 合规审查、高定交互设计与最终代码/多模态实拍复核（Codex 结论 `SHIP_READY`）。零后端及数据库改动，不触碰停放页、线上生产及审核中 `v1.0.5`。
+- ① 本人求职备忘本（`apps/miniapp/pages/job-tracker/*`、`utils/api-job-tracker.js`、`app.json`、`pages/me/me.js`、`pages/home/home.wxml`）：
+  - 以一页一分包形态接入后端既有 `GET / POST / PATCH / DELETE /api/v1/me/job-applications`（同步更新 `api-contract.json` 至 153/153 零缺口），严格按 `§4.4A` 与托管 a 白名单仅发送 `companyName / positionTitle / status / note / selfReportedAt` 五项，绝不发送 `jobId`、`channel`、`statusSource`、`resumeFileId`、`consentId` 或企业侧字段。
+  - 首屏常驻不可关闭的「本人自填备忘 · 仅本人可见，不向任何企业或第三方回传」声明条，单条卡片永久展示「本人自填」标签，状态文案区分「已自填投递」，主按钮为「记录一笔」；每条记录直接联动「去打印简历」（`/pages/documents/documents`）与「3 分钟练面」（`/pages/interview-entry/interview-entry?position=...&quick=1`）两大真闭环。
+  - 完整并发与隐私守卫：未登录不发请求；登出/换账号/切后台立即清空个人数据并作废迟到响应；POST 超时不自动重发而是提示刷新核对避免重复；单条状态推进与删除串行防连点；支持服务端游标分页与去重追加。
+- ② 3 分钟微面试快练增强（`apps/miniapp/pages/interview-entry/*`）：保留整数 `durationMin: 3 | 5 | 8` 与零简历字段约束，将 3 分钟（约 4 题）提炼为「3 分钟快练 · 4 题速测 · 通勤可用」精选卡，支持 `?quick=1&position=...` 预选与 6 个热门方向一键填入（可自由编辑、不自动建场）。
+- ③ 全站 12 个高频核心子页「墨翠鎏金白瓷」统一升级：`launch`（补白字状态栏配深墨翠顶底）、`print-upload / print-store / print-pay / print-pickup`（清除旧亮蓝 `#f3f8ff` 二维码卡片）、`orders`（保留 FG-2 到机码防折行规则）、`resumes / resume-diagnose / resume-optimize`、`interview-entry / interview-qa / interview-result`（保留固定免责说明与无等级口径）。全站视觉刻度偏离再降 123 处（字号 `368 → 277`、圆角 `133 → 101`）并同步收紧 `verify-miniapp-visual-scale.mjs` 棘轮基线。
+- ④ 全量验证：新增 `scripts/tests/job-tracker.test.mjs`（8 项，接入 `verify:page-lifecycle`）；通过 `apps/miniapp` `verify:static` 17/17 门禁与 608 项页面生命周期单测、改动文件 `eslint --quiet`、全仓 `verify:compliance-copy` / `verify:repository-integrity` / `verify:ci-gate-coverage`、`services/api` `verify:job-application-track`（144/144），以及微信开发者工具 7 屏实拍与 Codex 多模态复核。
+
 ## 2026-11-24：Batch B「一机构一码」官方采购联名入口与机构后台专属推广凭证（分支 `claude/miniapp-org-entry-b`，接 `origin/main@2dd84e0ae`，未上传微信公众平台，未动线上 `zyidai.cn`）
 
 - 来由：按产品负责人拍板「B → C → 全站子页视觉」分批路线推进第一批功能闭环，由 Antigravity × Codex CLI（`gpt-6.1-terra`）× Claude Code（Sonnet）三方联合完成安全/合规审查与高定联名视觉定稿。零新增 Prisma 迁移，严守无证非招聘提审边界与 2026-09-26 托管 a 红线（不引入任何岗位/招聘会/企业资料或外跳招聘链接）。
