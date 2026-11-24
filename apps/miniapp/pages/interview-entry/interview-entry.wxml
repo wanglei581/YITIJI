@@ -7,61 +7,94 @@
   </view>
   <view class="content has-bar">
 
-    <view class="notice plum">
-      <text class="ficon i-info n-ic"></text>
-      <text>模拟面试由 AI 出题并点评，仅供练习参考，不代表真实招聘标准。</text>
+    <view class="ie-hero">
+      <view class="ie-hero-kicker">AI INTERVIEW COACH</view>
+      <view class="ie-hero-title">开口练一次，上场更从容</view>
+      <view class="ie-hero-sub">模拟面试由 AI 出题并点评，仅供练习参考，不代表真实招聘标准。</view>
     </view>
 
-    <view class="section-t">面试方向</view>
+    <view class="ie-section-head">
+      <view class="ie-bar" aria-hidden="true"></view>
+      <text class="ie-sec-t">练习节奏</text>
+    </view>
+    <view class="ie-dur-list">
+      <view
+        class="ie-dur-card tap {{item.featured ? 'is-featured' : ''}} {{activeDuration === item.val ? 'active' : ''}}"
+        wx:for="{{durations}}"
+        wx:key="val"
+        hover-class="tap-press"
+        bindtap="tapDuration"
+        data-val="{{item.val}}"
+        role="button"
+      >
+        <view class="ie-dur-top">
+          <text class="ie-dur-title">{{item.title}}</text>
+          <text wx:if="{{item.badge}}" class="ie-dur-badge">{{item.badge}}</text>
+        </view>
+        <view class="ie-dur-sub">{{item.sub}}</view>
+      </view>
+    </view>
+
+    <view class="ie-section-head">
+      <view class="ie-bar" aria-hidden="true"></view>
+      <text class="ie-sec-t">面试方向</text>
+    </view>
     <view class="field-group">
       <view class="field-item">
         <view class="fi-label">目标岗位</view>
-        <input class="fi-input" placeholder="如：产品经理、Java 开发" value="{{form.position}}" bindinput="inputPosition" />
+        <input class="fi-input" maxlength="50" placeholder="如：产品经理、前端开发" value="{{form.position}}" bindinput="inputPosition" />
+      </view>
+      <view class="ie-hot-wrap">
+        <view class="ie-hot-label">常见方向一键填入（可自由修改）</view>
+        <view class="ie-hot-chips">
+          <view
+            class="ie-hot-chip tap {{form.position === item ? 'active' : ''}}"
+            wx:for="{{hotPositions}}"
+            wx:key="*this"
+            hover-class="tap-press"
+            bindtap="tapHotPosition"
+            data-pos="{{item}}"
+            role="button"
+          >{{item}}</view>
+        </view>
       </view>
     </view>
 
-    <view class="section-t">题目设置</view>
-    <view class="option-group">
-      <view class="og-label">难度</view>
-      <view class="og-chips">
-        <view
-          class="opt-chip tap {{activeLevel === item.val ? 'active' : ''}}"
-          wx:for="{{levels}}"
-          wx:key="val"
-          bindtap="tapLevel"
-          data-val="{{item.val}}"
-        >{{item.label}}</view>
-      </view>
+    <view class="ie-section-head">
+      <view class="ie-bar" aria-hidden="true"></view>
+      <text class="ie-sec-t">题目设置</text>
     </view>
-    <view class="option-group">
-      <view class="og-label">练习时长</view>
-      <view class="og-chips">
-        <view
-          class="opt-chip tap {{activeDuration === item.val ? 'active' : ''}}"
-          wx:for="{{durations}}"
-          wx:key="val"
-          bindtap="tapDuration"
-          data-val="{{item.val}}"
-        >{{item.label}}</view>
+    <view class="ie-card">
+      <view class="option-group">
+        <view class="og-label">当前阶段</view>
+        <view class="og-chips">
+          <view
+            class="opt-chip tap {{activeLevel === item.val ? 'active' : ''}}"
+            wx:for="{{levels}}"
+            wx:key="val"
+            bindtap="tapLevel"
+            data-val="{{item.val}}"
+          >{{item.label}}</view>
+        </view>
       </view>
-    </view>
-    <view class="option-group">
-      <view class="og-label">题型</view>
-      <view class="og-chips">
-        <view
-          class="opt-chip tap {{activeType === item.val ? 'active' : ''}}"
-          wx:for="{{qtypes}}"
-          wx:key="val"
-          bindtap="tapType"
-          data-val="{{item.val}}"
-        >{{item.label}}</view>
+      <view class="option-group">
+        <view class="og-label">考察题型</view>
+        <view class="og-chips">
+          <view
+            class="opt-chip tap {{activeType === item.val ? 'active' : ''}}"
+            wx:for="{{qtypes}}"
+            wx:key="val"
+            bindtap="tapType"
+            data-val="{{item.val}}"
+          >{{item.label}}</view>
+        </view>
       </view>
     </view>
 
   </view>
   <view class="actionbar">
-    <view class="btn primary tap w-full {{creating ? 'disabled' : ''}}" bindtap="tapStart">
-      {{creating ? '创建中…' : '开始模拟面试'}}
+    <view class="ie-start-btn tap w-full {{creating ? 'disabled' : ''}}" hover-class="tap-press" bindtap="tapStart" role="button">
+      {{creating ? '创建中…' : (activeDuration === 3 ? '开始 3 分钟快练' : '开始模拟面试')}}
     </view>
   </view>
 </view>

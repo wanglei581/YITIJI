@@ -1,125 +1,84 @@
+/* pages/career-plan/career-plan.wxss  职业规划（墨翠鎏金白瓷） */
 .page-wrap { min-height: 100vh; background: var(--paper); }
 
-/*
-  已删除的样式(随伪造内容一起下线,不要复活):
-  - .di-fit / .fit-label  方向匹配度徽章。后端 directions 只有 title/why/firstStep,
-                          没有匹配度字段,这两个类没有任何真实数据可渲染。
-  - .field-group / .field-item / .fi-label / .fi-input / .fi-select / .fi-arr / .skill-textarea
-                          四字段表单。后端不接受 body,表单纯装饰。
-  - .da-tags / .da-tag / .di-actions  多步骤标签。后端每个方向只给一个 firstStep。
-  - .cs-title / .cs-sub / .cs-disc    旧渐变头卡的文字层,已无引用。
-*/
-
-/* 运行中 / 空态 / 失败态共用 */
-.running-state { display: flex; flex-direction: column; align-items: center;
-  padding: 100rpx 32rpx 0; gap: 20rpx; }
+.running-state { display: flex; flex-direction: column; align-items: center; padding: 100rpx 32rpx 0; gap: 20rpx; }
 .rs-anim { position: relative; width: 120rpx; height: 120rpx; margin-bottom: 16rpx; }
-.rs-ring { position: absolute; inset: 0; border-radius: 50%;
-  border: 4rpx solid transparent; border-top-color: var(--teal);
-  animation: spin 1s linear infinite; }
-.rs-ic { position: absolute; inset: 0; display: flex; align-items: center;
-  justify-content: center; font-size: 48rpx; color: var(--teal); }
+.rs-ring { position: absolute; inset: 0; border-radius: var(--r-full); border: 4rpx solid transparent; border-top-color: var(--teal); animation: spin 1s linear infinite; }
+.rs-ic { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--fs-2xl); color: var(--teal); }
 @keyframes spin { to { transform: rotate(360deg); } }
-/* 空态/失败态的图标底盘(与 job-fit 同口径,全局 app.wxss 里没有,必须页内定义) */
-.st-ic { width: 128rpx; height: 128rpx; border-radius: 50%; background: var(--surface-2);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 56rpx; color: var(--muted); margin-bottom: 8rpx; }
+.st-ic { width: 128rpx; height: 128rpx; border-radius: var(--r-full); background: radial-gradient(circle at 30% 28%, #ECF7F3 0%, #D9EEE6 100%); display: flex; align-items: center; justify-content: center; font-size: var(--fs-2xl); color: var(--teal-deep); margin-bottom: 8rpx; }
 .st-ic.warn { background: var(--warn-soft); color: var(--warn); }
-.rs-title { font-size: 34rpx; font-weight: 700; color: var(--ink); }
-.rs-sub { font-size: 26rpx; color: var(--muted); text-align: center; line-height: 1.6; }
-.rs-disclaimer { font-size: 22rpx; color: var(--ghost); text-align: center; line-height: 1.6; }
+.rs-title { font-size: var(--fs-lg); font-weight: 750; color: var(--ink); }
+.rs-sub { font-size: var(--fs-base); color: var(--muted); text-align: center; line-height: 1.6; }
+.rs-disclaimer { font-size: var(--fs-sm); color: var(--faint); text-align: center; line-height: 1.6; }
 
-/* 空态/失败态的行动按钮。48px 是最小可点尺寸下限 */
-.cp-cta { margin-top: 12rpx; min-height: 96rpx; display: flex; align-items: center;
-  justify-content: center; gap: 10rpx; padding: 0 40rpx; border-radius: 24rpx;
-  background: var(--teal-wash); color: var(--teal-deep);
-  font-size: 28rpx; font-weight: 600; }
-.cp-cta-arrow { width: 19rpx; height: 19rpx; }
+.cp-cta {
+  margin-top: 12rpx;
+  min-height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  padding: 0 40rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  box-shadow: var(--sh-sm);
+}
+.cp-cta-arrow { width: 20rpx; height: 20rpx; }
 
-/* ready 态说明文字 */
-.cp-p { font-size: 27rpx; color: var(--muted); line-height: 1.75; margin-bottom: 14rpx; }
+.cp-p { font-size: var(--fs-base); color: var(--muted); line-height: 1.75; margin-bottom: 14rpx; }
 .cp-p:last-child { margin-bottom: 0; }
-.cp-strong { color: var(--ink); font-weight: 600; }
-.cp-file { display: flex; align-items: center; gap: 12rpx; margin-top: 6rpx;
-  padding: 18rpx 20rpx; background: var(--paper); border-radius: 12rpx;
-  border: 1rpx solid var(--line); }
-.cp-file-ic { font-size: 30rpx; color: var(--teal); flex-shrink: 0; }
-  /* min-width:0 不能省：flex 子项的 min-width 默认是 auto(=min-content)，
-     文件名一长就把整行撑出容器，ellipsis 永远不触发。旁边的图标是 flex-shrink:0，
-     压不动，于是溢出全部由这一项承担。删掉这行：长文件名把行顶出屏幕。 */
-.cp-file-name { flex: 1; min-width: 0; font-size: 26rpx; color: var(--ink);
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cp-strong { color: var(--ink); font-weight: 700; }
+.cp-file { display: flex; align-items: center; gap: 12rpx; margin-top: 6rpx; padding: 18rpx 20rpx; background: var(--paper); border-radius: var(--r-sm); border: 1rpx solid var(--line); }
+.cp-file-ic { font-size: var(--fs-md); color: var(--teal); flex-shrink: 0; }
+.cp-file-name { flex: 1; min-width: 0; font-size: var(--fs-base); color: var(--ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-/* 横向内缩用 px 与全局 .card 的 margin:0 16px 对齐,rpx 在宽屏机上会错位 */
 .cp-act { margin: 16px 16px 0; }
 
-/* 生成依据(如实展示参考了什么) */
-.cp-based { margin: 0 16px 12px; padding: 22rpx 24rpx;
-  background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 28rpx; }
-.cb-cap { font-size: 24rpx; color: var(--muted); margin-bottom: 14rpx; }
-.cb-hint { font-size: 22rpx; color: var(--ghost); line-height: 1.6; margin-top: 12rpx; }
-/* 依据栏里的文字链：颜色用全局文字链变量 --link，可点高度由全局 .text-action 保证 */
-.cb-link { font-size: var(--fs-sm); color: var(--link); }
+.cp-based { margin: 0 16px 12px; padding: 24rpx 26rpx; background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: var(--r-lg); box-shadow: var(--sh-sm); }
+.cb-cap { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 14rpx; }
+.cb-hint { font-size: var(--fs-sm); color: var(--faint); line-height: 1.6; margin-top: 12rpx; }
+.cb-link { font-size: var(--fs-sm); color: var(--link); font-weight: 600; }
 
-.cp-summary { font-size: 27rpx; color: var(--ink); line-height: 1.8; }
-.cp-hint { font-size: 22rpx; color: var(--ghost); line-height: 1.6;
-  margin: 10rpx 16px 0; }
+.cp-summary { font-size: var(--fs-base); color: var(--ink); line-height: 1.8; }
+.cp-hint { font-size: var(--fs-sm); color: var(--faint); line-height: 1.6; margin: 10rpx 16px 0; }
 
-/* 列表容器:与 .card 同一内缩 */
-.cp-list { margin: 0 16px; display: flex; flex-direction: column; gap: 12rpx; }
+.cp-list { margin: 0 16px; display: flex; flex-direction: column; gap: 14rpx; }
 
-/* 现状画像 */
-.cs-item { display: flex; gap: 14rpx; padding: 22rpx 24rpx;
-  background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 24rpx; }
-.cs-mark { flex-shrink: 0; width: 40rpx; height: 40rpx; border-radius: 50%;
-  background: var(--teal-soft); color: var(--teal); display: flex; align-items: center;
-  justify-content: center; margin-top: 2rpx; }
-.cs-mark .ficon { width: 21rpx; height: 21rpx; }
+.cs-item { display: flex; gap: 14rpx; padding: 24rpx 26rpx; background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: var(--r-lg); box-shadow: var(--sh-sm); }
+.cs-mark { flex-shrink: 0; width: 42rpx; height: 42rpx; border-radius: var(--r-full); background: var(--teal-soft); color: var(--teal-deep); display: flex; align-items: center; justify-content: center; margin-top: 2rpx; }
+.cs-mark .ficon { width: 22rpx; height: 22rpx; }
 .cs-body { flex: 1; min-width: 0; }
-.cs-point { font-size: 27rpx; color: var(--ink); font-weight: 600; line-height: 1.6; }
-.cs-ev { font-size: 23rpx; color: var(--muted); line-height: 1.6; margin-top: 8rpx;
-  padding-left: 16rpx; border-left: 3rpx solid var(--line); }
+.cs-point { font-size: var(--fs-base); color: var(--ink); font-weight: 650; line-height: 1.6; }
+.cs-ev { font-size: var(--fs-sm); color: var(--muted); line-height: 1.6; margin-top: 8rpx; padding-left: 16rpx; border-left: 4rpx solid var(--gold); }
 
-/* 方向卡(无匹配度徽章) */
 .dir-list { margin: 0 16px; display: flex; flex-direction: column; gap: 16rpx; }
-.dir-item { background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 26rpx; padding: 24rpx; }
+.dir-item { background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: var(--r-lg); box-shadow: var(--sh-sm); padding: 26rpx; }
 .di-head { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
-.di-rank { width: 36rpx; height: 36rpx; border-radius: 50%; background: var(--teal-wash);
-  color: var(--teal-deep); font-size: 22rpx; font-weight: 700;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.di-title { flex: 1; font-size: 30rpx; font-weight: 700; color: var(--ink); }
-.di-reason { font-size: 26rpx; color: var(--muted); line-height: 1.7; }
-.di-step { margin-top: 14rpx; padding: 16rpx 20rpx; background: var(--paper);
-  border-radius: 12rpx; }
-.ds-cap { font-size: 22rpx; color: var(--teal-deep); font-weight: 600; margin-bottom: 6rpx; }
-.ds-text { font-size: 26rpx; color: var(--ink); line-height: 1.7; }
+.di-rank { width: 40rpx; height: 40rpx; border-radius: var(--r-full); background: linear-gradient(135deg, #16483E 0%, #0A2720 100%); color: var(--gold-bright); font-size: var(--fs-sm); font-weight: 750; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.di-title { flex: 1; font-size: var(--fs-md); font-weight: 750; color: var(--ink); }
+.di-reason { font-size: var(--fs-base); color: var(--muted); line-height: 1.7; }
+.di-step { margin-top: 14rpx; padding: 16rpx 20rpx; background: var(--paper); border-radius: var(--r-sm); border-left: 4rpx solid var(--teal); }
+.ds-cap { font-size: var(--fs-sm); color: var(--teal-deep); font-weight: 700; margin-bottom: 6rpx; }
+.ds-text { font-size: var(--fs-base); color: var(--ink); line-height: 1.7; }
 
-/* 技能提升 */
-.sk-item { padding: 22rpx 24rpx; background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 24rpx; }
+.sk-item { padding: 24rpx 26rpx; background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: var(--r-lg); box-shadow: var(--sh-sm); }
 .sk-head { display: flex; align-items: center; gap: 12rpx; }
-.sk-name { flex: 1; font-size: 28rpx; font-weight: 600; color: var(--ink); }
-.sk-time { flex-shrink: 0; font-size: 22rpx; padding: 4rpx 14rpx; border-radius: 20rpx;
-  background: var(--paper); color: var(--muted); border: 1rpx solid var(--line); }
-.sk-act { font-size: 25rpx; color: var(--muted); line-height: 1.7; margin-top: 10rpx; }
+.sk-name { flex: 1; font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.sk-time { flex-shrink: 0; font-size: var(--fs-xs); padding: 6rpx 16rpx; border-radius: var(--r-full); background: var(--gold-soft); color: var(--gold-deep); border: 1rpx solid var(--gold-line); font-weight: 650; }
+.sk-act { font-size: var(--fs-base); color: var(--muted); line-height: 1.7; margin-top: 10rpx; }
 
-/* 行动清单 */
-.action-list { margin: 0 16px; display: flex; flex-direction: column;
-  background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 26rpx; overflow: hidden; }
-.al-item { display: flex; align-items: flex-start; gap: 16rpx; padding: 20rpx 24rpx;
-  border-bottom: 1rpx solid var(--line); }
+.action-list { margin: 0 16px; display: flex; flex-direction: column; background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: var(--r-lg); box-shadow: var(--sh-sm); overflow: hidden; }
+.al-item { display: flex; align-items: flex-start; gap: 16rpx; padding: 20rpx 24rpx; border-bottom: 1rpx solid var(--line-faint); }
 .al-item:last-child { border-bottom: none; }
-.al-dot { width: 16rpx; height: 16rpx; border-radius: 50%; background: var(--teal);
-  flex-shrink: 0; margin-top: 14rpx; }
-.al-text { flex: 1; font-size: 26rpx; color: var(--ink); line-height: 1.7; }
+.al-dot { width: 14rpx; height: 14rpx; border-radius: var(--r-full); background: var(--gold); flex-shrink: 0; margin-top: 14rpx; }
+.al-text { flex: 1; font-size: var(--fs-base); color: var(--ink); line-height: 1.7; }
 
-/* actionbar 双按钮配比 */
 .flex-1-4 { flex: 1.4; }
 
-/* done 且非 history 时底栏是「重新生成」+「生成建议单去打印」两颗**普通 .btn**
-   （不是 .lg），app.wxss 的窄屏底栏规则只收 .btn.lg，收不到这里。
-   320pt 实算：4×15+48+3 = 111，8×15+48 = 168，+gap 10 = 289 > 可用 288，溢 1px。
-   只差 1px，收 4px 内边距即可，不动字号不改文案。
-   删掉这段：320pt 上「打印」末字贴住屏幕右缘。 */
 @media (max-width: 374px) {
   .actionbar .btn { padding: 0 20px; }
 }

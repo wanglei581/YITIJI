@@ -6,10 +6,25 @@ const { plainAiMessageOf } = require('../../utils/user-error')
 // 题型 → backend interviewerType；'case' 对应管理面试官
 const TYPE_MAP = { hr: 'hr', tech: 'tech', case: 'manager' }
 
+const HOT_POSITIONS = [
+  '前端开发',
+  '产品经理',
+  '新媒体运营',
+  '行政人事',
+  '财会审计',
+  '国企综合',
+]
+
+function normalizeDurationVal(raw) {
+  const num = Number(raw)
+  return num === 3 || num === 5 || num === 8 ? num : 5
+}
+
 Page({
   data: {
     statusBarHeight: 20,
     form: { position: '' },
+    hotPositions: HOT_POSITIONS,
     levels: [
       { val: 'fresh', label: '应届生' },
       { val: 'lt1',   label: '1年以内' },
@@ -18,11 +33,11 @@ Page({
       { val: 'gt5',   label: '5年以上' },
       { val: 'switch', label: '转岗' },
     ],
-    // durationMin 对应后端 DURATION_TARGET: { 3:4, 5:6, 8:8 }
+    // durationMin 对应后端 DURATION_TARGET: { 3:4, 5:6, 8:8 }（严格整数 3 / 5 / 8）
     durations: [
-      { val: 3, label: '约4题' },
-      { val: 5, label: '约6题' },
-      { val: 8, label: '约8题' },
+      { val: 3, title: '3 分钟快练', sub: '4 题速测 · 通勤可用', badge: '最快', featured: true },
+      { val: 5, title: '标准模拟',   sub: '约 6 题 · 常见节奏', badge: '',     featured: false },
+      { val: 8, title: '深度演练',   sub: '约 8 题 · 全面复盘', badge: '',     featured: false },
     ],
     qtypes: [
       { val: 'hr',   label: '行为面试' },
@@ -35,17 +50,33 @@ Page({
     creating:       false,
   },
   onLoad(options) {
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
-    if (options.position) this.setData({ 'form.position': decodeURIComponent(options.position) })
+    const opts = options || {}
+    const patch = { statusBarHeight: (app && app.globalData && app.globalData.statusBarHeight) || 20 }
+    if (opts.position) {
+      let decoded = ''
+      try { decoded = decodeURIComponent(opts.position) } catch (_) { decoded = String(opts.position) }
+      patch['form.position'] = decoded.trim().slice(0, 50)
+    }
+    if (opts.quick === '1' || opts.quick === 'true') {
+      patch.activeDuration = 3
+    } else if (opts.durationMin !== undefined) {
+      patch.activeDuration = normalizeDurationVal(opts.durationMin)
+    }
+    this.setData(patch)
   },
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
-  inputPosition(e) { this.setData({ 'form.position': e.detail.value }) },
+  inputPosition(e) { this.setData({ 'form.position': ((e && e.detail && e.detail.value) || '').slice(0, 50) }) },
+  tapHotPosition(e) {
+    const pos = String((e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.pos) || '').trim().slice(0, 50)
+    if (!pos) return
+    this.setData({ 'form.position': pos })
+  },
   tapLevel(e)    { this.setData({ activeLevel:    e.currentTarget.dataset.val }) },
-  tapDuration(e) { this.setData({ activeDuration: e.currentTarget.dataset.val }) },
+  tapDuration(e) { this.setData({ activeDuration: normalizeDurationVal(e.currentTarget.dataset.val) }) },
   tapType(e)     { this.setData({ activeType:     e.currentTarget.dataset.val }) },
 
   async tapStart() {
-    const position = (this.data.form.position || '').trim()
+    const position = (this.data.form.position || '').trim().slice(0, 50)
     if (!position) { wx.showToast({ title: '请填写目标岗位', icon: 'none' }); return }
     if (this.data.creating) return
     this.setData({ creating: true })

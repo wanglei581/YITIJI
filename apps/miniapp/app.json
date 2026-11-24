@@ -47,15 +47,17 @@
     {"root": "pages/daily-report", "name": "daily-report", "pages": ["daily-report"]},
     {"root": "pages/feedback", "name": "feedback", "pages": ["feedback"]},
     {"root": "pages/invoice-center", "name": "invoice-center", "pages": ["invoice-center"]},
-    {"root": "pages/service-credits", "name": "service-credits", "pages": ["service-credits"]}
+    {"root": "pages/service-credits", "name": "service-credits", "pages": ["service-credits"]},
+    {"root": "pages/job-tracker", "name": "job-tracker", "pages": ["job-tracker"]},
+    {"root": "pages/print-toolbox", "name": "print-toolbox", "pages": ["print-toolbox"]}
   ],
   "preloadRule": {
-    "pages/home/home": {"network": "all", "packages": ["resume-diagnose", "resume-optimize", "interview-entry", "career-plan", "notifications", "assistant", "resume-voice", "documents"]},
+    "pages/home/home": {"network": "all", "packages": ["resume-diagnose", "resume-optimize", "interview-entry", "career-plan", "notifications", "assistant", "resume-voice", "documents", "job-tracker"]},
     "pages/launch/launch": {"network": "all", "packages": ["documents", "notifications", "legal"]},
     "pages/assistant/assistant": {"network": "all", "packages": ["resume-upload", "resume-diagnose", "resume-optimize", "career-plan", "job-fit", "interview-entry", "print-upload", "ai-records"]},
-    "pages/print/print": {"network": "all", "packages": ["documents", "package-create", "orders", "daily-report", "kiosk-login", "usb-import"]},
+    "pages/print/print": {"network": "all", "packages": ["documents", "print-toolbox", "package-create", "orders", "daily-report", "kiosk-login", "usb-import"]},
     "pages/ai/ai": {"network": "all", "packages": ["resume-build", "resume-voice", "resume-diagnose", "resume-optimize", "documents", "job-materials", "job-fit", "interview-entry", "self-explore", "career-plan", "assistant", "ai-records"]},
-    "pages/me/me": {"network": "all", "packages": ["resumes", "documents", "orders", "ai-records", "feedback", "settings", "notifications", "invoice-center", "service-credits"]},
+    "pages/me/me": {"network": "all", "packages": ["resumes", "documents", "orders", "ai-records", "job-tracker", "feedback", "settings", "notifications", "invoice-center", "service-credits"]},
     "pages/package-create/package-create": {"network": "all", "packages": ["store-select"]},
     "pages/store-select/store-select": {"network": "all", "packages": ["package-create", "package-confirm"]},
     "pages/package-confirm/package-confirm": {"network": "all", "packages": ["legal", "package-code", "package-create", "store-select", "orders"]},
@@ -87,7 +89,9 @@
     "pages/help/help": {"network": "all", "packages": ["feedback"]},
     "pages/about/about": {"network": "all", "packages": ["legal"]},
     "pages/notifications/notifications": {"network": "all", "packages": ["orders", "ai-records"]},
-    "pages/kiosk-login/kiosk-login": {"network": "all", "packages": ["kiosk-send"]}
+    "pages/kiosk-login/kiosk-login": {"network": "all", "packages": ["kiosk-send"]},
+    "pages/job-tracker/job-tracker": {"network": "all", "packages": ["documents", "interview-entry"]},
+    "pages/print-toolbox/print-toolbox": {"network": "all", "packages": ["print-upload"]}
   },
   "window": {
     "navigationBarTextStyle": "black",

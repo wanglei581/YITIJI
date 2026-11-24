@@ -162,6 +162,32 @@
         aria-label="导出为 {{item.label}}"
       >{{item.label}}</view>
     </view>
+    <view class="ro-preset-head">
+      <text class="ro-preset-label">PDF 排版风格</text>
+      <text class="ro-preset-hint">{{format === 'pdf' ? '套用于本次 PDF 导出' : '当前格式不套用排版风格'}}</text>
+    </view>
+    <view class="ro-preset-grid {{format !== 'pdf' ? 'is-muted' : ''}}">
+      <view
+        wx:for="{{stylePresets}}"
+        wx:key="key"
+        class="ro-preset-card tap {{item.on ? 'on' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="pickStylePreset"
+        role="button"
+        aria-label="排版风格 {{item.title}}"
+      >
+        <view class="ro-mini-paper {{item.columns === 2 ? 'cols-2' : ''}}">
+          <view class="ro-mp-bar" style="background:{{item.swatch}}"></view>
+          <view class="ro-mp-lines">
+            <view class="ro-mp-l"></view>
+            <view class="ro-mp-l s"></view>
+            <view class="ro-mp-l"></view>
+          </view>
+        </view>
+        <view class="ro-preset-t">{{item.title}}</view>
+        <view class="ro-preset-s">{{item.sub}}</view>
+      </view>
+    </view>
     <view class="export-note">四种格式都来自同一份优化稿；打印和打开预览使用同内容 PDF 副本。导出前请核对姓名、学校、公司、时间和数字。</view>
     <view class="export-note">{{aiLabelNote}}</view>
     <view class="pricing-line {{pricing.mode}}">

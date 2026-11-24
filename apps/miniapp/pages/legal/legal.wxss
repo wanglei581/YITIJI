@@ -1,17 +1,17 @@
+/* pages/legal/legal.wxss  法务与公示文档（墨翠鎏金白瓷） */
 .legal-page { min-height: 100vh; background: var(--paper); }
 .legal-content { padding-bottom: calc(48rpx + env(safe-area-inset-bottom)); }
-.legal-card { padding: 32rpx 28rpx; }
-.legal-meta { margin-bottom: 28rpx; color: var(--muted); font-size: 24rpx; line-height: 1.6; }
-.legal-heading { margin: 34rpx 0 16rpx; color: var(--ink); font-size: 32rpx; font-weight: 800; line-height: 1.45; }
+.legal-card { padding: 34rpx 30rpx; }
+.legal-meta { margin-bottom: 28rpx; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
+.legal-heading { margin: 34rpx 0 16rpx; color: var(--ink); font-size: var(--fs-lg); font-weight: 800; line-height: 1.45; }
 .legal-heading:first-of-type { margin-top: 0; }
-.legal-paragraph { margin-bottom: 20rpx; color: var(--ink-soft); font-size: 28rpx; line-height: 1.9; word-break: break-all; }
+.legal-paragraph { margin-bottom: 20rpx; color: var(--ink-soft); font-size: var(--fs-base); line-height: 1.9; word-break: break-all; }
 .legal-bullet { display: flex; align-items: flex-start; gap: 14rpx; padding-left: 4rpx; }
-.legal-bullet-dot { width: 9rpx; height: 9rpx; margin-top: 19rpx; border-radius: 50%;
-  background: var(--teal); flex-shrink: 0; }
+.legal-bullet-dot { width: 10rpx; height: 10rpx; margin-top: 19rpx; border-radius: var(--r-full); background: var(--gold); flex-shrink: 0; }
 .legal-bullet-text { flex: 1; }
 .legal-numbered { padding-left: 8rpx; }
-.legal-end { margin-top: 40rpx; color: var(--faint); font-size: 24rpx; text-align: center; }
-.legal-state { padding: 80rpx 32rpx; color: var(--muted); font-size: 28rpx; text-align: center; line-height: 1.7; }
-.legal-state-icon { display: block; margin-bottom: 18rpx; color: var(--teal); font-size: 64rpx; }
-.legal-state-title { margin-bottom: 12rpx; color: var(--ink); font-size: 32rpx; font-weight: 800; }
+.legal-end { margin-top: 40rpx; color: var(--faint); font-size: var(--fs-sm); text-align: center; }
+.legal-state { padding: 80rpx 32rpx; color: var(--muted); font-size: var(--fs-base); text-align: center; line-height: 1.7; }
+.legal-state-icon { display: block; margin-bottom: 18rpx; color: var(--teal-deep); font-size: var(--fs-2xl); }
+.legal-state-title { margin-bottom: 12rpx; color: var(--ink); font-size: var(--fs-lg); font-weight: 800; }
 .legal-state-desc { margin-bottom: 28rpx; }

@@ -14,7 +14,8 @@
   width: 220rpx;
   height: 220rpx;
   border-radius: 50%;
-  background: var(--line-soft); /* 轨道底色 */
+  background: var(--teal-soft); /* 轨道底色 */
+  box-shadow: 0 8rpx 28rpx rgba(11, 58, 49, 0.08);
   margin-bottom: 28rpx;
 }
 
@@ -28,7 +29,8 @@
   bottom: 0;
   border-radius: 50%;
   border: 10rpx solid transparent;
-  border-top-color: var(--plum);
+  border-top-color: var(--teal);
+  border-right-color: rgba(186, 152, 85, 0.35);
   box-sizing: border-box;
   animation: ringSpin 1s linear infinite;
 }
@@ -46,6 +48,7 @@
   height: 168rpx;
   border-radius: 50%;
   background: var(--surface);
+  box-shadow: inset 0 0 0 1rpx var(--line-faint);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -57,12 +60,12 @@
   font-family: var(--font-serif);
   font-size: 52rpx;
   font-weight: 700;
-  color: var(--plum-deep);
+  color: var(--teal-deep);
   line-height: 1;
 }
 
 .pr-label {
-  font-size: 20rpx;
+  font-size: var(--fs-xs);
   color: var(--muted);
   margin-top: 6rpx;
 }
@@ -73,6 +76,7 @@
   height: 128rpx;
   border-radius: 50%;
   background: var(--warn-soft, var(--surface-2));
+  border: 1rpx solid var(--line-faint);
   color: var(--warn, var(--muted));
   display: flex;
   align-items: center;
@@ -83,14 +87,14 @@
 
 .fail-title {
   font-family: var(--font-serif);
-  font-size: 34rpx;
+  font-size: var(--fs-title);
   font-weight: 700;
   color: var(--ink);
   margin-bottom: 12rpx;
 }
 
 .fail-msg {
-  font-size: 26rpx;
+  font-size: var(--fs-sub);
   line-height: 1.6;
   color: var(--muted);
   text-align: center;
@@ -98,7 +102,7 @@
 
 .unknown-next {
   margin-top: 24rpx;
-  font-size: 25rpx;
+  font-size: var(--fs-sub);
   line-height: 1.6;
   color: var(--ink);
   text-align: center;
@@ -112,8 +116,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--plum-deep);
-  font-size: 26rpx;
+  color: var(--teal-deep);
+  font-size: var(--fs-sub);
   text-decoration: underline;
 }
 
@@ -138,17 +142,17 @@
   width: 48rpx;
   height: 48rpx;
   border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--muted);
+  background: var(--teal-soft);
+  color: var(--teal-deep);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 22rpx;
+  font-size: var(--fs-cap);
 }
 
 .ps-label {
-  font-size: 28rpx;
+  font-size: var(--fs-body);
   font-weight: 500;
   color: var(--ink);
   flex-shrink: 0;
@@ -156,7 +160,7 @@
 
 .ps-desc {
   flex: 1;
-  font-size: 23rpx;
+  font-size: var(--fs-cap);
   color: var(--muted);
   text-align: right;
 }

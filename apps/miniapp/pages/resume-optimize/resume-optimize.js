@@ -10,6 +10,7 @@ const shareFriend = require('../../utils/share-friend')
 const draft = require('./draft')
 const factCheck = require('./fact-check')
 const ways = require('../../utils/resume-optimize-entry')
+const presets = require('../../utils/resume-style-presets')
 const failureCopy = require('./failure-copy')
 
 const FORMATS = [
@@ -33,6 +34,7 @@ Page({
     targetPosition: '',
     formats: FORMATS,
     format: 'pdf',
+    stylePresets: presets.listPresets('business'), layoutPresetKey: 'business',
     exporting: false,
     opening: false,
     exportResult: null,
@@ -263,6 +265,7 @@ Page({
     if (!FORMATS.some((item) => item.key === format)) return
     this.setData({ format, exportResult: null, exportShare: shareFriend.viewForFile(this, '') })
   },
+  pickStylePreset(e) { const k = String((e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.key) || ''); if (this.data.exporting || this.data.format !== 'pdf' || !presets.presetByKey(k)) return; this.setData({ layoutPresetKey: k, stylePresets: presets.listPresets(k), exportResult: null }) },
 
   exportResume() {
     if (this.data.exporting) return
@@ -344,7 +347,7 @@ Page({
   _doExport(factsConfirmedAt) {
     const format = this.data.format
     const resume = this._resume || this.data.opt.optimizedResume
-    const payload = buildModel.buildExportPayload(resume, { format, taskId: this.data.taskId })
+    const payload = buildModel.buildExportPayload(resume, { format, taskId: this.data.taskId, layout: presets.applyPreset(this.data.layoutPresetKey) })
     if (this.data.benefitGrantId) payload.benefitGrantId = this.data.benefitGrantId
     payload.factsConfirmedAt = factsConfirmedAt
     if (docLimits.stopIfListsOverLimit(payload, { wx, getApp })) return

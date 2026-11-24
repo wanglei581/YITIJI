@@ -1,49 +1,90 @@
+/* pages/interview-qa/interview-qa.wxss  模拟面试作答（墨翠鎏金白瓷） */
 .page-wrap { min-height: 100vh; background: var(--paper); }
 
 /* 进度条 */
-.qa-progress { height: 6rpx; background: var(--line); border-radius: 3rpx; margin-bottom: 20rpx; }
-.qap-bar { height: 100%; background: var(--teal); border-radius: 3rpx; transition: width .3s ease; }
+.qa-progress {
+  height: 8rpx;
+  background: var(--surface-3);
+  border-radius: var(--r-full);
+  margin-bottom: 24rpx;
+  overflow: hidden;
+}
+.qap-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal) 0%, var(--gold) 100%);
+  border-radius: var(--r-full);
+  transition: width .3s ease;
+}
 
 /* 题目卡 */
-.qa-card { background: var(--surface); border-radius: 14rpx; padding: 32rpx 28rpx; }
-.qa-q { font-size: 32rpx; font-weight: 600; color: var(--ink); line-height: 1.6; }
+.qa-card {
+  background: var(--surface);
+  border: 1rpx solid var(--gold-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+  padding: 34rpx 30rpx;
+}
+.qa-q { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); line-height: 1.6; }
 
 /* 输入区 */
-.qa-input-area { margin-top: 16rpx; }
-.qa-textarea { width: 100%; min-height: 240rpx; background: var(--surface);
-  border-radius: 14rpx; padding: 24rpx; font-size: 28rpx; color: var(--ink);
-  line-height: 1.7; border: 2rpx solid var(--line); }
-.word-count { font-size: 22rpx; color: var(--ghost); text-align: right;
-  margin-top: 8rpx; padding-right: 4rpx; }
+.qa-input-area { margin-top: 20rpx; }
+.qa-textarea {
+  width: 100%;
+  min-height: 260rpx;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 26rpx;
+  font-size: var(--fs-base);
+  color: var(--ink);
+  line-height: 1.7;
+  border: 2rpx solid var(--line);
+  box-shadow: var(--sh-xs);
+}
+.word-count {
+  font-size: var(--fs-sm);
+  color: var(--faint);
+  text-align: right;
+  margin-top: 10rpx;
+  padding-right: 6rpx;
+}
 
 /* nav */
-.prog-text { font-size: 24rpx; color: var(--muted); }
+.prog-text { font-size: var(--fs-sm); font-weight: 700; color: var(--gold-deep); }
 .w-full { width: 100%; }
 
 /* 状态：loading / failed */
-.qa-state { display: flex; flex-direction: column; align-items: center;
-  justify-content: center; padding: 80rpx 40rpx; gap: 24rpx; }
-.state-tip { font-size: 28rpx; color: var(--muted); text-align: center; line-height: 1.6; }
-.qa-fail-ic { font-size: 72rpx; color: var(--error); }
+.qa-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80rpx 40rpx; gap: 24rpx; }
+.state-tip { font-size: var(--fs-base); color: var(--muted); text-align: center; line-height: 1.6; }
+.qa-fail-ic { font-size: var(--fs-2xl); color: var(--error); }
 .qa-back-btn { margin-top: 8rpx; }
 
-/* spinner（inline SVG rotate） */
-.spinner { width: 56rpx; height: 56rpx; border: 4rpx solid var(--line);
-  border-top-color: var(--teal); border-radius: 50%;
-  animation: spin .8s linear infinite; }
+.spinner {
+  width: 56rpx;
+  height: 56rpx;
+  border: 4rpx solid var(--line);
+  border-top-color: var(--teal);
+  border-radius: var(--r-full);
+  animation: spin .8s linear infinite;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* 提交中按钮禁用态 */
 .qa-btn-loading { opacity: .6; }
 
-.qa-voice { margin-top: 16rpx; }
+.qa-voice { margin-top: 18rpx; }
 .qa-voice-btn { min-height: 96rpx; }
 .qa-voice-off, .qa-voice-err {
-  margin-top: 12rpx; font-size: 24rpx; color: var(--muted); line-height: 1.5;
+  margin-top: 12rpx;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: 1.5;
 }
 .qa-voice-err { color: var(--error); }
 .qa-omit {
-  display: flex; align-items: center; gap: 12rpx;
-  min-height: 96rpx; font-size: 26rpx; color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-height: 96rpx;
+  font-size: var(--fs-base);
+  color: var(--ink);
 }
 .actionbar.col { flex-direction: column; align-items: stretch; }

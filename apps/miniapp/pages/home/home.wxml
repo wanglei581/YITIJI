@@ -141,6 +141,16 @@
           </view>
           <view class="info-arrow"><text class="ficon i-right"></text></view>
         </view>
+        <view class="info-row tap" hover-class="tap-press" bindtap="tapService"
+              data-url="/pages/job-tracker/job-tracker"
+              role="button" aria-label="本人求职备忘本，记录意向单位与面试节奏，仅本人可见">
+          <view class="info-icon soft-jade"><text class="ficon i-calendar"></text></view>
+          <view class="info-copy">
+            <text class="info-title">本人求职备忘本</text>
+            <text class="info-desc">记录意向单位与面试节奏 · 仅本人可见</text>
+          </view>
+          <view class="info-arrow"><text class="ficon i-right"></text></view>
+        </view>
         <view class="info-row tap" hover-class="tap-press" bindtap="tapDaily" role="button" aria-label="今日提醒，快到期的到机码和平台通知">
           <view class="info-icon soft-amber"><text class="ficon i-bell"></text></view>
           <view class="info-copy">

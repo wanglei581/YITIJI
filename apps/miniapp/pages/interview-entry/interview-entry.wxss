@@ -1,25 +1,220 @@
+/* pages/interview-entry/interview-entry.wxss
+   青绪 · 墨翠鎏金白瓷：3 分钟微面试快练 + 热门方向快填，严格对齐 --fs-* / --r-* 令牌 */
 .page-wrap { min-height: 100vh; background: var(--paper); }
 
-/* 表单 */
-.field-group { background: var(--surface); border: 1rpx solid var(--line-soft);
-  border-radius: 26rpx; overflow: hidden; margin: 4rpx 16px 0; }
-.field-item { display: flex; align-items: center; padding: 22rpx 24rpx;
-  border-bottom: 1rpx solid var(--line); }
-.field-item:last-child { border-bottom: none; }
-.fi-label { font-size: 28rpx; color: var(--muted); width: 120rpx; flex-shrink: 0; }
-.fi-input { flex: 1; font-size: 28rpx; color: var(--ink); }
-.fi-select { flex: 1; font-size: 28rpx; color: var(--ink);
-  display: flex; justify-content: space-between; align-items: center; }
-.fi-arr { color: var(--ghost); font-size: 28rpx; }
+.ie-hero {
+  margin: 12rpx 32rpx 8rpx;
+  padding: 30rpx 28rpx;
+  border-radius: var(--r-lg);
+  background: linear-gradient(150deg, #16483E 0%, #0C2B24 58%, #071915 100%);
+  border: 1rpx solid rgba(223, 198, 147, .26);
+  box-shadow: var(--sh-md);
+}
+.ie-hero-kicker {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  color: var(--gold-bright);
+}
+.ie-hero-title {
+  margin-top: 8rpx;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  color: #FFFFFF;
+}
+.ie-hero-sub {
+  margin-top: 8rpx;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: rgba(255, 255, 255, .74);
+}
 
-/* 选项组 */
-.option-group { margin: 16rpx 16px 0; }
-.og-label { font-size: 26rpx; color: var(--muted); margin-bottom: 12rpx; }
-.og-chips { display: flex; flex-wrap: wrap; gap: 16rpx; }
-.opt-chip { min-height: 96rpx; padding: 0 28rpx; border-radius: 22rpx; border: 2rpx solid var(--line);
-  font-size: 26rpx; color: var(--ink); background: var(--surface); }
-.opt-chip.active { border-color: var(--teal); color: var(--teal);
-  background: var(--teal-soft); }
+.ie-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 28rpx 32rpx 14rpx;
+}
+.ie-bar {
+  width: 6rpx;
+  height: 26rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(180deg, var(--teal) 0%, var(--gold) 100%);
+}
+.ie-sec-t {
+  font-size: var(--fs-md);
+  font-weight: 750;
+  color: var(--ink);
+}
 
-/* full-width btn */
+/* 三档练习节奏（3 分钟快练精选突出） */
+.ie-dur-list {
+  margin: 0 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+.ie-dur-card {
+  padding: 22rpx 24rpx;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 2rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
+}
+.ie-dur-card.is-featured {
+  border-color: var(--gold-line);
+  background: linear-gradient(135deg, #FFFFFF 0%, #FAF8F2 100%);
+}
+.ie-dur-card.active {
+  background: linear-gradient(145deg, #16483E 0%, #0A2720 100%);
+  border-color: rgba(223, 198, 147, .5);
+  box-shadow: var(--sh-md);
+}
+.ie-dur-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+.ie-dur-title {
+  font-size: var(--fs-md);
+  font-weight: 750;
+  color: var(--ink);
+}
+.ie-dur-card.active .ie-dur-title {
+  color: #FFFFFF;
+}
+.ie-dur-badge {
+  padding: 4rpx 16rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #EAD4A6 0%, #C6A468 100%);
+  color: #10241E;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+.ie-dur-sub {
+  margin-top: 6rpx;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.ie-dur-card.active .ie-dur-sub {
+  color: var(--gold-bright);
+}
+
+/* 表单 + 热门岗位快填 */
+.field-group {
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+  overflow: hidden;
+  margin: 0 32rpx;
+}
+.field-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 26rpx;
+  border-bottom: 1rpx solid var(--line-faint);
+}
+.fi-label {
+  font-size: var(--fs-base);
+  font-weight: 650;
+  color: var(--muted);
+  width: 132rpx;
+  flex-shrink: 0;
+}
+.fi-input {
+  flex: 1;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ie-hot-wrap {
+  padding: 18rpx 26rpx 24rpx;
+  background: var(--surface);
+}
+.ie-hot-label {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+  margin-bottom: 14rpx;
+}
+.ie-hot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+.ie-hot-chip {
+  min-height: 68rpx;
+  padding: 0 22rpx;
+  border-radius: var(--r-full);
+  background: var(--paper);
+  border: 1rpx solid var(--line);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ie-hot-chip.active {
+  background: var(--teal-soft);
+  border-color: var(--teal);
+  color: var(--teal-deep);
+  font-weight: 700;
+}
+
+/* 题目设置白瓷卡 */
+.ie-card {
+  margin: 0 32rpx;
+  padding: 24rpx 26rpx;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+.option-group { margin: 0; }
+.og-label { font-size: var(--fs-sm); font-weight: 650; color: var(--muted); margin-bottom: 12rpx; }
+.og-chips { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.opt-chip {
+  min-height: 84rpx;
+  padding: 0 26rpx;
+  border-radius: var(--r-full);
+  border: 1rpx solid var(--line);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--paper);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.opt-chip.active {
+  border-color: var(--gold-line);
+  color: var(--gold-bright);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  font-weight: 700;
+}
+
+.ie-start-btn {
+  min-height: 96rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  border: 1rpx solid rgba(223, 198, 147, .38);
+  color: var(--gold-bright);
+  font-size: var(--fs-md);
+  font-weight: 750;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--sh-md);
+}
+.ie-start-btn.disabled {
+  opacity: .55;
+  pointer-events: none;
+}
+
 .w-full { width: 100%; }

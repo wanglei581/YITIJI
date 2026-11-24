@@ -161,3 +161,23 @@
 .rb-grow { flex: 1.6; }
 
 .rb-voice-go { margin-top: 16rpx; }
+
+/* 高定版式预设卡（纯 CSS 迷你纸页示意，不占本地图片预算） */
+.rb-preset-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14rpx; }
+.rb-preset-hint { font-size: var(--fs-xs); color: var(--faint); }
+.rb-preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12rpx; margin-bottom: 24rpx; }
+.rb-preset-grid.is-muted { opacity: .48; pointer-events: none; }
+.rb-preset-card { padding: 18rpx 14rpx; border-radius: var(--r-md); background: var(--paper); border: 2rpx solid var(--line-soft); display: flex; flex-direction: column; align-items: center; text-align: center; }
+.rb-preset-card.on { background: linear-gradient(150deg, #16483E 0%, #0A2720 100%); border-color: var(--gold-line); box-shadow: var(--sh-xs); }
+.rb-mini-paper { width: 64rpx; height: 82rpx; padding: 10rpx; border-radius: var(--r-xs); background: #FFFFFF; border: 1rpx solid var(--line); display: flex; flex-direction: column; gap: 6rpx; margin-bottom: 12rpx; }
+.rb-mini-paper.cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6rpx; align-content: start; }
+.rb-mini-paper.cols-2 .rb-mp-bar { grid-column: 1 / -1; }
+.rb-mini-paper.cols-2::after { content: ''; display: block; height: 28rpx; background: repeating-linear-gradient(to bottom, var(--surface-3) 0, var(--surface-3) 5rpx, transparent 5rpx, transparent 10rpx); }
+.rb-mp-bar { height: 8rpx; border-radius: var(--r-full); width: 100%; }
+.rb-mp-lines { display: flex; flex-direction: column; gap: 5rpx; }
+.rb-mp-l { height: 5rpx; border-radius: var(--r-full); background: var(--surface-3); width: 100%; }
+.rb-mp-l.s { width: 68%; }
+.rb-preset-t { font-size: var(--fs-sm); font-weight: 750; color: var(--ink); }
+.rb-preset-card.on .rb-preset-t { color: #FFFFFF; }
+.rb-preset-s { margin-top: 4rpx; font-size: var(--fs-xs); color: var(--muted); line-height: 1.35; }
+.rb-preset-card.on .rb-preset-s { color: var(--gold-bright); }

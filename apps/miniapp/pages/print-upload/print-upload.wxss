@@ -1,49 +1,87 @@
-/* pages/print-upload/print-upload.wxss  打印参数 */
+/* pages/print-upload/print-upload.wxss  打印参数（墨翠鎏金白瓷） */
 .page-wrap { min-height: 100vh; background: var(--paper); }
-/* actionbar 里是 .btn.lg（60px），app.wxss 的 has-bar 只预留 80px，会压住合规说明 */
 .content.has-bar { padding-bottom: calc(112px + var(--sab)); }
 
 /* ── 文件卡 ─────────────────────────────────────────────────── */
-/* 文件卡整卡可点（bindtap=tapFile），实测 47px → 补最小高度到 96rpx(48px) */
-.file-card { display: flex; align-items: center; min-height: 96rpx; gap: 24rpx; border: 1rpx solid var(--line-soft); box-shadow: none; }
-.fc-ic { width: 88rpx; height: 88rpx; border-radius: var(--r-md); flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center; }
+.file-card {
+  display: flex;
+  align-items: center;
+  min-height: 98rpx;
+  gap: 24rpx;
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+}
+.fc-ic {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: var(--r-full);
+  background: radial-gradient(circle at 30% 28%, #ECF7F3 0%, #D9EEE6 100%);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .fc-ic .ficon { width: 44rpx; height: 44rpx; }
 .fc-main { flex: 1; min-width: 0; }
-.fc-name { font-size: 30rpx; font-weight: 600; color: var(--ink); word-break: break-all; }
+.fc-name { font-size: var(--fs-md); font-weight: 700; color: var(--ink); word-break: break-all; }
 .fc-meta { display: flex; align-items: center; gap: 12rpx; margin-top: 8rpx; }
-.fc-tag { flex-shrink: 0; font-size: 20rpx; font-weight: 700; letter-spacing: .5rpx;
-  color: var(--teal-deep); background: var(--teal-wash); border-radius: var(--r-xs); padding: 4rpx 12rpx; }
-.fc-sub { font-size: 23rpx; color: var(--muted); }
-.fc-go { flex-shrink: 0; font-size: 24rpx; font-weight: 600; color: var(--teal-deep);
-  display: flex; align-items: center; gap: 7rpx; }
+.fc-tag {
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: .5rpx;
+  color: var(--gold-deep);
+  background: var(--gold-soft);
+  border: 1rpx solid var(--gold-line);
+  border-radius: var(--r-xs);
+  padding: 4rpx 12rpx;
+}
+.fc-sub { font-size: var(--fs-sm); color: var(--muted); }
+.fc-go {
+  flex-shrink: 0;
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  color: var(--teal-deep);
+  display: flex;
+  align-items: center;
+  gap: 7rpx;
+}
 .fc-go .ficon { width: 18rpx; height: 18rpx; }
 
 /* ── 页数核定失败 ───────────────────────────────────────────── */
 .bill { padding: 8rpx 28rpx 22rpx; }
 .bl-fail { padding: 22rpx 0; display: flex; flex-direction: column; gap: 14rpx; align-items: flex-start; }
-.bl-fail-t { display: flex; align-items: center; gap: 10rpx; font-size: 26rpx; font-weight: 600; color: var(--clay-deep); }
+.bl-fail-t { display: flex; align-items: center; gap: 10rpx; font-size: var(--fs-base); font-weight: 700; color: var(--clay-deep); }
 .bl-fail-t .ficon { width: 26rpx; height: 26rpx; }
-.bl-fail-s { font-size: 23rpx; line-height: 1.55; color: var(--muted); }
+.bl-fail-s { font-size: var(--fs-sm); line-height: 1.55; color: var(--muted); }
 .bl-retry { height: 88rpx; padding: 0 32rpx; }
 
 /* ── 隐私检查 ───────────────────────────────────────────────── */
 .privacy-check { display: flex; flex-direction: column; gap: 18rpx; padding: 26rpx 28rpx; }
 .pc-block { display: flex; flex-direction: column; gap: 16rpx; align-items: flex-start; }
-.pc-state, .pc-note { font-size: 24rpx; line-height: 1.6; color: var(--ink-soft); }
-.pc-title { font-size: 27rpx; font-weight: 600; color: var(--ink); }
-.pc-error { color: var(--error); font-size: 24rpx; line-height: 1.55; }
-.pc-ready { color: var(--ok); font-size: 25rpx; font-weight: 600; display: flex; align-items: center; gap: 10rpx; }
+.pc-state, .pc-note { font-size: var(--fs-sm); line-height: 1.6; color: var(--ink-soft); }
+.pc-title { font-size: var(--fs-base); font-weight: 700; color: var(--ink); }
+.pc-error { color: var(--error); font-size: var(--fs-sm); line-height: 1.55; }
+.pc-ready { color: var(--ok); font-size: var(--fs-base); font-weight: 650; display: flex; align-items: center; gap: 10rpx; }
 .pc-ready .ficon { width: 25rpx; height: 25rpx; }
-.pc-finding { width: 100%; box-sizing: border-box; padding: 18rpx; background: var(--surface-2);
-  border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 8rpx; font-size: 24rpx; }
+.pc-finding {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 18rpx;
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  font-size: var(--fs-sm);
+}
 .pc-snippet { color: var(--ink-soft); word-break: break-all; }
 .pc-btn { height: 88rpx; padding: 0 32rpx; }
 
 /* ── 底栏 ───────────────────────────────────────────────────── */
-.ab-label { font-size: 22rpx; color: var(--muted); display: block; }
-.ab-amt { font-size: 40rpx; font-weight: 700; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
-.ab-amt.pending { font-size: 32rpx; color: var(--ghost); }
+.ab-label { font-size: var(--fs-sm); color: var(--muted); display: block; }
+.ab-amt { font-size: var(--fs-xl); font-weight: 800; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
+.ab-amt.pending { font-size: var(--fs-lg); color: var(--ghost); }
 
-/* 页内所有可点卡片高度 ≥48px：复量到第 4 张 .card 为 47px（rpx 取整），用 98rpx 避免取整落到 47 */
 .card.tap { min-height: 98rpx; box-sizing: border-box; }

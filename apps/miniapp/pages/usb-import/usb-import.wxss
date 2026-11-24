@@ -1,18 +1,46 @@
-/* pages/usb-import/usb-import.wxss  P16 U盘打印指引 */
-.usb-hero { margin: 8rpx 32rpx 0; padding: 34rpx 30rpx; border-radius: 32rpx; border: 1rpx solid var(--teal-soft); background: var(--teal-wash); text-align: center; }
-.usb-hero .usb-ic { width: 112rpx; height: 112rpx; border-radius: 34rpx; background: var(--teal); color: #fff;
-  display: flex; align-items: center; justify-content: center; margin: 0 auto 24rpx; box-shadow: 0 12rpx 28rpx rgba(15, 110, 92,.18); }
-.usb-hero .usb-ic .ficon { width: 56rpx; height: 56rpx; }
-.usb-hero .usb-title { font-size: 36rpx; font-weight: 750; color: #17233e; }
-.usb-hero .usb-sub { font-size: 26rpx; color: var(--muted); margin-top: 16rpx; line-height: 1.65; }
+/* pages/usb-import/usb-import.wxss  U盘打印指引（墨翠鎏金白瓷） */
+.usb-hero {
+  margin: 12rpx 32rpx 0;
+  padding: 36rpx 30rpx;
+  border-radius: var(--r-lg);
+  border: 1rpx solid rgba(223, 198, 147, .28);
+  background: linear-gradient(150deg, #16483E 0%, #0C2B24 58%, #071915 100%);
+  box-shadow: var(--sh-md);
+  text-align: center;
+}
+.usb-hero .usb-ic {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: var(--r-full);
+  background: rgba(223, 198, 147, .16);
+  border: 1rpx solid rgba(223, 198, 147, .42);
+  color: var(--gold-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24rpx;
+}
+.usb-hero .usb-ic .ficon { width: 54rpx; height: 54rpx; }
+.usb-hero .usb-title { font-size: var(--fs-xl); font-weight: 800; color: #FFFFFF; }
+.usb-hero .usb-sub { font-size: var(--fs-base); color: rgba(255, 255, 255, .78); margin-top: 14rpx; line-height: 1.65; }
 
-.guide-step { display: flex; gap: 28rpx; padding: 24rpx 4rpx; }
+.guide-step { display: flex; gap: 24rpx; padding: 24rpx 4rpx; }
 .guide-step + .guide-step { border-top: 2rpx solid var(--line-faint); }
-.guide-step .gs-n { width: 56rpx; height: 56rpx; border-radius: 18rpx; background: var(--teal-soft); color: var(--teal);
-  font-weight: 700; font-size: 28rpx; display: flex; align-items: center;
-  justify-content: center; flex-shrink: 0; }
+.guide-step .gs-n {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  font-weight: 750;
+  font-size: var(--fs-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 .guide-step .gs-body { flex: 1; }
-.guide-step .gs-t { font-size: 29rpx; font-weight: 600; color: var(--ink); }
-.guide-step .gs-d { font-size: 25rpx; color: var(--muted); margin-top: 8rpx; line-height: 1.55; }
+.guide-step .gs-t { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.guide-step .gs-d { font-size: var(--fs-base); color: var(--muted); margin-top: 8rpx; line-height: 1.55; }
 
 .fmt-chips { display: flex; flex-wrap: wrap; gap: 12rpx; }

@@ -1,4 +1,4 @@
-/* pages/help/help.wxss */
+/* pages/help/help.wxss  使用帮助（墨翠鎏金白瓷） */
 .help-search {
   display: flex;
   align-items: center;
@@ -6,84 +6,49 @@
   border: 1rpx solid var(--line-soft);
   border-radius: var(--r-full);
   padding: 0 28rpx;
-  height: 80rpx;
-  box-shadow: var(--sh-xs);
+  height: 84rpx;
+  box-shadow: var(--sh-sm);
 }
-.hs-ic {
-  font-size: 32rpx;
-  color: var(--muted);
-  margin-right: 16rpx;
-}
-.hs-ph {
-  font-size: 28rpx;
-  color: var(--faint);
-}
+.hs-ic { font-size: var(--fs-lg); color: var(--teal-deep); margin-right: 16rpx; }
+.hs-ph { font-size: var(--fs-base); color: var(--faint); }
 
-.hot-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18rpx;
-  margin-bottom: 8rpx;
-}
+.hot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18rpx; margin-bottom: 8rpx; }
 .hot-cell {
   border-radius: var(--r-lg);
   padding: 28rpx 24rpx;
-  font-size: 28rpx;
-  font-weight: 500;
+  font-size: var(--fs-base);
+  font-weight: 650;
   color: var(--ink);
   background: var(--surface);
   border: 1rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
 }
-.hot-cell.c-teal  { background: var(--teal-wash);  color: var(--teal-deep); }
-.hot-cell.c-plum  { background: var(--plum-wash);  color: var(--plum-deep); }
-.hot-cell.c-clay  { background: var(--clay-wash);  color: var(--clay-deep); }
-.hot-cell.c-wheat { background: var(--wheat-wash); color: var(--wheat-deep); }
+.hot-cell.c-teal  { background: var(--teal-wash);  color: var(--teal-deep); border-color: var(--teal-soft); }
+.hot-cell.c-plum  { background: var(--plum-wash);  color: var(--plum-deep); border-color: var(--plum-soft); }
+.hot-cell.c-clay  { background: var(--clay-wash);  color: var(--clay-deep); border-color: var(--clay-soft); }
+.hot-cell.c-wheat { background: var(--gold-soft);  color: var(--gold-deep); border-color: var(--gold-line); }
 
-.faq-item {
-  padding: 30rpx 0;
-  border-bottom: 1rpx solid var(--line-faint);
-}
+.faq-item { padding: 30rpx 0; border-bottom: 1rpx solid var(--line-faint); }
 .faq-item:last-child { border-bottom: none; }
-.faq-q {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.fq-t {
-  flex: 1;
-  font-size: 29rpx;
-  font-weight: 600;
-  color: var(--ink);
-  padding-right: 16rpx;
-}
-.faq-arrow {
-  width: 22rpx;
-  height: 22rpx;
-  color: var(--faint);
-  line-height: 1;
-  transform: rotate(0deg);
-  transition: transform .2s ease;
-}
+.faq-q { display: flex; align-items: center; justify-content: space-between; }
+.fq-t { flex: 1; font-size: var(--fs-md); font-weight: 700; color: var(--ink); padding-right: 16rpx; }
+.faq-arrow { width: 22rpx; height: 22rpx; color: var(--faint); line-height: 1; transform: rotate(0deg); transition: transform .2s ease; }
 .faq-arrow.open { transform: rotate(90deg); }
-.faq-a {
-  margin-top: 16rpx;
-  font-size: 27rpx;
-  line-height: 1.75;
-  color: var(--ink-soft);
-}
+.faq-a { margin-top: 16rpx; font-size: var(--fs-base); line-height: 1.75; color: var(--ink-soft); }
 
 .help-fb {
   margin: 24rpx 32rpx 8rpx;
   min-height: 96rpx;
-  padding: 20rpx 24rpx;
+  padding: 22rpx 26rpx;
   display: flex;
   align-items: center;
   gap: 16rpx;
   background: var(--surface);
   border: 1rpx solid var(--line-soft);
   border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
 }
 .help-fb-copy { flex: 1; min-width: 0; }
-.help-fb-t { font-size: var(--fs-md); font-weight: 650; color: var(--ink); }
+.help-fb-t { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
 .help-fb-d { margin-top: 6rpx; font-size: var(--fs-sm); color: var(--muted); }
 .help-fb .ficon { width: 22rpx; height: 22rpx; color: var(--ghost); flex-shrink: 0; }

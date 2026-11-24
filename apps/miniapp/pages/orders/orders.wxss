@@ -1,37 +1,39 @@
-/* pages/orders/orders.wxss */
+/* pages/orders/orders.wxss  打印订单（墨翠鎏金白瓷） */
 .orders-intro {
-  margin: 20rpx 32rpx 0;
-  padding: 22rpx 24rpx;
-  border-radius: var(--r-md);
-  border: 1rpx solid var(--teal-soft);
-  background: var(--teal-wash);
+  margin: 16rpx 32rpx 0;
+  padding: 26rpx 26rpx;
+  border-radius: var(--r-lg);
+  border: 1rpx solid rgba(223, 198, 147, .28);
+  background: linear-gradient(150deg, #16483E 0%, #0C2B24 58%, #071915 100%);
+  box-shadow: var(--sh-md);
   display: flex;
   align-items: center;
-  gap: 18rpx;
+  gap: 20rpx;
 }
 .oi-icon {
-  width: 68rpx;
-  height: 68rpx;
-  border-radius: var(--r-sm);
-  background: var(--teal);
-  color: #f6f3ea;
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: var(--r-full);
+  background: rgba(223, 198, 147, .16);
+  border: 1rpx solid rgba(223, 198, 147, .38);
+  color: var(--gold-bright);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.oi-icon .ficon { width: 34rpx; height: 34rpx; }
+.oi-icon .ficon { width: 36rpx; height: 36rpx; }
 .oi-copy { flex: 1; min-width: 0; }
-.oi-title { font-size: var(--fs-base); font-weight: 700; color: var(--ink); }
-.oi-sub { margin-top: 5rpx; font-size: var(--fs-xs); color: var(--muted); }
+.oi-title { font-size: var(--fs-md); font-weight: 750; color: #FFFFFF; }
+.oi-sub { margin-top: 6rpx; font-size: var(--fs-xs); color: rgba(255, 255, 255, .74); }
 .ord-content { padding-top: 20rpx; }
 
 .ord-card {
   background: var(--surface);
   border: 1rpx solid var(--line-soft);
   border-radius: var(--r-lg);
-  box-shadow: none;
-  padding: 24rpx;
+  box-shadow: var(--sh-sm);
+  padding: 26rpx;
   margin: 0 32rpx 20rpx;
 }
 
@@ -45,11 +47,11 @@
   display: flex;
   align-items: center;
   gap: 8rpx;
-  font-size: 24rpx;
+  font-size: var(--fs-sm);
   color: var(--muted);
   min-width: 0;
 }
-.oc-store-ic { font-size: 26rpx; color: var(--teal); flex-shrink: 0; }
+.oc-store-ic { font-size: var(--fs-base); color: var(--teal); flex-shrink: 0; }
 
 .oc-body {
   display: flex;
@@ -59,20 +61,20 @@
 }
 .oc-thumb {
   flex-shrink: 0;
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: var(--r);
-  background: var(--teal-wash);
+  width: 82rpx;
+  height: 82rpx;
+  border-radius: var(--r-full);
+  background: radial-gradient(circle at 30% 28%, #ECF7F3 0%, #D9EEE6 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40rpx;
+  font-size: var(--fs-xl);
   color: var(--teal-deep);
 }
 .oc-info { flex: 1; min-width: 0; }
 .oc-title {
-  font-size: 28rpx;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: 700;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -80,33 +82,34 @@
 }
 .oc-spec {
   margin-top: 8rpx;
-  font-size: 23rpx;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
+/* FG-2 规则保留：标签与 8 位到机码同行不折断，提示语独立折行 */
 .pk-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   row-gap: 8rpx;
   column-gap: 14rpx;
-  padding: 18rpx 20rpx;
-  border-radius: var(--r);
-  background: var(--teal-wash);
-  border: 1rpx solid var(--teal-soft);
+  padding: 18rpx 22rpx;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, #F3F9F6 0%, #FAF7F0 100%);
+  border: 1rpx solid var(--gold-line);
   margin-bottom: 18rpx;
 }
-.pk-label { font-size: 23rpx; color: var(--teal-deep); font-weight: 600; flex-shrink: 0; white-space: nowrap; }
+.pk-label { font-size: var(--fs-sm); color: var(--gold-deep); font-weight: 700; flex-shrink: 0; white-space: nowrap; }
 .pk-code {
-  font-size: 34rpx;
-  font-weight: 700;
+  font-size: var(--fs-lg);
+  font-weight: 800;
   letter-spacing: 4rpx;
-  color: var(--ink);
+  color: var(--teal-deep);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   white-space: nowrap;
 }
-.pk-hint { font-size: 21rpx; color: var(--muted); flex: 1 0 100%; line-height: 1.4; }
+.pk-hint { font-size: var(--fs-xs); color: var(--muted); flex: 1 0 100%; line-height: 1.4; }
 
 .oc-foot {
   display: flex;
@@ -117,16 +120,14 @@
   padding-top: 18rpx;
 }
 .oc-price {
-  font-size: 32rpx;
-  font-weight: 700;
+  font-size: var(--fs-lg);
+  font-weight: 800;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   white-space: nowrap;
 }
 .oc-btns { display: flex; flex-wrap: wrap; gap: 14rpx; justify-content: flex-end; }
-/* 一体机历史任务的说明文字。不是按钮：它没有可点的去处，
-   做成按钮样子等于又给一次点击预期。 */
 .oc-note {
   flex: 1;
   align-self: center;
@@ -137,21 +138,21 @@
 .oc-btn {
   min-height: 48px;
   min-width: 48px;
-  padding: 0 24rpx;
+  padding: 0 26rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--r);
-  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-full);
+  border: 1rpx solid var(--line);
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: 650;
   color: var(--ink-soft);
   background: var(--surface);
 }
 .oc-btn.pri {
-  background: var(--teal);
-  color: #fff;
-  border-color: var(--teal);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  border-color: rgba(223, 198, 147, .36);
 }
 .oc-btn.cancel {
   color: var(--ink);
@@ -168,24 +169,21 @@
   align-items: center;
   text-align: center;
 }
-.es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
-.es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
-.es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
+.es-ic { font-size: var(--fs-2xl); color: var(--faint); margin-bottom: 20rpx; }
+.es-t { font-size: var(--fs-md); font-weight: 700; color: var(--ink-soft); }
+.es-d { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--muted); }
 .empty-slot .btn { margin-top: 28rpx; }
 
-/* ── 分区头：材料包 / 单件打印是两个独立来源，标题必须把这件事说清楚，
-   否则用户会以为「材料包订单」只是同一列表的一段，看不到就以为丢了。 */
 .sec-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin: 28rpx 16px 12rpx;
+  margin: 28rpx 32rpx 14rpx;
 }
-.sh-t { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
+.sh-t { font-size: var(--fs-lg); font-weight: 750; color: var(--ink); }
 .sh-n { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* 材料包卡片整卡可点（只带 orderId 进到机码页），左侧留一条色带作区分。 */
-.ord-card.pkg { border-left: 6rpx solid var(--teal); }
+.ord-card.pkg { border-left: 6rpx solid var(--gold); }
 
 .pkg-meta { margin-top: 16rpx; display: flex; flex-direction: column; gap: 10rpx; }
 .pm-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
@@ -198,16 +196,26 @@
   word-break: break-all;
 }
 
-/* 「加载更多」是材料包分区自己的游标出口，48px 触控高度。 */
-.load-more { min-height: 48px; margin-top: 16rpx; }
+.load-more {
+  margin: 16rpx 32rpx 20rpx;
+  min-height: 48px;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  box-shadow: var(--sh-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--teal-deep);
+}
 .list-foot {
   padding: 24rpx 0;
   text-align: center;
   font-size: var(--fs-sm);
   color: var(--muted);
 }
-
-/* 失败页脚：分区已经有内容时，失败信息降为一条页脚，不把已加载的订单顶掉。 */
 .list-foot.warn { color: var(--clay); }
 .lf-retry {
   display: inline-block;
@@ -215,6 +223,6 @@
   min-height: 48px;
   line-height: 48px;
   padding: 0 24rpx;
-  color: var(--teal);
-  font-weight: 600;
+  color: var(--teal-deep);
+  font-weight: 650;
 }

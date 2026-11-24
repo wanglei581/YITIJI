@@ -43,7 +43,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
 | **high** | 仍被 CI / 门禁 / 包脚本引用 | 178 |
 | **medium** | 只被文档或其它文件提及 | 30 |
-| **low** | 全仓零提及 | 95 |
+| **low** | 全仓零提及 | 96 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（95）
+## low — 全仓零提及（96）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
@@ -183,6 +183,12 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/resume/job-fit-actions.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/resume/jobFit-inkpaper-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/resume/resume-library-ext.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+
+### 测试（1）
+
+| 路径 | 判定依据 |
+| --- | --- |
+| `apps/admin/src/lib/auditActionLabels.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
 
 ──────────────────────────────────────────────────────────────────────

@@ -1,271 +1,85 @@
-/* pages/package-confirm/package-confirm.wxss */
+/* pages/package-confirm/package-confirm.wxss  材料包确认（墨翠鎏金白瓷） */
 
-.confirm-page {
-  min-height: 100vh;
-  background: var(--bg, #f5f7fa);
-  display: flex;
-  flex-direction: column;
-}
+.confirm-page { min-height: 100vh; background: var(--paper); display: flex; flex-direction: column; }
 
 .navbar {
   position: relative;
   height: 88rpx;
-  background: var(--card-bg, #ffffff);
+  background: var(--paper);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1rpx solid var(--border, #e5e8ed);
   z-index: 10;
 }
+.nav-back { position: absolute; left: 24rpx; top: 50%; transform: translateY(-50%); width: 88rpx; height: 88rpx; display: flex; align-items: center; justify-content: center; }
+.nav-back-ic { transform: rotate(180deg); font-size: var(--fs-lg); color: var(--ink); }
+.nav-title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
 
-.nav-back {
-  position: absolute;
-  left: 24rpx;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 56rpx;
-  height: 56rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+.confirm-scroll { flex: 1; overflow-y: scroll; }
+.confirm-body { padding: 16rpx 32rpx calc(400rpx + var(--sab)); }
 
-.nav-back-ic {
-  transform: rotate(180deg);
-  font-size: 32rpx;
-  color: var(--text, #2c3e50);
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 500;
-  color: var(--text, #2c3e50);
-}
-
-.confirm-scroll {
-  flex: 1;
-  overflow-y: scroll;
-}
-
-/* 给固定底栏留位。实测（390pt 模拟器）：.bottom-bar 高 197px，
-   而滚动内容零垫底——滑到底时最后 197px 被压在栏下面，最后一个服务点点不到。
-   底栏内容是 rpx 排的，197px @390pt ≈ 380rpx，所以垫底也用 rpx 跟着缩放；
-   var(--sab) 单列，因为模拟器里 env(safe-area-inset-bottom) 恒为 0，
-   真机全面屏才有值，不能把它算进那 380rpx 里。
-   删掉这条：列表最后一项被底栏遮住，用户以为没加载出来。 */
-.confirm-body {
-  padding: 24rpx;
-  padding-bottom: calc(400rpx + var(--sab));
-}
-
-/* 卡片区块 */
 .section-card {
-  background: var(--card-bg, #ffffff);
-  border-radius: var(--r-md, 12rpx);
-  padding: 32rpx;
-  box-shadow: var(--sh-xs, 0 2rpx 8rpx rgba(0,0,0,0.04));
-  margin-bottom: 24rpx;
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+  padding: 28rpx;
+  box-shadow: var(--sh-sm);
+  margin-bottom: 20rpx;
 }
+.section-header { display: flex; align-items: center; gap: 12rpx; margin-bottom: 20rpx; }
+.section-header .ficon { font-size: var(--fs-lg); color: var(--teal-deep); }
+.section-title { font-size: var(--fs-md); font-weight: 750; color: var(--ink); }
 
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  margin-bottom: 24rpx;
-}
+.store-info-compact { display: flex; flex-direction: column; gap: 10rpx; }
+.store-name-text { font-size: var(--fs-md); font-weight: 650; color: var(--ink); }
+.store-address-text { font-size: var(--fs-base); color: var(--muted); line-height: 1.5; }
 
-.section-header .ficon {
-  font-size: 32rpx;
-  color: var(--teal, var(--teal));
-}
+.summary-rows { display: flex; flex-direction: column; gap: 18rpx; }
+.summary-row { display: flex; justify-content: space-between; align-items: center; }
+.summary-label { font-size: var(--fs-base); color: var(--muted); }
+.summary-value { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
 
-.section-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--text, #2c3e50);
-}
-
-/* 服务点信息 */
-.store-info-compact {
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-}
-
-.store-name-text {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: var(--text, #2c3e50);
-}
-
-.store-address-text {
-  font-size: 26rpx;
-  color: var(--text-secondary, #5c6b7a);
-  line-height: 1.5;
-}
-
-/* 订单摘要 */
-.summary-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.summary-label {
-  font-size: 26rpx;
-  color: var(--text-secondary, #5c6b7a);
-}
-
-.summary-value {
-  font-size: 26rpx;
-  font-weight: 500;
-  color: var(--text, #2c3e50);
-}
-
-/* 六态文本块：未登录 / 草稿缺失 / 报价中 / 报价失败 / 建单失败都走这一套。
-   原先这里是一整套「微信支付 / 余额支付」单选样式 —— 材料包没有在线支付
-   （钱在一体机上现场付），一个默认选中的「微信支付」等于暗示这一步会扣款，
-   所以那套样式随元素一起删掉，不留着等人复活。 */
 .state-block { display: flex; flex-direction: column; gap: 14rpx; }
-.state-t { font-size: var(--fs-md); font-weight: 650; color: var(--ink, #2c3e50); }
-.state-d {
-  margin-top: 8rpx;
-  font-size: var(--fs-base);
-  line-height: 1.6;
-  color: var(--muted, #8d98a9);
-}
+.state-t { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.state-d { margin-top: 8rpx; font-size: var(--fs-base); line-height: 1.6; color: var(--muted); }
 .section-card .btn { min-height: 48px; margin-top: 16rpx; }
 
-/* 优惠券选择器 */
 .coupon-selector {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24rpx;
-  background: var(--bg, #f5f7fa);
-  border-radius: var(--r-sm, 8rpx);
+  padding: 22rpx 24rpx;
+  background: var(--paper);
+  border-radius: var(--r-md);
 }
+.coupon-text { font-size: var(--fs-base); color: var(--faint); }
+.coupon-text.selected { color: var(--gold-deep); font-weight: 650; }
+.coupon-selector .ficon { font-size: var(--fs-base); color: var(--faint); }
 
-.coupon-text {
-  font-size: 26rpx;
-  color: var(--text-tertiary, #8d98a9);
-}
+.price-rows { display: flex; flex-direction: column; gap: 18rpx; }
+.price-row { display: flex; justify-content: space-between; align-items: center; }
+.price-row.total { padding-top: 18rpx; border-top: 1rpx solid var(--line); }
+.price-label { font-size: var(--fs-base); color: var(--muted); }
+.price-row.total .price-label { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.price-value { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
+.price-value.discount { color: var(--clay-deep); }
+.price-value.final { font-size: var(--fs-lg); font-weight: 800; color: var(--teal-deep); }
 
-.coupon-text.selected {
-  color: var(--clay, #f06a3c);
-  font-weight: 500;
-}
+.agreement-section { display: flex; align-items: center; flex-wrap: wrap; padding: 24rpx 8rpx; }
+.agreement-label { display: flex; align-items: center; gap: 12rpx; font-size: var(--fs-base); color: var(--muted); }
+.agreement-label checkbox { transform: scale(0.9); }
+.agreement-section .link { color: var(--link); font-weight: 600; display: inline-block; font-size: var(--fs-base); padding: 30rpx 6rpx; }
+.agreement-hint { margin: -12rpx 8rpx 8rpx; font-size: var(--fs-sm); line-height: 1.6; color: var(--warn); }
 
-.coupon-selector .ficon {
-  font-size: 28rpx;
-  color: var(--text-tertiary, #8d98a9);
-}
-
-/* 费用明细 */
-.price-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-}
-
-.price-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.price-row.total {
-  padding-top: 20rpx;
-  border-top: 1rpx solid var(--border, #e5e8ed);
-}
-
-.price-label {
-  font-size: 26rpx;
-  color: var(--text-secondary, #5c6b7a);
-}
-
-.price-row.total .price-label {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: var(--text, #2c3e50);
-}
-
-.price-value {
-  font-size: 26rpx;
-  font-weight: 500;
-  color: var(--text, #2c3e50);
-}
-
-.price-value.discount {
-  color: var(--clay, #f06a3c);
-}
-
-.price-value.final {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: var(--clay, #f06a3c);
-}
-
-/* 服务协议。链接与勾选框是**两个独立可点区**（链接不在 label 里，否则点开协议
-   会顺手把同意勾上），所以这里用一行 flex 把它们排成视觉上的同一句话。 */
-.agreement-section {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  padding: 32rpx 24rpx;
-}
-
-.agreement-label {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  font-size: 26rpx;
-  color: var(--text-secondary, #5c6b7a);
-}
-
-.agreement-label checkbox {
-  transform: scale(0.9);
-}
-
-/* 协议链接实测 104x20：文字链补纵向内边距把可点区撑到 48px，视觉不变 */
-.agreement-section .link {
-  color: var(--teal, var(--teal));
-  display: inline-block;
-  font-size: 26rpx;
-  padding: 30rpx 6rpx;
-}
-
-/* 未勾协议时说清主按钮为什么是灰的（按钮 disabled 后 bindtap 不会触发，
-   没有这行提示用户只会反复去点一个不响应的按钮）。 */
-.agreement-hint {
-  margin: -16rpx 24rpx 8rpx;
-  font-size: 24rpx;
-  line-height: 1.6;
-  color: var(--warn, #b5643c);
-}
-
-/* 底部提交栏 */
-/* 2026-09-03 补安全区。原来是 padding: 24rpx，320pt 下底部只有 ~9.6px，
-   全面屏（iPhone X 及以后 / 大多数安卓全面屏）的 home indicator 会压住按钮。
-   全仓按「position:fixed + bottom:0」属性枚举扫出 6 个族群，其中三个用了
-   .actionbar 以外的类名——上一轮按 .actionbar **类名**扫的 26 页把它们全漏了。
-   （第六个 privacy 的 .su-mask 是全屏遮罩不是底栏，属误报，未动。）
-   写法对齐 app.wxss 的 .actionbar：calc(原内距 + var(--sab))。
-   删掉 var(--sab)：全面屏上按钮被 home indicator 压住，点不准。 */
 .bottom-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--card-bg, #ffffff);
-  padding: 24rpx 24rpx calc(24rpx + var(--sab));
-  box-shadow: 0 -4rpx 12rpx rgba(0,0,0,0.06);
+  background: var(--surface);
+  padding: 20rpx 32rpx calc(20rpx + var(--sab));
+  border-top: 1rpx solid var(--line-soft);
+  box-shadow: 0 -8rpx 24rpx rgba(11, 39, 33, .06);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -273,44 +87,22 @@
   z-index: 100;
 }
 
-.price-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
+.price-info { flex: 1; display: flex; flex-direction: column; gap: 4rpx; }
+.price-info .label { font-size: var(--fs-sm); color: var(--muted); }
+.price-info .amount { font-size: var(--fs-xl); font-weight: 800; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
 
-.price-info .label {
-  font-size: 24rpx;
-  color: var(--text-secondary, #5c6b7a);
-}
-
-.price-info .amount {
-  font-size: 40rpx;
-  font-weight: 600;
-  color: var(--clay, #f06a3c);
-}
-
-/* 主操作按钮，实测 43px → min-height 112rpx（§9 ≥56px） */
 .submit-btn {
   flex-shrink: 0;
   min-height: 112rpx;
-  padding: 24rpx 56rpx;
-  background: var(--teal, var(--teal));
-  color: #ffffff;
-  border-radius: 999rpx;
-  font-size: 28rpx;
-  font-weight: 500;
-  border: none;
+  padding: 24rpx 52rpx;
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  border: 1rpx solid rgba(223, 198, 147, .38);
+  color: var(--gold-bright);
+  border-radius: var(--r-full);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  box-shadow: var(--sh-sm);
   transition: all 0.2s ease;
 }
-
-.submit-btn:active {
-  transform: scale(0.98);
-}
-
-/* 报价未就绪时提交按钮必须明确不可点：此时下单一定被服务端拒绝。 */
-.submit-btn.disabled {
-  opacity: 0.45;
-  pointer-events: none;
-}
+.submit-btn:active { transform: scale(0.98); }
+.submit-btn.disabled { opacity: 0.45; pointer-events: none; }
