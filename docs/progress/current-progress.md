@@ -2,7 +2,7 @@
 
 ## 2026-11-25：Batch C-2「手机端求职材料轻工具箱」、简历 3 套高定排版预设与全站剩余 20 个活跃子页「墨翠鎏金白瓷」收口（分支 `claude/miniapp-batch-c2`，接 Batch C-1，未上传微信公众平台，未动线上 `zyidai.cn`）
 
-- 来由：按产品负责人拍板路线完成微信小程序 v1.1.0 全站视觉与核心功能闭环收官，由 Antigravity × Codex CLI（`gpt-6.1-terra`）联合完成合规/隐私预审、多模态实拍核查、2 项异步边界 P1 返工修复与最终复核（Codex 复核结论 `SHIP_READY`；本批次未含 Claude Code CLI 评审，因本机其 OAuth 会话已过期）。零后端与数据库改动，不触碰停放页、线上生产及审核中 `v1.0.5`。
+- 来由：按产品负责人拍板路线完成微信小程序 v1.1.0 全站视觉与核心功能闭环收官，由 Antigravity × Codex CLI（`gpt-6.1-terra`）联合完成合规/隐私预审、多模态实拍核查、2 项异步边界 P1 返工修复与最终复核（Codex 复核结论 `SHIP_READY`；本批次未含 Claude Code CLI 评审，因本机其 OAuth 会话已过期）。后端仅在 `services/api/src/ai/llm/assistant-channel.ts` 的 `MINIAPP_REGISTERED_PAGES` 同步登记 `pages/job-tracker/job-tracker` 与 `pages/print-toolbox/print-toolbox`（对齐 `verify:miniapp-review-backend` 48 页对账），零接口与数据库变更，不触碰停放页、线上生产及审核中 `v1.0.5`。
 - ① 手机端求职材料轻工具箱（`apps/miniapp/pages/print-toolbox/*`、`utils/material-canvas.js`、`app.json`、`pages/print/print.js`）：
   - 以一页一分包形态注册并挂入「打印」Tab 次位入口（「证件水印与 A4 拼版」），内置 3 合 1 本机 `<canvas type="2d">` 合成工具：用途水印（斜向自定义文字 + 3 档深浅）、正反合一 A4（上下居中 `contain` 留足页边距、可选叠水印）、证件照 A4 参考拼版（一寸 8 张 / 二寸 4 张 `cover` 裁切 + 裁切线，明确标注参考比例以实体出纸为准）。
   - 严守隐私与诚实口径：仅调用已声明的 `wx.chooseMedia`，绝不调用未声明相册写入接口；图片先在手机本地合成预览，仅在用户主动点击「上传并去终端打印」并登录本人账号后才调用既有 `api.uploadPrintFile` 按普通打印文档（`print_doc`）上传，核验返回 `fileId` 后直跳 `/pages/print-upload/print-upload`；不含任何夸大安全或已打印表述。

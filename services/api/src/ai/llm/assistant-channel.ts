@@ -62,6 +62,8 @@ export const MINIAPP_REGISTERED_PAGES = [
   'pages/feedback/feedback',
   'pages/invoice-center/invoice-center',
   'pages/service-credits/service-credits',
+  'pages/job-tracker/job-tracker',
+  'pages/print-toolbox/print-toolbox',
 ] as const
 
 const MINIAPP_PAGE_SET = new Set<string>(MINIAPP_REGISTERED_PAGES)
