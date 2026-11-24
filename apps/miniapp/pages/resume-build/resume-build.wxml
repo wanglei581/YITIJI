@@ -176,6 +176,31 @@
       <!-- 导出设置 -->
       <view class="section-t">导出设置</view>
       <view class="card"><view class="card-inner">
+        <view class="rb-preset-head">
+          <text class="rb-opt-l">高定版式预设</text>
+          <text class="rb-preset-hint">{{format === 'pdf' ? '一键套用，可继续微调下方参数' : '仅 PDF 生效'}}</text>
+        </view>
+        <view class="rb-preset-grid {{format !== 'pdf' ? 'is-muted' : ''}}">
+          <view
+            wx:for="{{stylePresets}}"
+            wx:key="key"
+            class="rb-preset-card tap {{item.on ? 'on' : ''}}"
+            data-key="{{item.key}}"
+            bindtap="pickStylePreset"
+            role="button"
+          >
+            <view class="rb-mini-paper {{item.columns === 2 ? 'cols-2' : ''}}">
+              <view class="rb-mp-bar" style="background:{{item.swatch}}"></view>
+              <view class="rb-mp-lines">
+                <view class="rb-mp-l"></view>
+                <view class="rb-mp-l s"></view>
+                <view class="rb-mp-l"></view>
+              </view>
+            </view>
+            <view class="rb-preset-t">{{item.title}}</view>
+            <view class="rb-preset-s">{{item.sub}}</view>
+          </view>
+        </view>
         <view wx:for="{{optionGroups}}" wx:key="key" class="rb-opt">
           <view class="rb-opt-l">{{item.label}}</view>
           <view class="seg rb-seg">

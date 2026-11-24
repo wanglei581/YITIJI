@@ -1,34 +1,33 @@
+/* pages/resume-upload/resume-upload.wxss  上传简历（墨翠鎏金白瓷） */
 .page-wrap { min-height: 100vh; background: var(--paper); }
 
-/* 来源选择列表 */
-.src-list { margin: 0 32rpx; background: var(--surface); border: 1rpx solid var(--line-soft);
-  border-radius: 28rpx; overflow: hidden; box-shadow: var(--sh-xs); }
-.src-item { display: flex; align-items: center; gap: 20rpx; min-height: 124rpx;
-  padding: 24rpx 26rpx; border-bottom: 1rpx solid var(--line-faint); }
+.src-list {
+  margin: 0 32rpx;
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--sh-sm);
+}
+.src-item { display: flex; align-items: center; gap: 20rpx; min-height: 124rpx; padding: 24rpx 26rpx; border-bottom: 1rpx solid var(--line-faint); }
 .src-item:last-child { border-bottom: none; }
-.src-ic { width: 72rpx; height: 72rpx; border-radius: 18rpx; display: flex;
-  align-items: center; justify-content: center; font-size: 36rpx; flex-shrink: 0; }
+.src-ic { width: 76rpx; height: 76rpx; border-radius: var(--r-full); display: flex; align-items: center; justify-content: center; font-size: var(--fs-lg); flex-shrink: 0; }
 .src-body { flex: 1; }
-.src-title { font-size: 30rpx; font-weight: 600; color: var(--ink); }
-.src-desc { font-size: 24rpx; color: var(--muted); margin-top: 4rpx; }
-.src-note { font-size: 23rpx; line-height: 1.55; color: var(--muted); margin-top: 8rpx; }
+.src-title { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.src-desc { font-size: var(--fs-sm); color: var(--muted); margin-top: 6rpx; }
+.src-note { font-size: var(--fs-sm); line-height: 1.55; color: var(--muted); margin-top: 8rpx; }
 .src-arr { width: 22rpx; height: 22rpx; color: var(--ghost); }
 
-/* 简历库列表 */
-.resume-list { background: var(--surface); border-radius: 14rpx; overflow: hidden; }
-.resume-item { display: flex; align-items: center; gap: 16rpx; padding: 24rpx;
-  border-bottom: 1rpx solid var(--line); }
+.resume-list { background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: var(--r-lg); box-shadow: var(--sh-sm); overflow: hidden; }
+.resume-item { display: flex; align-items: center; gap: 16rpx; padding: 24rpx; border-bottom: 1rpx solid var(--line-faint); }
 .resume-item:last-child { border-bottom: none; }
-.ri-ic { width: 56rpx; height: 56rpx; border-radius: 12rpx; background: var(--teal-soft);
-  display: flex; align-items: center; justify-content: center; font-size: 28rpx; color: var(--teal); }
+.ri-ic { width: 64rpx; height: 64rpx; border-radius: var(--r-full); background: var(--teal-soft); display: flex; align-items: center; justify-content: center; font-size: var(--fs-base); color: var(--teal-deep); }
 .ri-body { flex: 1; }
-.ri-name { font-size: 28rpx; font-weight: 600; color: var(--ink); }
-.ri-meta { font-size: 24rpx; color: var(--muted); margin-top: 4rpx; }
-.ri-arr { font-size: 28rpx; color: var(--ghost); }
+.ri-name { font-size: var(--fs-base); font-weight: 700; color: var(--ink); }
+.ri-meta { font-size: var(--fs-sm); color: var(--muted); margin-top: 4rpx; }
+.ri-arr { font-size: var(--fs-base); color: var(--ghost); }
 
-/* 空态 */
-.empty-hint { display: flex; flex-direction: column; align-items: center;
-  padding: 60rpx 32rpx; gap: 12rpx; }
-.eh-ic { font-size: 56rpx; color: var(--ghost); }
-.eh-text { font-size: 30rpx; font-weight: 600; color: var(--muted); }
-.eh-sub { font-size: 26rpx; color: var(--ghost); text-align: center; line-height: 1.6; }
+.empty-hint { display: flex; flex-direction: column; align-items: center; padding: 60rpx 32rpx; gap: 12rpx; }
+.eh-ic { font-size: var(--fs-2xl); color: var(--ghost); }
+.eh-text { font-size: var(--fs-md); font-weight: 700; color: var(--muted); }
+.eh-sub { font-size: var(--fs-base); color: var(--faint); text-align: center; line-height: 1.6; }

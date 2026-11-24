@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-11-25：Batch C-2「手机端求职材料轻工具箱」、简历 3 套高定排版预设与全站剩余 20 个活跃子页「墨翠鎏金白瓷」收口（分支 `claude/miniapp-batch-c2`，接 Batch C-1，未上传微信公众平台，未动线上 `zyidai.cn`）
+
+- 来由：按产品负责人拍板路线完成微信小程序 v1.1.0 全站视觉与核心功能闭环收官，由 Antigravity × Codex CLI（`gpt-6.1-terra`）联合完成合规/隐私预审、多模态实拍核查、2 项异步边界 P1 返工修复与最终复核（Codex 复核结论 `SHIP_READY`；本批次未含 Claude Code CLI 评审，因本机其 OAuth 会话已过期）。零后端与数据库改动，不触碰停放页、线上生产及审核中 `v1.0.5`。
+- ① 手机端求职材料轻工具箱（`apps/miniapp/pages/print-toolbox/*`、`utils/material-canvas.js`、`app.json`、`pages/print/print.js`）：
+  - 以一页一分包形态注册并挂入「打印」Tab 次位入口（「证件水印与 A4 拼版」），内置 3 合 1 本机 `<canvas type="2d">` 合成工具：用途水印（斜向自定义文字 + 3 档深浅）、正反合一 A4（上下居中 `contain` 留足页边距、可选叠水印）、证件照 A4 参考拼版（一寸 8 张 / 二寸 4 张 `cover` 裁切 + 裁切线，明确标注参考比例以实体出纸为准）。
+  - 严守隐私与诚实口径：仅调用已声明的 `wx.chooseMedia`，绝不调用未声明相册写入接口；图片先在手机本地合成预览，仅在用户主动点击「上传并去终端打印」并登录本人账号后才调用既有 `api.uploadPrintFile` 按普通打印文档（`print_doc`）上传，核验返回 `fileId` 后直跳 `/pages/print-upload/print-upload`；不含任何夸大安全或已打印表述。
+  - 完整并发与敏感图清理守卫：清空、切号、退出及同号重登时同步更新 `createLifecycleGuard` 身份并作废 `pick:front / pick:back / canvas / upload` 全部四条通道；重绘开始、重绘失败及修改水印文字时立即清除旧 `previewPath` 并在存在 `renderError` 时阻断上传，杜绝迟到选图回调恢复图片或上传过期成图。
+- ② 简历 3 套高定排版风格一键切换（`apps/miniapp/utils/resume-style-presets.js`、`pages/resume-build/*`、`pages/resume-optimize/*`）：
+  - 提供「极简商务」（单栏 · 远山灰）、「校招清新」（双栏 · 墨翠绿）、「国企稳重」（单栏 · 经典蓝）3 张纯 CSS 迷你纸页示意卡片（零本地图片体积占用），双端同时接入「AI 生成简历」与「AI 简历优化」。
+  - 严格映射后端 `ResumeLayoutDto` 五项真实字段且 `columns` 恒为整数 `1 | 2`；切换为非 PDF 格式（Word / 纯文本 / Markdown）时卡片置灰并如实提示不套用，实际导出请求体严格省略 `layout`；`resume-optimize.js` 保持 497 行（≤ 500 行硬红线）。
+- ③ 全站剩余 20 个活跃子页「墨翠鎏金白瓷」视觉收口：统一升级 `documents`（完整保留 `flow1a-print` 全部触控断言选择器）、`store-select`（清扫旧蓝紫渐变）、`about`、`settings`、`order-detail`、`package-create / package-confirm / package-code`、`print-preview`、`kiosk-send`、`usb-import`、`resume-upload`、`resume-parse`、`job-fit`、`career-plan`、`ai-records`、`notifications`、`help`、`privacy`、`legal` 共 20 页。至此全站 48/48 活跃页面完成旗舰视觉统一，活跃页实现 **0 处偏离圆角**（字号仅留 `launch.wxss` 验证码隐藏输入框 `1rpx` 1 处有意实现），全仓视觉刻度棘轮基线由 `277/101` 进一步收紧至 `138/67`（剩余偏离全在停放页）。
+- ④ 全量验证：新增 `scripts/tests/print-toolbox-presets.test.mjs`（11 项，覆盖几何计算、隐私/会话隔离、迟到选图与重绘失败防线及双页 PDF/非 PDF 导出契约，接入 `verify:page-lifecycle`）；通过 `apps/miniapp` `verify:static` 17/17 门禁与 619 项单测、改动文件 ESLint（0 error）、全仓 `verify:compliance-copy` / `verify:repository-integrity` / `verify:ci-gate-coverage`、`generate-project-graph.mjs --check`，以及微信开发者工具 7 屏真机模拟实拍目视验收与 Codex 终审。
+
 ## 2026-11-24：Batch C-1「本人求职备忘本」、3 分钟微面试快练与 12 个高频核心子页「墨翠鎏金白瓷」视觉统一（分支 `claude/miniapp-batch-c`，接 Batch B `f44eaee18`，未上传微信公众平台，未动线上 `zyidai.cn`）
 
 - 来由：按产品负责人拍板路线推进 Batch C-1，由 Antigravity × Codex CLI（`gpt-6.1-terra`）× Claude Code（Sonnet）三方联合完成 `compliance-boundary.md §4.4A` 合规审查、高定交互设计与最终代码/多模态实拍复核（Codex 结论 `SHIP_READY`）。零后端及数据库改动，不触碰停放页、线上生产及审核中 `v1.0.5`。

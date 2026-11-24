@@ -1,8 +1,8 @@
-/* pages/store-select/store-select.wxss */
+/* pages/store-select/store-select.wxss  材料包选点（墨翠鎏金白瓷） */
 
 .store-select-page {
   min-height: 100vh;
-  background: var(--bg, #f5f7fa);
+  background: var(--paper);
   display: flex;
   flex-direction: column;
 }
@@ -10,11 +10,10 @@
 .navbar {
   position: relative;
   height: 88rpx;
-  background: var(--card-bg, #ffffff);
+  background: var(--paper);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1rpx solid var(--border, #e5e8ed);
   z-index: 10;
 }
 
@@ -23,8 +22,8 @@
   left: 24rpx;
   top: 50%;
   transform: translateY(-50%);
-  width: 56rpx;
-  height: 56rpx;
+  width: 88rpx;
+  height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -32,60 +31,38 @@
 
 .nav-back-ic {
   transform: rotate(180deg);
-  font-size: 32rpx;
-  color: var(--text, #2c3e50);
+  font-size: var(--fs-lg);
+  color: var(--ink);
 }
 
 .nav-title {
-  font-size: 32rpx;
-  font-weight: 500;
-  color: var(--text, #2c3e50);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--ink);
 }
 
-.store-scroll {
-  flex: 1;
-  overflow-y: scroll;
-}
+.store-scroll { flex: 1; overflow-y: scroll; }
+.store-body { padding: 16rpx 32rpx 24rpx; }
 
-.store-body {
-  padding: 24rpx;
-}
-
-/* 提示卡片 */
+/* 提示卡片（移除旧蓝紫渐变，改为鎏金细框白瓷卡） */
 .tip-card {
-  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
-  border-radius: var(--r-md, 12rpx);
-  padding: 24rpx;
+  background: var(--surface);
+  border: 1rpx solid var(--gold-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs);
+  padding: 22rpx 24rpx;
   display: flex;
   align-items: flex-start;
   gap: 16rpx;
   margin-bottom: 24rpx;
 }
+.tip-card .ficon { font-size: var(--fs-lg); color: var(--gold-deep); flex-shrink: 0; margin-top: 2rpx; }
+.tip-card text { font-size: var(--fs-base); line-height: 1.6; color: var(--ink-soft); }
 
-.tip-card .ficon {
-  font-size: 32rpx;
-  color: var(--teal, var(--teal));
-  flex-shrink: 0;
-  margin-top: 2rpx;
-}
-
-.tip-card text {
-  font-size: 28rpx;
-  line-height: 1.6;
-  color: var(--text-secondary, #5c6b7a);
-}
-
-/* 服务点列表 */
-/* 给固定底栏留位。实测（390pt 模拟器）：.bottom-bar 高 197px，
-   而滚动内容零垫底——滑到底时最后 197px 被压在栏下面，最后一个服务点点不到。
-   底栏内容是 rpx 排的，197px @390pt ≈ 380rpx，所以垫底也用 rpx 跟着缩放；
-   var(--sab) 单列，因为模拟器里 env(safe-area-inset-bottom) 恒为 0，
-   真机全面屏才有值，不能把它算进那 380rpx 里。
-   删掉这条：列表最后一项被底栏遮住，用户以为没加载出来。 */
 .store-list {
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+  gap: 20rpx;
   padding-bottom: calc(400rpx + var(--sab));
 }
 .store-org-tag {
@@ -101,164 +78,84 @@
 
 .store-item {
   position: relative;
-  background: var(--card-bg, #ffffff);
-  border-radius: var(--r-md, 12rpx);
-  padding: 32rpx;
-  box-shadow: var(--sh-xs, 0 2rpx 8rpx rgba(0,0,0,0.04));
-  border: 2rpx solid transparent;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 28rpx;
+  box-shadow: var(--sh-sm);
+  border: 2rpx solid var(--line-soft);
   transition: all 0.2s ease;
 }
-
 .store-item.selected {
-  border-color: var(--teal, var(--teal));
-  box-shadow: 0 4rpx 16rpx rgba(15, 110, 92, 0.15);
+  border-color: var(--teal);
+  background: linear-gradient(180deg, #FFFFFF 0%, #F1F8F5 100%);
+  box-shadow: var(--sh-md);
 }
 
-/* 选中标记 */
 .store-check {
   position: absolute;
-  top: 32rpx;
-  right: 32rpx;
+  top: 28rpx;
+  right: 28rpx;
   width: 48rpx;
   height: 48rpx;
-  background: var(--teal, var(--teal));
-  border-radius: 50%;
+  background: var(--teal-deep);
+  border-radius: var(--r-full);
   display: flex;
   align-items: center;
   justify-content: center;
   animation: checkIn 0.3s ease;
 }
-
 @keyframes checkIn {
   0% { transform: scale(0); }
   50% { transform: scale(1.1); }
   100% { transform: scale(1); }
 }
+.store-check .ficon { font-size: var(--fs-base); color: var(--gold-bright); }
 
-.store-check .ficon {
-  font-size: 28rpx;
-  color: #ffffff;
-}
+.store-info { padding-right: 60rpx; }
+.store-header { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; margin-bottom: 14rpx; }
+.store-name { font-size: var(--fs-md); font-weight: 750; color: var(--ink); }
 
-/* 服务点信息 */
-.store-info {
-  padding-right: 60rpx;
-}
+.store-status { padding: 6rpx 16rpx; border-radius: var(--r-full); font-size: var(--fs-sm); font-weight: 600; }
+.store-status.open { background: var(--ok-soft); color: var(--ok); }
+.store-status.closed { background: var(--error-soft); color: var(--error); }
 
-.store-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16rpx;
-}
+.store-address { display: flex; align-items: flex-start; gap: 8rpx; margin-bottom: 14rpx; }
+.store-address .ficon { font-size: var(--fs-base); color: var(--muted); flex-shrink: 0; margin-top: 4rpx; }
+.store-address text { font-size: var(--fs-base); line-height: 1.5; color: var(--muted); }
 
-.store-name {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--text, #2c3e50);
-}
+.store-meta { display: flex; align-items: center; gap: 28rpx; margin-bottom: 12rpx; }
+.store-hours { display: flex; align-items: center; gap: 6rpx; }
+.store-hours .ficon { font-size: var(--fs-sm); color: var(--faint); }
+.store-hours text { font-size: var(--fs-sm); color: var(--muted); }
 
-.store-status {
-  padding: 6rpx 16rpx;
-  border-radius: 32rpx;
-  font-size: 22rpx;
-  font-weight: 500;
-}
+.store-item.offline { opacity: 0.68; }
 
-.store-status.open {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.store-status.closed {
-  background: #fce4ec;
-  color: #c2185b;
-}
-
-.store-address {
-  display: flex;
-  align-items: flex-start;
-  gap: 8rpx;
-  margin-bottom: 16rpx;
-}
-
-.store-address .ficon {
-  font-size: 28rpx;
-  color: var(--text-tertiary, #8d98a9);
-  flex-shrink: 0;
-  margin-top: 2rpx;
-}
-
-.store-address text {
-  font-size: 26rpx;
-  line-height: 1.5;
-  color: var(--text-secondary, #5c6b7a);
-}
-
-.store-meta {
-  display: flex;
-  align-items: center;
-  gap: 32rpx;
-  margin-bottom: 16rpx;
-}
-
-.store-hours {
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-}
-
-.store-hours .ficon {
-  font-size: 24rpx;
-  color: var(--text-tertiary, #8d98a9);
-}
-
-.store-hours text {
-  font-size: 24rpx;
-  color: var(--text-secondary, #5c6b7a);
-}
-
-/* 离线服务点仍然可见、可读、可点（点了会解释为什么不能选），
-   但不做成选中态 —— 服务端会拒绝向离线终端下单。 */
-.store-item.offline { opacity: 0.72; }
-
-/* 六态文本块：loading / error / 空 / 无草稿都走这一套 */
 .state-card {
   margin: 0 32rpx 24rpx;
   padding: 32rpx;
   border-radius: var(--r-lg);
   border: 1rpx solid var(--line-soft);
-  background: #fff;
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
   display: flex;
   flex-direction: column;
   gap: 14rpx;
 }
-.state-t { font-size: var(--fs-md); font-weight: 650; color: var(--ink); }
+.state-t { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
 .state-d { font-size: var(--fs-base); line-height: 1.6; color: var(--muted); }
 .state-card .btn { min-height: 48px; }
 
-.store-summary {
-  margin: 0 32rpx 12rpx;
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
+.store-summary { margin: 0 0 16rpx; font-size: var(--fs-sm); color: var(--muted); }
 
-/* 底部确认栏 */
-/* 2026-09-03 补安全区。原来是 padding: 24rpx，320pt 下底部只有 ~9.6px，
-   全面屏（iPhone X 及以后 / 大多数安卓全面屏）的 home indicator 会压住按钮。
-   全仓按「position:fixed + bottom:0」属性枚举扫出 6 个族群，其中三个用了
-   .actionbar 以外的类名——上一轮按 .actionbar **类名**扫的 26 页把它们全漏了。
-   （第六个 privacy 的 .su-mask 是全屏遮罩不是底栏，属误报，未动。）
-   写法对齐 app.wxss 的 .actionbar：calc(原内距 + var(--sab))。
-   删掉 var(--sab)：全面屏上按钮被 home indicator 压住，点不准。 */
 .bottom-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--card-bg, #ffffff);
-  padding: 24rpx 24rpx calc(24rpx + var(--sab));
-  box-shadow: 0 -4rpx 12rpx rgba(0,0,0,0.06);
+  background: var(--surface);
+  padding: 20rpx 32rpx calc(20rpx + var(--sab));
+  border-top: 1rpx solid var(--line-soft);
+  box-shadow: 0 -8rpx 24rpx rgba(11, 39, 33, .06);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -266,51 +163,24 @@
   z-index: 100;
 }
 
-.selected-info {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
+.selected-info { flex: 1; display: flex; align-items: center; gap: 12rpx; min-width: 0; }
+.selected-info .ficon { font-size: var(--fs-lg); color: var(--teal-deep); flex-shrink: 0; }
+.selected-info.empty .ficon { color: var(--faint); }
+.selected-info text { font-size: var(--fs-base); color: var(--ink-soft); font-weight: 600; }
+.selected-info.empty text { color: var(--faint); font-weight: 400; }
 
-.selected-info .ficon {
-  font-size: 32rpx;
-  color: var(--teal, var(--teal));
-}
-
-.selected-info.empty .ficon {
-  color: var(--text-tertiary, #8d98a9);
-}
-
-.selected-info text {
-  font-size: 28rpx;
-  color: var(--text-secondary, #5c6b7a);
-}
-
-.selected-info.empty text {
-  color: var(--text-tertiary, #8d98a9);
-}
-
-/* 主操作按钮，实测 43px；§9 主要按钮建议 ≥56px → min-height 112rpx */
 .confirm-btn {
   flex-shrink: 0;
   min-height: 112rpx;
   padding: 24rpx 48rpx;
-  background: var(--teal, var(--teal));
-  color: #ffffff;
-  border-radius: 999rpx;
-  font-size: 28rpx;
-  font-weight: 500;
-  border: none;
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  border: 1rpx solid rgba(223, 198, 147, .36);
+  color: var(--gold-bright);
+  border-radius: var(--r-full);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  box-shadow: var(--sh-sm);
   transition: all 0.2s ease;
 }
-
-.confirm-btn:active {
-  transform: scale(0.98);
-}
-
-.confirm-btn.disabled {
-  background: var(--bg, #f5f7fa);
-  color: var(--text-tertiary, #8d98a9);
-  transform: none;
-}
+.confirm-btn:active { transform: scale(0.98); }
+.confirm-btn.disabled { background: var(--surface-2); border-color: transparent; color: var(--ghost); box-shadow: none; transform: none; }

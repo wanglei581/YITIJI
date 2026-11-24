@@ -259,3 +259,24 @@
   -webkit-mask-position: center; mask-position: center;
   background-color: currentColor;
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896'%3E%3Cpath fill='%23000' d='M955.7 856l-416-720c-16-27.7-44.4-44-76.7-44s-60.7 16.3-76.8 44l-416 720C-46 880.4 11 960 84 960h856c73 0 130-79.6 15.7-104zM480 416c0-17.7 14.3-32 32-32s32 14.3 32 32v264c0 17.7-14.3 32-32 32s-32-14.3-32-32V416zm32 424a48 48 0 110-96 48 48 0 010 96z'/%3E%3C/svg%3E"); }
+
+/* 高定 PDF 排版风格卡（纯 CSS 迷你纸页示意） */
+.ro-preset-head { display: flex; align-items: baseline; justify-content: space-between; margin: 22rpx 4rpx 12rpx; }
+.ro-preset-label { font-size: var(--fs-sm); font-weight: 700; color: var(--ink-soft); }
+.ro-preset-hint { font-size: var(--fs-xs); color: var(--faint); }
+.ro-preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12rpx; }
+.ro-preset-grid.is-muted { opacity: .48; pointer-events: none; }
+.ro-preset-card { padding: 18rpx 14rpx; border-radius: var(--r-md); background: var(--surface); border: 2rpx solid var(--line-soft); box-shadow: var(--sh-xs); display: flex; flex-direction: column; align-items: center; text-align: center; }
+.ro-preset-card.on { background: linear-gradient(150deg, #16483E 0%, #0A2720 100%); border-color: var(--gold-line); box-shadow: var(--sh-sm); }
+.ro-mini-paper { width: 64rpx; height: 82rpx; padding: 10rpx; border-radius: var(--r-xs); background: #FFFFFF; border: 1rpx solid var(--line); display: flex; flex-direction: column; gap: 6rpx; margin-bottom: 12rpx; }
+.ro-mini-paper.cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6rpx; align-content: start; }
+.ro-mini-paper.cols-2 .ro-mp-bar { grid-column: 1 / -1; }
+.ro-mini-paper.cols-2::after { content: ''; display: block; height: 28rpx; background: repeating-linear-gradient(to bottom, var(--surface-3) 0, var(--surface-3) 5rpx, transparent 5rpx, transparent 10rpx); }
+.ro-mp-bar { height: 8rpx; border-radius: var(--r-full); width: 100%; }
+.ro-mp-lines { display: flex; flex-direction: column; gap: 5rpx; }
+.ro-mp-l { height: 5rpx; border-radius: var(--r-full); background: var(--surface-3); width: 100%; }
+.ro-mp-l.s { width: 68%; }
+.ro-preset-t { font-size: var(--fs-sm); font-weight: 750; color: var(--ink); }
+.ro-preset-card.on .ro-preset-t { color: #FFFFFF; }
+.ro-preset-s { margin-top: 4rpx; font-size: var(--fs-xs); color: var(--muted); line-height: 1.35; }
+.ro-preset-card.on .ro-preset-s { color: var(--gold-bright); }

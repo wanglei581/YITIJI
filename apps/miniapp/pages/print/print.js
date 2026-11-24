@@ -25,6 +25,7 @@ Page({
     // 同一个入口不在两个 Tab 各放一份。
     paths: [
       { id: 'docs',     icon: 'folder',    accent: 'teal',  title: '从我的文档打印', badge: '推荐', desc: '选已上传的简历或文档，设好参数后生成到机码', flow: '选文档 · 选参数 · 选终端' },
+      { id: 'toolbox',  icon: 'edit',      accent: 'wheat', title: '证件水印与 A4 拼版', badge: '实用', desc: '用途水印、正反合一 A4、证件照参考拼版', flow: '本机合成 · 上传队列 · 到机出纸' },
       { id: 'package',  icon: 'folder',    accent: 'clay',  title: '材料包', desc: '多份材料一次组包，拿到机码到终端打印', flow: '选材料 · 选服务点 · 拿到机码' },
       { id: 'orders',   icon: 'history',   accent: 'clay',  title: '打印订单', desc: '查看到机码和出纸状态', flow: '订单 · 状态 · 到机码' },
       { id: 'daily',    icon: 'file-text', accent: 'wheat', title: '今日提醒', desc: '即将过期的到机码和平台通知', flow: '登录后查看' },
@@ -62,6 +63,7 @@ Page({
     const id = e.currentTarget.dataset.id
     const routes = {
       docs:    '/pages/documents/documents',
+      toolbox: '/pages/print-toolbox/print-toolbox',
       package: '/pages/package-create/package-create',
       orders:  '/pages/orders/orders',
       daily:   '/pages/daily-report/daily-report',

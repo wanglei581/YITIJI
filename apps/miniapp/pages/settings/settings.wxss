@@ -1,33 +1,22 @@
-/* pages/settings/settings.wxss */
-.grp-label {
-  margin: 30rpx 40rpx 14rpx;
-  font-size: 24rpx;
-  color: var(--muted);
-  letter-spacing: .5rpx;
-}
+/* pages/settings/settings.wxss  账号设置（墨翠鎏金白瓷） */
+.grp-label { margin: 30rpx 40rpx 14rpx; font-size: var(--fs-sm); font-weight: 650; color: var(--muted); letter-spacing: .5rpx; }
 .grp-label:first-of-type { margin-top: 8rpx; }
 
 .set-group {
   margin: 0 32rpx;
   background: var(--surface);
   border: 1rpx solid var(--line-soft);
-  border-radius: 28rpx;
-  box-shadow: var(--sh-xs);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
   overflow: hidden;
 }
-.set-item {
-  display: flex;
-  align-items: center;
-  min-height: 108rpx;
-  padding: 18rpx 24rpx;
-  border-bottom: 1rpx solid var(--line-faint);
-}
+.set-item { display: flex; align-items: center; min-height: 108rpx; padding: 18rpx 24rpx; border-bottom: 1rpx solid var(--line-faint); }
 .set-item:last-child { border-bottom: none; }
 
 .set-ic {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 16rpx;
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: var(--r-full);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -39,34 +28,20 @@
 .set-ic.a-teal .ficon  { color: var(--teal-deep); }
 .set-ic.a-clay  { background: var(--clay-wash); }
 .set-ic.a-clay .ficon  { color: var(--clay-deep); }
-.set-ic.a-wheat { background: var(--wheat-wash); }
-.set-ic.a-wheat .ficon { color: var(--wheat-deep); }
+.set-ic.a-wheat { background: var(--gold-soft); }
+.set-ic.a-wheat .ficon { color: var(--gold-deep); }
 .set-ic.a-plum  { background: var(--plum-wash); }
 .set-ic.a-plum .ficon  { color: var(--plum-deep); }
 
-.set-t {
-  flex: 1;
-  font-size: 30rpx;
-  color: var(--ink);
-}
-.set-v {
-  font-size: 26rpx;
-  color: var(--muted);
-  margin-left: 12rpx;
-}
-.set-go {
-  margin-left: 12rpx;
-  width: 22rpx;
-  height: 22rpx;
-  color: var(--faint);
-}
+.set-t { flex: 1; font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+.set-v { font-size: var(--fs-base); color: var(--muted); margin-left: 12rpx; }
+.set-go { margin-left: 12rpx; width: 22rpx; height: 22rpx; color: var(--faint); }
 
-/* 开关 */
 .tgl {
   position: relative;
   width: 88rpx;
   height: 52rpx;
-  border-radius: 999rpx;
+  border-radius: var(--r-full);
   background: var(--line);
   transition: background .2s ease;
   flex-shrink: 0;
@@ -78,30 +53,31 @@
   right: 42rpx;
   width: 40rpx;
   height: 40rpx;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: #fff;
   box-shadow: 0 2rpx 6rpx rgba(0,0,0,.18);
   transition: right .2s ease;
 }
-.tgl.on { background: var(--teal); }
+.tgl.on { background: var(--teal-deep); }
 .tgl.on::after { right: 6rpx; }
 
 .logout {
   margin: 40rpx 32rpx 20rpx;
   height: 100rpx;
-  border-radius: var(--r-lg);
+  border-radius: var(--r-full);
   background: var(--surface);
   border: 1rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30rpx;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: 700;
   color: var(--clay-deep);
 }
 .logout.login-cta {
-  color: #fff;
-  background: var(--teal);
-  border-color: var(--teal);
-  box-shadow: 0 12rpx 28rpx rgba(15, 110, 92,.16);
+  color: var(--gold-bright);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  border-color: rgba(223, 198, 147, .36);
+  box-shadow: var(--sh-md);
 }

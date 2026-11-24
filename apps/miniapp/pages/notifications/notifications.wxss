@@ -1,36 +1,27 @@
-/* pages/notifications/notifications.wxss */
+/* pages/notifications/notifications.wxss  消息通知（墨翠鎏金白瓷） */
 
-/* 列表工具栏：承接原导航栏右上角的「全部已读」。
-   导航栏右侧被微信胶囊常驻遮挡，不可放操作。触控区 96rpx = 48px（CLAUDE.md §9）。 */
-.list-toolbar {
-  display: flex; align-items: center; justify-content: flex-end;
-  gap: 16rpx; padding: 0 32rpx 12rpx;
-}
+.list-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 16rpx; padding: 0 32rpx 12rpx; }
 .lt-action {
   flex-shrink: 0;
-  min-width: 132rpx; height: 96rpx; padding: 0 28rpx;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 22rpx; border: 1rpx solid var(--line);
-  background: var(--surface); color: var(--ink-soft);
-  font-size: 27rpx; font-weight: 600;
+  min-width: 132rpx;
+  height: 96rpx;
+  padding: 0 28rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  border: 1rpx solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  color: var(--teal-deep);
+  font-size: var(--fs-base);
+  font-weight: 650;
 }
 
-/* .content（app.wxss）没有横向内边距，列表若直接铺开会贴死屏幕左右边缘。
-   与 jobs / resumes / fairs 等列表页统一取 32rpx 左右留白。 */
 .nt-list { padding: 0 32rpx; }
-
-.nt-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 28rpx 0;
-  border-bottom: 1rpx solid var(--line-faint);
-}
+.nt-item { display: flex; align-items: flex-start; padding: 28rpx 0; border-bottom: 1rpx solid var(--line-faint); }
 .nt-item:last-child { border-bottom: none; }
 
-/* 未读红点。
-   原实现用 .nt-item::before 绝对定位到 left:-18rpx，而列表左侧无留白，
-   红点整体落在屏幕外不可见，已读/未读无法区分。改为跟在标题前的内联圆点：
-   不依赖容器留白，任何留白取值下都在可视区内。 */
 .nt-item.unread .nt-t::before {
   content: "";
   display: inline-block;
@@ -38,14 +29,14 @@
   height: 14rpx;
   margin-right: 12rpx;
   vertical-align: middle;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: var(--error);
 }
 
 .nt-ic {
   width: 80rpx;
   height: 80rpx;
-  border-radius: 22rpx;
+  border-radius: var(--r-full);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -64,41 +55,14 @@
 .tone-clay .ficon  { color: var(--clay-deep);  }
 
 .nt-body { flex: 1; }
-.nt-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-}
-.nt-t {
-  flex: 1;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--ink);
-}
-.nt-time {
-  font-size: 24rpx;
-  color: var(--faint);
-  flex-shrink: 0;
-}
-.nt-text {
-  margin-top: 10rpx;
-  font-size: 27rpx;
-  line-height: 1.7;
-  color: var(--ink-soft);
-}
-.nt-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-top: 14rpx;
-  font-size: 27rpx;
-  font-weight: 500;
-  color: var(--teal-deep);
-}
+.nt-head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; }
+.nt-t { flex: 1; font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.nt-time { font-size: var(--fs-sm); color: var(--faint); flex-shrink: 0; }
+.nt-text { margin-top: 10rpx; font-size: var(--fs-base); line-height: 1.7; color: var(--ink-soft); }
+.nt-link { display: inline-flex; align-items: center; gap: 8rpx; margin-top: 14rpx; font-size: var(--fs-base); font-weight: 650; color: var(--teal-deep); }
 .nt-link-arrow { width: 18rpx; height: 18rpx; }
-/* 空态 */
+
 .empty-slot { padding: 60rpx 20rpx; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
-.es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
-.es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
+.es-ic { font-size: var(--fs-2xl); color: var(--faint); margin-bottom: 20rpx; }
+.es-t { font-size: var(--fs-md); font-weight: 700; color: var(--ink-soft); }
+.es-d { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--muted); }

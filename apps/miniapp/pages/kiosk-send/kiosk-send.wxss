@@ -1,43 +1,63 @@
-/* pages/kiosk-send/kiosk-send.wxss
-   类名与 kiosk-login 对齐，避免同一条动线上两页观感割裂。 */
-.page-wrap { min-height: 100vh; background: #f5f7fa; }
+/* pages/kiosk-send/kiosk-send.wxss  传文件到一体机（墨翠鎏金白瓷） */
+.page-wrap { min-height: 100vh; background: var(--paper); }
 
-.navbar { display: flex; align-items: center; height: 88rpx; padding: 0 24rpx; background: #fff; }
+.navbar { display: flex; align-items: center; height: 88rpx; padding: 0 24rpx; background: var(--paper); }
 .nav-back { width: 96rpx; height: 96rpx; display: flex; align-items: center; justify-content: center; }
-.nav-back .ficon { transform: rotate(180deg); font-size: 36rpx; color: #1f2937; }
-.nav-title { flex: 1; text-align: center; font-size: 34rpx; font-weight: 600; color: #1f2937; padding-right: 96rpx; }
+.nav-back .ficon { transform: rotate(180deg); font-size: var(--fs-lg); color: var(--ink); }
+.nav-title { flex: 1; text-align: center; font-size: var(--fs-lg); font-weight: 700; color: var(--ink); padding-right: 96rpx; }
 
-.content { padding: 32rpx 32rpx 64rpx; }
+.content { padding: 24rpx 32rpx 64rpx; }
 
 .guide-card, .state-card {
-  background: #fff; border-radius: 24rpx; padding: 56rpx 40rpx;
-  display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+  padding: 52rpx 36rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
-.guide-icon, .sc-icon { font-size: 88rpx; color: var(--teal); margin-bottom: 24rpx; }
-.guide-title, .sc-title { font-size: 36rpx; font-weight: 600; color: #1f2937; margin-bottom: 16rpx; }
-.guide-desc, .sc-desc { font-size: 28rpx; color: #6b7280; line-height: 1.6; margin-bottom: 40rpx; }
+.guide-icon, .sc-icon { font-size: var(--fs-2xl); color: var(--teal-deep); margin-bottom: 24rpx; }
+.guide-title, .sc-title { font-size: var(--fs-lg); font-weight: 750; color: var(--ink); margin-bottom: 14rpx; }
+.guide-desc, .sc-desc { font-size: var(--fs-base); color: var(--muted); line-height: 1.65; margin-bottom: 36rpx; }
 
-.sent-list { width: 100%; margin-bottom: 32rpx; }
+.sent-list { width: 100%; margin-bottom: 30rpx; }
 .sent-item {
-  font-size: 26rpx; color: #4b5563; padding: 16rpx 24rpx; background: #f3f4f6;
-  border-radius: 12rpx; margin-bottom: 12rpx; word-break: break-all;
+  font-size: var(--fs-base);
+  color: var(--ink-soft);
+  padding: 18rpx 24rpx;
+  background: var(--paper);
+  border: 1rpx solid var(--line-faint);
+  border-radius: var(--r-md);
+  margin-bottom: 12rpx;
+  word-break: break-all;
 }
 
 .btn-primary, .btn-secondary {
-  width: 100%; min-height: 96rpx; line-height: 96rpx;
-  border-radius: 48rpx; font-size: 32rpx; border: none;
+  width: 100%;
+  min-height: 96rpx;
+  line-height: 96rpx;
+  border-radius: var(--r-full);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  border: none;
 }
-.btn-primary { background: var(--teal); color: #fff; }
-.btn-secondary { background: var(--teal-wash); color: var(--teal); }
+.btn-primary {
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  box-shadow: var(--sh-sm);
+}
+.btn-secondary {
+  background: var(--teal-wash);
+  border: 1rpx solid rgba(15, 106, 87, .24);
+  color: var(--teal-deep);
+}
 
-/* 拍照或从相册选（2026-11-02，#1363）：和上面的按钮隔开，用本页已有的 24rpx 间距，不新增颜色与字号。 */
 .album-btn { margin-top: 24rpx; }
-
-/* 从我的文档选（2026-10-29）：第二张卡与上一张隔开；行沿用 .sent-item 的底色与圆角，
-   左对齐、可点高度不低于 96rpx（CLAUDE.md §9）。只用本页已有的间距与 app.wxss 现有变量。 */
 .doc-card { margin-top: 24rpx; }
 .doc-list { text-align: left; }
 .doc-item { min-height: 96rpx; }
 .doc-meta { font-size: var(--fs-sm); color: var(--muted); }
-/* 收据标题里带文件名：没有空格的长文件名也要能折行 */
 .sent-title { word-break: break-all; }

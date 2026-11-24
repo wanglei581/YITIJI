@@ -1,0 +1,170 @@
+<!-- pages/print-toolbox/print-toolbox.wxml -->
+<view class="pt-page">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回上一页">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <view class="nav-title">材料轻工具箱</view>
+  </view>
+
+  <view class="pt-body">
+    <!-- 墨翠深松鎏金工具头卡 + 三合一模式切换 -->
+    <view class="pt-hero">
+      <view class="pt-hero-kicker">MATERIAL STUDIO · 直连云打印</view>
+      <view class="pt-hero-title">手机排版加水印，到终端直接出纸</view>
+      <view class="pt-seg">
+        <view
+          class="pt-seg-item tap {{activeTool === item.key ? 'on' : ''}}"
+          wx:for="{{tools}}"
+          wx:key="key"
+          data-key="{{item.key}}"
+          bindtap="tapTool"
+          hover-class="tap-press"
+          role="button"
+        >{{item.title}}</view>
+      </view>
+    </view>
+
+    <!-- 诚实隐私与留存口径提示 -->
+    <view class="pt-notice">
+      <text class="ficon i-info pt-notice-ic" aria-hidden="true"></text>
+      <text class="pt-notice-tx">图片先在手机本地画布合成预览；点击「上传并去终端打印」后才按普通打印文档上传，水印仅作用途提示，不替代敏感信息遮挡。</text>
+    </view>
+
+    <!-- 选图区 -->
+    <view class="pt-card">
+      <view class="pt-card-head">
+        <view class="pt-sec-wrap">
+          <view class="pt-sec-bar" aria-hidden="true"></view>
+          <text class="pt-sec-t">{{activeTool === 'duplex' ? '选择正反两面图片' : (activeTool === 'photo' ? '选择一张证件照原图' : '选择要加用途水印的图片')}}</text>
+        </view>
+        <view wx:if="{{frontPath || backPath}}" class="pt-clear tap" bindtap="tapClearImages" role="button">清空重选</view>
+      </view>
+
+      <view wx:if="{{activeTool === 'duplex'}}" class="pt-slot-grid">
+        <view class="pt-slot tap" hover-class="tap-press" data-slot="front" bindtap="chooseSlot" role="button">
+          <image wx:if="{{frontPath}}" class="pt-slot-img" src="{{frontPath}}" mode="aspectFit" />
+          <view wx:else class="pt-slot-empty">
+            <text class="ficon i-upload pt-slot-ic"></text>
+            <text class="pt-slot-tx">点击选正面</text>
+          </view>
+        </view>
+        <view class="pt-slot tap" hover-class="tap-press" data-slot="back" bindtap="chooseSlot" role="button">
+          <image wx:if="{{backPath}}" class="pt-slot-img" src="{{backPath}}" mode="aspectFit" />
+          <view wx:else class="pt-slot-empty">
+            <text class="ficon i-upload pt-slot-ic"></text>
+            <text class="pt-slot-tx">点击选反面</text>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="pt-slot single tap" hover-class="tap-press" data-slot="front" bindtap="chooseSlot" role="button">
+        <image wx:if="{{frontPath}}" class="pt-slot-img" src="{{frontPath}}" mode="aspectFit" />
+        <view wx:else class="pt-slot-empty">
+          <view class="pt-upload-circle"><text class="ficon i-upload pt-slot-ic"></text></view>
+          <text class="pt-slot-tx">{{activeTool === 'photo' ? '从相册选择或拍摄证件照' : '从相册选择或拍摄证件/证书'}}</text>
+          <text class="pt-slot-sub">支持常见 JPG / PNG 照片</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 参数设置卡 -->
+    <view wx:if="{{activeTool === 'watermark' || activeTool === 'duplex'}}" class="pt-card">
+      <view class="pt-card-head">
+        <view class="pt-sec-wrap">
+          <view class="pt-sec-bar" aria-hidden="true"></view>
+          <text class="pt-sec-t">用途水印设置</text>
+        </view>
+        <view wx:if="{{activeTool === 'duplex'}}" class="pt-toggle tap {{duplexWatermarkOn ? 'on' : ''}}" bindtap="toggleDuplexWatermark" role="button">
+          {{duplexWatermarkOn ? '已开启水印' : '不加水印'}}
+        </view>
+      </view>
+
+      <block wx:if="{{activeTool === 'watermark' || duplexWatermarkOn}}">
+        <input
+          class="pt-input"
+          maxlength="32"
+          placeholder="输入用途说明（如：仅供入职审核使用）"
+          value="{{watermarkText}}"
+          bindinput="onWatermarkInput"
+          bindblur="onWatermarkBlur"
+        />
+        <view class="pt-chips">
+          <view
+            class="pt-chip tap {{watermarkText === item ? 'on' : ''}}"
+            wx:for="{{watermarkPresets}}"
+            wx:key="*this"
+            data-text="{{item}}"
+            bindtap="tapWatermarkPreset"
+            role="button"
+          >{{item}}</view>
+        </view>
+        <view class="pt-sub-label">水印深浅</view>
+        <view class="pt-op-row">
+          <view
+            class="pt-op-btn tap {{opacityKey === item.key ? 'on' : ''}}"
+            wx:for="{{opacityLevels}}"
+            wx:key="key"
+            data-key="{{item.key}}"
+            bindtap="tapOpacity"
+            role="button"
+          >{{item.label}}</view>
+        </view>
+      </block>
+    </view>
+
+    <view wx:else class="pt-card">
+      <view class="pt-card-head">
+        <view class="pt-sec-wrap">
+          <view class="pt-sec-bar" aria-hidden="true"></view>
+          <text class="pt-sec-t">A4 拼版规格（参考比例）</text>
+        </view>
+      </view>
+      <view class="pt-mode-list">
+        <view
+          class="pt-mode-item tap {{photoModeKey === item.key ? 'on' : ''}}"
+          wx:for="{{photoModes}}"
+          wx:key="key"
+          data-key="{{item.key}}"
+          bindtap="tapPhotoMode"
+          role="button"
+        >
+          <view class="pt-mode-t">{{item.label}}</view>
+          <view class="pt-mode-s">{{item.sub}}</view>
+        </view>
+      </view>
+      <view class="pt-foot-note">实际出纸尺寸受终端无边距/缩放设置影响，请以实体出纸效果为准。</view>
+    </view>
+
+    <!-- 成品预览卡 -->
+    <view wx:if="{{rendering || previewPath || renderError}}" class="pt-card">
+      <view class="pt-card-head">
+        <view class="pt-sec-wrap">
+          <view class="pt-sec-bar" aria-hidden="true"></view>
+          <text class="pt-sec-t">本地合成预览</text>
+        </view>
+        <view wx:if="{{previewPath}}" class="pt-clear tap" bindtap="tapPreviewFull" role="button">放大查看</view>
+      </view>
+      <view wx:if="{{rendering}}" class="pt-rendering">
+        <view class="pt-spinner"></view>
+        <text class="pt-render-tx">正在手机本地合成预览…</text>
+      </view>
+      <view wx:elif="{{renderError}}" class="pt-err-box">
+        <text class="pt-err-tx">{{renderError}}</text>
+        <view class="pt-retry tap" bindtap="tapRefreshPreview" role="button">重新合成</view>
+      </view>
+      <image wx:elif="{{previewPath}}" class="pt-preview-img" src="{{previewPath}}" mode="widthFix" bindtap="tapPreviewFull" />
+    </view>
+  </view>
+
+  <!-- 屏外 2D 合成画布 -->
+  <canvas type="2d" id="matCanvas" class="pt-offscreen-canvas"></canvas>
+
+  <!-- 底部操作栏 -->
+  <view class="pt-bar">
+    <view class="pt-sub-btn tap {{rendering ? 'disabled' : ''}}" bindtap="tapRefreshPreview" role="button">刷新预览</view>
+    <view class="pt-pri-btn tap {{(!previewPath || uploading || rendering) ? 'disabled' : ''}}" hover-class="tap-press" bindtap="tapUploadToPrint" role="button">
+      {{uploading ? '上传中…' : '上传并去终端打印'}}
+    </view>
+  </view>
+</view>

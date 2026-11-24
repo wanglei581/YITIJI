@@ -1,7 +1,5 @@
-/* pages/documents/documents.wxss */
+/* pages/documents/documents.wxss  我的文档（墨翠鎏金白瓷） */
 
-/* 列表标题行 + 刷新：承接原导航栏右上角的「刷新」。
-   导航栏右侧被微信胶囊常驻遮挡，不可放操作。触控区 96rpx = 48px（CLAUDE.md §9）。 */
 .list-toolbar {
   display: flex; align-items: center; justify-content: space-between;
   gap: 16rpx; padding-right: 32rpx; padding-bottom: 8rpx;
@@ -11,12 +9,12 @@
   flex-shrink: 0;
   min-width: 132rpx; height: 96rpx; padding: 0 28rpx;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 22rpx; border: 1rpx solid var(--line);
-  background: var(--surface); color: var(--ink-soft);
-  font-size: 27rpx; font-weight: 600;
+  border-radius: var(--r-full); border: 1rpx solid var(--line);
+  background: var(--surface); color: var(--teal-deep);
+  box-shadow: var(--sh-xs);
+  font-size: var(--fs-base); font-weight: 650;
 }
 
-/* 行：左右留 32rpx，格式块不再贴卡片边；格式块与主名顶部对齐，不再垂直居中到整行（FLOW1a 实图 01）。 */
 .doc-item {
   padding: 24rpx 32rpx;
   border-bottom: 1rpx solid var(--line-faint);
@@ -41,19 +39,17 @@
   letter-spacing: 1rpx;
   color: #fff;
 }
-/* 四个字母的扩展名（DOCX、XLSX 等）在 72rpx 的格式块里会顶边：字号降一档、去掉字距（产品负责人 11/12 看图后要求）。 */
 .doc-ic.ic-long { font-size: var(--fs-xs); letter-spacing: 0; }
 .doc-ic.ic-pdf  { background: #d9534f; }
-.doc-ic.ic-img  { background: #3fa46a; }
-.doc-ic.ic-doc  { background: #3f68b0; }
+.doc-ic.ic-img  { background: #0f7a5a; }
+.doc-ic.ic-doc  { background: #2e538e; }
 .doc-ic.ic-scan { background: #a9781f; }
 .doc-ic.ic-ai   { background: var(--plum-deep); }
 
 .doc-body { flex: 1; min-width: 0; }
-/* 主名最多两行：单行省略时几份同前缀的文件（…-OFFLINE-D93A / …-COLOR-D93A）看不出区别。 */
 .doc-name {
-  font-size: 28rpx;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: 650;
   color: var(--ink);
   line-height: 1.4;
   overflow-wrap: break-word;
@@ -68,7 +64,7 @@
   display: flex;
   align-items: center;
   gap: 10rpx;
-  font-size: 23rpx;
+  font-size: var(--fs-sm);
   color: var(--muted);
   flex-wrap: wrap;
 }
@@ -81,12 +77,10 @@
   border-radius: var(--r-full);
   background: var(--clay-wash);
   color: var(--clay-deep);
-  font-size: 21rpx;
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
-/* ⋯ 的点击盒实打实 96rpx × 96rpx（48px，CLAUDE.md §9）。负边距只把它挪进行的上、右内边距里，
-   在排版里只占 72rpx 宽，少挤主名；点击盒本身不缩。底行操作离它至少 20rpx（见 .doc-item .doc-actions），
-   两块点击区不重叠。 */
+/* 保持 FLOW1a 断言：⋯ 真实点击盒 96rpx 见方 */
 .doc-more {
   flex-shrink: 0;
   width: 96rpx;
@@ -95,7 +89,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40rpx;
+  font-size: var(--fs-xl);
   color: var(--faint);
 }
 
@@ -106,15 +100,11 @@
   align-items: center;
   text-align: center;
 }
-.es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
-.es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
-.es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
+.es-ic { font-size: var(--fs-2xl); color: var(--faint); margin-bottom: 20rpx; }
+.es-t { font-size: var(--fs-md); font-weight: 700; color: var(--ink-soft); }
+.es-d { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--muted); }
 
-/* 保存期限行。放在 meta 行之下而不是挤进去：到期日期是"什么时候没"，
-   保留档位是"按哪条规则保存"，两件事混在一行读不出区别。档位与「不可延长」合成这一行小字。 */
 .doc-retention { margin-top: 6rpx; font-size: var(--fs-xs); color: var(--muted); line-height: 1.5; }
-
-/* 分页提示。没有它，上拉加载对用户是不可见的静默行为 */
 .load-hint { padding: 24rpx 0 8rpx; text-align: center; font-size: var(--fs-xs); color: var(--faint); }
 
 .doc-actions {
@@ -123,11 +113,8 @@
   gap: 16rpx;
   margin-top: 12rpx;
 }
-/* 列表行的操作在独立底行靠右，不占主名的宽度。margin-top 20rpx 大于下面伪元素向上扩的 18rpx，
-   胶囊的点击区不会伸进上面「⋯」的 96rpx 点击盒。 */
+/* 保持 FLOW1a 断言：底行离 ⋯ 至少 20rpx */
 .doc-item .doc-actions { justify-content: flex-end; margin-top: 20rpx; }
-/* 视觉是紧凑胶囊（60rpx 高）；伪元素把点击区上下各扩 18rpx、左右各扩 8rpx，
-   实际点击区 96rpx 高（48px，CLAUDE.md §9），相邻两个胶囊（间距 16rpx）的点击区刚好相接、不重叠。 */
 .doc-action {
   position: relative;
   flex-shrink: 0;
@@ -142,8 +129,9 @@
   background: var(--surface);
   color: var(--ink-soft);
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: 650;
 }
+/* 保持 FLOW1a 断言：上下各扩 18rpx 触控区 */
 .doc-action::after {
   content: '';
   position: absolute;
@@ -153,8 +141,9 @@
   bottom: -18rpx;
 }
 .doc-action.primary {
-  border-color: var(--teal);
-  color: var(--teal);
+  border-color: rgba(223, 198, 147, .36);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
 }
 .doc-action.is-disabled {
   color: var(--ghost);
@@ -169,13 +158,14 @@
 .convert-result {
   margin: 0 32rpx 16rpx;
   padding: 24rpx;
-  border-radius: var(--r);
-  border: 1rpx solid var(--line);
+  border-radius: var(--r-lg);
+  border: 1rpx solid var(--line-soft);
   background: var(--surface);
+  box-shadow: var(--sh-sm);
 }
 .convert-result-title {
   font-size: var(--fs-md);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
   word-break: break-all;
 }

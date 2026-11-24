@@ -1,25 +1,27 @@
+/* pages/package-code/package-code.wxss  材料包到机码（墨翠鎏金白瓷） */
 page { height: 100%; overflow: hidden; background: var(--paper); }
 .code-page { height: 100vh; display: flex; flex-direction: column; background: var(--paper); }
 .code-scroll { flex: 1; min-height: 0; }
-.code-body { padding: 0 32rpx 40rpx; }
+.code-body { padding: 12rpx 32rpx 40rpx; }
 
-/* 成功提示 */
 .success-banner {
-  padding: 32rpx 28rpx;
-  border-radius: 26rpx;
-  background: var(--ok-soft);
-  border: 1rpx solid rgba(18, 168, 121, 0.15);
+  padding: 28rpx 26rpx;
+  border-radius: var(--r-lg);
+  background: linear-gradient(150deg, #16483E 0%, #0C2B24 58%, #071915 100%);
+  border: 1rpx solid rgba(223, 198, 147, .28);
+  box-shadow: var(--sh-md);
   display: flex;
   align-items: center;
   gap: 20rpx;
-  margin-bottom: 32rpx;
+  margin-bottom: 24rpx;
 }
 .success-icon {
   width: 72rpx;
   height: 72rpx;
-  border-radius: 50%;
-  background: var(--ok);
-  color: #fff;
+  border-radius: var(--r-full);
+  background: rgba(223, 198, 147, .18);
+  border: 1rpx solid rgba(223, 198, 147, .42);
+  color: var(--gold-bright);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -27,37 +29,24 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 }
 .success-icon .ficon { width: 36rpx; height: 36rpx; }
 .success-copy { flex: 1; }
-.success-title {
-  font-size: 29rpx;
-  font-weight: 700;
-  color: var(--ok);
-  display: block;
-}
-.success-desc {
-  margin-top: 6rpx;
-  font-size: 23rpx;
-  color: var(--ok);
-  display: block;
-}
+.success-title { font-size: var(--fs-md); font-weight: 750; color: #FFFFFF; display: block; }
+.success-desc { margin-top: 6rpx; font-size: var(--fs-sm); color: var(--gold-bright); display: block; }
 
-/* 二维码 */
 .qr-card {
   padding: 36rpx 28rpx 32rpx;
-  border-radius: 26rpx;
-  background: #fff;
-  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1rpx solid var(--gold-line);
+  box-shadow: var(--sh-sm);
   display: flex;
   flex-direction: column;
   align-items: center;
   margin-bottom: 24rpx;
 }
-/* 二维码容器：里面是真码（canvas type="2d"，utils/pickup-qrcode.js 本地编码），
-   不再是虚线框加「二维码」三个字的占位 —— 那让用户以为有码可扫，到了机器前才发现
-   只能手输。实线边框也是这个意思：虚线在本产品里表示「占位」。 */
 .qr-box {
   width: 400rpx;
   min-height: 400rpx;
-  border-radius: 20rpx;
+  border-radius: var(--r-md);
   background: #fff;
   border: 1rpx solid var(--line-soft);
   display: flex;
@@ -67,120 +56,82 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   padding: 16rpx;
 }
 .package-qr { display: block; }
-.qr-placeholder-text {
-  padding: 24rpx;
-  font-size: var(--fs-sm);
-  line-height: 1.6;
-  color: var(--muted);
-  text-align: center;
-}
-.qr-hint {
-  font-size: 23rpx;
-  color: var(--muted);
-  text-align: center;
-}
+.qr-placeholder-text { padding: 24rpx; font-size: var(--fs-sm); line-height: 1.6; color: var(--muted); text-align: center; }
+.qr-hint { font-size: var(--fs-sm); color: var(--muted); text-align: center; }
 
-/* 数字码 */
 .digital-code {
   padding: 32rpx 28rpx;
-  border-radius: 26rpx;
-  background: #fff;
+  border-radius: var(--r-lg);
+  background: var(--surface);
   border: 1rpx solid var(--line-soft);
+  box-shadow: var(--sh-sm);
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 32rpx;
+  margin-bottom: 28rpx;
 }
-.code-label {
-  font-size: 23rpx;
-  color: var(--muted);
-  margin-bottom: 16rpx;
-}
-.code-hint {
-  font-size: 23rpx;
-  color: var(--muted);
-  margin-top: 16rpx;
-}
+.code-label { font-size: var(--fs-sm); color: var(--gold-deep); font-weight: 700; margin-bottom: 16rpx; }
+.code-hint { font-size: var(--fs-sm); color: var(--muted); margin-top: 16rpx; }
 
-/* 分享给代取人 / 作废换新码：两颗等宽按钮，可点高度守 48px */
-.code-acts { display: flex; gap: 16rpx; margin-top: 16rpx; }
-.code-act { flex: 1; min-height: 96rpx; border-radius: var(--r-full); border: 1rpx solid var(--teal-soft); background: var(--surface);
-  color: var(--teal-deep); font-size: var(--fs-base); font-weight: 600; display: flex; align-items: center; justify-content: center; }
-.code-act.off { opacity: .5; }
-.code-share-note { margin-top: 12rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; text-align: center; }
-/* 分享图的画布：画在屏幕外，不参与布局。尺寸与 utils/pickup-actions.js 的 CARD_W / CARD_H 一致。 */
-.share-card-canvas { position: fixed; left: -2000rpx; top: 0; width: 600px; height: 840px; }
-
-/* 订单信息 */
-.info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 72rpx;
-}
-.info-label {
-  font-size: 25rpx;
-  color: var(--muted);
-}
-.info-val {
-  font-size: 25rpx;
-  font-weight: 600;
-  color: var(--ink);
-  text-align: right;
-}
-
-/* 使用说明 */
-.step-list { display: flex; flex-direction: column; gap: 24rpx; }
-.step-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 18rpx;
-}
-.step-num {
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 50%;
-  background: var(--teal-soft);
-  color: var(--teal);
+.code-acts { display: flex; gap: 16rpx; margin-top: 16rpx; width: 100%; }
+.code-act {
+  flex: 1;
+  min-height: 96rpx;
+  border-radius: var(--r-full);
+  border: 1rpx solid rgba(15, 106, 87, .24);
+  background: var(--teal-wash);
+  color: var(--teal-deep);
+  font-size: var(--fs-base);
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 23rpx;
-  font-weight: 700;
+}
+.code-act.off { opacity: .5; }
+.code-share-note { margin-top: 12rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; text-align: center; }
+.share-card-canvas { position: fixed; left: -2000rpx; top: 0; width: 600px; height: 840px; }
+
+.info-row { display: flex; align-items: center; justify-content: space-between; min-height: 72rpx; }
+.info-label { font-size: var(--fs-base); color: var(--muted); }
+.info-val { font-size: var(--fs-base); font-weight: 650; color: var(--ink); text-align: right; }
+
+.step-list { display: flex; flex-direction: column; gap: 24rpx; }
+.step-item { display: flex; align-items: flex-start; gap: 18rpx; }
+.step-num {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: 750;
   flex-shrink: 0;
 }
-.step-text {
-  flex: 1;
-  padding-top: 8rpx;
-  font-size: 25rpx;
-  line-height: 1.6;
-  color: var(--ink-soft);
-}
+.step-text { flex: 1; padding-top: 6rpx; font-size: var(--fs-base); line-height: 1.6; color: var(--ink-soft); }
 
-/* 底部按钮 */
 .actionbar {
   padding: 20rpx 32rpx calc(28rpx + env(safe-area-inset-bottom));
   background: var(--surface);
   border-top: 1rpx solid var(--line-soft);
+  box-shadow: 0 -8rpx 24rpx rgba(11, 39, 33, .06);
   display: flex;
   gap: 16rpx;
 }
-/* 底部主操作，实测 45px；§9 主要按钮建议 ≥56px → 112rpx */
-.actionbar .btn {
-  flex: 1;
-  height: 112rpx;
-}
+.actionbar .btn { flex: 1; height: 112rpx; }
 
-/* 订单核对失败时的重试按钮。触控目标不小于 48px（CLAUDE.md §9）。 */
 .retry-btn {
   margin: 24rpx auto 0;
   min-height: 96rpx;
   line-height: 96rpx;
   padding: 0 48rpx;
-  border-radius: 48rpx;
-  background: var(--teal);
-  color: #fff;
-  font-size: 30rpx;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, #16483E 0%, #0A2720 100%);
+  color: var(--gold-bright);
+  font-size: var(--fs-md);
+  font-weight: 700;
   text-align: center;
   display: inline-block;
 }

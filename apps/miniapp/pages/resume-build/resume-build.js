@@ -3,6 +3,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const storage = require('../../utils/storage')
 const model = require('../../utils/resume-build-model')
+const presets = require('../../utils/resume-style-presets')
 const view = require('./resume-build-view')
 
 /** 三段可重复条目的规格。key 就是 data 里的数组名，wxml 通过 data-group 指过来。 */
@@ -81,8 +82,9 @@ Page({
     exporting: false,
 
     format: 'pdf',
-    // 排版默认值与 ResumeLayoutDto 的服务端缺省一致；页面上选中的就是会提交的那一份
-    layout: { fontScale: 'standard', lineSpacing: 'standard', margin: 'normal', columns: 1, accent: 'blue' },
+    // 默认采用「极简商务」高定预设（单栏远山灰）；页面上选中的就是会提交的那一份
+    layout: presets.defaultLayout(),
+    stylePresets: presets.listPresets('business'),
     optionGroups: [],
   },
 
@@ -368,8 +370,18 @@ Page({
     this.setData({ [`layout.${ds.opt}`]: value }, () => this._syncOptions())
   },
 
+  pickStylePreset(e) {
+    const key = String((e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.key) || '')
+    if (!presets.presetByKey(key) || this.data.format !== 'pdf') return
+    const nextLayout = presets.applyPreset(key)
+    this.setData({ layout: nextLayout }, () => this._syncOptions())
+  },
+
   _syncOptions() {
-    this.setData({ optionGroups: model.syncOptionGroups(model.optionGroups(), this.data.format, this.data.layout) })
+    this.setData({
+      optionGroups: model.syncOptionGroups(model.optionGroups(), this.data.format, this.data.layout),
+      stylePresets: presets.listPresets(presets.matchPresetKey(this.data.layout)),
+    })
   },
 
   tapExport() { this._export(false) },
