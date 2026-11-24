@@ -1,4 +1,6 @@
 // app.js
+const orgEntry = require('./utils/org-entry');
+
 App({
   globalData: {
     statusBarHeight: 20,
@@ -7,7 +9,14 @@ App({
     // 自定义顶栏右侧内容需要的右让（px）。见 onLaunch 里的计算与实测依据。
     capsuleInsetRight: 94,
   },
-  onLaunch() {
+  onLaunch(options) {
+    try {
+      const launchOrgId = orgEntry.parseOrgIdFromLaunch(options && options.query);
+      if (launchOrgId) orgEntry.rememberLaunchOrgId(launchOrgId);
+    } catch (e) {
+      // 忽略异常启动参数
+    }
+
     try {
       const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
       const statusBarHeight = win.statusBarHeight || 20;
@@ -36,5 +45,13 @@ App({
     // 启动时的「招聘会提醒」弹窗已随招聘会页一起停放（首发按非招聘类目提审，
     // 见 docs/compliance/compliance-boundary.md §1.1）。取得人力资源服务许可证、
     // 通过求职/招聘类目后，与 pages/fair-reminders 一起恢复。
+  },
+  onShow(options) {
+    try {
+      const warmOrgId = orgEntry.parseOrgIdFromLaunch(options && options.query);
+      if (warmOrgId) orgEntry.rememberLaunchOrgId(warmOrgId);
+    } catch (e) {
+      // 忽略异常热启动参数
+    }
   },
 });

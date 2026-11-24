@@ -63,6 +63,7 @@
             <view class="store-info">
               <view class="store-header">
                 <text class="store-name">{{item.name}}</text>
+                <view wx:if="{{item.isOrgTerminal}}" class="store-org-tag">本机构终端</view>
                 <view class="store-status {{item.isOnline ? 'open' : 'closed'}}">
                   <text>{{item.isOnline ? '在线' : '离线 · 暂不可下单'}}</text>
                 </view>

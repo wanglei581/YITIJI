@@ -4,7 +4,18 @@
     <view class="home-band">
       <view style="height:{{statusBarHeight}}px"></view>
       <view class="home-head" style="padding-right:{{capsuleInsetRight}}px">
-        <view class="brand-row">
+        <view wx:if="{{orgEntry}}" class="brand-row is-co tap" hover-class="tap-press" bindtap="tapOrgSwitch" role="button" aria-label="{{orgBrandTitle}}联名服务入口，点击查看服务点或恢复默认首页">
+          <view class="brand-seal" aria-hidden="true">{{orgSealText}}</view>
+          <view class="brand-copy">
+            <view class="brand-co-line">
+              <text class="brand-name">{{orgBrandTitle}}</text>
+              <view class="brand-co-sep" aria-hidden="true"></view>
+              <text class="brand-co-with">× 职易达</text>
+            </view>
+            <text class="brand-en">专属联名服务站 · 点击切换 ▾</text>
+          </view>
+        </view>
+        <view wx:else class="brand-row">
           <view class="brand-seal" aria-hidden="true">职</view>
           <view class="brand-copy">
             <text class="brand-name">职易达</text>
@@ -37,6 +48,19 @@
           <view class="qing-say">简历诊断、面试陪练、打印取件，随时问我</view>
         </view>
         <view class="qing-go" aria-hidden="true"><text class="ficon i-right"></text></view>
+      </view>
+
+      <!-- 一机构一码鎏金铭牌条：白瓷底细金线，展示联名归属与本机构实时在线终端数 -->
+      <view wx:if="{{orgEntry}}" class="org-plate tap" hover-class="tap-press" bindtap="tapOrgNameplate" role="button" aria-label="{{orgEntry.orgName}}专属服务点，点击查看">
+        <view class="org-plate-seal" aria-hidden="true">{{orgSealText}}</view>
+        <view class="org-plate-copy">
+          <text class="org-plate-name">{{orgEntry.orgName}}</text>
+          <text class="org-plate-sub">官方协作 · 数字化求职打印服务站</text>
+        </view>
+        <view class="org-plate-stat">
+          <text class="org-plate-badge">{{orgTerminalCount > 0 ? orgTerminalCount + ' 台在线' : '服务点'}}</text>
+          <text class="ficon i-right org-plate-arrow" aria-hidden="true"></text>
+        </view>
       </view>
 
       <!-- 动态状态区：有未核销到机码优先浮现；无待取件时展示最近订单状态 -->
@@ -84,7 +108,7 @@
       <view class="print-banner tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/documents/documents" role="button" aria-label="从我的文档发起打印">
         <view class="print-icon"><text class="ficon i-printer"></text></view>
         <view class="print-copy">
-          <view class="print-kicker">CLOUD PRINT · 双端直连</view>
+          <view class="print-kicker">{{orgTopTerminalName ? ('本机构优选 · ' + orgTopTerminalName + '在线') : 'CLOUD PRINT · 双端直连'}}</view>
           <text class="print-title">手机准备文件，到终端直接打印</text>
           <text class="print-desc">选择本人文档 · 生成到机码 · 扫码出纸</text>
         </view>

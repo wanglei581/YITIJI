@@ -88,6 +88,16 @@
   gap: 24rpx;
   padding-bottom: calc(400rpx + var(--sab));
 }
+.store-org-tag {
+  padding: 4rpx 14rpx;
+  border-radius: var(--r-full);
+  background: var(--gold-soft);
+  border: 1rpx solid var(--gold-line);
+  color: var(--gold-deep);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  flex-shrink: 0;
+}
 
 .store-item {
   position: relative;

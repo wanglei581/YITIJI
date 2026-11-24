@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-11-24：Batch B「一机构一码」官方采购联名入口与机构后台专属推广凭证（分支 `claude/miniapp-org-entry-b`，接 `origin/main@2dd84e0ae`，未上传微信公众平台，未动线上 `zyidai.cn`）
+
+- 来由：按产品负责人拍板「B → C → 全站子页视觉」分批路线推进第一批功能闭环，由 Antigravity × Codex CLI（`gpt-6.1-terra`）× Claude Code（Sonnet）三方联合完成安全/合规审查与高定联名视觉定稿。零新增 Prisma 迁移，严守无证非招聘提审边界与 2026-09-26 托管 a 红线（不引入任何岗位/招聘会/企业资料或外跳招聘链接）。
+- ① 后端「一机构一码」公开入口与机构发码接口（`services/api/src/miniapp-code/miniapp-org-entry.*`、`branding/branding.service.ts`）：
+  - `GET /api/v1/public/miniapp-org-entry?orgId=`：免登录、按 IP 限流（30 次/分）、成功与 404 响应均强制 `Cache-Control: private, no-store`；机构不存在/停用/归档/授权不可用统一 404 fail-closed（复用 `BrandingService.isOrgBrandActive()`，保持 `verify:license` 管控点收口）；仅返回最小白名单字段（联名品牌标识与当前机构 5 分钟有效心跳且非未来时钟偏移的在线打印终端列表）。
+  - `GET /api/v1/partner/miniapp-entry` 与 `POST /api/v1/partner/miniapp-entry-code`：`orgId` 严格取自登录态 `user.orgId`（缺失直接 403），`scene` 严守微信 `o=<orgId>` 字符集与 ≤ 32 字符约束；写接口不加入 `PARTNER_WRITE_EXEMPTIONS`，授权不可用时由全局拦截器自动拦截；如实返回 `envVersion`（`release`/`trial`/`develop`），绝不把体验/开发码伪装成对外正式码；新增 6 项单元测试（`miniapp-org-entry.service.test.ts`）。
+- ② 合作机构后台「专属小程序入口与推广凭证」卡片（`apps/partner/src/routes/profile/MiniappEntrySection.tsx`、`services/api/miniappEntry.ts`）：挂入机构资料页，提供高清小程序码一键生成与按实际 MIME 下载、公众号菜单路径（`pages/home/home?orgId=<orgId>`）一键复制、实时在线终端计数及 `envVersion` 诚实提示，无原始 `Error.message` 上屏。
+- ③ 小程序联名「数字公文头」与打印终端优选（`apps/miniapp/utils/org-entry.js`、`utils/api-org-entry.js`、`app.js`、`pages/home/`、`pages/print-store/`、`pages/store-select/`）：支持冷/热启动解析 `?orgId=` 与编码/未编码 `scene=o=<id>`；首页墨翠头区优雅切换为「机构简称 | × 职易达」联名公文头（点击印纹可查本机构服务点或一键恢复默认首页），悬浮小青卡下方新增紧凑白瓷细金线「鎏金铭牌条」并在云打印主卡展示本机构优先终端；404/停服或用户恢复默认时立即清理本机视图偏好并作废在途异步响应防覆盖；打印选终端与材料包选点页自动将本机构在线终端置顶并打「本机构终端」鎏金徽标（不隐藏其他可用终端，下单仍由服务端复核）；新增 `scripts/tests/org-entry.test.mjs` 并更新 `api-contract.json`（149/149 零缺口）。
+- ④ 全量验证：通过 `miniapp-org-entry.service.test.ts`（6/6）、`services/api` 构建与隔离库 `verify:license` / `verify:branding` / `verify:official-channels` 全绿；`apps/partner` ESLint（0 error）+ 正式 HTTP 生产构建；`apps/miniapp` `verify:static` 17/17 门禁 + 700+ 单测（含 `org-entry.test.mjs`、视觉刻度 0 新增偏离）；全仓合规文案/完整性/CI 覆盖率门禁全绿，并完成微信开发者工具联名首页实拍目视验收。
+
 ## 2026-11-24：小程序「青绪 · 墨翠鎏金白瓷」旗舰 UI 重塑与三方联合实拍验收（分支 `claude/miniapp-qingxu-ui-v110`，接 `origin/main@8349cc1e2`，未上传微信公众平台，不影响审核中 `v1.0.5`）
 
 - 来由：按产品负责人要求提升小程序整体 UI 与高端旗舰质感，并与线下 27 寸「青绪」一体机形成品牌同源；由 Antigravity、Claude Code（Sonnet）、Codex CLI（`gpt-6.1-terra`）三方基于微信开发者工具真机模拟实拍图联合会审并一次性落地精修。零后端改动，未触碰停放页、合规红线与主仓工作区，未动线上生产与提审中 `v1.0.5`。

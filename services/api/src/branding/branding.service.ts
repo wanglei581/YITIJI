@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
+import { loadOrgLicenseResolution } from '../licenses/license-gate'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { BrandLogoService } from './brand-logo.service'
 import {
@@ -195,6 +196,15 @@ export class BrandingService {
       return next
     })
     return this.toAdmin(after)
+  }
+
+  /**
+   * 公开联名入口使用的只读授权可用性判定（统一收口在 branding 模块内）。
+   * 机构不存在或授权不可用一律返回 false；licenseMode='none' 保持放行。
+   */
+  async isOrgBrandActive(orgId: string, now?: Date): Promise<boolean> {
+    const resolution = await loadOrgLicenseResolution(this.prisma, orgId, now)
+    return Boolean(resolution && resolution.usable)
   }
 
   private async toAdmin(stored: PlatformBrandStored): Promise<AdminBranding> {

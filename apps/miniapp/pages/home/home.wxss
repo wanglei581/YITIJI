@@ -42,7 +42,8 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   align-items: center;
   justify-content: space-between;
 }
-.brand-row { display: flex; align-items: center; gap: 16rpx; }
+.brand-row { display: flex; align-items: center; gap: 16rpx; min-width: 0; flex: 1; }
+.brand-row.is-co { min-height: 96rpx; }
 .brand-seal {
   width: 56rpx;
   height: 56rpx;
@@ -54,11 +55,15 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, .45), 0 6rpx 16rpx rgba(0, 0, 0, .24);
 }
-.brand-copy { display: flex; flex-direction: column; gap: 2rpx; }
-.brand-name { font-size: var(--fs-lg); line-height: 1.15; font-weight: 700; letter-spacing: 2rpx; color: #F7F5EE; }
-.brand-en { font-size: var(--fs-xs); line-height: 1; letter-spacing: 2rpx; color: var(--gold-bright); opacity: .78; }
+.brand-copy { display: flex; flex-direction: column; gap: 4rpx; min-width: 0; flex: 1; }
+.brand-co-line { display: flex; align-items: center; gap: 10rpx; min-width: 0; }
+.brand-name { font-size: var(--fs-lg); line-height: 1.15; font-weight: 700; letter-spacing: 2rpx; color: #F7F5EE; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-co-sep { width: 2rpx; height: 24rpx; background: rgba(223, 198, 147, .55); flex-shrink: 0; }
+.brand-co-with { font-size: var(--fs-xs); font-weight: 600; color: var(--gold-bright); white-space: nowrap; flex-shrink: 0; }
+.brand-en { font-size: var(--fs-xs); line-height: 1; letter-spacing: 2rpx; color: var(--gold-bright); opacity: .78; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 保留 96rpx=48px 完整可点热区，但视觉收束为精致 64rpx 圆形微光按钮，绝不喧宾夺主 */
 .head-btn { width: 96rpx; height: 96rpx; display: flex; align-items: center; justify-content: center; }
@@ -131,6 +136,47 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   box-shadow: 0 6rpx 16rpx rgba(15, 106, 87, .24);
 }
 .qing-go .ficon { width: 20rpx; height: 20rpx; }
+
+/* 一机构一码鎏金铭牌条：白瓷底 + 细金线，厚度紧凑不抢核心 AI 入口重心 */
+.org-plate {
+  min-height: 96rpx;
+  margin-top: 20rpx;
+  padding: 18rpx 22rpx;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, #FFFFFF 0%, #FBF8F1 100%);
+  border: 1rpx solid var(--gold-line);
+  box-shadow: var(--sh-xs);
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.org-plate-seal {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: var(--r-sm);
+  background: linear-gradient(145deg, #184E43 0%, #0B2721 100%);
+  border: 1rpx solid rgba(212, 186, 135, .45);
+  color: var(--gold-bright);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.org-plate-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4rpx; }
+.org-plate-name { font-size: var(--fs-base); font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.org-plate-sub { font-size: var(--fs-xs); color: var(--gold-deep); }
+.org-plate-stat { display: flex; align-items: center; gap: 8rpx; flex-shrink: 0; }
+.org-plate-badge {
+  padding: 4rpx 14rpx;
+  border-radius: var(--r-full);
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.org-plate-arrow { width: 18rpx; height: 18rpx; color: var(--gold); }
 
 /* 待取件优先动态卡 */
 .pickup-card {

@@ -3,12 +3,15 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const storage = require('../../utils/storage')
+const orgEntryUtil = require('../../utils/org-entry')
+const orgEntryApi = require('../../utils/api-org-entry')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 const pickup = require('./pickup-summary')
 const entryWays = require('../../utils/resume-optimize-entry')
 
-// 首页是 Tab 页，每次切回来都会 onShow：同一个人 30 秒内不重复拉订单。
+// 首页是 Tab 页，每次切回来都会 onShow：同一个人 / 同一机构 30 秒内不重复拉取。
 const PICKUP_FRESH_MS = 30 * 1000
+const ORG_FRESH_MS = 30 * 1000
 
 // 问候语按时段
 function greetWord() {
@@ -28,6 +31,29 @@ function todayStr() {
   return `${M}月${D}日 · 周${days[d.getDay()]}`
 }
 
+function emptyOrgView() {
+  return {
+    orgEntry: null,
+    orgBrandTitle: '',
+    orgSealText: '',
+    orgTerminalCount: 0,
+    orgTopTerminalName: '',
+  }
+}
+
+function formatOrgView(entry) {
+  const terminals = Array.isArray(entry && entry.terminals) ? entry.terminals : []
+  const brandTitle = (entry && (entry.brandName || entry.orgName)) || ''
+  const seal = (entry && entry.brandMark) || (brandTitle ? brandTitle.slice(0, 1) : '职')
+  return {
+    orgEntry: entry,
+    orgBrandTitle: brandTitle,
+    orgSealText: seal,
+    orgTerminalCount: terminals.length,
+    orgTopTerminalName: terminals[0] ? (terminals[0].displayName || '') : '',
+  }
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -41,6 +67,11 @@ Page({
     greetTitle: '你好',
     greetWord: '你好',
     todayStr: '',
+    orgEntry: null,
+    orgBrandTitle: '',
+    orgSealText: '',
+    orgTerminalCount: 0,
+    orgTopTerminalName: '',
     primaryServices: [
       { title: '简历诊断', icon: 'file-search', tone: 'blue', url: '/pages/resume-diagnose/resume-diagnose' },
       { title: '简历优化', icon: 'edit', tone: 'violet', url: entryWays.OPTIMIZE_URL },
@@ -59,9 +90,11 @@ Page({
     latestOrderAt: '',
   },
 
-  onLoad() {
+  onLoad(options) {
     this._guard = createLifecycleGuard()
     this._pickupAt = 0
+    this._orgLoadedId = ''
+    this._orgLoadedAt = 0
     const g = app.globalData || {}
     this.setData({
       statusBarHeight: g.statusBarHeight || 20,
@@ -69,6 +102,8 @@ Page({
       greetWord: greetWord(),
       todayStr: todayStr(),
     })
+    const directOrgId = orgEntryUtil.parseOrgIdFromLaunch(options)
+    if (directOrgId) orgEntryUtil.rememberLaunchOrgId(directOrgId)
   },
 
   onShow() {
@@ -78,11 +113,89 @@ Page({
     this._guard.activate()
     this._refresh()
     this._loadPickup()
+    this._syncOrgEntry()
   },
 
   onHide() {
     this._guard.deactivate()
     entryWays.cancelEntry(this, wx)
+  },
+
+  /**
+   * 同步「一机构一码」官方采购联名入口。
+   * 新扫码/菜单参数优先于本机已记住的视图偏好；服务端 404 / 停用 / 授权失效时立即清回默认视图。
+   */
+  _syncOrgEntry() {
+    const freshLaunchId = orgEntryUtil.consumePendingLaunchOrgId()
+    const stored = orgEntryUtil.getStoredOrgContext()
+    const targetId = freshLaunchId || (stored && stored.orgId) || ''
+    if (!targetId) {
+      if (this.data.orgEntry) this.setData(emptyOrgView())
+      this._orgLoadedId = ''
+      this._orgLoadedAt = 0
+      return
+    }
+    if (!freshLaunchId && this._orgLoadedId === targetId && this._orgLoadedAt && Date.now() - this._orgLoadedAt < ORG_FRESH_MS) {
+      return
+    }
+    // 切换到新机构时先清掉上一家机构的旧展示，避免异步加载期间出现「张冠李戴」
+    if (this.data.orgEntry && this.data.orgEntry.orgId !== targetId) {
+      this.setData(emptyOrgView())
+    }
+    const token = this._guard.issue('orgEntry')
+    orgEntryApi.getPublicOrgEntry(targetId).then((entry) => {
+      if (!this._guard.accepts(token)) return
+      this._orgLoadedId = entry.orgId
+      this._orgLoadedAt = Date.now()
+      orgEntryUtil.saveOrgContext(entry)
+      this.setData(formatOrgView(entry))
+    }).catch(() => {
+      if (!this._guard.accepts(token)) return
+      this._orgLoadedId = ''
+      this._orgLoadedAt = 0
+      orgEntryUtil.clearOrgContext()
+      this.setData(emptyOrgView())
+    })
+  },
+
+  clearOrgMode() {
+    // 递增代次：即使有在途机构请求正在返回，也不得覆盖用户已主动恢复的默认视图
+    this._guard.issue('orgEntry')
+    this._orgLoadedId = ''
+    this._orgLoadedAt = 0
+    orgEntryUtil.clearOrgContext()
+    this.setData(emptyOrgView())
+    wx.showToast({ title: '已恢复职易达默认首页', icon: 'none' })
+  },
+
+  tapOrgSwitch() {
+    if (!this.data.orgEntry) return
+    wx.showActionSheet({
+      itemList: ['查看本机构打印服务点', '恢复职易达默认首页'],
+      success: (res) => {
+        if (res.tapIndex === 0) this.tapOrgNameplate()
+        else if (res.tapIndex === 1) this.clearOrgMode()
+      },
+    })
+  },
+
+  tapOrgNameplate() {
+    const entry = this.data.orgEntry
+    if (!entry) return
+    const terminals = Array.isArray(entry.terminals) ? entry.terminals : []
+    const lines = terminals.length
+      ? terminals.map((t, i) => `${i + 1}. ${t.displayName}${t.locationLabel ? '（' + t.locationLabel + '）' : ''}`)
+      : ['当前暂无实时在线终端，请稍后刷新或选择其他可用服务点。']
+    const note = entry.terminalSelectionNote || '在线列表为实时预筛，实际是否可打印以选点后服务端核验为准。'
+    wx.showModal({
+      title: `${entry.orgName} · 服务点`,
+      content: `${lines.join('\n')}\n\n${note}`,
+      confirmText: '前往打印',
+      cancelText: '知道了',
+      success: (res) => {
+        if (res.confirm) wx.switchTab({ url: '/pages/print/print' })
+      },
+    })
   },
 
   /**
@@ -177,9 +290,10 @@ Page({
   },
 
   onShareAppMessage() {
+    const orgId = this.data.orgEntry && this.data.orgEntry.orgId
     return {
-      title: '职易达 · AI 简历与打印服务',
-      path: '/pages/home/home',
+      title: orgId ? `${this.data.orgBrandTitle} × 职易达 · AI 简历与打印服务` : '职易达 · AI 简历与打印服务',
+      path: orgId ? `/pages/home/home?orgId=${encodeURIComponent(orgId)}` : '/pages/home/home',
     }
   },
 })

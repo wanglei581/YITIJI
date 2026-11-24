@@ -2,6 +2,7 @@
 // 选择终端，并在本页选择彩色 / 长边双面。只认本次核定结果。
 const api = require('../../utils/api')
 const printParams = require('../../utils/print-params')
+const orgEntryUtil = require('../../utils/org-entry')
 
 function decodeParam(value) {
   if (typeof value !== 'string' || !value) return ''
@@ -106,7 +107,9 @@ Page({
     if (!silent || !(this.data.stores && this.data.stores.length)) this.setData({ loading: true, loadError: '' })
     api.getPublicTerminals().then(data => {
       if (!this._active || seq !== this._listSeq) return
-      const list = Array.isArray(data) ? data : ((data && data.data) || [])
+      const rawList = Array.isArray(data) ? data : ((data && data.data) || [])
+      const orgCtx = orgEntryUtil.getStoredOrgContext()
+      const list = orgEntryUtil.prioritizeOrgTerminals(rawList, orgCtx && orgCtx.terminalIds)
       let picked = this.data.picked
       if (picked && !list.some(item => item && item.id === picked)) picked = ''
       if (!picked && list.length === 1) picked = list[0].id
