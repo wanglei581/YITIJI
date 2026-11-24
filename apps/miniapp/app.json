@@ -93,14 +93,14 @@
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "职易达",
     "navigationStyle": "custom",
-    "backgroundColor": "#f5f7fa",
+    "backgroundColor": "#F6F7F5",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "custom": true,
-    "color": "#8d98a9",
-    "selectedColor": "#2354E6",
-    "backgroundColor": "#ffffff",
+    "color": "#64756F",
+    "selectedColor": "#0B4D3F",
+    "backgroundColor": "#FFFFFF",
     "list": [
       {
         "pagePath": "pages/home/home",

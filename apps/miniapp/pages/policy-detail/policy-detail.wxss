@@ -1,7 +1,7 @@
 .page-wrap { min-height: 100vh; background: var(--paper); }
 
 .policy-hero { margin: 12rpx 32rpx 0; padding: 30rpx; border-radius: 32rpx;
-  border: 1rpx solid #dce9ff; background: #eef5ff; }
+  border: 1rpx solid var(--teal-soft); background: var(--teal-wash); }
 .ph-top { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
 .ph-labels { display: flex; align-items: center; gap: 10rpx; }
 .ph-kind { font-size: 21rpx; color: var(--muted); }

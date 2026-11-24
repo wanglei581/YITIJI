@@ -25,9 +25,9 @@ const DIM_COUNT_EXPECTED = 5
 const MAX_STRENGTH = 5
 
 const RADAR_COLORS = {
-  fillInner: 'rgba(35, 84, 230, 0.20)',
-  fillOuter: 'rgba(35, 84, 230, 0.04)',
-  stroke:    '#2354E6',
+  fillInner: 'rgba(15, 110, 92, 0.20)',
+  fillOuter: 'rgba(15, 110, 92, 0.04)',
+  stroke:    '#0f6e5c',
   guide:     '#e6ebf3',
 }
 

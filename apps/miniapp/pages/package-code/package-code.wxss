@@ -178,7 +178,7 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   line-height: 96rpx;
   padding: 0 48rpx;
   border-radius: 48rpx;
-  background: #1677ff;
+  background: var(--teal);
   color: #fff;
   font-size: 30rpx;
   text-align: center;

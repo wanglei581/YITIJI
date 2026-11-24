@@ -12,7 +12,7 @@
 .fav-btn.on { border-color: var(--teal); background: var(--teal-wash); color: var(--teal-deep); }
 
 .company-hero { margin: 12rpx 32rpx 0; padding: 30rpx; border-radius: 32rpx;
-  border: 1rpx solid #dce9ff; background: #eef5ff; }
+  border: 1rpx solid var(--teal-soft); background: var(--teal-wash); }
 .ch-top { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
 .ch-logo { width: 82rpx; height: 82rpx; border-radius: 26rpx; background: var(--teal);
   color: #fff; display: flex; align-items: center; justify-content: center; }

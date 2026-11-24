@@ -48,7 +48,7 @@
 
 /* 结果头:只写对照的是哪个岗位,不放等级、不放总评(见 job-fit.js 文件头) */
 /* 横向内缩用 px 与全局 .card 的 margin:0 16px 对齐,rpx 在宽屏机上会错位 */
-.fit-hero { background: var(--surface); border: 1rpx solid #dce9ff;
+.fit-hero { background: var(--surface); border: 1rpx solid var(--teal-soft);
   border-radius: 30rpx; margin: 0 16px 12px; padding: 30rpx;
   box-shadow: var(--sh-xs); }
 .fit-cap { font-size: var(--fs-sm); color: var(--muted); }

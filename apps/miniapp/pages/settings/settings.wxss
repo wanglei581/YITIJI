@@ -103,5 +103,5 @@
   color: #fff;
   background: var(--teal);
   border-color: var(--teal);
-  box-shadow: 0 12rpx 28rpx rgba(22,119,255,.16);
+  box-shadow: 0 12rpx 28rpx rgba(15, 110, 92,.16);
 }

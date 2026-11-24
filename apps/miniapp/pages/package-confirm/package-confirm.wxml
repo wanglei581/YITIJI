@@ -136,7 +136,7 @@
         <view class="agreement-section">
           <checkbox-group bindchange="toggleAgreement">
             <label class="agreement-label">
-              <checkbox value="agreed" checked="{{agreedToTerms}}" color="#1677ff" />
+              <checkbox value="agreed" checked="{{agreedToTerms}}" color="#0f6e5c" />
               <text>我已阅读并同意</text>
             </label>
           </checkbox-group>

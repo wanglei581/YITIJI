@@ -13,7 +13,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 20rpx 40rpx rgba(22,119,255,.16);
+  box-shadow: 0 20rpx 40rpx rgba(15, 110, 92,.16);
 }
 .ab-ic {
   width: 70rpx;

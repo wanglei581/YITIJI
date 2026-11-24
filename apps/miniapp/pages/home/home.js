@@ -37,7 +37,8 @@ Page({
     // 不能在 wxss 里写死：胶囊位置随机型与系统版本变。
     capsuleInsetRight: 94,
     isLoggedIn: false,
-    userName: '同学',
+    userName: '',
+    greetTitle: '你好',
     greetWord: '你好',
     todayStr: '',
     primaryServices: [
@@ -128,8 +129,14 @@ Page({
   _refresh() {
     const loggedIn = auth.isLoggedIn()
     const user = loggedIn ? auth.getUser() : null
-    const name = (user && (user.nickname || user.name)) || '同学'
-    this.setData({ isLoggedIn: loggedIn, userName: name })
+    const name = (user && (user.nickname || user.name)) || ''
+    const gw = greetWord()
+    this.setData({
+      isLoggedIn: loggedIn,
+      userName: name,
+      greetWord: gw,
+      greetTitle: name ? `${gw}，${name}` : gw,
+    })
   },
 
   // ── 事件处理 ──

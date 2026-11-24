@@ -1,47 +1,86 @@
+/* 独立组件完全自包含定位、实底色与配色，杜绝 page 级变量丢失导致透明透字 */
+.tabbar-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  padding: 16rpx 24rpx calc(18rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  background: linear-gradient(180deg, rgba(246, 247, 245, 0) 0%, rgba(246, 247, 245, .94) 34%, #F6F7F5 100%);
+  pointer-events: none;
+}
+
 .tabbar {
-  position: static;
+  position: relative;
   width: 100%;
-  min-height: 116rpx;
-  padding: 14rpx 8rpx calc(16rpx + env(safe-area-inset-bottom));
-  border-radius: 0;
-  border-top: 1rpx solid #edf1f6;
-  box-shadow: 0 -8rpx 24rpx rgba(31, 50, 77, .035);
-  background: #fff;
+  min-height: 112rpx;
+  padding: 10rpx 12rpx;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  border-radius: 48rpx;
+  background: #FFFFFF;
+  border: 1rpx solid rgba(15, 61, 52, .08);
+  box-shadow: 0 2rpx 8rpx rgba(11, 39, 33, .05), 0 14rpx 38rpx rgba(11, 39, 33, .13);
+  pointer-events: auto;
 }
 
 .tabbar .tab {
-  gap: 5rpx;
+  flex: 1;
   min-height: 96rpx;
-  padding-top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5rpx;
+  padding: 2rpx 0;
+  position: relative;
 }
 
 .tabbar .tab .tb {
-  width: 72rpx;
-  height: 48rpx;
+  width: 84rpx;
+  height: 52rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: background-color .2s ease, transform .2s ease;
 }
 
 .tabbar .tab .ti {
-  width: 42rpx;
-  height: 42rpx;
-  color: #8d98a9;
+  width: 40rpx;
+  height: 40rpx;
+  font-size: 40rpx;
+  line-height: 1;
+  color: #64756F;
+  transition: color .2s ease;
 }
 
 .tabbar .tab .tl {
-  color: #667085;
-  font-size: 22rpx;
+  color: #64756F;
+  font-size: 20rpx;
   line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: .5rpx;
+  transition: color .2s ease;
 }
 
 .tabbar .tab.on .tb {
-  background: #eaf2ff;
-  transform: none;
+  background: linear-gradient(135deg, rgba(15, 106, 87, .12) 0%, rgba(182, 154, 104, .16) 100%);
 }
 
-.tabbar .tab.on .ti,
-.tabbar .tab.on .tl {
-  color: var(--teal);
+.tabbar .tab.on .ti {
+  color: #0B4D3F;
 }
 
 .tabbar .tab.on .tl {
-  font-weight: 650;
+  color: #0B4D3F;
+  font-weight: 700;
+}
+
+.tabbar .tab:active .tb {
+  transform: scale(.92);
 }

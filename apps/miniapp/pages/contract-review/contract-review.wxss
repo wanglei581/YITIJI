@@ -6,7 +6,7 @@ page { background: var(--paper); }
 .type-grid { margin-top: 16rpx; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14rpx; }
 .type-item { min-height: 96rpx; padding: 20rpx; border-radius: 22rpx; background: #fff; border: 1rpx solid var(--line-soft); font-size: 27rpx; color: var(--ink); display: flex; align-items: center; justify-content: center; }
 .type-item.on { border-color: var(--teal); background: var(--teal-wash); color: var(--teal-deep); font-weight: 700; }
-.cr-cta { margin-top: 28rpx; height: 96rpx; border-radius: 26rpx; background: linear-gradient(128deg,#2E5BEA,#1A3FB8); color: #fff; font-size: 29rpx; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 12rpx 26rpx -10rpx rgba(26,63,184,.5); }
+.cr-cta { margin-top: 28rpx; height: 96rpx; border-radius: 26rpx; background: linear-gradient(145deg, var(--dark-a), var(--dark-b)); color: #fff; font-size: 29rpx; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 12rpx 26rpx -10rpx rgba(11, 42, 34,.5); }
 .cr-sub { margin-top: 18rpx; height: 80rpx; display: flex; align-items: center; justify-content: center; font-size: 26rpx; color: var(--muted); }
 .cr-note { margin-top: 18rpx; font-size: 22rpx; color: var(--muted); line-height: 1.6; }
 .scope-card { margin-top: 16rpx; padding: 24rpx; border-radius: 26rpx; background: #fff; border: 1rpx solid var(--line-soft); }
@@ -62,7 +62,7 @@ page { background: var(--paper); }
 
 /* 分析进度：按服务端真实状态推进，不做匀速假动画 */
 .pg-bar { height: 10rpx; border-radius: 6rpx; background: var(--surface-2); overflow: hidden; }
-.pg-fill { height: 100%; border-radius: 6rpx; background: linear-gradient(90deg,#2E5BEA,#1A3FB8); transition: width .4s ease; }
+.pg-fill { height: 100%; border-radius: 6rpx; background: linear-gradient(90deg, var(--teal-mid), var(--teal)); transition: width .4s ease; }
 .pg-step { margin-top: 14rpx; font-size: 23rpx; font-weight: 700; color: var(--teal-deep); }
 .pg-list { margin-top: 24rpx; }
 .pg-item { display: flex; align-items: flex-start; gap: 16rpx; padding: 14rpx 0; }

@@ -8,7 +8,7 @@
         <text class="ficon i-right as-back-ic"></text>
       </view>
       <view class="as-av">
-        <image src="/assets/xiaoqing-card.jpg" mode="aspectFill" />
+        <image src="/assets/xiaoqing-avatar.jpg" mode="aspectFill" />
       </view>
       <view style="flex:1">
         <view class="as-name">小青</view>
@@ -37,7 +37,7 @@
         <!-- AI 消息 -->
         <view wx:if="{{item.role === 'ai'}}" class="msg msg-ai">
           <view class="msg-av-wrap">
-            <image src="/assets/xiaoqing-card.jpg" mode="aspectFill" />
+            <image src="/assets/xiaoqing-avatar.jpg" mode="aspectFill" />
           </view>
           <view class="b-ai">
             <view wx:if="{{item.loading}}" class="bt msg-loading">
@@ -98,15 +98,15 @@
         </view>
       </view>
 
-      <view style="height:320rpx"></view>
+      <view style="height:40rpx"></view>
     </view>
   </scroll-view>
 
-  <!-- 底部输入栏（fixed） -->
+  <!-- 底部输入栏（flex 流末端，彻底杜绝盖住聊天内容） -->
   <view class="input-bar as-input-col">
-    <view class="as-voice-row">
+    <view wx:if="{{asrEnabled}}" class="as-voice-row">
       <view
-        class="as-hold {{holding ? 'is-on' : ''}} {{(!asrEnabled || sending || transcribing) ? 'is-off' : ''}}"
+        class="as-hold {{holding ? 'is-on' : ''}} {{(sending || transcribing) ? 'is-off' : ''}}"
         hover-class="tap-press"
         bindtouchstart="onHoldStart"
         bindtouchend="onHoldEnd"

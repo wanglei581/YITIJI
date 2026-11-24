@@ -93,12 +93,13 @@ Page({
       const ok = !!(cap && cap.asrEnabled)
       this.setData({
         asrEnabled: ok,
-        voiceBlockedReason: ok ? '' : '语音转写未启用，请使用文字输入。恢复条件：管理员配置 ASR 后重新进入本页。',
+        // ASR 未开启时直接收起语音栏，不向求职者暴露内部运维配置提示
+        voiceBlockedReason: '',
       })
     }).catch(() => {
       this.setData({
         asrEnabled: false,
-        voiceBlockedReason: '语音转写未启用，请使用文字输入。恢复条件：管理员配置 ASR 后重新进入本页。',
+        voiceBlockedReason: '',
       })
     })
   },

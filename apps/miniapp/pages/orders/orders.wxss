@@ -2,9 +2,9 @@
 .orders-intro {
   margin: 20rpx 32rpx 0;
   padding: 22rpx 24rpx;
-  border-radius: 24rpx;
-  border: 1rpx solid #dce9ff;
-  background: #f3f8ff;
+  border-radius: var(--r-md);
+  border: 1rpx solid var(--teal-soft);
+  background: var(--teal-wash);
   display: flex;
   align-items: center;
   gap: 18rpx;
@@ -12,9 +12,9 @@
 .oi-icon {
   width: 68rpx;
   height: 68rpx;
-  border-radius: 21rpx;
+  border-radius: var(--r-sm);
   background: var(--teal);
-  color: #fff;
+  color: #f6f3ea;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -22,8 +22,8 @@
 }
 .oi-icon .ficon { width: 34rpx; height: 34rpx; }
 .oi-copy { flex: 1; min-width: 0; }
-.oi-title { font-size: 27rpx; font-weight: 700; color: #17233e; }
-.oi-sub { margin-top: 5rpx; font-size: 21rpx; color: #66758d; }
+.oi-title { font-size: var(--fs-base); font-weight: 700; color: var(--ink); }
+.oi-sub { margin-top: 5rpx; font-size: var(--fs-xs); color: var(--muted); }
 .ord-content { padding-top: 20rpx; }
 
 .ord-card {
@@ -93,7 +93,7 @@
   padding: 18rpx 20rpx;
   border-radius: var(--r);
   background: var(--teal-wash);
-  border: 1rpx solid #dce9ff;
+  border: 1rpx solid var(--teal-soft);
   margin-bottom: 18rpx;
 }
 .pk-label { font-size: 23rpx; color: var(--teal-deep); font-weight: 600; flex-shrink: 0; white-space: nowrap; }
