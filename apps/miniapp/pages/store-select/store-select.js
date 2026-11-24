@@ -17,6 +17,7 @@
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
+const orgEntryUtil = require('../../utils/org-entry')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 Page({
@@ -94,14 +95,18 @@ Page({
     api.getPublicTerminals()
       .then((list) => {
         if (!this._guard.accepts(token)) return
-        const rows = (Array.isArray(list) ? list : []).map((terminal) => ({
-          id: terminal.id,
-          name: terminal.displayName || '服务点',
-          address: terminal.locationLabel || '位置待补充',
-          isOnline: terminal.isOnline === true,
-          // 心跳时间是服务端给的事实，直接展示比「营业中/已打烊」这种推断更诚实。
-          lastSeenText: pkg.formatExpireAt(terminal.lastSeenAt),
-        }))
+        const orgCtx = orgEntryUtil.getStoredOrgContext()
+        const rows = orgEntryUtil.prioritizeOrgTerminals(
+          (Array.isArray(list) ? list : []).map((terminal) => ({
+            id: terminal.id,
+            name: terminal.displayName || '服务点',
+            address: terminal.locationLabel || '位置待补充',
+            isOnline: terminal.isOnline === true,
+            // 心跳时间是服务端给的事实，直接展示比「营业中/已打烊」这种推断更诚实。
+            lastSeenText: pkg.formatExpireAt(terminal.lastSeenAt),
+          })),
+          orgCtx && orgCtx.terminalIds,
+        )
         this.setData({
           stores: rows,
           onlineCount: rows.filter((r) => r.isOnline).length,

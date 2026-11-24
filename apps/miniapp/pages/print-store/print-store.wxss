@@ -25,6 +25,7 @@
 .ab-amt { font-size: 40rpx; font-weight: 700; color: var(--teal); font-variant-numeric: tabular-nums; }
 
 /* 门店徽章变体 */
+.badge.org-pref { background: var(--gold-soft); border: 1rpx solid var(--gold-line); color: var(--gold-deep); font-weight: 700; }
 .badge.dist { background: var(--surface); color: var(--muted); }
 .badge.time { background: var(--surface); color: var(--muted); }
 .store-list .empty { margin: 0; border: 1rpx solid var(--line-soft); border-radius: 26rpx; background: var(--surface); }

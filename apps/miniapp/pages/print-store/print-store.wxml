@@ -46,6 +46,7 @@
       </view>
       <view class="sc-addr">{{item.locationLabel || '暂未配置服务点说明'}}</view>
       <view class="sc-badges">
+        <view wx:if="{{item.isOrgTerminal}}" class="badge org-pref">本机构终端</view>
         <view class="badge time"><text class="ficon i-history"></text>{{item.isOnline ? '在线' : '离线'}}</view>
       </view>
     </view>

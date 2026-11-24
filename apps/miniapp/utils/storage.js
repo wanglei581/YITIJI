@@ -36,6 +36,9 @@ const KEYS = {
   // 本机记下的两项本人声明 { age_14_plus?: { version, at }, voice_recording?: { version, at } }。
   // 只记「是否声明、哪一版文案、何时」，不记出生日期、手机号或录音。见 utils/ai-access.js。
   AI_DECLARATIONS: 'zyd_ai_declarations',
+
+  // 机构联名视图偏好（一机构一码）：仅用于联名头区展示与打印终端优先排序，不作为授权或权限凭证。
+  ORG_ENTRY_CONTEXT: 'zyd_org_entry_ctx',
 };
 
 function get(key, fallback = null) {

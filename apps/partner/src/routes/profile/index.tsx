@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { getOrgProfile, updateOrgProfile, type PartnerOrgProfile } from '../../services/api/orgSelf'
 import { OfficialChannelsSection } from './OfficialChannelsSection'
+import { MiniappEntrySection } from './MiniappEntrySection'
 import { DeviceAlertNotifySection } from './DeviceAlertNotifySection'
 import { useRecruitmentHosting } from '../../services/capabilities'
 
@@ -152,6 +153,7 @@ export default function ProfilePage() {
     >
       {/* 本机构官方渠道（3.14）：二维码只在本机构终端显示；与内容信任无关，单独成块 */}
       <OfficialChannelsSection />
+      <MiniappEntrySection />
       <LicenseSection />
 
       <div className="grid gap-6 lg:grid-cols-2">
