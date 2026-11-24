@@ -85,8 +85,8 @@ function SidebarNavItem({
   return (
     <li key={item.key}>
       {showGroup && (
-        <div className={cn('px-3 pb-0 leading-none', index === 0 ? 'pt-0.5' : 'pt-1')}>
-          <span className="block text-[10px] font-bold leading-none tracking-[0.08em] text-[#8fb5a7]">
+        <div className={cn('px-3 pb-1 leading-none', index === 0 ? 'pt-1' : 'pt-3')}>
+          <span className="block text-[10px] font-bold uppercase leading-none tracking-[0.12em] text-[#d8bf8e]/90">
             {item.group}
           </span>
         </div>
@@ -103,15 +103,21 @@ function SidebarNavItem({
           onNavigate()
         }}
         className={cn(
-          'relative flex w-full items-center gap-2.5 rounded-[9px] px-3 text-[13px] font-semibold leading-4 transition-colors',
+          'relative flex w-full items-center gap-2.5 rounded-[10px] px-3 text-[13px] font-semibold leading-4 transition-all duration-150',
           tall ? 'min-h-11' : 'min-h-9',
           active
-            ? 'bg-primary-600 text-white'
-            : 'text-[#c6ddd3] hover:bg-white/[0.07] hover:text-white',
+            ? 'bg-gradient-to-r from-[#176253] to-[#114A3E] text-white shadow-[inset_0_1px_0_rgba(223,198,147,0.3),0_4px_12px_rgba(0,0,0,0.2)] ring-1 ring-[#dfc693]/30'
+            : 'text-[#c2d8cf] hover:bg-white/[0.06] hover:text-white',
           !named && collapsed && 'justify-center px-2',
         )}
       >
-        <Icon className="h-4 w-4 shrink-0 opacity-85" aria-hidden="true" />
+        {active && (
+          <span
+            className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full bg-gradient-to-b from-[#f0ddb4] to-[#b8985e]"
+            aria-hidden="true"
+          />
+        )}
+        <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-[#f0ddb4]' : 'opacity-80')} aria-hidden="true" />
         {named && <span className="flex-1 truncate">{item.label}</span>}
         {named && item.badge != null && (
           <span
@@ -119,7 +125,7 @@ function SidebarNavItem({
               'inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[10.5px] font-extrabold leading-none',
               typeof item.badge === 'number' && item.badge > 0
                 ? 'bg-error text-white'
-                : 'bg-white/10 text-[#c6ddd3]',
+                : 'bg-white/10 text-[#d8e7e1]',
             )}
           >
             {item.badge}
@@ -173,36 +179,36 @@ export function AdminLayout({
       {/* ── Sidebar ────────────────────────────────────────── */}
       <aside
         className={cn(
-          'ui-admin-sidebar flex shrink-0 flex-col bg-neutral-900 transition-all duration-200',
+          'ui-admin-sidebar flex shrink-0 flex-col border-r border-[#dfc693]/15 bg-gradient-to-b from-[#0E312A] via-[#0A2520] to-[#071B17] transition-all duration-200',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
         {/* Brand */}
         <div
           className={cn(
-            'flex h-14 shrink-0 items-center gap-2.5',
+            'flex h-[60px] shrink-0 items-center gap-2.5 border-b border-white/[0.07]',
             collapsed ? 'justify-center px-3' : 'px-5',
           )}
         >
           {appLogo
             ? <div className="shrink-0">{appLogo}</div>
             : (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-gradient-to-br from-[#fdfbf4] to-[#dff2ea]">
-                <span className="text-sm font-extrabold leading-none text-primary-700">AI</span>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#F2E3BE] via-[#D4B67B] to-[#A68649] shadow-[0_2px_10px_rgba(223,198,147,0.28)] ring-1 ring-[#fff4d6]/40">
+                <span className="text-sm font-black leading-none text-[#09231E]">职</span>
               </div>
             )
           }
           {!collapsed && (
             <div className="min-w-0">
-              <p className="truncate text-[15px] font-extrabold text-white">{appName}</p>
-              <p className="mt-0.5 truncate text-[11px] text-[#9dc4b6]">AI求职打印服务终端</p>
+              <p className="truncate text-[15px] font-extrabold tracking-[0.01em] text-white">{appName}</p>
+              <p className="mt-0.5 truncate text-[11px] tracking-[0.04em] text-[#c8ae7c]/85">AI求职打印服务终端</p>
             </div>
           )}
         </div>
 
         {/* Nav items */}
-        <nav aria-label="侧边导航" aria-hidden={flyoutMode || undefined} className="flex-1 overflow-y-auto py-1">
-          <ul role="list" className="space-y-0 px-2">
+        <nav aria-label="侧边导航" aria-hidden={flyoutMode || undefined} className="flex-1 overflow-y-auto py-2">
+          <ul role="list" className="space-y-0.5 px-2.5">
             {navItems.map((item, index) => (
               <SidebarNavItem
                 key={item.key}
@@ -224,12 +230,12 @@ export function AdminLayout({
         {(userName ?? userRole) && (
           <div
             className={cn(
-              'flex shrink-0 items-center gap-2.5 border-t border-white/10',
-              collapsed ? 'justify-center px-2 py-2' : 'px-4 py-2',
+              'flex shrink-0 items-center gap-2.5 border-t border-white/[0.08] bg-white/[0.025]',
+              collapsed ? 'justify-center px-2 py-2.5' : 'px-4 py-2.5',
             )}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-600">
-              <span className="text-sm font-extrabold text-white">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#196E5D] to-[#0D463B] ring-1 ring-[#dfc693]/45">
+              <span className="text-sm font-extrabold text-[#f8f0dc]">
                 {(userName ?? '管')[0]}
               </span>
             </div>
@@ -239,7 +245,7 @@ export function AdminLayout({
                   <p className="truncate text-sm font-semibold text-white">{userName}</p>
                 )}
                 {userRole && (
-                  <p className="mt-0.5 truncate text-[11px] text-white/60">{userRole}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-[#d8bf8e]/90">{userRole}</p>
                 )}
               </div>
             )}
@@ -248,7 +254,7 @@ export function AdminLayout({
 
         {/* Collapse toggle */}
         {onCollapseChange && (
-          <div className="relative z-40 border-t border-white/10 p-1">
+          <div className="relative z-40 border-t border-white/[0.08] p-1.5">
             <button
               type="button"
               aria-label={narrow && collapsed ? (flyoutOpen ? '关闭菜单' : '打开菜单') : (collapsed ? '展开侧边栏' : '收起侧边栏')}
@@ -256,7 +262,7 @@ export function AdminLayout({
                 if (narrow && collapsed) setFlyoutOpen((open) => !open)
                 else onCollapseChange(!collapsed)
               }}
-              className="flex h-8 w-full items-center justify-center rounded-[9px] text-[#8fb5a7] hover:bg-white/[0.07] hover:text-white"
+              className="flex h-8 w-full items-center justify-center rounded-[9px] text-[#9cbab0] transition-colors hover:bg-white/[0.07] hover:text-[#f0ddb4]"
             >
               {collapsed
                 ? <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -272,14 +278,14 @@ export function AdminLayout({
           <button
             type="button"
             aria-label="关闭菜单"
-            className="fixed bottom-0 left-16 right-0 top-[60px] z-30 bg-black/20"
+            className="fixed bottom-0 left-16 right-0 top-[60px] z-30 bg-black/25 backdrop-blur-[1px]"
             onClick={() => setFlyoutOpen(false)}
           />
           <nav
             aria-label="侧边导航"
-            className="fixed bottom-0 left-16 top-[60px] z-40 w-60 overflow-y-auto bg-neutral-900 px-2 py-2 shadow-xl"
+            className="fixed bottom-0 left-16 top-[60px] z-40 w-60 overflow-y-auto border-r border-[#dfc693]/15 bg-gradient-to-b from-[#0E312A] to-[#071B17] px-2.5 py-2 shadow-xl"
           >
-            <ul role="list" className="space-y-0">
+            <ul role="list" className="space-y-0.5">
               {navItems.map((item, index) => (
                 <SidebarNavItem
                   key={item.key}
@@ -303,7 +309,7 @@ export function AdminLayout({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="ui-admin-topbar flex h-[60px] shrink-0 items-center justify-between border-b border-neutral-900/[0.06] bg-surface px-3 sm:px-7">
+        <header className="ui-admin-topbar flex h-[60px] shrink-0 items-center justify-between border-b border-neutral-200/80 bg-surface/90 px-3 backdrop-blur-md sm:px-7">
           {/* Left placeholder (can be used for breadcrumbs) */}
           <div />
 

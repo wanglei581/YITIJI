@@ -19,13 +19,13 @@ export function SectionCard({ title, action, children, className, flush = false 
   return (
     <section
       className={cn(
-        'overflow-hidden rounded-lg border border-neutral-900/[0.06] bg-surface shadow-sm',
+        'overflow-hidden rounded-xl border border-neutral-200/80 bg-surface shadow-sm',
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-neutral-900/[0.07] px-5 pb-3.5 pt-4">
-        <h2 className="flex items-center gap-2 text-[15px] font-extrabold text-neutral-900 [font-family:var(--font-heading,inherit)]">
-          <span className="inline-block h-[15px] w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-200/70 bg-gradient-to-r from-neutral-50/75 via-surface to-surface px-5 pb-3.5 pt-4">
+        <h2 className="flex items-center gap-2.5 text-[15px] font-extrabold tracking-[0.01em] text-neutral-900 [font-family:var(--font-heading,inherit)]">
+          <span className="inline-block h-[16px] w-[3.5px] shrink-0 rounded-full bg-gradient-to-b from-[#117562] via-[#0E5D4E] to-[#C8A86C]" aria-hidden="true" />
           {title}
         </h2>
         {action}
