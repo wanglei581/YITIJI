@@ -13,7 +13,7 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── 总评卡 ── */
-.ri-hero { background: var(--surface); border: 1rpx solid #dce9ff; border-radius: 30rpx;
+.ri-hero { background: var(--surface); border: 1rpx solid var(--teal-soft); border-radius: var(--r-lg);
   padding: 36rpx 32rpx; margin: 16rpx 32rpx 0; box-shadow: var(--sh-xs); }
 .rh-level { font-size: 44rpx; font-weight: 800; line-height: 1; }
 .rh-pos { font-size: 28rpx; color: var(--ink); font-weight: 600; margin-top: 12rpx; }

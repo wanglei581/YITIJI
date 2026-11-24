@@ -29,7 +29,7 @@
 .saved-tip-arrow { width: 18rpx; height: 18rpx; }
 
 /* 概览卡 */
-.diag-summary { background: var(--surface); border: 1rpx solid #dce9ff;
+.diag-summary { background: var(--surface); border: 1rpx solid var(--teal-soft);
   border-radius: var(--r-md); padding: 32rpx 28rpx; display: flex; align-items: center;
   gap: 32rpx; margin: 16rpx 32rpx 0; box-shadow: var(--sh-xs); }
 .ds-score { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }

@@ -12,7 +12,7 @@
 
 /* 与 UI Notes 效率类 App 一致的冷白信息卡：清楚层级，不用大面积渐变。 */
 .fair-hero { margin: 12rpx 32rpx 0; padding: 30rpx; border-radius: 32rpx;
-  border: 1rpx solid #dce9ff; background: #eef5ff; }
+  border: 1rpx solid var(--teal-soft); background: var(--teal-wash); }
 .fh-top { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
 .fh-badge { display: inline-flex; align-items: center; font-size: 22rpx; font-weight: 600;
   padding: 6rpx 18rpx; border-radius: 999rpx; background: #fff; color: var(--teal-deep); }

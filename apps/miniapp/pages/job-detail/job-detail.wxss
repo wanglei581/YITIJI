@@ -29,7 +29,7 @@
 /* AI 匹配入口 */
 .ai-entry { background: #f3f8ff; border-radius: 26rpx; padding: 24rpx 28rpx;
   display: flex; align-items: center; justify-content: space-between; margin: 18rpx 32rpx 0;
-  border: 1rpx solid #dce9ff; }
+  border: 1rpx solid var(--teal-soft); }
 .ae-left { display: flex; align-items: center; gap: 20rpx; flex: 1; min-width: 0; }
 .ae-ic { font-size: 36rpx; color: var(--teal); flex-shrink: 0; }
 .ae-body { flex: 1; min-width: 0; }

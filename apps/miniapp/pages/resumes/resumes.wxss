@@ -8,8 +8,8 @@
   margin: 0 32rpx;
   padding: 30rpx;
   border-radius: 32rpx;
-  border: 1rpx solid #dce9ff;
-  background: #eef5ff;
+  border: 1rpx solid var(--teal-soft);
+  background: var(--teal-wash);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -29,7 +29,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12rpx 28rpx rgba(22, 119, 255, .18);
+  box-shadow: 0 12rpx 28rpx rgba(15, 110, 92, .18);
 }
 .rh-icon .ficon { width: 47rpx; height: 47rpx; }
 
@@ -52,7 +52,7 @@
 .resume-status { margin-top: 12rpx; }
 .resume-actions { margin-top: 18rpx; display: flex; gap: 12rpx; }
 .action-button { min-height: 60rpx; padding: 0 22rpx; border-radius: 18rpx; background: var(--surface-2); color: var(--ink-soft); border: 1rpx solid var(--line-soft); display: flex; align-items: center; justify-content: center; font-size: 23rpx; font-weight: 650; }
-.action-button.primary { color: var(--teal-deep); background: var(--teal-soft); border-color: #dce9ff; }
+.action-button.primary { color: var(--teal-deep); background: var(--teal-soft); border-color: var(--teal-soft); }
 .resume-arrow { width: 22rpx; height: 22rpx; color: var(--ghost); margin-top: 29rpx; }
 
 .empty-card { margin: 30rpx 32rpx 0; padding: 60rpx 40rpx; border-radius: 30rpx; background: var(--surface); border: 1rpx solid var(--line-soft); display: flex; flex-direction: column; align-items: center; text-align: center; }

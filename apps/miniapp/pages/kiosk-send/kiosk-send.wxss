@@ -13,7 +13,7 @@
   background: #fff; border-radius: 24rpx; padding: 56rpx 40rpx;
   display: flex; flex-direction: column; align-items: center; text-align: center;
 }
-.guide-icon, .sc-icon { font-size: 88rpx; color: #1677ff; margin-bottom: 24rpx; }
+.guide-icon, .sc-icon { font-size: 88rpx; color: var(--teal); margin-bottom: 24rpx; }
 .guide-title, .sc-title { font-size: 36rpx; font-weight: 600; color: #1f2937; margin-bottom: 16rpx; }
 .guide-desc, .sc-desc { font-size: 28rpx; color: #6b7280; line-height: 1.6; margin-bottom: 40rpx; }
 
@@ -27,8 +27,8 @@
   width: 100%; min-height: 96rpx; line-height: 96rpx;
   border-radius: 48rpx; font-size: 32rpx; border: none;
 }
-.btn-primary { background: #1677ff; color: #fff; }
-.btn-secondary { background: #eef2ff; color: #1677ff; }
+.btn-primary { background: var(--teal); color: #fff; }
+.btn-secondary { background: var(--teal-wash); color: var(--teal); }
 
 /* 拍照或从相册选（2026-11-02，#1363）：和上面的按钮隔开，用本页已有的 24rpx 间距，不新增颜色与字号。 */
 .album-btn { margin-top: 24rpx; }

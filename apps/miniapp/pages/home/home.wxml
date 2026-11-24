@@ -1,28 +1,45 @@
 <view class="home-page">
-  <view style="height:{{statusBarHeight}}px"></view>
-
-  <!-- padding-right 让开微信胶囊：本行右侧的按钮实测整个落在胶囊矩形内，点不到。
-       值由 app.js 运行时按 getMenuButtonBoundingClientRect 算，不能写死 rpx。 -->
-  <view class="home-head" style="padding-right:{{capsuleInsetRight}}px">
-    <!-- 原为「方块 logo + 主标题 + 副标题」的 B 端 header 写法，
-         与下方「晚上好，同学」构成两个自我介绍区块叠在一起。
-         收敛成一行品牌字：C 端小程序顶部要克制，把注意力让给问候与主功能。 -->
-    <view class="brand-row">
-      <text class="brand-name">职易达</text>
-    </view>
-    <view class="head-btn icon-action tap" hover-class="tap-press" bindtap="tapNotify" role="button" aria-label="查看消息通知">
-      <text class="ficon i-bell" aria-hidden="true"></text>
-    </view>
-  </view>
-
   <scroll-view class="home-scroll" scroll-y enhanced show-scrollbar="{{false}}">
-    <view class="home-body">
+    <!-- 墨翠深松鎏金弧形头区：高定瓷釉质感 + 状态栏与微信胶囊安全避让 -->
+    <view class="home-band">
+      <view style="height:{{statusBarHeight}}px"></view>
+      <view class="home-head" style="padding-right:{{capsuleInsetRight}}px">
+        <view class="brand-row">
+          <view class="brand-seal" aria-hidden="true">职</view>
+          <view class="brand-copy">
+            <text class="brand-name">职易达</text>
+            <text class="brand-en">AI CAREER · PRINT</text>
+          </view>
+        </view>
+        <view class="head-btn icon-action tap" hover-class="tap-press" bindtap="tapNotify" role="button" aria-label="查看消息通知">
+          <view class="head-btn-disc" aria-hidden="true">
+            <text class="ficon i-bell"></text>
+          </view>
+        </view>
+      </view>
       <view class="greeting">
-        <text class="greet-title">{{greetWord}}，{{userName}}</text>
-        <text class="greet-sub">{{todayStr}} · 今天也向理想工作靠近一点</text>
+        <text class="greet-title">{{greetTitle}}</text>
+        <text class="greet-sub">{{todayStr}} · 让每一次求职准备更从容</text>
+      </view>
+    </view>
+
+    <view class="home-body">
+      <!-- 悬浮问小青高定卡片：跨头区下沿，鎏金极细描边 + 近景精裁肖像光环 -->
+      <view class="qing-bar tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/assistant/assistant" role="button" aria-label="打开小青 AI 职业助手">
+        <view class="qing-avatar-ring" aria-hidden="true">
+          <image class="qing-face" src="/assets/xiaoqing-avatar.jpg" mode="aspectFill" />
+        </view>
+        <view class="qing-copy">
+          <view class="qing-head-row">
+            <text class="qing-name">小青 · AI 职业顾问</text>
+            <text class="qing-tag">AI 助手</text>
+          </view>
+          <view class="qing-say">简历诊断、面试陪练、打印取件，随时问我</view>
+        </view>
+        <view class="qing-go" aria-hidden="true"><text class="ficon i-right"></text></view>
       </view>
 
-      <!-- 待取件（两端打通）：手机上下的单，到一体机前凭到机码取。首页不显示码本身，码在取件页里现取。 -->
+      <!-- 动态状态区：有未核销到机码优先浮现；无待取件时展示最近订单状态 -->
       <view wx:if="{{pickupCount > 0}}" class="pickup-card">
         <view class="pickup-main tap" hover-class="tap-press" bindtap="tapPickup" role="button" aria-label="待取件 {{pickupCount}} 单，查看到机码">
           <view class="pickup-icon"><text class="ficon i-printer" aria-hidden="true"></text></view>
@@ -39,37 +56,13 @@
         <text class="ficon i-right" aria-hidden="true"></text>
       </view>
 
-
-      <!-- 原为 320rpx 的落地页式 hero（大标题+描述+CTA+半身抠图）。
-           那是营销页语言，占掉首屏三分之一却只承载一个入口。
-           改为对话入口条：圆头像 + 她「说」的一句话 + 箭头，像微信里一个真人在讲话。
-           真人形象保留（对低数字素养用户，"有个人在帮我"比抽象图标更可信），
-           但裁成 220px 头像后仅 7KB，远低于图片预算。 -->
-      <view class="qing-bar tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/assistant/assistant" role="button" aria-label="打开小青 AI 职业助手">
-        <image class="qing-face" src="/assets/xiaoqing-avatar.jpg" mode="aspectFill" aria-hidden="true" />
-        <view class="qing-copy">
-          <view class="qing-name">小青 · AI 职业助手</view>
-          <view class="qing-say">问我：简历怎么改、面试怎么准备、文件怎么打印</view>
-        </view>
-        <view class="qing-go"><text class="ficon i-right"></text></view>
-      </view>
-
-      <view class="info-card" style="margin-top:22rpx">
-        <view class="info-row tap" hover-class="tap-press" bindtap="tapService"
-              data-url="/pages/resume-voice/resume-voice"
-              role="button" aria-label="语音说简历，一题一问，看字确认后再生成">
-          <view class="info-icon soft-indigo"><text class="ficon i-comment"></text></view>
-          <view class="info-copy">
-            <text class="info-title">语音说简历</text>
-            <text class="info-desc">一题一问，看字确认后再生成</text>
-          </view>
-          <view class="info-arrow"><text class="ficon i-right"></text></view>
-        </view>
-      </view>
-
+      <!-- 核心 AI 四服务 Bento 区：高优先露于首屏黄金视觉位 -->
       <view class="section-head">
-        <text class="section-title">常用服务</text>
-        <text class="section-more text-action" bindtap="tapLifeCircle" role="button" aria-label="查看全部 AI 工具">全部 AI 工具</text>
+        <view class="section-title-wrap">
+          <view class="section-bar" aria-hidden="true"></view>
+          <text class="section-title">常用服务</text>
+        </view>
+        <text class="section-more text-action" bindtap="tapLifeCircle" role="button" aria-label="查看全部 AI 工具">全部工具 ›</text>
       </view>
       <view class="service-grid">
         <view
@@ -87,17 +80,35 @@
         </view>
       </view>
 
+      <!-- 双端联动墨翠鎏金旗舰主卡（与 27 寸一体机同源核心锚点） -->
       <view class="print-banner tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/documents/documents" role="button" aria-label="从我的文档发起打印">
         <view class="print-icon"><text class="ficon i-printer"></text></view>
         <view class="print-copy">
+          <view class="print-kicker">CLOUD PRINT · 双端直连</view>
           <text class="print-title">手机准备文件，到终端直接打印</text>
           <text class="print-desc">选择本人文档 · 生成到机码 · 扫码出纸</text>
         </view>
-        <view class="print-go"><text class="ficon i-right"></text></view>
+        <view class="print-go" aria-hidden="true"><text class="ficon i-right"></text></view>
       </view>
 
-      <!-- 到一体机前用得上的两件事（两端打通）：扫屏幕上的码登录或传文件；看快到期的到机码与平台通知。 -->
-      <view class="info-card" style="margin-top:22rpx">
+      <!-- 快捷与终端联动：整合语音说简历、扫码连接一体机、今日提醒为一张洁净纯白卡组 -->
+      <view class="section-head compact">
+        <view class="section-title-wrap">
+          <view class="section-bar" aria-hidden="true"></view>
+          <text class="section-title">快捷联动</text>
+        </view>
+      </view>
+      <view class="info-card">
+        <view class="info-row tap" hover-class="tap-press" bindtap="tapService"
+              data-url="/pages/resume-voice/resume-voice"
+              role="button" aria-label="语音说简历，一题一问，看字确认后再生成">
+          <view class="info-icon soft-jade"><text class="ficon i-comment"></text></view>
+          <view class="info-copy">
+            <text class="info-title">语音说简历</text>
+            <text class="info-desc">一题一问，看字确认后再生成</text>
+          </view>
+          <view class="info-arrow"><text class="ficon i-right"></text></view>
+        </view>
         <view class="info-row tap" hover-class="tap-press" bindtap="tapScanKiosk" role="button" aria-label="扫码连接一体机，扫屏幕上的码登录或把文件传过去">
           <view class="info-icon soft-indigo"><text class="ficon i-scan"></text></view>
           <view class="info-copy">
@@ -117,7 +128,7 @@
       </view>
 
       <view class="home-note">AI 生成，仅供参考，请核对后再使用。</view>
-      <!-- 电子商务法第十五条：首页持续公示经营者信息（或指向它的链接）；AI 服务说明里公示模型名称与备案号（C1）。 -->
+      <!-- 电子商务法第十五条：首页持续公示经营者信息；AI 服务说明里公示模型名称与备案号（C1）。 -->
       <view class="home-legal">
         <text class="home-legal-link" bindtap="tapLegal" data-type="operator_info" role="link" aria-label="经营者信息">经营者信息</text>
         <text class="home-legal-sep" aria-hidden="true">·</text>

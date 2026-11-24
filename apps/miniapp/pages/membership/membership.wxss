@@ -5,8 +5,8 @@
   margin: 0 32rpx;
   padding: 30rpx;
   border-radius: 32rpx;
-  border: 1rpx solid #dce9ff;
-  background: #eaf2ff;
+  border: 1rpx solid var(--teal-soft);
+  background: var(--teal-wash);
   display: flex;
   align-items: center;
   gap: 24rpx;
@@ -20,7 +20,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12rpx 28rpx rgba(22, 119, 255, .18);
+  box-shadow: 0 12rpx 28rpx rgba(15, 110, 92, .18);
   flex-shrink: 0;
 }
 .bh-icon .ficon { width: 47rpx; height: 47rpx; }
