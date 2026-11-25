@@ -22,6 +22,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FilesController } from '../src/files/files.controller'
 import { canAccessFile, type FileRequester } from '../src/files/files.service'
+import { signFileUrl } from '../src/files/signing'
 import {
   canActorUseUploadPurpose,
   rawUploadByteLimitForPurpose,
@@ -560,6 +561,78 @@ async function main(): Promise<void> {
     assert.equal(canActorUseUploadPurpose('admin_upload', null), false)
     assert.equal(canActorUseUploadPurpose('print_doc', 'kiosk'), true)
     assert.equal(canActorUseUploadPurpose('partner_image', 'partner'), true)
+  })
+
+  // 文件内容接口(/files/:id/content)的响应不得被浏览器或中间层缓存:
+  // 一体机是公共机器,上一位用户预览过的简历、证件不能留在缓存里。
+  // 真实 FilesController + 真实签名,只把 readContent 换成内存桩。
+  process.env['FILE_SIGNING_SECRET'] ??= 'verify-file-internal-auth-signing-secret-0123456789'
+  const contentBytes = Buffer.from('%PDF-1.4\nresume-content-cache\n%%EOF\n')
+  const contentFileId = 'file-content-cache-control'
+  let signedContent:
+    | Promise<{ statusCode: number; headers: Record<string, string>; body: Buffer | undefined }>
+    | undefined
+  const readSignedContent = () => {
+    signedContent ??= (async () => {
+      const files = {
+        readContent: async (id: string) => {
+          assert.equal(id, contentFileId)
+          return { buffer: contentBytes, mimeType: 'application/pdf', filename: 'resume.pdf', purpose: 'resume' }
+        },
+      }
+      const controller = new FilesController(
+        files as never,
+        { write: async () => undefined, writeRequired: async () => 'unused' } as never,
+        jwt,
+        {} as never,
+        {} as never,
+      )
+      const signed = new URL(signFileUrl(contentFileId, 60_000).url, 'http://internal.local')
+      const headers: Record<string, string> = {}
+      const response = {
+        statusCode: 200,
+        body: undefined as Buffer | undefined,
+        setHeader(name: string, value: string | number) {
+          headers[name.toLowerCase()] = String(value)
+        },
+        status(code: number) {
+          this.statusCode = code
+          return this
+        },
+        send(payload: Buffer) {
+          this.body = payload
+        },
+      }
+      await controller.content(
+        contentFileId,
+        signed.searchParams.get('expires') ?? '',
+        signed.searchParams.get('sig') ?? '',
+        undefined,
+        response as never,
+      )
+      return { statusCode: response.statusCode, headers, body: response.body }
+    })()
+    return signedContent
+  }
+
+  await scenario('GET /files/:id/content 响应带 no-store,不许浏览器或中间层缓存', async () => {
+    const { headers } = await readSignedContent()
+    const cacheControl = headers['cache-control']
+    assert.ok(cacheControl, '必须显式下发 Cache-Control')
+    const directives = cacheControl.split(',').map((part) => part.trim().toLowerCase())
+    assert.ok(directives.includes('no-store'), `Cache-Control 必须含 no-store,实为「${cacheControl}」`)
+    assert.ok(!directives.includes('public'), `Cache-Control 不得含 public,实为「${cacheControl}」`)
+    for (const directive of directives) {
+      const match = /^(?:max-age|s-maxage)=(\d+)$/.exec(directive)
+      assert.ok(!match || Number(match[1]) === 0, `Cache-Control 不得给出正的缓存时长,实为「${cacheControl}」`)
+    }
+  })
+
+  await scenario('GET /files/:id/content 改缓存头后状态码、类型与正文不变', async () => {
+    const { statusCode, headers, body } = await readSignedContent()
+    assert.equal(statusCode, 200)
+    assert.equal(headers['content-type'], 'application/pdf')
+    assert.ok(body?.equals(contentBytes), '正文必须仍是 readContent 返回的原字节')
   })
 
   resetRedisCooldownForTests()
