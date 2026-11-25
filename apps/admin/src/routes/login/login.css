@@ -6,37 +6,37 @@
    ============================================================ */
 
 .clogin {
-  --paper: #f4f1e8;
-  --paper-2: #efeadd;
-  --surface: #fffdf8;
-  --surface-2: #f7f4ec;
-  --ink: #10302b;
-  --ink-2: #2c4a43;
-  --muted: #5d6b63;
-  --line: rgba(16, 48, 43, 0.1);
-  --line-2: rgba(16, 48, 43, 0.06);
-  --red: #c14a34;
-  --red-soft: #f6e3de;
+  --paper: #f3f6f4;
+  --paper-2: #e9efec;
+  --surface: #ffffff;
+  --surface-2: #f6f8f7;
+  --ink: #0c2620;
+  --ink-2: #1f4038;
+  --muted: #5a6b63;
+  --line: rgba(12, 38, 32, 0.11);
+  --line-2: rgba(12, 38, 32, 0.07);
+  --red: #c14533;
+  --red-soft: #fbe9e6;
   --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
-  --shadow: 0 14px 40px rgba(16, 48, 43, 0.08);
-  --r-lg: 26px;
+  --shadow: 0 4px 12px rgba(10, 38, 32, 0.04), 0 24px 56px rgba(10, 38, 32, 0.09);
+  --r-lg: 24px;
   --r-sm: 14px;
 
-  /* 主题色（默认 Admin 青绿；.clogin--partner 覆盖为陶土） */
-  --acc: #1f9e86;
-  --acc-deep: #157a67;
-  --acc-soft: #e2f2ec;
-  --acc-text: #157a67;
-  --acc-glow: rgba(31, 158, 134, 0.45);
-  --left-grad: linear-gradient(122deg, #0c2f29 0%, #124b41 52%, #1c7a67 100%);
-  --cta-grad: linear-gradient(150deg, #10302b 10%, #1c463d);
-  --cta-shadow: 0 12px 26px rgba(16, 48, 43, 0.22);
-  --em: #8fe3cd;
-  --left-sub: rgba(226, 247, 239, 0.62);
-  --left-body: rgba(226, 247, 239, 0.75);
-  --dot: #46d6b4;
-  --dot-halo: rgba(70, 214, 180, 0.16);
-  --logo-grad: linear-gradient(160deg, #fdfbf4, #dff2ea);
+  /* 主题色（默认 Admin 墨翠青玉；.clogin--partner 覆盖为御翠鎏金） */
+  --acc: #117562;
+  --acc-deep: #0c5c4d;
+  --acc-soft: #e6f4ef;
+  --acc-text: #0c5c4d;
+  --acc-glow: rgba(17, 117, 98, 0.36);
+  --left-grad: linear-gradient(135deg, #071915 0%, #0e342c 52%, #175447 100%);
+  --cta-grad: linear-gradient(145deg, #0c2b24 0%, #155447 100%);
+  --cta-shadow: 0 12px 28px rgba(12, 43, 36, 0.24);
+  --em: #dfc693;
+  --left-sub: rgba(223, 198, 147, 0.78);
+  --left-body: rgba(226, 245, 238, 0.76);
+  --dot: #55d4b4;
+  --dot-halo: rgba(85, 212, 180, 0.18);
+  --logo-grad: linear-gradient(150deg, #f7efdc, #dfc693);
 
   position: relative;
   isolation: isolate;
@@ -49,31 +49,31 @@
 }
 
 .clogin--partner {
-  --acc: #b8683c;
-  --acc-deep: #9e5330;
-  --acc-soft: #f4e8dd;
-  --acc-text: #9e5330;
-  --acc-glow: rgba(184, 104, 60, 0.45);
-  --left-grad: linear-gradient(122deg, #2b1a10 0%, #56331d 52%, #9e5330 100%);
-  --cta-grad: linear-gradient(150deg, #56331d 10%, #7c4525);
-  --cta-shadow: 0 12px 26px rgba(86, 51, 29, 0.28);
-  --em: #f5c9a4;
-  --left-sub: rgba(247, 236, 226, 0.66);
-  --left-body: rgba(247, 236, 226, 0.78);
-  --dot: #f5c9a4;
-  --dot-halo: rgba(245, 201, 164, 0.16);
-  --logo-grad: linear-gradient(160deg, #fdfbf4, #f3e3d3);
+  --acc: #b89558;
+  --acc-deep: #8f6f36;
+  --acc-soft: #f7f0e1;
+  --acc-text: #866730;
+  --acc-glow: rgba(184, 149, 88, 0.38);
+  --left-grad: linear-gradient(135deg, #081e19 0%, #123b32 50%, #1b5246 100%);
+  --cta-grad: linear-gradient(145deg, #0d3129 0%, #175144 100%);
+  --cta-shadow: 0 12px 28px rgba(13, 49, 41, 0.26);
+  --em: #edd7a6;
+  --left-sub: rgba(237, 215, 166, 0.8);
+  --left-body: rgba(231, 244, 239, 0.78);
+  --dot: #edd7a6;
+  --dot-halo: rgba(237, 215, 166, 0.2);
+  --logo-grad: linear-gradient(150deg, #f9f2e1, #dec28a);
 }
 
-/* 印刷工艺层：纸纹 + 噪点 */
+/* 丝绒白瓷柔光氛围层（替代旧扫描线） */
 .clogin::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background-image: repeating-linear-gradient(0deg, rgba(16, 48, 43, 0.018) 0 1px, transparent 1px 5px);
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.12));
+  background: radial-gradient(ellipse 68% 54% at 72% 18%, rgba(17, 117, 98, 0.06), transparent 70%),
+    radial-gradient(ellipse 46% 42% at 88% 82%, rgba(184, 152, 94, 0.055), transparent 72%);
 }
 .clogin::after {
   content: "";
@@ -81,7 +81,7 @@
   inset: 0;
   z-index: 60;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: 0.015;
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
@@ -159,7 +159,7 @@
   width: 300px;
   height: 300px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(223, 198, 147, 0.22);
   pointer-events: none;
 }
 .clogin .vert {
@@ -170,8 +170,8 @@
   letter-spacing: 0.42em;
   font-size: 12px;
   font-weight: 650;
-  color: rgba(255, 255, 255, 0.42);
-  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(223, 198, 147, 0.52);
+  border-left: 1px solid rgba(223, 198, 147, 0.24);
   padding-left: 12px;
 }
 .clogin .c-brand {
@@ -188,8 +188,8 @@
   border-radius: 13px;
   flex: 0 0 auto;
   background: var(--logo-grad);
-  color: var(--acc-deep);
-  box-shadow: inset 0 -5px 12px rgba(16, 48, 43, 0.1);
+  color: #09241e;
+  box-shadow: 0 4px 14px rgba(223, 198, 147, 0.26), inset 0 -4px 10px rgba(12, 38, 32, 0.08);
 }
 .clogin .c-brand strong {
   display: block;
@@ -371,6 +371,7 @@
   max-width: 524px;
   background: var(--surface);
   border: 1px solid var(--line-2);
+  border-top: 2px solid rgba(184, 152, 94, 0.4);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
   padding: 46px 50px 40px;

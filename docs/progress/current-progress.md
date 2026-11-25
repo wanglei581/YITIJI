@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-11-25：Batch D 管理后台与合作机构后台「青绪 · 墨翠鎏金白瓷」旗舰 UI 统一升级（分支 `claude/console-flagship-ui`，接 `origin/main@942433fcd`，未动线上 `zyidai.cn` 与审核中 `v1.0.5`）
+
+- 来由：按产品负责人要求将全线产品整体 UI 视觉拉升至高端旗舰水准，使 B2G/B2B 合作机构后台（15 路由）与管理员后台（38 路由）与微信小程序端形成完全同源的「青绪 · 墨翠鎏金白瓷」视觉体系。零后端及数据库改动，严格隔离 27 寸一体机端（不触碰共享 `Card.tsx` / `PageHeader.tsx` 与 `tokens.css` / `service-desk.css` / `fusion-youth.css`）。
+- ① 后台专用主题令牌升级（`packages/ui/src/styles/inkpaper.css`，Kiosk 不引入）：淘汰偏黄米纸底色（`#f4f1e8` / `#fffdf8`）与旧横条纹扫描线，升级为冷白瓷画布（`#F3F6F4`）、纯白浮层卡片（`#FFFFFF`）、冷玉矿灰中性阶、深翠玉青主色（`#117562` / `#0C5C4D`）、香槟鎏金扩展令牌（`#B8985E` / `#DFC693`）、双层冷墨翠微柔影与柔和顶光雾面，以及细腻滚动条。
+- ② 公共壳层与模块组件升级（`packages/ui/src/layouts/AdminLayout.tsx`、`components/SectionCard.tsx`、`components/ConsoleTable.tsx`）：侧栏升级为深墨翠纵深渐变配香槟金右侧细边线、烫金 `[职]` 印章图标、投影友好高对比度香槟金分组标头、翡翠琉璃鎏金左标激活胶囊、私行黑金用户区与磨砂白瓷顶栏（完整保留 `verify-service-desk-foundation` 全部 DOM 钩子与默认 props）；`SectionCard` 竖标升级为墨翠→香槟鎏金渐变锚点；`ConsoleTable` 升级清透冷瓷表头与翠雾行悬停（保留 `sticky` 固定列 `bg-inherit` 与 `max-w-64 truncate` 契约）。
+- ③ 双后台登录屏与官方采购联名入口升级（`apps/admin/src/routes/login/login.css`、`apps/partner/src/routes/login/login.css`、`apps/partner/src/routes/profile/MiniappEntrySection.tsx`）：合作机构登录淘汰发闷泥棕色，升级为**御翠鎏金**（深松翠 × 香槟金强调），管理员登录为**墨翠青玉**，一眼区分角色且全站同源，保留 `verify-partner-phone-verify-guide` 全部类名；合作机构资料页「一机构一码」卡片新增墨翠鎏金机构专享抬头条与香槟金细线白瓷展台，零改动诚实文案与错误处理契约。
+- ④ 全量验证：通过 `packages/ui`（`typecheck` / `lint` / `verify:service-desk-foundation` / `verify:fusion-youth-foundation`）、`apps/partner`（`typecheck` / `lint` / 正式 HTTP 构建 / 4 项 UI 门禁）、`apps/admin`（`typecheck` / `lint` / 正式 HTTP 构建 / `verify:service-desk-dashboard-ui` / `verify:console-plain-copy`）、`apps/kiosk`（`typecheck` / `lint` / 正式 HTTP 构建 / `verify-kiosk-visual-unity` / `verify-fusion-shell` / `verify-fusion-w3` / `verify-fusion-w5`）、全仓 `verify:compliance-copy` / `verify:repository-integrity` / `verify:ci-gate-coverage`，以及 5 张 1440×900 2x Retina 真实 Chromium 实拍目视验收与 Codex CLI（`gpt-6.1-terra`）独立复审（依 Codex 意见还原了与一体机共用的 `Card.tsx` / `PageHeader.tsx` 并补全三端回归与完整卡片截图）。
+
 ## 2026-11-25：Batch C-2「手机端求职材料轻工具箱」、简历 3 套高定排版预设与全站剩余 20 个活跃子页「墨翠鎏金白瓷」收口（分支 `claude/miniapp-batch-c2`，接 Batch C-1，未上传微信公众平台，未动线上 `zyidai.cn`）
 
 - 来由：按产品负责人拍板路线完成微信小程序 v1.1.0 全站视觉与核心功能闭环收官，由 Antigravity × Codex CLI（`gpt-6.1-terra`）联合完成合规/隐私预审、多模态实拍核查、2 项异步边界 P1 返工修复与最终复核（Codex 复核结论 `SHIP_READY`；本批次未含 Claude Code CLI 评审，因本机其 OAuth 会话已过期）。后端仅在 `services/api/src/ai/llm/assistant-channel.ts` 的 `MINIAPP_REGISTERED_PAGES` 同步登记 `pages/job-tracker/job-tracker` 与 `pages/print-toolbox/print-toolbox`（对齐 `verify:miniapp-review-backend` 48 页对账），零接口与数据库变更，不触碰停放页、线上生产及审核中 `v1.0.5`。

@@ -106,16 +106,16 @@ export function ConsoleTable<T>({
     <div className={className}>
       <div className={scrollX ? 'overflow-x-auto' : undefined}>
         <table className="w-full text-sm">
-          <thead>
+          <thead className="border-b border-neutral-200/80 bg-neutral-50/85">
             {useColumns ? (
               <tr>
                 {columns.map((column) => (
                   <th
                     key={column.id}
                     className={cn(
-                      'whitespace-nowrap px-4 py-3 text-xs font-medium text-neutral-500',
+                      'whitespace-nowrap px-4 py-3 text-xs font-semibold text-neutral-600',
                       alignClass(column.align),
-                      column.sticky && 'sticky right-0 z-10 bg-surface border-l border-neutral-900/[0.06]',
+                      column.sticky && 'sticky right-0 z-10 bg-neutral-50 border-l border-neutral-900/[0.06]',
                       column.headerClassName,
                     )}
                   >
@@ -140,7 +140,7 @@ export function ConsoleTable<T>({
               </tr>
             ) : useColumns
               ? items.map((item, index) => (
-                  <tr key={index} className={cn('group bg-surface hover:bg-neutral-50', rowClassName?.(item, index))}>
+                  <tr key={index} className={cn('group bg-surface transition-colors hover:bg-primary-50/45', rowClassName?.(item, index))}>
                     {columns.map((column) => {
                       const content = column.cell(item, index)
                       const title = column.truncate
