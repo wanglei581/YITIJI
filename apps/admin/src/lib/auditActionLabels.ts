@@ -175,6 +175,7 @@ const ACTION_LABELS: Record<string, string> = {
   'order.paid_output_anomaly_auto_refund_skipped': '跳过付费出纸异常自动退款',
   'order.refund': '订单退款',
   'order.stale_attempt_collection': '过期付款尝试入账后退回',
+  'order.closed_terminal_not_charging': '本机已不向个人收费，关闭未付订单',
   'org.account.action_cancelled': '取消机构账号敏感操作',
   'org.account.action_challenge_started': '发送机构账号操作验证码',
   'org.account.action_verification_failed': '机构账号操作验证失败',

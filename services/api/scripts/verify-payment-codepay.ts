@@ -135,6 +135,21 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
   const findManyCalls: Array<Record<string, unknown>> = []
 
   const prisma = {
+    // 出码前按终端当前状态重算该不该向个人收费：夹具里的机器是自营、向用户收费、总开关开着。
+    platformSetting: {
+      findUnique: async () => ({ value: 'true' }),
+    },
+    terminal: {
+      findUnique: async ({ where }: { where: { id?: string; terminalCode?: string } }) =>
+        where.id === 'terminal-codepay-verify' || where.terminalCode === 'terminal-codepay-verify'
+          ? {
+              id: 'terminal-codepay-verify',
+              userChargeMode: 'user_pays',
+              org: null,
+              servicePrices: [{ serviceKey: 'print_bw_page', unitCents: 100 }],
+            }
+          : null,
+    },
     order: {
       findUnique: async ({ where }: { where: { id: string } }) => orders.get(where.id) ?? null,
       updateMany: async ({ where, data }: { where: { id: string; payStatus?: string | { in: string[] } }; data: Partial<Order> }) => {

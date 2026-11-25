@@ -46,6 +46,7 @@ import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
 import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from '../src/terminals/terminal-session.service'
 import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { verifyPayAttemptChargeRecheck } from './support/pay-attempt-charge-recheck-cases'
 import {
   PERSONAL_CHARGE_SETTING_KEY as SHARED_PERSONAL_CHARGE_SETTING_KEY,
   PUBLIC_EMPLOYMENT_ORG_TYPES,
@@ -774,6 +775,8 @@ async function main(): Promise<void> {
       prices: ZERO_PRICES,
     }, partnerHeaders)
     expectStatus(partnerWrite, 403, '机构不能改收费设置')
+
+    await verifyPayAttemptChargeRecheck({ prisma, call, adminHeaders, publicOrgId: ORG_PUBLIC })
   } finally {
     await app.close()
     await prisma.onModuleDestroy()

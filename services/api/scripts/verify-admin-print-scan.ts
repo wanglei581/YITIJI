@@ -28,6 +28,7 @@ import { OrderStatusService } from '../src/payment/order-status.service'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
+import { restoreTerminalChargeFixture, setTerminalUserPrintPrices } from './support/terminal-charge-fixture'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { BadRequestException, ValidationPipe } from '@nestjs/common'
@@ -1343,6 +1344,8 @@ async function main() {
       orderStatus,
       new PaymentProviderRegistry([new SandboxPaymentProvider('verify-admin-print-scan-sandbox-secret-0123456789')]),
     )
+    // 出码前会按终端当前状态重算该不该向个人收费；这段只验关闭与出码的竞态，先把机器配成向用户收费，测完复位。
+    await setTerminalUserPrintPrices(prisma, terminalId, { print_bw_page: 137 })
     const paymentRace = await createCloseFixture('payment-race')
     const paymentRaceOrder = await prisma.order.findUniqueOrThrow({ where: { printTaskId: paymentRace.id } })
     const paymentRaceToken = createPaymentSessionToken({
@@ -1366,6 +1369,7 @@ async function main() {
     const closeWonPaymentRace = paymentRaceTask?.status === 'cancelled' && paymentRaceAfterOrder?.payStatus === 'closed' && paymentRaceAttempts.length === 0
     if (!paymentWon && !closeWonPaymentRace) fail('支付出码与关闭竞态后不得出现付款中且任务已取消')
     pass('支付出码与关闭竞态由 Order CAS 保持一致')
+    await restoreTerminalChargeFixture(prisma)
     const closedPaymentToken = createPaymentSessionToken({
       orderId: closeAfterOrder!.id,
       orderNo: closeAfterOrder!.orderNo,
@@ -1603,6 +1607,7 @@ async function main() {
     console.log('\n✅ ALL PASS — Task 10 admin print-scan invariants hold')
   } finally {
     setPrintScanCapabilityModeForTest(null)
+    await restoreTerminalChargeFixture(prisma)
     // 清理本脚本创建的数据（依赖 Terminal onDelete: Cascade 清 capability/scan/print）
     await prisma.auditLog.deleteMany({ where: { targetId: { in: [...createdPrintTaskIds, ...createdPaymentAttemptIds, `VPS-${suffix}`] } } }).catch(() => undefined)
     await prisma.paymentAttempt.deleteMany({ where: { orderId: { in: createdOrderIds } } }).catch(() => undefined)

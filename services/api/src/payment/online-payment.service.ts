@@ -15,6 +15,8 @@
  * - 出码/轮询/查单必须携带打印建单时服务端签发的短期 payment session token；orderId 不能单独授权。
  * - 待退款（refundReason=ONLINE_PAID_PENDING_REFUND）或已有 success PaymentAttempt 的
  *   unpaid/paying/closed 单禁止再出码：不调渠道、不铸第二码。paid 仍走 ORDER_ALREADY_PAID。
+ * - 出码（二维码、付款码）前按订单所属终端的当前状态重算生效价：这台机器现在不该向个人收费
+ *   就关掉这笔未付单、不出码，回 ORDER_CLOSED（pay-attempt-charge-recheck.ts）。
  */
 import { BadRequestException, Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
 import { RedisService } from '../common/redis/redis.service'
@@ -38,6 +40,7 @@ import { SandboxPaymentProvider } from './providers/sandbox-payment.provider'
 import { rejectSettledChannelCollection } from './settled-collection-guard'
 import { settleUnfulfillableCallback } from './same-amount-expired-collection'
 import { settleServiceOrderCallback } from './service-order.payment'
+import { closeUnpaidOrderIfTerminalStoppedCharging } from './pay-attempt-charge-recheck'
 import { ONLINE_PAYMENT_CHANNELS, type PaymentAttemptStatus, type PaymentChannel } from './payment.types'
 
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -276,7 +279,10 @@ export class OnlinePaymentService {
     if (order.payStatus === 'paying') throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
     const attemptExpiresAt = new Date(now + this.qrTtlSeconds * 1000)
     const attempt = await this.prisma.$transaction(async (tx) => {
-      await rejectSettledChannelCollection(tx, await this.requireTxOrder(tx, order.id))
+      const current = await this.requireTxOrder(tx, order.id)
+      await rejectSettledChannelCollection(tx, current)
+      // 按这笔单所属终端的当前状态重算：现在不该向个人收费就关掉这笔未付单，不出码。
+      if (await closeUnpaidOrderIfTerminalStoppedCharging(tx, current)) return null
       const reserved = await tx.order.updateMany({
         where: this.unpaidReservationWhere(order.id),
         data: { payStatus: 'paying', expiresAt: order.expiresAt ?? new Date(now + this.orderTtlSeconds * 1000) },
@@ -300,6 +306,7 @@ export class OnlinePaymentService {
         },
       })
     })
+    if (!attempt) throw new BadRequestException('ORDER_CLOSED')
     let qr
     try {
       qr = await provider.createQrPayment({
@@ -410,7 +417,10 @@ export class OnlinePaymentService {
     // 外部付款码渠道调用严格在事务外，不能拉长数据库锁。
     if (order.payStatus === 'paying') throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
     const attempt = await this.prisma.$transaction(async (tx) => {
-      await rejectSettledChannelCollection(tx, await this.requireTxOrder(tx, order.id))
+      const current = await this.requireTxOrder(tx, order.id)
+      await rejectSettledChannelCollection(tx, current)
+      // 与二维码同一口径：本机现在不该向个人收费就关掉这笔未付单，不扫付款码。
+      if (await closeUnpaidOrderIfTerminalStoppedCharging(tx, current)) return null
       const reserved = await tx.order.updateMany({
         where: this.unpaidReservationWhere(order.id),
         data: { payStatus: 'paying', expiresAt: order.expiresAt ?? new Date(now + this.orderTtlSeconds * 1000) },
@@ -431,6 +441,7 @@ export class OnlinePaymentService {
         },
       })
     })
+    if (!attempt) throw new BadRequestException('ORDER_CLOSED')
     const freshOrder = await this.requireOrder(order.id)
     await this.audit.write({
       actorId: null,
