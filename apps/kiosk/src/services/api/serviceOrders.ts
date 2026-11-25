@@ -7,6 +7,7 @@
 //
 // 建单不幂等：每次 POST 都是新的一张。这一趟的订单号由 services/serviceTrip.ts 记在本机，
 // 「再出一张码」是先关旧单再建新单。金额一律用建单返回的 amountCents，本文件不算价。
+// 已登录时建单带上会员令牌：服务端订单归属人取自登录身份，没带令牌就按匿名单建。
 // 走 terminalProtectedFetch：付款是「没有已验签终端就必须失败」的请求，不降级成匿名。
 // ============================================================
 import type { ServiceOrderKey } from '@ai-job-print/shared'
@@ -147,13 +148,17 @@ export function serviceOrderHeaders(trip: { orderId: string; kioskSessionId: str
   }
 }
 
-async function send(path: string, init: { method: 'GET' | 'POST'; body?: unknown; kioskSessionId?: string }): Promise<ServiceOrderView> {
+async function send(
+  path: string,
+  init: { method: 'GET' | 'POST'; body?: unknown; kioskSessionId?: string; token?: string | null },
+): Promise<ServiceOrderView> {
   if (API_MODE !== 'http') throw new ApiHttpError('MOCK_MODE', '当前为演示模式，未连接真实服务', 0)
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (init.body !== undefined) headers['Content-Type'] = 'application/json'
   if (init.kioskSessionId) headers['x-kiosk-session-id'] = init.kioskSessionId
+  if (init.token) headers.Authorization = `Bearer ${init.token}`
   let res: Response
   try {
     res = await terminalProtectedFetch(`${API_BASE_URL}/kiosk/service-orders${path}`, {
@@ -183,15 +188,16 @@ async function send(path: string, init: { method: 'GET' | 'POST'; body?: unknown
   return view
 }
 
-/** 建单。每次调用都是新的一张；调用方要先关掉这一趟的旧单。 */
+/** 建单。每次调用都是新的一张；调用方要先关掉这一趟的旧单。已登录时传会员令牌。 */
 export function createServiceOrder(input: {
   serviceKey: ServiceOrderKey
   kioskSessionId: string
   endUserId?: string | null
+  token?: string | null
 }): Promise<ServiceOrderView> {
   const body: Record<string, string> = { serviceKey: input.serviceKey, kioskSessionId: input.kioskSessionId }
   if (input.endUserId) body.endUserId = input.endUserId
-  return send('', { method: 'POST', body })
+  return send('', { method: 'POST', body, token: input.token })
 }
 
 /**

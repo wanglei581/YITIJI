@@ -136,7 +136,8 @@ export class ServiceOrderService {
     }
   }
 
-  async create(terminalId: string, input: { serviceKey: ServiceOrderKey; kioskSessionId: string; endUserId?: string }): Promise<ServiceOrderView> {
+  /** endUserId 是控制器从登录身份取出的归属人；没有有效登录态时为 null（匿名单）。 */
+  async create(terminalId: string, input: { serviceKey: ServiceOrderKey; kioskSessionId: string; endUserId: string | null }): Promise<ServiceOrderView> {
     const prices = await getEffectiveUserPrices(this.prisma, terminalId)
     const unit = prices.prices[input.serviceKey]
     try {
@@ -165,7 +166,7 @@ export class ServiceOrderService {
         amountCents,
         status: 'pending',
         kioskSessionId: input.kioskSessionId,
-        endUserId: input.endUserId?.trim() || null,
+        endUserId: input.endUserId,
         provider: provider.channel,
         providerOrderNo: newProviderOrderNo(),
         expiresAt,

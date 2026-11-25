@@ -128,6 +128,56 @@ test('G2 serviceOrderPhase 在 pending 下严格按 paymentFailed → checking �
   assert.equal(serviceOrdersMod.serviceOrderPhase(expiredUnpaid, 15_000), 'awaiting', '未过期且 checking:false 为 awaiting')
 })
 
+test('G3 建服务单：已登录带上会员令牌（服务端归属人取自登录身份），未登录不带；重建也带同一个令牌', async () => {
+  const envKey = `__G3_OWNER_${Math.random().toString(36).slice(2)}`
+  const sent = []
+  globalThis[envKey] = sent
+  const prevWin = globalThis.window
+  globalThis.window = { setTimeout: () => 0, clearTimeout: () => {} }
+  try {
+    const ordersMod = await import(toDataUrl(
+      `${transpile('src/services/api/serviceOrders.ts')
+        .replaceAll("from '../terminalAuth'", `from '${toDataUrl(`export async function terminalProtectedFetch(url, init) { globalThis.${envKey}.push({ url, init }); return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ data: ${JSON.stringify(makeView())} }) } }`)}'`)
+        .replaceAll("from './client'", `from '${toDataUrl('export const API_BASE_URL = "/api/v1"; export const API_MODE = "http"')}'`)
+        .replaceAll("from './httpAdapter'", `from '${toDataUrl('export class ApiHttpError extends Error { constructor(code, message, status) { super(message); this.code = code; this.status = status } }')}'`)
+        .replaceAll("from './throwHttpError'", `from '${toDataUrl('export function networkError(e) { return e }; export async function readHttpError() { return { code: "ERR", message: "err" } }')}'`)}\n// ${envKey}`,
+    ))
+    await ordersMod.createServiceOrder({ serviceKey: 'resume_optimize', kioskSessionId: 'sess-g3', endUserId: 'user-g3', token: 'tok-g3' })
+    await ordersMod.createServiceOrder({ serviceKey: 'resume_optimize', kioskSessionId: 'sess-g3' })
+    assert.equal(sent.length, 2)
+    assert.equal(sent[0].url, '/api/v1/kiosk/service-orders')
+    assert.equal(sent[0].init.headers.Authorization, 'Bearer tok-g3', '已登录建单要带会员令牌')
+    assert.deepEqual(JSON.parse(sent[0].init.body), { serviceKey: 'resume_optimize', kioskSessionId: 'sess-g3', endUserId: 'user-g3' })
+    assert.equal('Authorization' in sent[1].init.headers, false, '未登录建单不带令牌')
+
+    const tripOrderMod = await import(toDataUrl(
+      `${transpile('src/services/serviceTripOrder.ts')
+        .replaceAll("from '../auth/useKioskSessionReporting'", `from '${toDataUrl('export async function kioskVisitReadyForCharge() { return "sess-g3" }')}'`)
+        .replaceAll("from './api/serviceOrders'", `from '${toDataUrl('export async function closeServiceOrder() { return null }; export async function createServiceOrder() { return null }')}'`)
+        .replaceAll("from './api/userErrorMessage'", `from '${toDataUrl('export function errorCodeOf(e) { return e && typeof e === "object" ? e.code : undefined }')}'`)
+        .replaceAll("from './serviceTrip'", `from '${toDataUrl('export function forgetServiceTrip() {}; export function rememberServiceTrip() {}; export function serviceTripOwnerFor(id) { return id ? { kind: "member", endUserId: id } : { kind: "guest" } }')}'`)}\n// ${envKey}-trip`,
+    ))
+    const creates = []
+    await tripOrderMod.openServiceTripOrder(
+      { serviceKey: 'resume_optimize', pathname: '/pay/resume', endUserId: 'user-g3', token: 'tok-g3' },
+      {
+        ready: async () => 'sess-g3',
+        sleep: async () => {},
+        create: async (input) => {
+          creates.push(input)
+          if (creates.length === 1) throw { code: 'SERVICE_SESSION_REQUIRED' }
+          return makeView()
+        },
+      },
+    )
+    assert.equal(creates.length, 2, '会话没落库时再建一次')
+    assert.equal(creates.every((input) => input.token === 'tok-g3' && input.endUserId === 'user-g3'), true, '两次建单都带同一个会员令牌')
+  } finally {
+    globalThis.window = prevWin
+    delete globalThis[envKey]
+  }
+})
+
 /** 极简可控 React Hook + 虚拟时钟运行器，直接挂载真实 usePayServiceFlow 源码。 */
 async function mountFlowHarness({ initialOrder, onGet, storedTrip = null }) {
   let now = 0
@@ -539,6 +589,7 @@ test('F5 切换用户（endUserId A→B）立即作废 A 的在途查权益与�
   const nav = []
   const closedOrders = []
   const keptTrips = []
+  const openCalls = []
   let redeemCalls = 0
   let resolveCheckA
   let resolveRedeemA
@@ -604,7 +655,7 @@ test('F5 切换用户（endUserId A→B）立即作废 A 的在途查权益与�
       return makeView({ id: orderId, status: 'refunded', provider: 'miniapp_credit', amountCents: 0 })
     },
     keepServiceTripOrder: (trip) => keptTrips.push(trip),
-    openServiceTripOrder: async ({ endUserId }) => ({
+    openServiceTripOrder: async ({ endUserId, token }) => (openCalls.push({ endUserId, token }), {
       trip: { serviceKey: 'resume_optimize', orderId: `${initialOrder.id}-${endUserId}`, kioskSessionId: 'sess-b', owner: { kind: 'member', endUserId }, savedAt: 1000 },
       view: { ...initialOrder, id: `${initialOrder.id}-${endUserId}` },
     }),
@@ -698,6 +749,8 @@ test('F5 切换用户（endUserId A→B）立即作废 A 的在途查权益与�
     await flushAll()
     assert.equal(latest.screen, 'wait', '用户 A 延迟返回的 owned 绝不能污染用户 B')
     assert.equal(keptTrips.every((t) => t.owner?.endUserId === 'user-b'), true)
+    assert.ok(openCalls.length > 0, '用户 B 要建付款单')
+    assert.equal(openCalls.every((c) => c.token === `tok-${c.endUserId}`), true, '建付款单带上当前登录用户自己的会员令牌')
 
     // 场景 B：切回用户 A 进入 owned，同一拍连点 2 次 onUseCredit 严格只发 1 次；在途切换为用户 B → A 晚到核销不存 trip、不跳 B、自动 /close 退回权益
     currentUserId = 'user-a'

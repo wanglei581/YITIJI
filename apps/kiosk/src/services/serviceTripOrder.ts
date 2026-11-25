@@ -33,18 +33,18 @@ const defaultDeps: OpenServiceTripDeps = {
  * 否则晚到的旧结果会盖掉新记的单。
  */
 export async function openServiceTripOrder(
-  input: { serviceKey: ServiceOrderKey; pathname: string; endUserId?: string | null },
+  input: { serviceKey: ServiceOrderKey; pathname: string; endUserId?: string | null; token?: string | null },
   deps: OpenServiceTripDeps = defaultDeps,
 ): Promise<{ view: ServiceOrderView; trip: ServiceTrip }> {
   let kioskSessionId = await deps.ready(input.pathname)
   let view: ServiceOrderView
   try {
-    view = await deps.create({ serviceKey: input.serviceKey, kioskSessionId, endUserId: input.endUserId })
+    view = await deps.create({ serviceKey: input.serviceKey, kioskSessionId, endUserId: input.endUserId, token: input.token })
   } catch (error) {
     if (errorCodeOf(error) !== 'SERVICE_SESSION_REQUIRED') throw error
     await deps.sleep(SERVICE_SESSION_RETRY_DELAY_MS)
     kioskSessionId = await deps.ready(input.pathname)
-    view = await deps.create({ serviceKey: input.serviceKey, kioskSessionId, endUserId: input.endUserId })
+    view = await deps.create({ serviceKey: input.serviceKey, kioskSessionId, endUserId: input.endUserId, token: input.token })
   }
   return {
     view,
