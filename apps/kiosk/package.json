@@ -100,7 +100,7 @@
     "verify:home-jobs-availability": "node scripts/verify-home-jobs-availability.mjs",
     "verify:resume-phone-upload-ui": "node scripts/verify-resume-phone-upload-ui.mjs && node --test scripts/tests/phone-upload-signature.test.mjs",
     "verify:job-material-library-ui": "node scripts/verify-job-material-library-ui.mjs",
-    "verify:resume-diagnosis-flow-ui": "node scripts/verify-resume-diagnosis-flow-ui.mjs && pnpm run verify:resume-report-qx && pnpm run verify:resume-decisions && node --test scripts/tests/resume-trip-charge.test.mjs",
+    "verify:resume-diagnosis-flow-ui": "node scripts/verify-resume-diagnosis-flow-ui.mjs && pnpm run verify:resume-report-qx && pnpm run verify:resume-decisions && node --test scripts/tests/resume-trip-charge.test.mjs scripts/tests/resume-ai-login-first.test.mjs",
     "verify:resume-report-qx": "node scripts/verify-resume-report-qx.mjs",
     "verify:resume-decisions": "node scripts/verify-resume-decisions.mjs && node --test scripts/tests/resume-decisions.test.mjs",
     "verify:resume-fact-additions": "node --test scripts/tests/resume-fact-additions.test.mjs",
