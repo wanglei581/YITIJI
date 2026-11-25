@@ -34,7 +34,21 @@ const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi
 const ID18_RE = /(?<!\d)(\d{6}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx])(?!\d)/g
 const ID15_RE = /(?<!\d)(\d{6}\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3})(?!\d)/g
 const BANK_RE = /(?<!\d)(\d{16,19})(?!\d)/g
-const PHONE_RE = /(?<!\d)(1\d{10})(?!\d)/g
+/** 号码段之间的同一行空白（含全角空格，不含换行）和各种横线。 */
+const PHONE_SEP = String.raw`(?:[^\S\r\n\u2028\u2029]|[\u2010-\u2015\u2212\uFF0D-])`
+/**
+ * 大陆手机号：11 位连写（原规则），或按 3-4-4 分段、段间可隔空白或横线（第二位 3–9）；
+ * 前面可带 +86，可加括号。两头不能紧挨别的数字；年份区间、金额凑不成这个样子。
+ */
+const PHONE_RE = new RegExp(
+  String.raw`(?<!\d)(?:(?:[(（][+＋]86[)）]|[+＋]86)${PHONE_SEP}*)?(?:1\d{10}|1[3-9]\d${PHONE_SEP}*\d{4}${PHONE_SEP}*\d{4})(?!\d)`,
+  'g',
+)
+
+/** 去掉 +86、空白和横线，归一成 11 位再打码，屏上一律是 138****5678 的样子。 */
+function maskPhoneHit(hit: string): string {
+  return maskPhone(hit.replace(/\D/g, '').slice(-11))
+}
 
 /**
  * 一段展示文字里的手机、邮箱、身份证、银行卡。
@@ -46,7 +60,7 @@ export function maskPii(text: string): string {
     .replace(ID18_RE, (hit) => maskIdCard(hit))
     .replace(ID15_RE, (hit) => maskIdCard(hit))
     .replace(BANK_RE, (hit) => maskBankCard(hit))
-    .replace(PHONE_RE, (hit) => maskPhone(hit))
+    .replace(PHONE_RE, (hit) => maskPhoneHit(hit))
 }
 
 export function maskSnippet(type: string, snippet: string | null): string {

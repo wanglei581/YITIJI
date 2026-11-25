@@ -21,6 +21,26 @@ function loadMask() {
 
 const { maskPii, maskPhone, maskEmail, maskIdCard, maskBankCard } = loadMask()
 
+/** 导出前核对框的事实来源（facts.ts 只有类型依赖和同目录相对依赖）。 */
+function loadFacts() {
+  const cache = new Map()
+  const load = (absPath) => {
+    if (cache.has(absPath)) return cache.get(absPath).exports
+    const output = ts.transpileModule(readFileSync(absPath, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText
+    const loaded = { exports: {} }
+    cache.set(absPath, loaded)
+    const localRequire = (id) => {
+      if (!id.startsWith('.')) throw new Error(`意外依赖 ${id}`)
+      return load(join(dirname(absPath), id.endsWith('.ts') ? id : `${id}.ts`))
+    }
+    new Function('exports', 'module', 'require', output)(loaded.exports, loaded, localRequire)
+    return loaded.exports
+  }
+  return load(join(kioskRoot, 'src/pages/resume/components/resume-deliver/facts.ts'))
+}
+
 const ID18 = '370200199001011234'
 const ID18X = '11010119900307867X'
 const ID15 = '110101900307123'
@@ -62,4 +82,69 @@ test('18 位证件号不会被当成银行卡留下中间数字', () => {
   const masked = maskPii(ID18)
   assert.equal(masked.includes('19900101'), false)
   assert.equal(masked, '370200********1234')
+})
+
+test('带空格、横线或 +86 前缀的大陆手机号，归一后一律显示成 138****5678', () => {
+  for (const raw of [
+    '138 1234 5678',
+    '138-1234-5678',
+    '+86 13812345678',
+    '+8613812345678',
+    '+86 138 1234 5678',
+    '+86-138-1234-5678',
+    '（+86）138 1234 5678',
+    '138\u30001234\u30005678',
+    '138\uFF0D1234\uFF0D5678',
+    '138 12345678',
+  ]) {
+    assert.equal(maskPii(raw), '138****5678', raw)
+  }
+  assert.equal(maskPii('电话：+86 138-1234-5678（微信同号）'), '电话：138****5678（微信同号）')
+  assert.equal(maskPii('(+86 138 1234 5678)'), '(138****5678)')
+})
+
+test('普通 11 位手机号照旧打码', () => {
+  assert.equal(maskPii('13812345678'), '138****5678')
+  assert.equal(maskPii('2019 年起 13812345678 可联系'), '2019 年起 138****5678 可联系')
+})
+
+test('座机号不按手机号打码', () => {
+  for (const raw of ['010-12345678', '0755-8888 1234', '021 6123 4567', '+86 10 8888 6666']) {
+    assert.equal(maskPii(raw), raw, raw)
+  }
+})
+
+test('年份区间、金额等不是手机号的数字串不打码', () => {
+  for (const raw of [
+    '2019-2023',
+    '2015.09 - 2019.06',
+    '1998-2002 120 人',
+    '月薪 15000-20000 元',
+    '销售额 1380 万',
+    '138 1234 56789',
+    '138123456789',
+    '135\n2019\n2023',
+  ]) {
+    assert.equal(maskPii(raw), raw, raw)
+  }
+})
+
+test('导出前核对框：简历里带分隔或 +86 的电话显示成 138****5678，时间段原样', () => {
+  const { extractConfirmableFacts } = loadFacts()
+  for (const phone of ['138 1234 5678', '138-1234-5678', '+86 13812345678']) {
+    const facts = extractConfirmableFacts({
+      basic: { name: '周晴', phone, email: 'zhouqing@example.com', city: '青岛' },
+      intention: { position: '行政专员', city: '青岛' },
+      summary: '',
+      education: [{ school: '青岛大学', major: '行政管理', degree: '本科', period: '2015.09 - 2019.06' }],
+      experience: [{ company: '青岛海纳物业服务有限公司', role: '行政助理', period: '2019.07 - 2023.12' }],
+      projects: [],
+      skills: [],
+      certificates: [],
+    })
+    const shown = Object.fromEntries(facts.map((fact) => [fact.id, maskPii(fact.value)]))
+    assert.equal(shown.phone, '138****5678', phone)
+    assert.equal(shown['edu-period-0'], '2015.09 - 2019.06')
+    assert.equal(shown['exp-period-0'], '2019.07 - 2023.12')
+  }
 })
