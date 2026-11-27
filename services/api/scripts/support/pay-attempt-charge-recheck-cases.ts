@@ -13,6 +13,7 @@ import { AuditService } from '../../src/audit/audit.service'
 import { OnlinePaymentService } from '../../src/payment/online-payment.service'
 import { OrderStatusService } from '../../src/payment/order-status.service'
 import {
+  closeUnpaidOrderIfTerminalStoppedCharging,
   TERMINAL_NOT_CHARGING_CLOSE_ACTION,
   TERMINAL_NOT_CHARGING_TASK_ERROR_CODE,
 } from '../../src/payment/pay-attempt-charge-recheck'
@@ -235,4 +236,59 @@ export async function verifyPayAttemptChargeRecheck(deps: PayAttemptChargeRechec
   assert.equal(freeRow.paymentSource, 'free')
   assert.equal((await prisma.printTask.findUniqueOrThrow({ where: { id: freeOrder.taskId } })).status, 'pending', '免费单的打印任务不动')
   console.log('PASS 免费单仍是 PAY_NOT_REQUIRED，订单与打印任务都不动')
+
+  // ── 边角：下面都用已改绑到公共就业机构、不再收费的那台机器 ──
+  const orderRow = (id: string) => prisma.order.findUniqueOrThrow({ where: { id } })
+  const taskRow = (id: string) => prisma.printTask.findUniqueOrThrow({ where: { id } })
+
+  // 订单上没有终端：不关单，订单和任务都不动（保持原来的出码行为）
+  const noTerminal = await kioskOrder('term-recheck-public', 100)
+  const noTerminalRef = { ...(await orderRow(noTerminal.orderId)), terminalId: null }
+  assert.equal(
+    await closeUnpaidOrderIfTerminalStoppedCharging(prisma, noTerminalRef),
+    false,
+    '订单上没有终端：不在这里关单',
+  )
+  assert.equal((await orderRow(noTerminal.orderId)).payStatus, 'unpaid', '没有终端时订单不动')
+  assert.equal((await taskRow(noTerminal.taskId)).status, 'pending', '没有终端时打印任务不动')
+  console.log('PASS 订单上没有终端时不关单，订单与打印任务都不动')
+
+  // 打印任务已经失败：任务不动，订单照样关掉并记审计
+  const endedTask = await kioskOrder('term-recheck-public', 100)
+  await prisma.printTask.update({ where: { id: endedTask.taskId }, data: { status: 'failed' } })
+  await prisma.order.update({ where: { id: endedTask.orderId }, data: { taskStatus: 'failed' } })
+  assert.equal(
+    await closeUnpaidOrderIfTerminalStoppedCharging(prisma, await orderRow(endedTask.orderId)),
+    true,
+    '任务已失败：不能出码',
+  )
+  assert.equal((await orderRow(endedTask.orderId)).payStatus, 'closed', '任务已失败时订单也要关掉，不能停在未付')
+  assert.equal((await taskRow(endedTask.taskId)).status, 'failed', '已结束的任务不动')
+  const endedAudit = await prisma.auditLog.findFirst({
+    where: { action: TERMINAL_NOT_CHARGING_CLOSE_ACTION, targetId: endedTask.orderId },
+  })
+  assert.ok(endedAudit, '任务已失败时关单也要记审计')
+  assert.equal(JSON.parse(endedAudit.payloadJson ?? '{}').taskCancelled, false, '审计写明这次没有取消任务')
+
+  // 打印任务在执行：订单和任务都不动，只拒绝出码
+  const busyTask = await kioskOrder('term-recheck-public', 100)
+  await prisma.printTask.update({ where: { id: busyTask.taskId }, data: { status: 'printing' } })
+  assert.equal(
+    await closeUnpaidOrderIfTerminalStoppedCharging(prisma, await orderRow(busyTask.orderId)),
+    true,
+    '任务在执行：不能出码',
+  )
+  assert.equal((await orderRow(busyTask.orderId)).payStatus, 'unpaid', '任务在执行时不改订单')
+  assert.equal((await taskRow(busyTask.taskId)).status, 'printing', '执行中的任务不动')
+  console.log('PASS 任务已失败时只关订单、不动任务；任务在执行时订单与任务都不动')
+
+  // 读完订单之后刚被认领：关单后按库里的当前值把取件状态复位
+  const raced = await kioskOrder('term-recheck-public', 100)
+  const racedSnapshot = await orderRow(raced.orderId)
+  await prisma.order.update({ where: { id: raced.orderId }, data: { pickupStatus: 'claimed' } })
+  assert.equal(await closeUnpaidOrderIfTerminalStoppedCharging(prisma, racedSnapshot), true, '读完之后刚被认领：仍要关单')
+  const racedRow = await orderRow(raced.orderId)
+  assert.equal(racedRow.payStatus, 'closed')
+  assert.equal(racedRow.pickupStatus, 'pending', '关单后取件状态不能停在已认领')
+  console.log('PASS 读完订单后刚被认领：关单后取件状态按库里的当前值复位')
 }

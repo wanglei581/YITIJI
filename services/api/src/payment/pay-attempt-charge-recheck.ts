@@ -20,6 +20,8 @@ const TERMINAL_NOT_CHARGING_TASK_MESSAGE = '这台机器现在不向个人收费
 
 const LIVE_ATTEMPT_STATUSES = ['created', 'pending'] as const
 const BUSY_TASK_STATUSES = ['claimed', 'printing', 'completed'] as const
+/** 打印任务已经结束：没出纸，也不会再出纸。 */
+const ENDED_TASK_STATUSES = new Set(['failed', 'cancelled'])
 
 type ChargeRecheckDb = Pick<
   PrismaTransactionClient,
@@ -32,7 +34,6 @@ interface UnpaidOrderRef {
   terminalId: string | null
   printTaskId: string | null
   payStatus: string
-  pickupStatus: string
   amountCents: number
 }
 
@@ -57,6 +58,8 @@ export async function closeUnpaidOrderIfTerminalStoppedCharging(
 ): Promise<boolean> {
   // 只处理还没预留的未付单。paying 等状态交给调用方原有的预留判断。
   if (order.payStatus !== 'unpaid') return false
+  // 订单上没有终端：看不出是哪台机器，保持原来的出码行为，不在这里关单。
+  if (!order.terminalId) return false
   const reason = await terminalStopChargingReason(tx, order.terminalId)
   if (reason === null) return false
 
@@ -71,17 +74,22 @@ export async function closeUnpaidOrderIfTerminalStoppedCharging(
         errorMessage: TERMINAL_NOT_CHARGING_TASK_MESSAGE,
       },
     })
-    // 任务已不在待领状态（被别的流程处理过）：不改订单，只拒绝出码。
-    if (task.count !== 1) return true
-    taskCancelled = true
-    await tx.printTaskStatusLog.create({
-      data: {
-        taskId: order.printTaskId,
-        fromStatus: 'pending',
-        toStatus: 'cancelled',
-        errorCode: TERMINAL_NOT_CHARGING_TASK_ERROR_CODE,
-      },
-    })
+    if (task.count === 1) {
+      taskCancelled = true
+      await tx.printTaskStatusLog.create({
+        data: {
+          taskId: order.printTaskId,
+          fromStatus: 'pending',
+          toStatus: 'cancelled',
+          errorCode: TERMINAL_NOT_CHARGING_TASK_ERROR_CODE,
+        },
+      })
+    } else {
+      // 任务已不在待领：已经结束（失败、取消）就不动任务、照样关订单；
+      // 在执行、已完成或查不到时不改订单，只拒绝出码。
+      const current = await tx.printTask.findUnique({ where: { id: order.printTaskId }, select: { status: true } })
+      if (!current || !ENDED_TASK_STATUSES.has(current.status)) return true
+    }
   }
 
   const closed = await tx.order.updateMany({
@@ -94,12 +102,16 @@ export async function closeUnpaidOrderIfTerminalStoppedCharging(
     data: {
       payStatus: 'closed',
       ...(taskCancelled ? { taskStatus: 'cancelled' } : {}),
-      // 与超时关单同口径：认领后未付被关单，pickupStatus 不得停在 claimed。
-      ...(order.pickupStatus === 'claimed' ? { pickupStatus: 'pending' } : {}),
     },
   })
   // 订单刚被别的请求改走：整段回滚（含上面的任务取消），按出码互斥口径拒绝。
   if (closed.count !== 1) throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+  // 与超时关单同口径：认领后未付被关单，pickupStatus 不得停在 claimed。
+  // 按库里的当前值复位，不看前面读到的快照（读完之后可能刚被认领）。
+  await tx.order.updateMany({
+    where: { id: order.id, payStatus: 'closed', pickupStatus: 'claimed' },
+    data: { pickupStatus: 'pending' },
+  })
 
   await tx.auditLog.create({
     data: {
