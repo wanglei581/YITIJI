@@ -1066,14 +1066,14 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/orders/:id/code-pay` | PaymentController.createCodePayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
-| POST | `/api/v1/orders/:id/pay` | PaymentController.createPayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
-| GET | `/api/v1/orders/:id/pay-status` | PaymentController.getPayStatus | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/code-pay` | PaymentController.createCodePayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>PrintTaskStatusLog<br/>Refund<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/pay` | PaymentController.createPayAttempt | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>PrintTaskStatusLog<br/>Refund<br/>ServiceOrder |
+| GET | `/api/v1/orders/:id/pay-status` | PaymentController.getPayStatus | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>PrintTaskStatusLog<br/>Refund<br/>ServiceOrder |
 | POST | `/api/v1/orders/:id/pay/abandon` | PaymentController.abandonPayAttempt | — | — | — |
-| POST | `/api/v1/orders/:id/pay/reconcile` | PaymentController.reconcile | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
+| POST | `/api/v1/orders/:id/pay/reconcile` | PaymentController.reconcile | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>PrintTaskStatusLog<br/>Refund<br/>ServiceOrder |
 | POST | `/api/v1/payment/callback/:channel` | PaymentController.callback | — | — | — |
-| GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
-| POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund<br/>ServiceOrder |
+| GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>PrintTaskStatusLog<br/>Refund<br/>ServiceOrder |
+| POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>PrintTaskStatusLog<br/>Refund<br/>ServiceOrder |
 | POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund<br/>ServiceOrder<br/>Terminal |
 | GET | `/api/v1/print/price-config` | PaymentController.getPrintPriceConfig | — | PricingService | PlatformSetting<br/>PriceConfig<br/>Terminal |
 

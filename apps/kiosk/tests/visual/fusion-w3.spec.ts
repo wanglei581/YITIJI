@@ -1323,6 +1323,78 @@ test('resume parse consent gate pauses the rail and sends nothing until granted 
 })
 
 /*
+ * 后台开着「用 AI 前先登录」（终端配置 ai.loginGate = before_generate）：游客从简历服务台点「有，帮我改一改」，
+ * 在选来源、传文件之前就到现有登录页；登录后回到同一步（诊断意图不变），这时才传文件，诊断请求带着本人登录。
+ * 开关关着时照旧：游客留在来源页，按临时上传处理。
+ */
+function aiLoginGateBaseline(api: ApiRouter, loginGate: 'off' | 'before_generate'): void {
+  terminalBaseline(api)
+  // 简历服务台先探一次在线服务；探不到会把每张卡都置灰。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { ok: true } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: { smartCampus: { enabled: false, modules: {}, items: [] }, toolbox: { enabled: false, items: [] }, ...RECRUITMENT_HOSTING_ON, ai: { loginGate, declarationEnforced: false, paused: false }, configVersion: `w3-login-gate-${loginGate}`, refreshIntervalMs: 300000, serverTime: '2026-11-26T02:00:00.000Z' },
+  })
+}
+
+test('AI login gate on: a guest logs in before choosing a resume source and comes back to the same step @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  aiLoginGateBaseline(api, 'before_generate')
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', { status: 200, json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } } })
+  api.respond('POST', '/api/v1/member/auth/login', { status: 200, json: { success: true, data: { token: 'w3-login-gate-member', user: { id: 'w3-login-gate', phoneMasked: '138****8000', nickname: '周晴' } } } })
+  api.respond('GET', '/api/v1/me/ai-consents/status', { status: 200, json: { success: true, data: [{ scope: 'resume_ai', granted: true }] } })
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  const parseAuth: string[] = []
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    parseAuth.push(route.request().headers().authorization ?? '')
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) })
+  })
+
+  await page.goto('/resume-service')
+  await page.locator('[data-hub-title="AI简历诊断"]').click()
+  await page.waitForURL((url) => url.pathname === '/login')
+  await expect(page.locator('[data-kiosk-screen="resume-source"]')).toHaveCount(0)
+  expect(api.requestCount('POST', '/api/v1/files/kiosk-upload')).toBe(0)
+
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
+
+  await page.waitForURL((url) => url.pathname === '/resume/source' && url.search === '?intent=diagnose')
+  const source = page.locator('[data-kiosk-screen="resume-source"]')
+  await expect(source).toHaveAttribute('data-resume-step', 'where')
+  await expect(source).toHaveAttribute('data-intent', 'diagnose')
+  await expect(page.getByText('当前未登录 · 这次按临时上传处理 · 去登录')).toHaveCount(0)
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await startResumeDiagnosis(page)
+  await page.waitForURL('/resume/report')
+  expect(api.requestCount('POST', '/api/v1/files/kiosk-upload')).toBe(1)
+  expect(parseAuth).toEqual(['Bearer w3-login-gate-member'])
+  expect(runtimeErrors).toEqual([])
+})
+
+test('AI login gate off: a guest stays on the resume source step as before @w3-kiosk', async ({ page, api }) => {
+  aiLoginGateBaseline(api, 'off')
+  await page.goto('/resume-service')
+  await page.locator('[data-hub-title="AI简历诊断"]').click()
+  await page.waitForURL((url) => url.pathname === '/resume/source' && url.search === '?intent=diagnose')
+  await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBeGreaterThan(0)
+  await expect(page.locator('[data-kiosk-screen="resume-source"]')).toHaveAttribute('data-resume-step', 'where')
+  await expect(page.getByText('当前未登录 · 这次按临时上传处理 · 去登录')).toBeVisible()
+  await expect(page).toHaveURL((url) => url.pathname === '/resume/source')
+})
+
+/*
  * 顶栏返回必须把解析页这条历史换掉（replace），不能压在来源页底下：否则浏览器 / 系统后退会让解析页
  * 带着原来的路由 state 重新挂载，用同一个 fileId、同一条签名链接再提交一次解析，文件名也重新摆回屏幕。
  * 1080 与 390（舞台不缩放，顶栏返回键与胶囊走窄屏规则）各走一遍；优化 intent 要原样带回来源页。

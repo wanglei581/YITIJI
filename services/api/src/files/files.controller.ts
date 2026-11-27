@@ -320,6 +320,7 @@ export class FilesController {
    * 流式读取文件(/content 代理,兼容本地 & COS 后端)。
    * 签名失败一律 401,不区分原因(防探测)。不挂 JwtAuthGuard:浏览器
    * <img>/<iframe> 不带 Authorization,只能靠签名。
+   * 响应一律 no-store:一体机是公共机器,预览过的简历、证件不得留在浏览器或中间层缓存里。
    */
   @Get(':id/content')
   async content(
@@ -336,7 +337,7 @@ export class FilesController {
     const dispType = disposition === 'attachment' ? 'attachment' : 'inline'
     res.setHeader('Content-Type', mimeType)
     res.setHeader('Content-Disposition', `${dispType}; filename="${encodeURIComponent(filename)}"`)
-    res.setHeader('Cache-Control', 'private, max-age=300')
+    res.setHeader('Cache-Control', 'no-store')
     res.send(buffer)
   }
 

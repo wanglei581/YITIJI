@@ -13,6 +13,9 @@ process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-terminal-charge-terminal
 process.env['ADMIN_IP_ALLOWLIST'] = ''
 process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 process.env['NODE_ENV'] = 'test'
+// 打开总开关要先有可用的收款渠道；本门禁用沙箱通道。没有渠道时的拒绝另在 personal-charge-channel-cases 里断言。
+process.env['PAYMENT_PROVIDER'] = 'sandbox'
+process.env['SANDBOX_PAYMENT_SECRET'] = 'verify-terminal-charge-sandbox-secret-0123'
 
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
@@ -46,6 +49,8 @@ import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
 import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from '../src/terminals/terminal-session.service'
 import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { verifyPayAttemptChargeRecheck } from './support/pay-attempt-charge-recheck-cases'
+import { verifyPersonalChargeChannelGate } from './support/personal-charge-channel-cases'
 import {
   PERSONAL_CHARGE_SETTING_KEY as SHARED_PERSONAL_CHARGE_SETTING_KEY,
   PUBLIC_EMPLOYMENT_ORG_TYPES,
@@ -774,6 +779,9 @@ async function main(): Promise<void> {
       prices: ZERO_PRICES,
     }, partnerHeaders)
     expectStatus(partnerWrite, 403, '机构不能改收费设置')
+
+    await verifyPayAttemptChargeRecheck({ prisma, call, adminHeaders, publicOrgId: ORG_PUBLIC })
+    await verifyPersonalChargeChannelGate({ prisma, call, adminHeaders })
   } finally {
     await app.close()
     await prisma.onModuleDestroy()

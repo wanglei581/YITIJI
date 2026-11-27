@@ -10,6 +10,7 @@ import { RedisInflightLock } from '../src/ai/redis-inflight-lock'
 import { AiService } from '../src/ai/ai.service'
 import {
   ADMIN,
+  MEMBER,
   pass,
   TERM_CHARGE,
   TERM_FREE,
@@ -496,5 +497,32 @@ export async function verifyServiceOrderChargeCases(fx: ServiceOrderFixture): Pr
   assert.equal(m7After.serviceKey, 'scan')
   assert.equal(m7After.consumedAt, m7Before.consumedAt)
   pass('M7 扫描单拿去改写仍要付款，扫描单不变')
+
+  // 归属人取自登录身份：只认服务端验过的会员登录态；请求体里的 endUserId 只用来核对。
+  // 没有有效登录态或两者对不上一律按匿名单建，付款照常（旧一体机前端只带请求体也不坏）。
+  const ownerSession = await openKiosk(TERM_CHARGE, chargeToken)
+  const tamperedToken = `${memberToken.slice(0, -2)}${memberToken.endsWith('AA') ? 'BB' : 'AA'}`
+  const ownerCases: Array<{ label: string; body: Record<string, string>; authorization?: string; owner: string | null }> = [
+    { label: '登录态与请求体一致', body: { endUserId: MEMBER }, authorization: `Bearer ${memberToken}`, owner: MEMBER },
+    { label: '只带登录态', body: {}, authorization: `Bearer ${memberToken}`, owner: MEMBER },
+    { label: '只带请求体（旧前端）', body: { endUserId: MEMBER }, owner: null },
+    { label: '登录态与请求体对不上', body: { endUserId: 'svc-order-someone-else' }, authorization: `Bearer ${memberToken}`, owner: null },
+    { label: '登录态无效', body: { endUserId: MEMBER }, authorization: `Bearer ${tamperedToken}`, owner: null },
+    { label: '登录态格式不对', body: { endUserId: MEMBER }, authorization: 'Bearer not-a-member-token', owner: null },
+  ]
+  for (const item of ownerCases) {
+    const made = await call('POST', '/api/v1/kiosk/service-orders', {
+      serviceKey: 'resume_optimize',
+      kioskSessionId: ownerSession,
+      ...item.body,
+    }, { ...termHeaders(TERM_CHARGE, chargeToken), ...(item.authorization ? { authorization: item.authorization } : {}) })
+    expectStatus(made, 200, `${item.label}：照常建单出码`)
+    assert.equal(typeof made.json.data?.['qrCodeContent'], 'string', `${item.label}：照常出码`)
+    const row = await prisma.serviceOrder.findUniqueOrThrow({ where: { id: String(made.json.data?.['id']) } })
+    assert.equal(row.endUserId, item.owner, `${item.label}：订单归属人`)
+    const closedOwner = await call('POST', `/api/v1/kiosk/service-orders/${row.id}/close`, {}, termHeaders(TERM_CHARGE, chargeToken, ownerSession))
+    expectStatus(closedOwner, 200, `${item.label}：关掉这张待付单`)
+  }
+  pass('服务单归属人只认登录身份：对不上或没有有效登录态按匿名单，付款不被打断')
   return createdRow.id
 }

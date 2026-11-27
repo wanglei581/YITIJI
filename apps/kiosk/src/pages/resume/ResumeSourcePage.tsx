@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from 'react'
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
+import { guestMustLoginBeforeAi, useKioskAiLoginGate } from '../../hooks/useKioskAiLoginGate'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { ResumeSourceWhere, type StagedFile } from './touch/ResumeSourceWhere'
@@ -146,7 +147,8 @@ export function ResumeSourcePage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const intent: ResumeIntent = searchParams.get('intent') === 'optimize' ? 'optimize' : 'diagnose'
   const copy = INTENT_COPY[intent]
-  const { getToken } = useAuth()
+  const { getToken, isLoggedIn } = useAuth()
+  const aiLoginGate = useKioskAiLoginGate()
   const { capabilities: conversionCapabilities } = useDocumentConversionCapabilities()
   const wordConversionAvailable = conversionCapabilities.wordToPdf
   const supportedFormats = wordConversionAvailable
@@ -447,6 +449,13 @@ export function ResumeSourcePage() {
       : step === 'direction'
         ? { label: uploadedFile ? copy.buttonReady : copy.buttonEmpty, onClick: handleStartDiagnosis, disabled: !uploadedFile || sourceBusy }
         : { label: uploadedFile ? '下一步：诊断方向' : '请先上传简历文件', onClick: () => setStep('direction'), disabled: !uploadedFile || sourceBusy, className: 'resume-primary-action' }
+
+  // 后台开着「用 AI 前先登录」时，游客先到现有登录页，登录后回到这一步再选来源、传文件；
+  // 否则传完点诊断才被服务端拒，登录回来文件已经不在了，只能重传。
+  // 小青停用（aiDown）这一屏只走不用 AI 的打印原件，不拦；开关关着、没读到配置时照旧。
+  if (guestMustLoginBeforeAi(aiLoginGate, isLoggedIn) && !aiDown) {
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
+  }
 
   return (
     <ResumeTouchPage

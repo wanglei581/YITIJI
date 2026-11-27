@@ -10,6 +10,8 @@ import {
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 import { getEffectiveUserPrices, normalizeUserChargeMode } from './effective-user-prices'
+import { resolvePaymentProviders } from './payment-provider.factory'
+import { chargingProvider } from './service-order.payment'
 import { retirePendingServiceOrders } from './service-order.retire'
 
 export const TERMINAL_CHARGE_SETTINGS_AUDIT_ACTION = 'terminal.charge_settings.update'
@@ -21,6 +23,23 @@ type ChargeReadDb = Pick<PrismaTransactionClient, 'terminal' | 'platformSetting'
 
 export const TERMINAL_CHARGE_SETTINGS_STALE_CODE = 'TERMINAL_CHARGE_SETTINGS_STALE'
 export const TERMINAL_CHARGE_SETTINGS_STALE_MESSAGE = '机构刚改过，收费设置已复位，请重新读取后再改'
+
+export const PERSONAL_CHARGE_CHANNEL_UNAVAILABLE_CODE = 'PERSONAL_CHARGE_CHANNEL_UNAVAILABLE'
+export const PERSONAL_CHARGE_CHANNEL_UNAVAILABLE_MESSAGE = '还没有可用的收款渠道，不能打开向个人收费'
+
+/**
+ * 打开总开关前：至少要有一个能向个人收款的线上渠道启用且配置完整。
+ * 判据与按次付款出码同一处（chargingProvider：微信，非生产可用沙箱）；
+ * 渠道配置不完整时工厂直接拒绝解析，同样算没有可用渠道。
+ */
+function personalChargeChannelReady(): boolean {
+  try {
+    chargingProvider(resolvePaymentProviders())
+    return true
+  } catch {
+    return false
+  }
+}
 
 export interface TerminalChargeSettingsView extends EffectiveUserPrices {
   terminalCode: string
@@ -225,6 +244,12 @@ export async function writePersonalChargeEnabled(
   if (enabled && confirm !== true) {
     throw new BadRequestException({
       error: { code: 'PERSONAL_CHARGE_CONFIRM_REQUIRED', message: '打开向个人收费必须确认' },
+    })
+  }
+  // 没有可用收款渠道就打开，收费机上的改简历、练面试会被收银挡住。关闭不受影响。
+  if (enabled && !personalChargeChannelReady()) {
+    throw new ConflictException({
+      error: { code: PERSONAL_CHARGE_CHANNEL_UNAVAILABLE_CODE, message: PERSONAL_CHARGE_CHANNEL_UNAVAILABLE_MESSAGE },
     })
   }
   const saved = await db.$transaction(async (tx) => {

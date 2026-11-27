@@ -127,7 +127,9 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
     const alive = () => current(gen) && endUserIdRef.current === startedUserId
     setState({ ...INITIAL, screen: 'loading' })
     try {
-      const opened = await openServiceTripOrder({ serviceKey, pathname, endUserId: startedUserId })
+      // 已登录就带上会员令牌：服务端订单归属人取自登录身份，不认请求体里的会员号。
+      const token = startedUserId ? getToken?.() ?? null : null
+      const opened = await openServiceTripOrder({ serviceKey, pathname, endUserId: startedUserId, token })
       if (!alive()) {
         // 人已经走了，或已经换成更新的一次/另一个人：这张晚到的单不要了，关掉。
         void retireServiceTripOrder(opened.trip, opened.view.status)
@@ -149,7 +151,7 @@ export function usePayServiceFlow(what: PayWhat, targets: { next: string; back: 
       }
       setState({ ...INITIAL, screen: 'error', error })
     }
-  }, [applyView, current, endUserId, passFree, pathname, serviceKey])
+  }, [applyView, current, endUserId, getToken, passFree, pathname, serviceKey])
 
   const { creditNotice, checkOwned, onUseCredit } = useMiniappCreditFlow({
     what, serviceKey, pathname, endUserId, getToken, busy,
