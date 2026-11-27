@@ -10955,6 +10955,8 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "PrintTask",
+          "PrintTaskStatusLog",
           "Refund",
           "ServiceOrder"
         ],
@@ -10975,6 +10977,8 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "PrintTask",
+          "PrintTaskStatusLog",
           "Refund",
           "ServiceOrder"
         ],
@@ -10995,6 +10999,8 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "PrintTask",
+          "PrintTaskStatusLog",
           "Refund",
           "ServiceOrder"
         ],
@@ -11025,6 +11031,8 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "PrintTask",
+          "PrintTaskStatusLog",
           "Refund",
           "ServiceOrder"
         ],
@@ -12966,6 +12974,8 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "PrintTask",
+          "PrintTaskStatusLog",
           "Refund",
           "ServiceOrder"
         ],
@@ -12986,6 +12996,8 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "PrintTask",
+          "PrintTaskStatusLog",
           "Refund",
           "ServiceOrder"
         ],
@@ -16003,7 +16015,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 891,
+      "reachableFileCount": 892,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -19295,7 +19307,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 1080
+      "sourceFileCount": 1081
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20078,6 +20090,7 @@
           "services/api/src/files/files.service.ts",
           "services/api/src/job-materials/job-materials.service.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/payment/pay-attempt-charge-recheck.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
           "services/api/src/payment/print-return-disposition.ts",
           "services/api/src/payment/print-return-settlement-fault.ts",
@@ -20977,6 +20990,7 @@
           "services/api/src/payment/closed-window-unprinted.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/order-status.service.ts",
+          "services/api/src/payment/pay-attempt-charge-recheck.ts",
           "services/api/src/payment/pending-refund-signal.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
@@ -21252,6 +21266,7 @@
           "services/api/src/payment/cancel-unclaimed-print-task.ts",
           "services/api/src/payment/close-order-if-unreleased.ts",
           "services/api/src/payment/closed-window-unprinted.ts",
+          "services/api/src/payment/pay-attempt-charge-recheck.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/print-no-paper-refund.ts",
           "services/api/src/payment/refund-channel-answer.ts",
@@ -21288,6 +21303,7 @@
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/payment/pay-attempt-charge-recheck.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
@@ -28203,8 +28219,14 @@
     "services/api/scripts/support/partner-terminal-ops-cases.ts": [
       "services/api/scripts/verify-partner-stats-contract.ts"
     ],
+    "services/api/scripts/support/pay-attempt-charge-recheck-cases.ts": [
+      "services/api/scripts/verify-terminal-charge-settings.ts"
+    ],
     "services/api/scripts/support/payment-callback-race-cases.ts": [
       "services/api/scripts/verify-payment-flow.ts"
+    ],
+    "services/api/scripts/support/personal-charge-channel-cases.ts": [
+      "services/api/scripts/verify-terminal-charge-settings.ts"
     ],
     "services/api/scripts/support/pickup-arrival-p2b8-channel-business-cases.ts": [
       "services/api/scripts/verify-pickup-arrival-price-postgres.ts",
@@ -28380,6 +28402,7 @@
     ],
     "services/api/scripts/support/terminal-charge-fixture.ts": [
       "services/api/scripts/verify-admin-billing.ts",
+      "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-copy-c1b.ts",
       "services/api/scripts/verify-free-print-quota.ts",
@@ -31009,6 +31032,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-document-conversion.ts",
+      "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -42310,6 +42334,7 @@
         "dirs": [],
         "files": [
           "packages/shared/src/types/printScanCapability.ts",
+          "services/api/scripts/support/terminal-charge-fixture.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-print-scan/dto/list-print-scan-tasks.dto.ts",
           "services/api/src/audit/audit.service.ts",
@@ -45420,7 +45445,8 @@
           "services/api/src/files/collect-raw-upload-body.ts",
           "services/api/src/files/file-validation.ts",
           "services/api/src/files/files.controller.ts",
-          "services/api/src/files/files.service.ts"
+          "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts"
         ],
         "missing": []
       },
@@ -52594,6 +52620,8 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/pay-attempt-charge-recheck-cases.ts",
+          "services/api/scripts/support/personal-charge-channel-cases.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/jwt-auth.guard.ts",
